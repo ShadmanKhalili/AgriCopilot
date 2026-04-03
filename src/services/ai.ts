@@ -70,18 +70,26 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
 export const getMarketInsights = async (produce: string, location: string, lang: string, isAdvanced?: boolean) => {
   try {
     const ai = getAi();
-    const prompt = `Search for the current market price and demand trends for ${produce} in ${location}, Bangladesh. Based on the data, provide a short market insight including current estimated price, demand level (High/Medium/Low), and a recommendation on whether to sell now or hold. Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`;
+    const prompt = `Search for the current market price and demand trends for ${produce} in ${location}, Bangladesh. Based on the data, provide a short market insight including current estimated price and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`;
     
-    const response = await ai.models.generateContent({
-      model: getModelName(isAdvanced),
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        toolConfig: { includeServerSideToolInvocations: true }
-      }
-    });
-    
-    return response.text || "No insights could be generated at this time.";
+    try {
+      const response = await ai.models.generateContent({
+        model: getModelName(isAdvanced),
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
+      });
+      return response.text || "No insights could be generated at this time.";
+    } catch (searchError) {
+      console.warn("Google Search tool failed, falling back to standard generation:", searchError);
+      // Fallback without googleSearch
+      const fallbackResponse = await ai.models.generateContent({
+        model: getModelName(isAdvanced),
+        contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh, including an estimated price range and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`
+      });
+      return fallbackResponse.text || "No insights could be generated at this time.";
+    }
   } catch (error) {
     console.error("AI Service Error (Market Insights):", error);
     throw error;

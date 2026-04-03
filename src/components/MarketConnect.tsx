@@ -30,13 +30,23 @@ export default function MarketConnect({ lang }: Props) {
 
     setIsLoading(true);
     setInsights(null);
+    
+    let result = null;
     try {
-      const result = await getMarketInsights(produce, location, lang, isAdvanced);
-      await incrementUsage();
+      result = await getMarketInsights(produce, location, lang, isAdvanced);
       setInsights(result);
     } catch (error) {
       console.error("Market insights failed:", error);
-      setInsights("Error fetching market insights. Please try again.");
+      setInsights("Error fetching market insights from AI. Please try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await incrementUsage();
+    } catch (error) {
+      console.error("Usage increment failed:", error);
+      // We don't overwrite insights here, just log the error
     } finally {
       setIsLoading(false);
     }

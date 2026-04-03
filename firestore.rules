@@ -139,10 +139,10 @@ service cloud.firestore {
                     (
                       isAdmin() || 
                       (isOwner(userId) && 
-                       request.resource.data.role == resource.data.role &&
-                       request.resource.data.tier == resource.data.tier &&
-                       request.resource.data.usageCount >= resource.data.usageCount &&
-                       request.resource.data.usageCount <= resource.data.usageCount + 1
+                       request.resource.data.role == resource.data.get('role', 'agri-preneur') &&
+                       request.resource.data.tier == resource.data.get('tier', 'free') &&
+                       request.resource.data.usageCount >= resource.data.get('usageCount', 0) &&
+                       request.resource.data.usageCount <= resource.data.get('usageCount', 0) + 1
                       )
                     );
       allow delete: if isAdmin();
