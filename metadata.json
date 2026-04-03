@@ -1,0 +1,7 @@
+{
+  "name": "Cox's Bazar Climate Agri-Tools",
+  "description": "AI-Powered Climate Intelligence Tools for Cox's Bazar Agriculture including Agri-Copilot, Smart-Grade, and WeatherGuard.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile for Agri-Preneurs and Hub Managers",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["agri-preneur", "hub-manager", "admin"] },
+        "tier": { "type": "string", "enum": ["free", "premium"] },
+        "usageCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "tier", "usageCount", "createdAt"]
+    },
+    "Diagnosis": {
+      "title": "Diagnosis",
+      "description": "Record of a crop disease diagnosis",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the Agri-Preneur" },
+        "crop": { "type": "string" },
+        "upazila": { "type": "string" },
+        "diagnosisText": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "crop", "upazila", "diagnosisText", "createdAt"]
+    },
+    "QualityCertificate": {
+      "title": "QualityCertificate",
+      "description": "Record of a quality grading certificate",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the Hub Manager" },
+        "produce": { "type": "string" },
+        "grade": { "type": "string" },
+        "justification": { "type": "string" },
+        "estimatedPriceBdt": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "produce", "grade", "justification", "estimatedPriceBdt", "createdAt"]
+    },
+    "WeatherAlert": {
+      "title": "WeatherAlert",
+      "description": "Record of a broadcasted weather alert",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who triggered it" },
+        "scenario": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "scenario", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profiles"
+    },
+    "/diagnoses/{diagnosisId}": {
+      "schema": { "$ref": "#/entities/Diagnosis" },
+      "description": "Stores crop diagnoses"
+    },
+    "/certificates/{certificateId}": {
+      "schema": { "$ref": "#/entities/QualityCertificate" },
+      "description": "Stores quality certificates"
+    },
+    "/alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/WeatherAlert" },
+      "description": "Stores weather alerts"
+    }
+  }
+}
