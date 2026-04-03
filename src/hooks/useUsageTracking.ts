@@ -40,8 +40,9 @@ export function useUsageTracking() {
     } else if (userProfile) {
       try {
         const userDocRef = doc(db, 'users', user.uid);
+        const { increment } = await import('firebase/firestore');
         await updateDoc(userDocRef, {
-          usageCount: (userProfile.usageCount || 0) + 1
+          usageCount: increment(1)
         });
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);

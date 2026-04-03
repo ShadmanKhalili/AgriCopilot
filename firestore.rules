@@ -136,7 +136,15 @@ service cloud.firestore {
                     request.resource.data.uid == resource.data.uid &&
                     request.resource.data.email == resource.data.email &&
                     request.resource.data.createdAt == resource.data.createdAt &&
-                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+                    (
+                      isAdmin() || 
+                      (isOwner(userId) && 
+                       request.resource.data.role == resource.data.role &&
+                       request.resource.data.tier == resource.data.tier &&
+                       request.resource.data.usageCount >= resource.data.usageCount &&
+                       request.resource.data.usageCount <= resource.data.usageCount + 1
+                      )
+                    );
       allow delete: if isAdmin();
     }
     

@@ -36,6 +36,7 @@ export default function MarketConnect({ lang }: Props) {
       setInsights(result);
     } catch (error) {
       console.error("Market insights failed:", error);
+      setInsights("Error fetching market insights. Please try again.");
     } finally {
       setIsLoading(false);
     }

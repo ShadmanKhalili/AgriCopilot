@@ -7,6 +7,7 @@ import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
+import { resizeImage } from '../utils/imageOptimizer';
 
 const PRODUCE_TYPES = ['Tomato', 'Brinjal', 'Dry Fish'];
 
@@ -34,17 +35,18 @@ export default function SmartGrade({ lang }: Props) {
   const { canUse, incrementUsage, tier } = useUsageTracking();
   const t = translations[lang];
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setImage(base64String.split(',')[1]);
-        setMimeType(file.type);
+      try {
+        const optimizedDataUrl = await resizeImage(file, 800);
+        setImage(optimizedDataUrl.split(',')[1]);
+        setMimeType('image/jpeg'); // resizeImage converts to jpeg
         setResult(null);
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Error optimizing image:", error);
+        alert("Failed to process image. Please try another one.");
+      }
     }
   };
 
@@ -80,7 +82,7 @@ export default function SmartGrade({ lang }: Props) {
       }
     } catch (error) {
       console.error("Grading failed:", error);
-      // Handle error
+      alert("Error connecting to AI service. Please try again.");
     } finally {
       setIsLoading(false);
     }
