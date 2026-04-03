@@ -85,7 +85,34 @@ export default function AgriCopilot({ lang }: Props) {
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
-        const blob = new Blob([bytes], { type: 'audio/wav' });
+        
+        // Gemini TTS returns raw 16-bit PCM at 24000Hz. We must add a WAV header for the <audio> tag to play it.
+        const addWavHeader = (pcmData: Uint8Array, sampleRate: number) => {
+          const buffer = new ArrayBuffer(44 + pcmData.length);
+          const view = new DataView(buffer);
+          const writeString = (offset: number, string: string) => {
+            for (let i = 0; i < string.length; i++) {
+              view.setUint8(offset + i, string.charCodeAt(i));
+            }
+          };
+          writeString(0, 'RIFF');
+          view.setUint32(4, 36 + pcmData.length, true);
+          writeString(8, 'WAVE');
+          writeString(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate * 2, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          writeString(36, 'data');
+          view.setUint32(40, pcmData.length, true);
+          new Uint8Array(buffer, 44).set(pcmData);
+          return new Blob([buffer], { type: 'audio/wav' });
+        };
+
+        const blob = addWavHeader(bytes, 24000);
         setAudioUrl(URL.createObjectURL(blob));
       }
     } catch (error) {
