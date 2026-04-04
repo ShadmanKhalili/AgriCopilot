@@ -421,6 +421,12 @@ export default function AgriCopilot({
                   </option>
                 ))}
               </select>
+              {coords && upazila === 'others' && (
+                <div className="mt-2 text-xs text-green-600 font-medium flex items-center bg-green-50 p-2 rounded-lg border border-green-100">
+                  <Navigation className="w-3 h-3 mr-1" />
+                  GPS: {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+                </div>
+              )}
             </div>
           </div>
 
@@ -593,9 +599,9 @@ export default function AgriCopilot({
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart
                                 data={[
-                                  { name: 'N', value: diagnosis.nutrientLevels.nitrogen, fill: '#3b82f6' },
-                                  { name: 'P', value: diagnosis.nutrientLevels.phosphorus, fill: '#8b5cf6' },
-                                  { name: 'K', value: diagnosis.nutrientLevels.potassium, fill: '#f59e0b' }
+                                  { name: 'N', value: diagnosis.nutrientLevels.nitrogen, ideal: diagnosis.idealNutrientLevels?.nitrogen, fill: '#3b82f6' },
+                                  { name: 'P', value: diagnosis.nutrientLevels.phosphorus, ideal: diagnosis.idealNutrientLevels?.phosphorus, fill: '#8b5cf6' },
+                                  { name: 'K', value: diagnosis.nutrientLevels.potassium, ideal: diagnosis.idealNutrientLevels?.potassium, fill: '#f59e0b' }
                                 ]}
                                 margin={{ top: 5, right: 20, left: -20, bottom: 5 }}
                               >
@@ -605,6 +611,12 @@ export default function AgriCopilot({
                                 <RechartsTooltip 
                                   cursor={{ fill: 'transparent' }}
                                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                  formatter={(value: any, name: string, props: any) => {
+                                    if (name === 'value') {
+                                      return [`${value}% (${t.idealLevel}: ${props.payload.ideal || 'N/A'})`, t.detectedLevel];
+                                    }
+                                    return [value, name];
+                                  }}
                                 />
                                 <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40} />
                               </BarChart>

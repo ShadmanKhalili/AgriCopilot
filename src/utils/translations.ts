@@ -100,6 +100,8 @@ export const translations = {
     email: "Email",
     role: "Role",
     memberSince: "Member Since",
+    idealLevel: "Ideal Level",
+    detectedLevel: "Detected Level",
     // Tooltips
     tooltips: {
       disease: "Identify crop diseases from images",
@@ -144,7 +146,8 @@ export const translations = {
       ramu: "Ramu",
       peua: "Pekua",
       kutubdia: "Kutubdia",
-      moheshkhali: "Moheshkhali"
+      moheshkhali: "Moheshkhali",
+      others: "Others (GPS)"
     },
     produce: {
       tomato: "Tomato",
@@ -169,7 +172,8 @@ export const translations = {
       ramu: "Ramu",
       sadar: "Cox's Bazar Sadar",
       chakaria: "Chakaria",
-      pekua: "Pekua"
+      pekua: "Pekua",
+      others: "Others (GPS)"
     }
   },
   bn: {
@@ -271,6 +275,8 @@ export const translations = {
     email: "ইমেল",
     role: "পদবী",
     memberSince: "সদস্য হয়েছেন",
+    idealLevel: "আদর্শ মাত্রা",
+    detectedLevel: "শনাক্তকৃত মাত্রা",
     // Tooltips
     tooltips: {
       disease: "ছবি থেকে ফসলের রোগ শনাক্ত করুন",
@@ -315,7 +321,8 @@ export const translations = {
       ramu: "রামু",
       peua: "পেকুয়া",
       kutubdia: "কুতুবদিয়া",
-      moheshkhali: "মহেশখালী"
+      moheshkhali: "মহেশখালী",
+      others: "অন্যান্য (জিপিএস)"
     },
     produce: {
       tomato: "টমেটো",
@@ -340,7 +347,8 @@ export const translations = {
       ramu: "রামু",
       sadar: "কক্সবাজার সদর",
       chakaria: "চকোরিয়া",
-      pekua: "পেকুয়া"
+      pekua: "পেকুয়া",
+      others: "অন্যান্য (জিপিএস)"
     }
   }
 };

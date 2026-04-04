@@ -81,6 +81,7 @@ export const diagnoseCrop = async (
       
       CRITICAL: Pay special attention to Nutrient Levels. Farmers rely on this for soil management. 
       Provide specific percentages for Nitrogen (N), Phosphorus (P), and Potassium (K) based on visual symptoms like leaf yellowing (N), purple tints (P), or burnt edges (K).
+      Also, provide the ideal percentage range for these nutrients for this specific crop.
       
       Return the response in the following JSON format:
       {
@@ -93,6 +94,11 @@ export const diagnoseCrop = async (
           "nitrogen": number (0-100),
           "phosphorus": number (0-100),
           "potassium": number (0-100)
+        },
+        "idealNutrientLevels": {
+          "nitrogen": "ideal range string (e.g., '40-60%')",
+          "phosphorus": "ideal range string",
+          "potassium": "ideal range string"
         }
       }
       
@@ -114,6 +120,14 @@ export const diagnoseCrop = async (
                 nitrogen: { type: Type.NUMBER },
                 phosphorus: { type: Type.NUMBER },
                 potassium: { type: Type.NUMBER }
+              }
+            },
+            idealNutrientLevels: {
+              type: Type.OBJECT,
+              properties: {
+                nitrogen: { type: Type.STRING },
+                phosphorus: { type: Type.STRING },
+                potassium: { type: Type.STRING }
               }
             }
           },

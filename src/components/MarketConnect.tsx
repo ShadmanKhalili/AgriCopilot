@@ -229,6 +229,12 @@ export default function MarketConnect({
                     </option>
                   ))}
                 </select>
+                {coords && location === 'others' && (
+                  <div className="mt-2 text-xs text-purple-600 font-medium flex items-center bg-purple-50 p-2 rounded-lg border border-purple-100">
+                    <Navigation className="w-3 h-3 mr-1" />
+                    GPS: {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-2 bg-purple-50/50 p-3.5 rounded-xl border border-purple-100">
