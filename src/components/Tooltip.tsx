@@ -36,13 +36,13 @@ export default function Tooltip({ content, children, position = 'top' }: Props) 
       <AnimatePresence>
         {isVisible && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: position === 'top' ? 5 : -5 }}
+            initial={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className={`absolute z-50 px-3 py-2 text-xs font-medium text-white bg-gray-800 rounded-lg shadow-lg whitespace-nowrap pointer-events-none ${positionClasses[position]}`}
+            exit={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
+            className={`absolute z-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-gray-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 whitespace-nowrap pointer-events-none ${positionClasses[position]}`}
           >
             {content}
-            <div className={`absolute border-4 border-transparent ${arrowClasses[position]}`} />
+            <div className={`absolute border-[6px] border-transparent ${arrowClasses[position]} opacity-90`} />
           </motion.div>
         )}
       </AnimatePresence>

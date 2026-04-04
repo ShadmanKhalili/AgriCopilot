@@ -117,155 +117,214 @@ export default function Profile({ lang }: Props) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center p-3 bg-indigo-100 rounded-2xl mb-4">
-          <UserCircle className="w-8 h-8 text-indigo-600" />
-        </div>
-        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">{t.profile}</h2>
-        <p className="text-gray-500 text-lg">{t.profileDesc}</p>
+      <div className="text-center mb-16">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl mb-6 shadow-lg shadow-indigo-200"
+        >
+          <UserCircle className="w-10 h-10 text-white" />
+        </motion.div>
+        <h2 className="text-5xl font-black text-gray-900 tracking-tight mb-4 uppercase italic">{t.profile}</h2>
+        <p className="text-gray-500 text-xl max-w-2xl mx-auto leading-relaxed font-medium">{t.profileDesc}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Account Info */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-5 md:p-8 rounded-3xl border border-indigo-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <User className="w-5 h-5 mr-2 text-indigo-600" />
+        <div className="lg:col-span-1 space-y-8">
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-white p-10 rounded-[40px] border border-indigo-100 shadow-xl shadow-indigo-50/50 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+            
+            <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-10 flex items-center">
+              <div className="bg-indigo-50 p-2 rounded-xl mr-3">
+                <User className="w-5 h-5" />
+              </div>
               {t.accountInfo}
             </h3>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t.email}</p>
-                <p className="text-gray-900 font-medium break-all">{user.email}</p>
+            
+            <div className="space-y-8 relative z-10">
+              <div className="group/item">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.email}</p>
+                <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
               </div>
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t.role}</p>
-                <p className="text-gray-900 font-medium capitalize">{userProfile?.role || 'User'}</p>
+              <div className="group/item">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.role}</p>
+                <div className="flex items-center space-x-2">
+                  <p className="text-lg font-black text-gray-900 capitalize tracking-tight">{userProfile?.role || 'User'}</p>
+                  {userProfile?.tier === 'premium' && (
+                    <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest shadow-md">Premium</span>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t.memberSince}</p>
-                <p className="text-gray-900 font-medium">
+              <div className="group/item">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.memberSince}</p>
+                <p className="text-lg font-black text-gray-900 tracking-tight">
                   {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* History */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-10">
           {/* Diagnoses History */}
-          <div className="bg-white p-5 md:p-8 rounded-3xl border border-green-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-green-600" />
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-white p-10 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
+            
+            <h3 className="text-xs font-black text-green-600 uppercase tracking-widest mb-10 flex items-center">
+              <div className="bg-green-50 p-2 rounded-xl mr-3">
+                <FileText className="w-5 h-5" />
+              </div>
               {t.diagnosesHistory}
             </h3>
+            
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-100 border-t-green-600 shadow-inner"></div>
               </div>
             ) : diagnoses.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4 relative z-10">
                 {diagnoses.map((diag) => (
-                  <div key={diag.id} className="flex items-center justify-between p-4 bg-green-50/50 rounded-2xl border border-green-100 hover:bg-green-50 transition-colors">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-white p-2 rounded-xl shadow-sm">
-                        <Calendar className="w-4 h-4 text-green-600" />
+                  <motion.div 
+                    key={diag.id} 
+                    whileHover={{ x: 5 }}
+                    className="flex items-center justify-between p-6 bg-green-50/30 rounded-[24px] border border-green-100 hover:bg-green-50 transition-all group/card"
+                  >
+                    <div className="flex items-center space-x-5">
+                      <div className="bg-white p-3 rounded-2xl shadow-sm group-hover/card:scale-110 transition-transform">
+                        <Calendar className="w-5 h-5 text-green-600" />
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900">{diag.crop}</p>
-                        <p className="text-xs text-gray-500">{new Date(diag.createdAt).toLocaleDateString()}</p>
+                        <p className="text-lg font-black text-gray-900 tracking-tight">{diag.crop}</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{new Date(diag.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded-lg uppercase tracking-tighter">
+                      <span className="text-[10px] font-black text-green-700 bg-green-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
                         {diag.analysisType}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <p className="text-center py-8 text-gray-400 text-sm italic">{t.noHistory}</p>
+              <div className="text-center py-12 relative z-10">
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs italic">{t.noHistory}</p>
+              </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Certificates History */}
-          <div className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <Award className="w-5 h-5 mr-2 text-blue-600" />
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-white p-10 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
+            
+            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-10 flex items-center">
+              <div className="bg-blue-50 p-2 rounded-xl mr-3">
+                <Award className="w-5 h-5" />
+              </div>
               {t.certificatesHistory}
             </h3>
+            
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-100 border-t-blue-600 shadow-inner"></div>
               </div>
             ) : certificates.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4 relative z-10">
                 {certificates.map((cert) => (
-                  <div key={cert.id} className="flex items-center justify-between p-4 bg-blue-50/50 rounded-2xl border border-blue-100 hover:bg-blue-50 transition-colors">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-white p-2 rounded-xl shadow-sm">
-                        <Award className="w-4 h-4 text-blue-600" />
+                  <motion.div 
+                    key={cert.id} 
+                    whileHover={{ x: 5 }}
+                    className="flex items-center justify-between p-6 bg-blue-50/30 rounded-[24px] border border-blue-100 hover:bg-blue-50 transition-all group/card"
+                  >
+                    <div className="flex items-center space-x-5">
+                      <div className="bg-white p-3 rounded-2xl shadow-sm group-hover/card:scale-110 transition-transform">
+                        <Award className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900">{cert.produce}</p>
-                        <p className="text-xs text-gray-500">{new Date(cert.createdAt).toLocaleDateString()}</p>
+                        <p className="text-lg font-black text-gray-900 tracking-tight">{cert.produce}</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{new Date(cert.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-lg uppercase tracking-tighter ${
+                      <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm ${
                         cert.grade.includes('A') ? 'text-green-700 bg-green-100' : 
                         cert.grade.includes('B') ? 'text-yellow-700 bg-yellow-100' : 'text-red-700 bg-red-100'
                       }`}>
                         {cert.grade}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <p className="text-center py-8 text-gray-400 text-sm italic">{t.noHistory}</p>
+              <div className="text-center py-12 relative z-10">
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs italic">{t.noHistory}</p>
+              </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Market Queries History */}
-          <div className="bg-white p-6 rounded-3xl border border-purple-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2 text-purple-600" />
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="bg-white p-10 rounded-[40px] border border-purple-100 shadow-xl shadow-purple-50/50 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-48 h-48 bg-purple-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
+            
+            <h3 className="text-xs font-black text-purple-600 uppercase tracking-widest mb-10 flex items-center">
+              <div className="bg-purple-50 p-2 rounded-xl mr-3">
+                <TrendingUp className="w-5 h-5" />
+              </div>
               {t.marketInsights}
             </h3>
+            
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-100 border-t-purple-600 shadow-inner"></div>
               </div>
             ) : marketQueries.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4 relative z-10">
                 {marketQueries.map((mq) => (
-                  <div key={mq.id} className="flex items-center justify-between p-4 bg-purple-50/50 rounded-2xl border border-purple-100 hover:bg-purple-50 transition-colors">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-white p-2 rounded-xl shadow-sm">
-                        <TrendingUp className="w-4 h-4 text-purple-600" />
+                  <motion.div 
+                    key={mq.id} 
+                    whileHover={{ x: 5 }}
+                    className="flex items-center justify-between p-6 bg-purple-50/30 rounded-[24px] border border-purple-100 hover:bg-purple-50 transition-all group/card"
+                  >
+                    <div className="flex items-center space-x-5">
+                      <div className="bg-white p-3 rounded-2xl shadow-sm group-hover/card:scale-110 transition-transform">
+                        <TrendingUp className="w-5 h-5 text-purple-600" />
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900">{mq.produce}</p>
-                        <p className="text-xs text-gray-500">{mq.location} • {new Date(mq.createdAt).toLocaleDateString()}</p>
+                        <p className="text-lg font-black text-gray-900 tracking-tight">{mq.produce}</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{mq.location} • {new Date(mq.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       {mq.isAdvanced && (
-                        <span className="text-[10px] font-bold text-yellow-700 bg-yellow-100 px-2 py-1 rounded-lg uppercase tracking-tighter">
+                        <span className="text-[10px] font-black text-yellow-700 bg-yellow-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
                           Premium
                         </span>
                       )}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <p className="text-center py-8 text-gray-400 text-sm italic">{t.noHistory}</p>
+              <div className="text-center py-12 relative z-10">
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs italic">{t.noHistory}</p>
+              </div>
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
     </motion.div>
