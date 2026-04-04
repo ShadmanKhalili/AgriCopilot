@@ -74,21 +74,46 @@ export const diagnoseCrop = async (
       
       CRITICAL VALIDATION: 
       1. Look at the image. Does it contain a ${crop}?
-      2. If NO, stop immediately and respond ONLY with: ${lang === 'bn' ? "'এই ছবিটি নির্বাচিত ফসলের সাথে মিলছে না। অনুগ্রহ করে সঠিক ফসলের ছবি আপলোড করুন।'" : "'This image does not match the selected crop. Please upload a correct crop image.'"}
-      3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar. Use Google Maps to find nearby agricultural supply stores or DAE offices if relevant.
+      2. If NO, stop immediately and respond with 'Invalid' status.
+      3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar.
       
       RESPONSE FORMAT: 
-      - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - Use markdown for formatting (bolding, lists) to make it readable.
-      - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. Max 60 words.`;
+      - Respond in JSON format.
+      - The 'diagnosis' field should be approximately 100 words, detailed and non-generalized.
+      - Include 'severity' (0-100) and 'confidence' (0-100).
+      - If it's a nutrient analysis, include 'nutrientLevels' (0-100 for N, P, K).
+      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
+      - Use markdown for formatting inside the 'diagnosis' field.`;
       
-      const config: any = {};
+      const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            status: { type: Type.STRING, description: 'Valid or Invalid' },
+            diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
+            severity: { type: Type.NUMBER, description: 'Severity percentage' },
+            confidence: { type: Type.NUMBER, description: 'Confidence percentage' },
+            nutrientLevels: {
+              type: Type.OBJECT,
+              properties: {
+                nitrogen: { type: Type.NUMBER },
+                phosphorus: { type: Type.NUMBER },
+                potassium: { type: Type.NUMBER }
+              }
+            }
+          },
+          required: ['status', 'diagnosis', 'severity', 'confidence']
+        }
+      };
+      
       if (coords) {
         config.tools = [{ googleMaps: {} }];
         config.toolConfig = {
           retrievalConfig: {
             latLng: coords
-          }
+          },
+          includeServerSideToolInvocations: true
         };
       }
 
@@ -104,7 +129,7 @@ export const diagnoseCrop = async (
         throw new Error("AI returned an empty response.");
       }
       
-      return response.text;
+      return JSON.parse(response.text);
     } catch (error) {
       console.error("AI Service Error (Diagnose Crop):", error);
       throw error;
@@ -202,14 +227,45 @@ export const getMarketInsights = async (
 
       const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). 
       ${locationContext}
-      Search for official market reports, news articles, or agricultural bulletins from today or the most recent available date. 
-      Also use Google Maps to identify the nearest major wholesale markets (Aroths) to the user's location.
-      Provide a short market insight including the specific wholesale rate in BDT, the current demand level (High/Medium/Low), and a brief recommendation on whether to sell or hold. 
-      List the names and distances of the nearest 2-3 markets found via Google Maps.
-      Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown for better readability.
-      CRITICAL: Be extremely concise and to the point.`;
+      Search for official market reports, news articles, or agricultural bulletins.
+      Also use Google Maps to identify the nearest major wholesale markets (Aroths).
+      
+      RESPONSE FORMAT:
+      - Respond in JSON format.
+      - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      - 'priceTrend': array of 7 objects with 'date' (string) and 'price' (number) representing the last 7 days.
+      - 'nearestMarkets': array of objects with 'name' and 'distance'.
+      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown in 'insights'.`;
       
       const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            insights: { type: Type.STRING },
+            priceTrend: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  date: { type: Type.STRING },
+                  price: { type: Type.NUMBER }
+                }
+              }
+            },
+            nearestMarkets: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  distance: { type: Type.STRING }
+                }
+              }
+            }
+          },
+          required: ['insights', 'priceTrend']
+        },
         tools: [{ googleSearch: {} }, { googleMaps: {} }],
         toolConfig: {
           includeServerSideToolInvocations: true
@@ -227,14 +283,20 @@ export const getMarketInsights = async (
           contents: prompt,
           config
         }, SEARCH_MODEL);
-        return response.text || "No insights could be generated at this time.";
+        return JSON.parse(response.text || '{}');
       } catch (searchError) {
         console.warn("Google Search tool failed, falling back to standard generation:", searchError);
         // Fallback without googleSearch
         const fallbackResponse = await callAiWithFallback({
-          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh, including an estimated price range and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown for better readability.`
+          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh. 
+          Return JSON with 'insights' (string) and 'priceTrend' (7 days array). 
+          Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: config.responseSchema
+          }
         }, BACKUP_MODEL);
-        return fallbackResponse.text || "No insights could be generated at this time.";
+        return JSON.parse(fallbackResponse.text || '{}');
       }
     } catch (error) {
       console.error("AI Service Error (Market Insights):", error);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar, Navigation } from 'lucide-react';
+import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar, Navigation, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
@@ -33,7 +34,7 @@ export default function MarketConnect({ lang }: Props) {
   const [produce, setProduce] = useState(PRODUCE_TYPES[0]);
   const [location, setLocation] = useState(MARKET_LOCATIONS[0]);
   const [isLoading, setIsLoading] = useState(false);
-  const [insights, setInsights] = useState<string | null>(null);
+  const [insights, setInsights] = useState<any | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -91,7 +92,7 @@ export default function MarketConnect({ lang }: Props) {
             userId: user.uid,
             produce,
             location,
-            insights: result,
+            insights: result.insights,
             isAdvanced,
             createdAt: new Date().toISOString()
           });
@@ -301,23 +302,107 @@ export default function MarketConnect({ lang }: Props) {
                   </div>
                 </div>
                 
-                <div className="p-5 md:p-8 flex-1 flex flex-col bg-gradient-to-b from-white to-purple-50/30">
-                  <div className="space-y-6">
-                    <div className="bg-purple-50/80 backdrop-blur-sm border border-purple-100/50 rounded-2xl p-6 shadow-sm">
-                      <div className="flex items-start gap-5">
-                        <div className="mt-1 bg-white p-3 rounded-xl shadow-sm">
-                          <Sparkles className="w-6 h-6 text-purple-500" />
+                <div className="p-5 md:p-8 flex-1 flex flex-col bg-gradient-to-b from-white to-purple-50/30 space-y-6">
+                  {/* Price Trend Chart */}
+                  <div className="bg-white rounded-2xl border border-purple-100 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <h4 className="font-bold text-gray-900 flex items-center">
+                        <TrendingUp className="w-5 h-5 mr-2 text-purple-600" />
+                        {lang === 'bn' ? 'মূল্যের প্রবণতা (৭ দিন)' : 'Price Trend (7 Days)'}
+                      </h4>
+                      {insights.priceTrend && insights.priceTrend.length > 1 && (
+                        <div className={`flex items-center text-xs font-bold ${
+                          insights.priceTrend[insights.priceTrend.length - 1].price >= insights.priceTrend[0].price 
+                            ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {insights.priceTrend[insights.priceTrend.length - 1].price >= insights.priceTrend[0].price 
+                            ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+                          {Math.abs(((insights.priceTrend[insights.priceTrend.length - 1].price - insights.priceTrend[0].price) / insights.priceTrend[0].price) * 100).toFixed(1)}%
                         </div>
-                        <div className="flex-1 space-y-4">
-                          <h4 className="font-black text-gray-900 text-2xl tracking-tight">
-                            {t.crops[produce as keyof typeof t.crops] || produce} <span className="text-purple-600 font-medium">{lang === 'bn' ? 'মধ্যে' : 'in'}</span> {t.locations[location as keyof typeof t.locations] || location}
+                      )}
+                    </div>
+                    <div className="w-full h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={insights.priceTrend}>
+                          <defs>
+                            <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                          <XAxis 
+                            dataKey="date" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fill: '#9ca3af' }}
+                            dy={10}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fontSize: 10, fill: '#9ca3af' }}
+                            tickFormatter={(value) => `৳${value}`}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            formatter={(value: number) => [`৳${value}`, lang === 'bn' ? 'মূল্য' : 'Price']}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="price" 
+                            stroke="#8b5cf6" 
+                            strokeWidth={3}
+                            fillOpacity={1} 
+                            fill="url(#colorPrice)" 
+                            dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Insights Text */}
+                    <div className="bg-purple-50/80 backdrop-blur-sm border border-purple-100/50 rounded-2xl p-6 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="mt-1 bg-white p-2 rounded-xl shadow-sm">
+                          <Sparkles className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <div className="flex-1 space-y-3">
+                          <h4 className="font-bold text-gray-900 text-lg tracking-tight">
+                            {t.crops[produce as keyof typeof t.crops] || produce} <span className="text-purple-600 font-medium">{lang === 'bn' ? 'বিশ্লেষণ' : 'Analysis'}</span>
                           </h4>
-                          <div className="text-gray-800 leading-relaxed prose prose-purple max-w-none text-base markdown-body">
-                            <ReactMarkdown>{insights}</ReactMarkdown>
+                          <div className="text-gray-800 leading-relaxed prose prose-purple max-w-none text-sm markdown-body">
+                            <ReactMarkdown>{insights.insights}</ReactMarkdown>
                           </div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Nearest Markets */}
+                    {insights.nearestMarkets && (
+                      <div className="bg-white rounded-2xl border border-purple-100 p-6 shadow-sm">
+                        <h4 className="font-bold text-gray-900 mb-4 flex items-center text-sm uppercase tracking-wider">
+                          <MapPin className="w-4 h-4 mr-2 text-purple-600" />
+                          {lang === 'bn' ? 'নিকটস্থ বাজার' : 'Nearest Markets'}
+                        </h4>
+                        <div className="space-y-3">
+                          {insights.nearestMarkets.map((m: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-purple-200 transition-colors group">
+                              <div className="flex items-center space-x-3">
+                                <div className="bg-purple-100 p-2 rounded-lg text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                  <Store className="w-4 h-4" />
+                                </div>
+                                <span className="font-bold text-gray-800 text-sm">{m.name}</span>
+                              </div>
+                              <span className="text-xs font-black text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">{m.distance}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>

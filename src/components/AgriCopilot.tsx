@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { diagnoseCrop, generateSpeech, startAgriChat } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -26,7 +27,7 @@ export default function AgriCopilot({ lang }: Props) {
   const [crop, setCrop] = useState(CROPS[0]);
   const [analysisType, setAnalysisType] = useState('disease');
   const [isLoading, setIsLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<string | null>(null);
+  const [diagnosis, setDiagnosis] = useState<any | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -119,7 +120,7 @@ export default function AgriCopilot({ lang }: Props) {
       const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
       const upazilaName = translations.en.upazilas[upazila as keyof typeof translations.en.upazilas];
       
-      const resultText = await diagnoseCrop(
+      const result = await diagnoseCrop(
         image, 
         mimeType, 
         cropName, 
@@ -129,10 +130,10 @@ export default function AgriCopilot({ lang }: Props) {
         isAdvanced,
         coords || undefined
       );
-      setDiagnosis(resultText);
+      setDiagnosis(result);
       
       // Initialize chat session
-      const session = startAgriChat(resultText, lang);
+      const session = startAgriChat(result.diagnosis, lang);
       setChatSession(session);
       setChatMessages([]);
       
@@ -146,7 +147,9 @@ export default function AgriCopilot({ lang }: Props) {
             crop,
             upazila,
             analysisType,
-            diagnosisText: resultText,
+            diagnosisText: result.diagnosis,
+            severity: result.severity,
+            confidence: result.confidence,
             createdAt: new Date().toISOString()
           });
         } catch (error) {
@@ -155,7 +158,7 @@ export default function AgriCopilot({ lang }: Props) {
       }
 
       // Generate audio
-      const audioBase64 = await generateSpeech(resultText);
+      const audioBase64 = await generateSpeech(result.diagnosis);
       if (audioBase64) {
         const binary = atob(audioBase64);
         const bytes = new Uint8Array(binary.length);
@@ -403,10 +406,91 @@ export default function AgriCopilot({ lang }: Props) {
                   </div>
                 </div>
                 
-                <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm max-w-none">
-                  <div className="markdown-body text-sm md:text-base">
-                    <ReactMarkdown>{diagnosis}</ReactMarkdown>
-                  </div>
+                <div className="flex-1 space-y-6">
+                  {diagnosis.status === 'Invalid' ? (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-6 flex items-start space-x-4">
+                      <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                      <p className="text-red-800 font-medium">{diagnosis.diagnosis}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Severity Gauge */}
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-200/50 shadow-sm flex flex-col items-center">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
+                          <div className="w-full h-32 relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={[
+                                    { value: diagnosis.severity },
+                                    { value: 100 - diagnosis.severity }
+                                  ]}
+                                  cx="50%"
+                                  cy="100%"
+                                  startAngle={180}
+                                  endAngle={0}
+                                  innerRadius={40}
+                                  outerRadius={60}
+                                  paddingAngle={0}
+                                  dataKey="value"
+                                >
+                                  <Cell fill={diagnosis.severity > 70 ? '#ef4444' : diagnosis.severity > 40 ? '#f59e0b' : '#10b981'} />
+                                  <Cell fill="#f3f4f6" />
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-end pb-2">
+                              <span className="text-2xl font-black text-gray-900">{diagnosis.severity}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Confidence Score */}
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-200/50 shadow-sm flex flex-col items-center justify-center">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{lang === 'bn' ? 'নির্ভরযোগ্যতা' : 'Confidence'}</p>
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle2 className="w-8 h-8 text-green-500" />
+                            <span className="text-3xl font-black text-gray-900">{diagnosis.confidence}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nutrient Chart */}
+                      {diagnosis.nutrientLevels && (
+                        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-green-200/50 shadow-sm">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'পুষ্টির মাত্রা' : 'Nutrient Levels'}</p>
+                          <div className="w-full h-48">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={[
+                                  { name: 'N', value: diagnosis.nutrientLevels.nitrogen, fill: '#3b82f6' },
+                                  { name: 'P', value: diagnosis.nutrientLevels.phosphorus, fill: '#8b5cf6' },
+                                  { name: 'K', value: diagnosis.nutrientLevels.potassium, fill: '#f59e0b' }
+                                ]}
+                                margin={{ top: 5, right: 20, left: -20, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold' }} />
+                                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                                <RechartsTooltip 
+                                  cursor={{ fill: 'transparent' }}
+                                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm max-w-none">
+                        <div className="markdown-body text-sm md:text-base">
+                          <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {audioUrl && (
