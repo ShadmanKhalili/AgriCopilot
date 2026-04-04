@@ -8,6 +8,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
+import { motion, AnimatePresence } from 'motion/react';
 
 const UPAZILAS = ['Teknaf', 'Ukhia', 'Moheshkhali', 'Kutubdia', 'Ramu', 'Cox\'s Bazar Sadar', 'Chakaria', 'Pekua'];
 const CROPS = ['Tomato', 'Brinjal', 'Paddy', 'Betel Leaf', 'Chili', 'Watermelon'];
@@ -28,7 +29,7 @@ export default function AgriCopilot({ lang }: Props) {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
-  const { canUse, incrementUsage, tier } = useUsageTracking();
+  const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,29 +127,41 @@ export default function AgriCopilot({ lang }: Props) {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">{t.agriCopilot}</h2>
-        <p className="text-gray-500 mt-1">{t.agriCopilotDesc}</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center p-3 bg-green-100 rounded-2xl mb-4">
+          <Leaf className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">{t.agriCopilot}</h2>
+        <p className="text-gray-500 text-lg">{t.agriCopilotDesc}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Input Section */}
-        <div className="space-y-6 bg-gray-50 p-6 rounded-xl border border-gray-100">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6 bg-white p-6 rounded-3xl border border-green-100 shadow-sm hover:shadow-md transition-shadow"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.captureImage}</label>
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-green-300 rounded-xl p-8 text-center cursor-pointer hover:bg-green-50 transition-colors bg-white relative overflow-hidden group"
+              className="border-2 border-dashed border-green-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-green-50 transition-colors bg-white relative overflow-hidden group min-h-[200px] flex items-center justify-center"
             >
               {image ? (
-                <img src={`data:${mimeType};base64,${image}`} alt="Crop" className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                <img src={`data:${mimeType};base64,${image}`} alt="Crop" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
               ) : null}
               <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
-                <div className="bg-green-100 p-3 rounded-full text-green-600">
-                  <Camera className="w-6 h-6" />
+                <div className="bg-green-100 p-4 rounded-full text-green-600 shadow-inner group-hover:scale-110 transition-transform">
+                  <Camera className="w-8 h-8" />
                 </div>
-                <div className="text-sm text-gray-600 font-medium">
+                <div className="text-sm text-gray-700 font-medium bg-white/80 backdrop-blur-sm px-4 py-1.5 rounded-full">
                   {image ? 'Tap to change image' : 'Tap to take photo or upload'}
                 </div>
               </div>
@@ -169,7 +182,7 @@ export default function AgriCopilot({ lang }: Props) {
               <select 
                 value={crop} 
                 onChange={(e) => setCrop(e.target.value)}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 bg-white p-2.5 border"
+                className="w-full rounded-xl border-gray-200 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-50 p-3 border transition-colors"
               >
                 {CROPS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -179,7 +192,7 @@ export default function AgriCopilot({ lang }: Props) {
               <select 
                 value={upazila} 
                 onChange={(e) => setUpazila(e.target.value)}
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 bg-white p-2.5 border"
+                className="w-full rounded-xl border-gray-200 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-50 p-3 border transition-colors"
               >
                 {UPAZILAS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
@@ -191,7 +204,7 @@ export default function AgriCopilot({ lang }: Props) {
             <select 
               value={analysisType} 
               onChange={(e) => setAnalysisType(e.target.value)}
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 bg-white p-2.5 border"
+              className="w-full rounded-xl border-gray-200 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-50 p-3 border transition-colors"
             >
               <option value="disease">{t.disease}</option>
               <option value="pest">{t.pest}</option>
@@ -199,14 +212,14 @@ export default function AgriCopilot({ lang }: Props) {
             </select>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
             <input 
               type="checkbox" 
               id="advanced" 
               checked={isAdvanced}
               onChange={(e) => setIsAdvanced(e.target.checked)}
               disabled={tier !== 'premium'}
-              className="rounded text-green-600 focus:ring-green-500 disabled:opacity-50"
+              className="rounded text-green-600 focus:ring-green-500 disabled:opacity-50 w-4 h-4"
             />
             <label htmlFor="advanced" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
               <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
@@ -214,58 +227,93 @@ export default function AgriCopilot({ lang }: Props) {
             </label>
           </div>
 
+          <div className="pt-2">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[10px] font-black text-green-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
+            </div>
+            <div className="w-full bg-green-100 rounded-full h-1.5 overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${(currentUsage / limit) * 100}%` }}
+                className="bg-green-600 h-full"
+              />
+            </div>
+          </div>
+
           <button
             onClick={handleDiagnose}
             disabled={!image || isLoading}
-            className="w-full bg-green-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors"
+            className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white font-bold py-4 px-4 rounded-xl hover:from-green-500 hover:to-green-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-6 h-6 animate-spin" />
                 <span>{t.analyzing}</span>
               </>
             ) : (
               <>
-                <Leaf className="w-5 h-5" />
+                <Leaf className="w-6 h-6" />
                 <span>{t.diagnoseDisease}</span>
               </>
             )}
           </button>
-        </div>
+        </motion.div>
 
         {/* Results Section */}
         <div className="space-y-6">
-          {diagnosis ? (
-            <div className="bg-green-50 rounded-xl p-6 border border-green-100 h-full flex flex-col">
-              <h3 className="text-lg font-semibold text-green-900 mb-4 flex items-center">
-                <Leaf className="w-5 h-5 mr-2 text-green-600" />
-                {t.diagnosisResult}
-              </h3>
-              
-              <div className="flex-1 bg-white rounded-lg p-4 border border-green-200 text-gray-800 leading-relaxed shadow-sm">
-                {diagnosis}
-              </div>
-
-              {audioUrl && (
-                <div className="mt-6 bg-white rounded-lg p-4 border border-green-200 shadow-sm flex items-center space-x-4">
-                  <div className="bg-green-100 p-2 rounded-full text-green-600">
-                    <Volume2 className="w-6 h-6" />
+          <AnimatePresence mode="wait">
+            {diagnosis ? (
+              <motion.div 
+                key="result"
+                initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl p-8 border border-green-100 h-full flex flex-col shadow-sm relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center">
+                  <div className="bg-green-100 p-2 rounded-xl mr-3">
+                    <Leaf className="w-6 h-6 text-green-600" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-700 mb-2">{t.playAudio}</p>
-                    <audio controls src={audioUrl} className="w-full h-10" />
-                  </div>
+                  {t.diagnosisResult}
+                </h3>
+                
+                <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm prose prose-green max-w-none">
+                  <div className="whitespace-pre-wrap">{diagnosis}</div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 h-full flex flex-col items-center justify-center text-gray-400 text-center">
-              <Leaf className="w-12 h-12 mb-4 opacity-20" />
-              <p>Upload an image and click Diagnose to see results here.</p>
-            </div>
-          )}
+
+                {audioUrl && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 bg-white rounded-2xl p-4 border border-green-200 shadow-sm flex items-center space-x-4"
+                  >
+                    <div className="bg-green-100 p-3 rounded-xl text-green-600 shadow-inner">
+                      <Volume2 className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-gray-700 mb-2">{t.playAudio}</p>
+                      <audio controls src={audioUrl} className="w-full h-10 rounded-lg" />
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-white rounded-3xl p-8 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center"
+              >
+                <div className="bg-gray-50 p-6 rounded-full mb-4">
+                  <Leaf className="w-12 h-12 text-gray-300" />
+                </div>
+                <p className="text-lg font-medium text-gray-500">Upload an image and click Diagnose to see results here.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

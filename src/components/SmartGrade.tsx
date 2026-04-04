@@ -8,6 +8,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
+import { motion, AnimatePresence } from 'motion/react';
 
 const PRODUCE_TYPES = ['Tomato', 'Brinjal', 'Dry Fish'];
 
@@ -32,7 +33,7 @@ export default function SmartGrade({ lang }: Props) {
   const [isAdvanced, setIsAdvanced] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
-  const { canUse, incrementUsage, tier } = useUsageTracking();
+  const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,29 +90,41 @@ export default function SmartGrade({ lang }: Props) {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">{t.smartGrade}</h2>
-        <p className="text-gray-500 mt-1">{t.smartGradeDesc}</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8"
+    >
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center p-3 bg-blue-100 rounded-2xl mb-4">
+          <Award className="w-8 h-8 text-blue-600" />
+        </div>
+        <h2 className="text-3xl font-extrabold text-gray-900 mb-2">{t.smartGrade}</h2>
+        <p className="text-gray-500 text-lg">{t.smartGradeDesc}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Input Section */}
-        <div className="space-y-6 bg-gray-50 p-6 rounded-xl border border-gray-100">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-6 bg-white p-6 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.captureBatch}</label>
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-blue-300 rounded-xl p-8 text-center cursor-pointer hover:bg-blue-50 transition-colors bg-white relative overflow-hidden group"
+              className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-blue-50 transition-colors bg-white relative overflow-hidden group min-h-[200px] flex items-center justify-center"
             >
               {image ? (
-                <img src={`data:${mimeType};base64,${image}`} alt="Produce" className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                <img src={`data:${mimeType};base64,${image}`} alt="Produce" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
               ) : null}
               <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
-                <div className="bg-blue-100 p-3 rounded-full text-blue-600">
-                  <Camera className="w-6 h-6" />
+                <div className="bg-blue-100 p-4 rounded-full text-blue-600 shadow-inner group-hover:scale-110 transition-transform">
+                  <Camera className="w-8 h-8" />
                 </div>
-                <div className="text-sm text-gray-600 font-medium">
+                <div className="text-sm text-gray-700 font-medium bg-white/80 backdrop-blur-sm px-4 py-1.5 rounded-full">
                   {image ? 'Tap to change image' : 'Tap to take photo of batch'}
                 </div>
               </div>
@@ -131,20 +144,20 @@ export default function SmartGrade({ lang }: Props) {
             <select 
               value={produce} 
               onChange={(e) => setProduce(e.target.value)}
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white p-2.5 border"
+              className="w-full rounded-xl border-gray-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-3 border transition-colors"
             >
               {PRODUCE_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
             <input 
               type="checkbox" 
               id="advancedGrade" 
               checked={isAdvanced}
               onChange={(e) => setIsAdvanced(e.target.checked)}
               disabled={tier !== 'premium'}
-              className="rounded text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+              className="rounded text-blue-600 focus:ring-blue-500 disabled:opacity-50 w-4 h-4"
             />
             <label htmlFor="advancedGrade" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
               <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
@@ -152,94 +165,125 @@ export default function SmartGrade({ lang }: Props) {
             </label>
           </div>
 
+          <div className="pt-2">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
+            </div>
+            <div className="w-full bg-blue-100 rounded-full h-1.5 overflow-hidden">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${(currentUsage / limit) * 100}%` }}
+                className="bg-blue-600 h-full"
+              />
+            </div>
+          </div>
+
           <button
             onClick={handleGrade}
             disabled={!image || isLoading}
-            className="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors"
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold py-4 px-4 rounded-xl hover:from-blue-500 hover:to-blue-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-6 h-6 animate-spin" />
                 <span>{t.gradingBatch}</span>
               </>
             ) : (
               <>
-                <Award className="w-5 h-5" />
+                <Award className="w-6 h-6" />
                 <span>{t.generateCert}</span>
               </>
             )}
           </button>
-        </div>
+        </motion.div>
 
         {/* Results Section */}
         <div className="space-y-6">
-          {result ? (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
-              <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <FileCheck className="w-6 h-6" />
-                  <span className="font-semibold text-lg">{t.certTitle}</span>
-                </div>
-                <span className="text-blue-100 text-sm">{new Date().toLocaleDateString()}</span>
-              </div>
-              
-              <div className="p-6 flex-1 flex flex-col space-y-6">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                  <div>
-                    <p className="text-sm text-gray-500">{t.produceType}</p>
-                    <p className="font-medium text-gray-900">{produce}</p>
+          <AnimatePresence mode="wait">
+            {result ? (
+              <motion.div 
+                key="result"
+                initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                className="bg-white rounded-3xl border border-blue-200 shadow-sm overflow-hidden flex flex-col h-full relative"
+              >
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 flex items-center justify-between relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+                  <div className="flex items-center space-x-3 relative z-10">
+                    <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
+                      <FileCheck className="w-6 h-6" />
+                    </div>
+                    <span className="font-bold text-xl">{t.certTitle}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-500">{t.assignedGrade}</p>
-                    <p className={`font-bold text-2xl ${result.grade.includes('A') ? 'text-green-600' : result.grade.includes('B') ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {result.grade}
+                  <span className="text-blue-100 text-sm font-medium relative z-10 bg-black/10 px-3 py-1 rounded-full">{new Date().toLocaleDateString()}</span>
+                </div>
+                
+                <div className="p-8 flex-1 flex flex-col space-y-6 bg-gradient-to-b from-white to-blue-50/30">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-6">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.produceType}</p>
+                      <p className="font-bold text-gray-900 text-xl">{produce}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.assignedGrade}</p>
+                      <p className={`font-black text-4xl drop-shadow-sm ${result.grade.includes('A') ? 'text-green-600' : result.grade.includes('B') ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {result.grade}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">{t.justification}</p>
+                    <p className="text-gray-800 bg-white p-4 rounded-2xl border border-gray-100 text-sm leading-relaxed shadow-sm">
+                      {result.justification}
                     </p>
                   </div>
-                </div>
 
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">{t.justification}</p>
-                  <p className="text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm leading-relaxed">
-                    {result.justification}
-                  </p>
-                </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-blue-50/80 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
+                      <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">{t.shelfLife}</p>
+                      <p className="text-sm font-bold text-blue-900">{result.shelfLife}</p>
+                    </div>
+                    <div className="bg-indigo-50/80 backdrop-blur-sm p-4 rounded-2xl border border-indigo-100/50">
+                      <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-1">{t.bestMarket}</p>
+                      <p className="text-sm font-bold text-indigo-900">{result.bestMarket}</p>
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <p className="text-xs text-blue-600 font-medium mb-1">{t.shelfLife}</p>
-                    <p className="text-sm font-bold text-blue-900">{result.shelfLife}</p>
-                  </div>
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <p className="text-xs text-blue-600 font-medium mb-1">{t.bestMarket}</p>
-                    <p className="text-sm font-bold text-blue-900">{result.bestMarket}</p>
-                  </div>
-                </div>
-
-                <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center space-x-2 text-gray-600">
-                    <DollarSign className="w-5 h-5" />
-                    <span className="text-sm font-medium">{t.estimatedPrice}</span>
-                  </div>
-                  <div className="text-xl font-bold text-gray-900">
-                    ৳ {result.estimatedPriceBdt} <span className="text-sm font-normal text-gray-500">/ kg</span>
+                  <div className="mt-auto pt-6 border-t border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full">
+                      <DollarSign className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-bold">{t.estimatedPrice}</span>
+                    </div>
+                    <div className="text-2xl font-black text-gray-900">
+                      ৳ {result.estimatedPriceBdt} <span className="text-sm font-semibold text-gray-400">/ kg</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end">
-                 <button className="text-blue-600 font-medium text-sm hover:text-blue-700 flex items-center space-x-1">
-                   <span>{t.sendToBuyer}</span>
-                 </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-50 rounded-xl p-6 border border-gray-100 h-full flex flex-col items-center justify-center text-gray-400 text-center">
-              <Award className="w-12 h-12 mb-4 opacity-20" />
-              <p>Upload a batch photo and generate a certificate to see results here.</p>
-            </div>
-          )}
+                
+                <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end">
+                   <button className="text-blue-600 font-bold text-sm hover:text-blue-700 flex items-center space-x-2 bg-blue-100/50 hover:bg-blue-100 px-4 py-2 rounded-full transition-colors">
+                     <span>{t.sendToBuyer}</span>
+                   </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-white rounded-3xl p-8 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center"
+              >
+                <div className="bg-gray-50 p-6 rounded-full mb-4">
+                  <Award className="w-12 h-12 text-gray-300" />
+                </div>
+                <p className="text-lg font-medium text-gray-500">Upload a batch photo and generate a certificate to see results here.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

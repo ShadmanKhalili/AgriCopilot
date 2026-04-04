@@ -14,6 +14,7 @@ service cloud.firestore {
     //   - role: string (required, enum: ['agri-preneur', 'hub-manager', 'admin'])
     //   - tier: string (required, enum: ['free', 'premium'])
     //   - usageCount: number (required)
+    //   - lastUsedDate: string (optional, YYYY-MM-DD)
     //   - createdAt: string (required, immutable)
     //
     // Collection: diagnoses
@@ -82,7 +83,7 @@ service cloud.firestore {
     // ===============================================================
     
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'name', 'role', 'tier', 'usageCount', 'createdAt']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'name', 'role', 'tier', 'usageCount', 'lastUsedDate', 'createdAt']) &&
              hasRequiredFields(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.email is string && isValidEmail(data.email) && data.email.size() < 100 &&
@@ -90,6 +91,7 @@ service cloud.firestore {
              data.role in ['agri-preneur', 'hub-manager', 'admin'] &&
              data.tier in ['free', 'premium'] &&
              data.usageCount is number && data.usageCount >= 0 &&
+             (!('lastUsedDate' in data) || (data.lastUsedDate is string && data.lastUsedDate.matches("^\\d{4}-\\d{2}-\\d{2}$"))) &&
              isValidDateString(data.createdAt);
     }
     
@@ -140,9 +142,19 @@ service cloud.firestore {
                       isAdmin() || 
                       (isOwner(userId) && 
                        request.resource.data.role == resource.data.get('role', 'agri-preneur') &&
-                       request.resource.data.tier == resource.data.get('tier', 'free') &&
-                       request.resource.data.usageCount >= resource.data.get('usageCount', 0) &&
-                       request.resource.data.usageCount <= resource.data.get('usageCount', 0) + 1
+                       (
+                         // Tier upgrade
+                         (request.resource.data.tier != resource.data.get('tier', 'free') && 
+                          request.resource.data.usageCount == resource.data.get('usageCount', 0)) ||
+                         // Normal increment (same day)
+                         (request.resource.data.tier == resource.data.get('tier', 'free') &&
+                          request.resource.data.lastUsedDate == resource.data.get('lastUsedDate', '') &&
+                          request.resource.data.usageCount == resource.data.get('usageCount', 0) + 1) ||
+                         // Daily reset (new day)
+                         (request.resource.data.tier == resource.data.get('tier', 'free') &&
+                          request.resource.data.lastUsedDate != resource.data.get('lastUsedDate', '') &&
+                          request.resource.data.usageCount == 1)
+                       )
                       )
                     );
       allow delete: if isAdmin();

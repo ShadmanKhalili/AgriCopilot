@@ -70,7 +70,8 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
 export const getMarketInsights = async (produce: string, location: string, lang: string, isAdvanced?: boolean) => {
   try {
     const ai = getAi();
-    const prompt = `Search for the current market price and demand trends for ${produce} in ${location}, Bangladesh. Based on the data, provide a short market insight including current estimated price and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`;
+    const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+    const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). Search for official market reports, news articles, or agricultural bulletins from today or the most recent available date. Provide a short market insight including the specific wholesale rate in BDT, the current demand level (High/Medium/Low), and a brief recommendation on whether to sell or hold. Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`;
     
     try {
       const response = await ai.models.generateContent({

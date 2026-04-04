@@ -24,7 +24,17 @@ export function useUsageTracking() {
   };
 
   const getCurrentUsage = () => {
-    if (!user) return anonUsage;
+    const today = new Date().toISOString().split('T')[0];
+    if (!user) {
+      const lastDate = localStorage.getItem('anonLastUsedDate');
+      if (lastDate !== today) {
+        return 0;
+      }
+      return anonUsage;
+    }
+    if (userProfile?.lastUsedDate !== today) {
+      return 0;
+    }
     return userProfile?.usageCount || 0;
   };
 
@@ -33,17 +43,31 @@ export function useUsageTracking() {
   };
 
   const incrementUsage = async () => {
+    const today = new Date().toISOString().split('T')[0];
     if (!user) {
-      const newUsage = anonUsage + 1;
+      const lastDate = localStorage.getItem('anonLastUsedDate');
+      let newUsage = 1;
+      if (lastDate === today) {
+        newUsage = anonUsage + 1;
+      }
       setAnonUsage(newUsage);
       localStorage.setItem('anonUsageCount', newUsage.toString());
+      localStorage.setItem('anonLastUsedDate', today);
     } else if (userProfile) {
       try {
         const userDocRef = doc(db, 'users', user.uid);
         const { increment } = await import('firebase/firestore');
-        await updateDoc(userDocRef, {
-          usageCount: increment(1)
-        });
+        
+        if (userProfile.lastUsedDate !== today) {
+          await updateDoc(userDocRef, {
+            usageCount: 1,
+            lastUsedDate: today
+          });
+        } else {
+          await updateDoc(userDocRef, {
+            usageCount: increment(1)
+          });
+        }
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       }

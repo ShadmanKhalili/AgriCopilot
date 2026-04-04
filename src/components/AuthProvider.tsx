@@ -11,6 +11,7 @@ export interface UserProfile {
   role: string;
   tier: 'free' | 'premium';
   usageCount: number;
+  lastUsedDate?: string;
   createdAt: string;
 }
 
@@ -58,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: 'agri-preneur',
               tier: 'free',
               usageCount: 0,
+              lastUsedDate: new Date().toISOString().split('T')[0],
               createdAt: new Date().toISOString()
             };
             await setDoc(userDocRef, newProfile);

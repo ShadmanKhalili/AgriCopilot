@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
 import MarketConnect from './MarketConnect';
@@ -43,7 +44,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
       {/* Mobile Header */}
       <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-20">
         <div className="flex items-center space-x-2">
@@ -87,8 +88,8 @@ export default function Layout() {
                   setActiveTab(tab.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-left ${
-                  isActive ? 'bg-green-700 text-white shadow-sm' : 'text-green-100 hover:bg-green-700/50'
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 text-left ${
+                  isActive ? 'bg-green-700 text-white shadow-md scale-[1.02]' : 'text-green-100 hover:bg-green-700/50 hover:scale-[1.01]'
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-green-300' : 'text-green-200'}`} />
@@ -103,25 +104,27 @@ export default function Layout() {
         
         <div className="p-4 border-t border-green-700 space-y-4">
           {/* Usage Stats */}
-          <div className="bg-green-900/50 rounded-lg p-3">
+          <div className="bg-green-900/50 rounded-xl p-4 shadow-inner">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-medium text-green-200">{t.usage} ({getTierName()})</span>
               <span className="text-xs font-bold text-white">
                 {currentUsage} / {limit === Infinity ? '∞' : limit}
               </span>
             </div>
-            <div className="w-full bg-green-950 rounded-full h-1.5">
-              <div 
-                className={`h-1.5 rounded-full ${tier === 'premium' ? 'bg-yellow-400' : 'bg-green-400'}`} 
-                style={{ width: `${Math.min((currentUsage / (limit === Infinity ? 1 : limit)) * 100, 100)}%` }}
-              ></div>
+            <div className="w-full bg-green-950 rounded-full h-2 overflow-hidden">
+              <motion.div 
+                className={`h-full rounded-full ${tier === 'premium' ? 'bg-yellow-400' : 'bg-green-400'}`} 
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((currentUsage / (limit === Infinity ? 1 : limit)) * 100, 100)}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
             </div>
             {tier !== 'premium' && (
               <button 
                 onClick={user ? () => setIsPricingOpen(true) : signIn}
-                className="mt-3 w-full flex items-center justify-center space-x-1 text-xs bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold py-1.5 rounded transition-colors"
+                className="mt-4 w-full flex items-center justify-center space-x-1 text-xs bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-yellow-950 font-bold py-2 rounded-lg shadow-sm transition-all hover:shadow-md"
               >
-                <Crown className="w-3 h-3" />
+                <Crown className="w-4 h-4" />
                 <span>{t.upgrade}</span>
               </button>
             )}
@@ -129,9 +132,9 @@ export default function Layout() {
 
           {/* Auth Section */}
           {user ? (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between bg-green-900/30 p-3 rounded-xl">
               <div className="text-sm">
-                <div className="font-medium truncate max-w-[150px]">{user.displayName}</div>
+                <div className="font-medium truncate max-w-[140px]">{user.displayName}</div>
                 <div className="text-green-300 text-xs capitalize">{userRole}</div>
               </div>
               <button onClick={signOut} className="p-2 hover:bg-green-700 rounded-lg text-green-200 hover:text-white transition-colors" title={t.signOut}>
@@ -141,7 +144,7 @@ export default function Layout() {
           ) : (
             <button
               onClick={signIn}
-              className="w-full flex items-center justify-center space-x-2 bg-white text-green-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-100 transition-colors"
+              className="w-full flex items-center justify-center space-x-2 bg-white text-green-800 font-semibold py-2.5 px-4 rounded-xl hover:bg-gray-100 transition-colors shadow-sm"
             >
               <LogIn className="w-4 h-4" />
               <span>{t.signIn}</span>
@@ -151,19 +154,30 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-5xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-8 min-h-[calc(100vh-2rem)]">
-          {activeTab === 'agri-copilot' && <AgriCopilot lang={lang} />}
-          {activeTab === 'smart-grade' && <SmartGrade lang={lang} />}
-          {activeTab === 'market-connect' && <MarketConnect lang={lang} />}
-          {activeTab === 'user-guide' && <UserGuide lang={lang} />}
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-6xl mx-auto">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 md:p-8 min-h-[calc(100vh-2rem)] relative overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              {activeTab === 'agri-copilot' && <AgriCopilot lang={lang} />}
+              {activeTab === 'smart-grade' && <SmartGrade lang={lang} />}
+              {activeTab === 'market-connect' && <MarketConnect lang={lang} />}
+              {activeTab === 'user-guide' && <UserGuide lang={lang} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
       
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-0 md:hidden"
+          className="fixed inset-0 bg-black/50 z-0 md:hidden backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
