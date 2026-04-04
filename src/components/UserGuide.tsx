@@ -1,6 +1,6 @@
 import React from 'react';
 import { translations, Language } from '../utils/translations';
-import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2, HelpCircle, Crown } from 'lucide-react';
+import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2, HelpCircle, Crown, Satellite, Cloud } from 'lucide-react';
 import { motion } from 'motion/react';
 import Tooltip from './Tooltip';
 
@@ -51,7 +51,7 @@ export default function UserGuide({ lang }: Props) {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {/* Agri-Copilot Guide */}
         <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-48 h-48 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
@@ -115,6 +115,48 @@ export default function UserGuide({ lang }: Props) {
             ].map((step, i) => (
               <li key={i} className="flex items-start group/item">
                 <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center text-sm font-black mr-5 border border-orange-100 shadow-sm group-hover/item:scale-110 transition-transform">
+                  {i + 1}
+                </span>
+                <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        {/* Satellite Health Guide */}
+        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-indigo-100 shadow-xl shadow-indigo-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+          <div className="flex items-center space-x-5 mb-10 relative z-10">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-100">
+              <Satellite className="w-7 h-7" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.guideSatelliteTitle}</h3>
+          </div>
+          <ul className="space-y-8 relative z-10">
+            {[t.guideSatellite1, t.guideSatellite2, t.guideSatellite3].map((step, i) => (
+              <li key={i} className="flex items-start group/item">
+                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-black mr-5 border border-indigo-100 shadow-sm group-hover/item:scale-110 transition-transform">
+                  {i + 1}
+                </span>
+                <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        {/* Weather Advisory Guide */}
+        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-cyan-100 shadow-xl shadow-cyan-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+          <div className="flex items-center space-x-5 mb-10 relative z-10">
+            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-4 rounded-2xl text-white shadow-lg shadow-cyan-100">
+              <Cloud className="w-7 h-7" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.guideWeatherTitle}</h3>
+          </div>
+          <ul className="space-y-8 relative z-10">
+            {[t.guideWeather1, t.guideWeather2, t.guideWeather3].map((step, i) => (
+              <li key={i} className="flex items-start group/item">
+                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-sm font-black mr-5 border border-cyan-100 shadow-sm group-hover/item:scale-110 transition-transform">
                   {i + 1}
                 </span>
                 <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>

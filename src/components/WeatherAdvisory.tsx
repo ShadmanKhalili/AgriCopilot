@@ -253,6 +253,44 @@ export default function WeatherAdvisory({ lang }: Props) {
                     </motion.div>
                   </div>
 
+                  {/* Weather Insights Section */}
+                  <div className="mt-8 pt-6 border-t border-blue-50">
+                    <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <HelpCircle className="w-5 h-5 text-blue-500" />
+                      {t.weatherInsightsTitle}
+                    </h4>
+                    <div className="space-y-4">
+                      <div className="flex gap-3">
+                        <Droplets className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-700">{t.humidity}</p>
+                          <p className="text-sm text-gray-500">{t.humidityInsight}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Wind className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-700">{t.windSpeed}</p>
+                          <p className="text-sm text-gray-500">{t.windInsight}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <CloudRain className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-700">{t.rainChance}</p>
+                          <p className="text-sm text-gray-500">{t.rainChanceInsight}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Sun className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-gray-700">{t.uvIndex}</p>
+                          <p className="text-sm text-gray-500">{t.uvInsight}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {lastUpdated && (
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Updated</span>
