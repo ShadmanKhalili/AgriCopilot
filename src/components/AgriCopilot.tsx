@@ -612,7 +612,9 @@ export default function AgriCopilot({
                       {/* Verification Advice */}
                       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">{t.confidenceAdvice}</p>
-                        <p className="text-sm text-blue-900 font-medium mb-4">{diagnosis.verificationAdvice}</p>
+                        <div className="markdown-body text-sm text-blue-900 font-medium mb-4 prose-sm prose-blue">
+                          <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
+                        </div>
                         
                         {diagnosis.confidence < 70 && (
                           <div className="flex items-center space-x-2 text-amber-600 mb-4">

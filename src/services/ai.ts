@@ -87,7 +87,7 @@ export const diagnoseCrop = async (
         "diagnosis": "Detailed markdown diagnosis and treatment plan (approx 100 words)",
         "severity": number (0-100),
         "confidence": number (0-100),
-        "verificationAdvice": "Specific advice on how to verify this diagnosis with a local expert or simple field test",
+        "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers).",
         "nutrientLevels": {
           "nitrogen": number (0-100),
           "phosphorus": number (0-100),
