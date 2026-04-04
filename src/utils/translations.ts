@@ -112,6 +112,33 @@ export const translations = {
     memberSince: "Member Since",
     idealLevel: "Ideal Level",
     detectedLevel: "Detected Level",
+    cropHealth: "Satellite Crop Health",
+    cropHealthDesc: "Real-time satellite monitoring",
+    ndviValue: "NDVI Index",
+    healthStatus: "Health Status",
+    fetchSatelliteData: "Fetch Satellite Data",
+    satelliteInsights: "Satellite Insights",
+    healthLevels: {
+      healthy: "Healthy (Dense Vegetation)",
+      stressed: "Stressed (Potential Problem)",
+      sparse: "Sparse Vegetation",
+      water: "Water/No Vegetation"
+    },
+    moistureLevels: {
+      high: "High Moisture (Waterlogged)",
+      good: "Good Moisture",
+      low: "Low Moisture (Dry)",
+      drought: "Severe Drought"
+    },
+    actionableInsights: "Actionable Insights",
+    insightHealthy: "Your crop canopy is dense and healthy. Continue your current irrigation and fertilizer schedule. Monitor for localized pest outbreaks.",
+    insightStressed: "The satellite detects stress in the vegetation. This could be early signs of nutrient deficiency, pest attack, or disease. Please physically inspect the field.",
+    insightSparse: "Vegetation is very sparse. If you recently planted, this is normal. If crops are mature, you may have severe growth issues or poor soil health.",
+    insightWater: "This area appears to be mostly water or bare soil. Ensure your GPS coordinates are exactly over your crop field.",
+    insightMoistureGood: "Soil and canopy moisture levels are optimal. No immediate irrigation needed.",
+    insightMoistureLow: "Moisture levels are dropping. Consider scheduling irrigation soon to prevent water stress.",
+    insightMoistureDrought: "Severe water stress detected. Immediate irrigation is required to prevent yield loss.",
+    insightMoistureHigh: "High moisture detected. Ensure proper drainage to prevent root rot or fungal diseases.",
     // Tooltips
     tooltips: {
       disease: "Identify crop diseases from images",
@@ -297,6 +324,33 @@ export const translations = {
     memberSince: "সদস্য হয়েছেন",
     idealLevel: "আদর্শ মাত্রা",
     detectedLevel: "শনাক্তকৃত মাত্রা",
+    cropHealth: "স্যাটেলাইট শস্য স্বাস্থ্য",
+    cropHealthDesc: "স্যাটেলাইটের মাধ্যমে শস্যের অবস্থা",
+    ndviValue: "এনডিভিআই সূচক",
+    healthStatus: "স্বাস্থ্যের অবস্থা",
+    fetchSatelliteData: "স্যাটেলাইট তথ্য নিন",
+    satelliteInsights: "স্যাটেলাইট বিশ্লেষণ",
+    healthLevels: {
+      healthy: "সুস্থ (ঘন গাছপালা)",
+      stressed: "অসুস্থ (সম্ভাব্য সমস্যা)",
+      sparse: "পাতলা গাছপালা",
+      water: "পানি/গাছপালা নেই"
+    },
+    moistureLevels: {
+      high: "অতিরিক্ত আর্দ্রতা (জলাবদ্ধতা)",
+      good: "সঠিক আর্দ্রতা",
+      low: "কম আর্দ্রতা (শুষ্ক)",
+      drought: "তীব্র খরা"
+    },
+    actionableInsights: "কৃষকের জন্য পরামর্শ",
+    insightHealthy: "আপনার ফসলের পাতা ঘন এবং সুস্থ আছে। বর্তমান সেচ এবং সারের রুটিন চালিয়ে যান। পোকার আক্রমণের দিকে নজর রাখুন।",
+    insightStressed: "স্যাটেলাইট আপনার ফসলে সমস্যার লক্ষণ দেখতে পাচ্ছে। এটি পুষ্টির অভাব, পোকার আক্রমণ বা রোগের প্রাথমিক লক্ষণ হতে পারে। দয়া করে মাঠে গিয়ে পরীক্ষা করুন।",
+    insightSparse: "গাছপালা খুবই কম। যদি আপনি সম্প্রতি চারা রোপণ করে থাকেন তবে এটি স্বাভাবিক। ফসল বড় হলে, এটি বৃদ্ধি বা মাটির সমস্যার লক্ষণ হতে পারে।",
+    insightWater: "এই এলাকায় বেশিরভাগই পানি বা খালি মাটি দেখা যাচ্ছে। নিশ্চিত করুন যে আপনার জিপিএস লোকেশন ঠিক আপনার ফসলের মাঠের উপরে আছে।",
+    insightMoistureGood: "মাটি এবং গাছের আর্দ্রতা সঠিক মাত্রায় আছে। এখনই সেচ দেওয়ার প্রয়োজন নেই।",
+    insightMoistureLow: "আর্দ্রতা কমে যাচ্ছে। পানির অভাব রোধ করতে দ্রুত সেচ দেওয়ার ব্যবস্থা করুন।",
+    insightMoistureDrought: "তীব্র পানির অভাব দেখা যাচ্ছে। ফসলের ক্ষতি এড়াতে এখনই সেচ দেওয়া প্রয়োজন।",
+    insightMoistureHigh: "অতিরিক্ত আর্দ্রতা দেখা যাচ্ছে। শিকড় পচা বা ছত্রাকজনিত রোগ এড়াতে পানি নিষ্কাশনের ব্যবস্থা করুন।",
     // Tooltips
     tooltips: {
       disease: "ছবি থেকে ফসলের রোগ শনাক্ত করুন",

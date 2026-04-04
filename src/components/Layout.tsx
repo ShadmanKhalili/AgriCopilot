@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
 import MarketConnect from './MarketConnect';
 import WeatherAdvisory from './WeatherAdvisory';
+import SatelliteHealth from './SatelliteHealth';
 import UserGuide from './UserGuide';
 import Profile from './Profile';
 import PricingModal from './PricingModal';
@@ -13,7 +14,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'user-guide' | 'profile';
+type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'user-guide' | 'profile';
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -46,6 +47,7 @@ export default function Layout() {
     { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
     { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
     { id: 'weather-advisory', name: t.weatherAdvisory, icon: Cloud, description: t.weatherAdvisoryDesc },
+    { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc },
     { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc },
     { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc },
   ] as const;
@@ -309,6 +311,9 @@ export default function Layout() {
               )}
               {activeTab === 'weather-advisory' && (
                 <WeatherAdvisory lang={lang} />
+              )}
+              {activeTab === 'crop-health' && (
+                <SatelliteHealth lang={lang} />
               )}
               {activeTab === 'user-guide' && <UserGuide lang={lang} />}
               {activeTab === 'profile' && <Profile lang={lang} />}
