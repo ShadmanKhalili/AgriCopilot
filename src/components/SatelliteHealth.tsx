@@ -45,7 +45,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/sentinel/ndvi', {
+      const response = await fetch('/.netlify/functions/sentinel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(location)

@@ -16,8 +16,8 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Sentinel Hub Proxy
-  app.post("/api/sentinel/ndvi", async (req, res) => {
+  // Sentinel Hub Proxy (matching Netlify function path for local dev)
+  app.post("/.netlify/functions/sentinel", async (req, res) => {
     try {
       const { lat, lng } = req.body;
       const rawClientId = process.env.SENTINEL_HUB_CLIENT_ID || "";
