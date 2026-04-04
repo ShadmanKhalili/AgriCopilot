@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { diagnoseCrop, generateSpeech, startAgriChat } from '../services/ai';
@@ -18,44 +18,132 @@ const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'o
 
 interface Props {
   lang: Language;
+  persistedImages?: { base64: string; mimeType: string }[];
+  setPersistedImages?: (images: { base64: string; mimeType: string }[]) => void;
+  persistedDiagnosis?: any | null;
+  setPersistedDiagnosis?: (diagnosis: any | null) => void;
+  persistedChatMessages?: { role: 'user' | 'model'; text: string }[];
+  setPersistedChatMessages?: (messages: { role: 'user' | 'model'; text: string }[]) => void;
+  persistedChatSession?: any | null;
+  setPersistedChatSession?: (session: any | null) => void;
+  persistedAudioUrl?: string | null;
+  setPersistedAudioUrl?: (url: string | null) => void;
+  persistedUpazila?: string;
+  setPersistedUpazila?: (upazila: string) => void;
+  persistedCrop?: string;
+  setPersistedCrop?: (crop: string) => void;
+  persistedAnalysisType?: string;
+  setPersistedAnalysisType?: (type: string) => void;
 }
 
-export default function AgriCopilot({ lang }: Props) {
-  const [image, setImage] = useState<string | null>(null);
-  const [mimeType, setMimeType] = useState<string>('');
-  const [upazila, setUpazila] = useState(UPAZILAS[0]);
-  const [crop, setCrop] = useState(CROPS[0]);
-  const [analysisType, setAnalysisType] = useState('disease');
+export default function AgriCopilot({ 
+  lang,
+  persistedImages,
+  setPersistedImages,
+  persistedDiagnosis,
+  setPersistedDiagnosis,
+  persistedChatMessages,
+  setPersistedChatMessages,
+  persistedChatSession,
+  setPersistedChatSession,
+  persistedAudioUrl,
+  setPersistedAudioUrl,
+  persistedUpazila,
+  setPersistedUpazila,
+  persistedCrop,
+  setPersistedCrop,
+  persistedAnalysisType,
+  setPersistedAnalysisType
+}: Props) {
+  const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
+  const [upazila, setUpazila] = useState(persistedUpazila || UPAZILAS[0]);
+  const [crop, setCrop] = useState(persistedCrop || CROPS[0]);
+  const [analysisType, setAnalysisType] = useState(persistedAnalysisType || 'disease');
   const [isLoading, setIsLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<any | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isFindingExpert, setIsFindingExpert] = useState(false);
+  const [diagnosis, setDiagnosis] = useState<any | null>(persistedDiagnosis || null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(persistedAudioUrl || null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatSession, setChatSession] = useState<any>(null);
+  const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
 
+  // Sync with persisted state
+  React.useEffect(() => {
+    if (setPersistedImages) setPersistedImages(images);
+  }, [images, setPersistedImages]);
+
+  useEffect(() => {
+    if (setPersistedDiagnosis) setPersistedDiagnosis(diagnosis);
+  }, [diagnosis, setPersistedDiagnosis]);
+
+  useEffect(() => {
+    if (setPersistedChatMessages) setPersistedChatMessages(chatMessages);
+  }, [chatMessages, setPersistedChatMessages]);
+
+  useEffect(() => {
+    if (setPersistedChatSession) setPersistedChatSession(chatSession);
+  }, [chatSession, setPersistedChatSession]);
+
+  useEffect(() => {
+    if (setPersistedAudioUrl) setPersistedAudioUrl(audioUrl);
+  }, [audioUrl, setPersistedAudioUrl]);
+
+  useEffect(() => {
+    if (setPersistedUpazila) setPersistedUpazila(upazila);
+  }, [upazila, setPersistedUpazila]);
+
+  useEffect(() => {
+    if (setPersistedCrop) setPersistedCrop(crop);
+  }, [crop, setPersistedCrop]);
+
+  useEffect(() => {
+    if (setPersistedAnalysisType) setPersistedAnalysisType(analysisType);
+  }, [analysisType, setPersistedAnalysisType]);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const optimizedDataUrl = await resizeImage(file, 800);
-        setImage(optimizedDataUrl.split(',')[1]);
-        setMimeType('image/jpeg'); // resizeImage converts to jpeg
-        setDiagnosis(null);
-        setAudioUrl(null);
-      } catch (error) {
-        console.error("Error optimizing image:", error);
-        alert("Failed to process image. Please try another one.");
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const remainingSlots = 3 - images.length;
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+      for (const file of filesToProcess) {
+        try {
+          const optimizedDataUrl = await resizeImage(file, 800);
+          const base64Data = optimizedDataUrl.split(',')[1];
+          setImages(prev => [...prev, { base64: base64Data, mimeType: 'image/jpeg' }]);
+          setDiagnosis(null);
+          setAudioUrl(null);
+        } catch (error) {
+          console.error("Error optimizing image:", error);
+          alert("Failed to process image. Please try another one.");
+        }
       }
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVerifyWithExpert = () => {
+    setIsFindingExpert(true);
+    // Simulate finding expert or open maps directly
+    const query = encodeURIComponent("Department of Agricultural Extension Cox's Bazar");
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    
+    setTimeout(() => {
+      window.open(mapsUrl, '_blank');
+      setIsFindingExpert(false);
+    }, 1500);
   };
 
   const handleDetectLocation = () => {
@@ -106,7 +194,7 @@ export default function AgriCopilot({ lang }: Props) {
   };
 
   const handleDiagnose = async () => {
-    if (!image) return;
+    if (images.length === 0) return;
     
     if (!canUse()) {
       alert(t.limitReached);
@@ -121,8 +209,7 @@ export default function AgriCopilot({ lang }: Props) {
       const upazilaName = translations.en.upazilas[upazila as keyof typeof translations.en.upazilas];
       
       const result = await diagnoseCrop(
-        image, 
-        mimeType, 
+        images, 
         cropName, 
         upazilaName, 
         analysisTypeStr, 
@@ -150,6 +237,7 @@ export default function AgriCopilot({ lang }: Props) {
             diagnosisText: result.diagnosis,
             severity: result.severity,
             confidence: result.confidence,
+            verificationAdvice: result.verificationAdvice,
             createdAt: new Date().toISOString()
           });
         } catch (error) {
@@ -226,31 +314,57 @@ export default function AgriCopilot({ lang }: Props) {
           className="space-y-6 bg-white p-5 md:p-8 rounded-3xl border border-green-100 shadow-sm hover:shadow-md transition-shadow"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.captureImage}</label>
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-green-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-green-50 transition-colors bg-white relative overflow-hidden group min-h-[200px] flex items-center justify-center"
-            >
-              {image ? (
-                <img src={`data:${mimeType};base64,${image}`} alt="Crop" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
-              ) : null}
-              <div className="relative z-10 flex flex-col items-center justify-center space-y-3">
-                <div className="bg-green-100 p-4 rounded-full text-green-600 shadow-inner group-hover:scale-110 transition-transform">
-                  <Camera className="w-8 h-8" />
-                </div>
-                <div className="text-sm text-gray-700 font-medium bg-white/80 backdrop-blur-sm px-4 py-1.5 rounded-full">
-                  {image ? 'Tap to change image' : 'Tap to take photo or upload'}
-                </div>
-              </div>
-              <input 
-                type="file" 
-                accept="image/*" 
-                capture="environment" 
-                className="hidden" 
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-              />
+            <div className="flex items-center justify-between mb-4">
+              <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider">{t.captureImage}</label>
+              <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{images.length}/3 {t.photoLimit}</span>
             </div>
+            
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {images.map((img, idx) => (
+                <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border-2 border-green-100 group">
+                  <img 
+                    src={`data:${img.mimeType};base64,${img.base64}`} 
+                    alt={`Upload ${idx + 1}`} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(idx);
+                    }}
+                    className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {images.length < 3 && (
+                <label className="aspect-square rounded-xl border-2 border-dashed border-green-200 flex flex-col items-center justify-center cursor-pointer hover:bg-green-50 transition-colors">
+                  <Plus className="w-6 h-6 text-green-400 mb-1" />
+                  <span className="text-[8px] font-bold text-green-600 uppercase">{t.addPhoto}</span>
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" multiple={images.length === 0} />
+                </label>
+              )}
+            </div>
+
+            {images.length === 0 && (
+              <div className="bg-green-50/50 rounded-2xl p-8 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                <div className="bg-white p-4 rounded-2xl shadow-sm mb-4 group-hover:scale-110 transition-transform">
+                  <Camera className="w-10 h-10 text-green-600" />
+                </div>
+                <p className="text-sm font-bold text-green-800 mb-1">{t.captureImage}</p>
+                <p className="text-xs text-green-600/70">{lang === 'bn' ? 'পাতা বা ফলের ছবি দিন' : 'Upload leaf or fruit photo'}</p>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="hidden" 
+                  multiple
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -365,7 +479,7 @@ export default function AgriCopilot({ lang }: Props) {
 
           <button
             onClick={handleDiagnose}
-            disabled={!image || isLoading}
+            disabled={images.length === 0 || isLoading}
             className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white font-bold py-4 px-4 rounded-xl hover:from-green-500 hover:to-green-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
           >
             {isLoading ? (
@@ -380,6 +494,17 @@ export default function AgriCopilot({ lang }: Props) {
               </>
             )}
           </button>
+
+          {/* Safety Disclaimer */}
+          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <ShieldAlert className="w-5 h-5 text-amber-600" />
+              <h4 className="font-bold text-amber-900 text-sm">{t.disclaimerTitle}</h4>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              {t.disclaimerText}
+            </p>
+          </div>
         </motion.div>
 
         {/* Results Section */}
@@ -483,6 +608,32 @@ export default function AgriCopilot({ lang }: Props) {
                           </div>
                         </div>
                       )}
+
+                      {/* Verification Advice */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">{t.confidenceAdvice}</p>
+                        <p className="text-sm text-blue-900 font-medium mb-4">{diagnosis.verificationAdvice}</p>
+                        
+                        {diagnosis.confidence < 70 && (
+                          <div className="flex items-center space-x-2 text-amber-600 mb-4">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase">{t.lowConfidenceWarning}</span>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={handleVerifyWithExpert}
+                          disabled={isFindingExpert}
+                          className="w-full bg-blue-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+                        >
+                          {isFindingExpert ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Search className="w-4 h-4" />
+                          )}
+                          <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert}</span>
+                        </button>
+                      </div>
 
                       <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm max-w-none">
                         <div className="markdown-body text-sm md:text-base">

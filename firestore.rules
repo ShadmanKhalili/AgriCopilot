@@ -27,6 +27,7 @@ service cloud.firestore {
     //   - diagnosisText: string (required)
     //   - severity: number (required, 0-100)
     //   - confidence: number (required, 0-100)
+    //   - verificationAdvice: string (required)
     //   - createdAt: string (required, immutable)
     //
     // Collection: certificates
@@ -109,8 +110,8 @@ service cloud.firestore {
     }
     
     function isValidDiagnosis(data) {
-      return hasOnlyAllowedFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'createdAt']) &&
-             hasRequiredFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'createdAt']) &&
+      return hasOnlyAllowedFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'verificationAdvice', 'createdAt']) &&
+             hasRequiredFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'verificationAdvice', 'createdAt']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
              data.upazila is string && data.upazila.size() > 0 && data.upazila.size() < 100 &&
@@ -118,6 +119,7 @@ service cloud.firestore {
              data.diagnosisText is string && data.diagnosisText.size() > 0 && data.diagnosisText.size() < 2000 &&
              data.severity is number && data.severity >= 0 && data.severity <= 100 &&
              data.confidence is number && data.confidence >= 0 && data.confidence <= 100 &&
+             data.verificationAdvice is string && data.verificationAdvice.size() > 0 && data.verificationAdvice.size() < 1000 &&
              isValidDateString(data.createdAt);
     }
     

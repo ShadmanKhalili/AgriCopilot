@@ -53,8 +53,7 @@ const callAiWithFallback = async (params: any, primaryModel: string) => {
 };
 
 export const diagnoseCrop = async (
-  imageBase64: string, 
-  mimeType: string, 
+  images: { base64: string; mimeType: string }[], 
   crop: string, 
   upazila: string, 
   analysisType: string, 
@@ -68,22 +67,35 @@ export const diagnoseCrop = async (
         ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
         : `General Location: ${upazila}, Cox's Bazar.`;
 
-      const prompt = `You are a Bangladesh DAE agronomist. 
-      TASK: Analyze the image for ${analysisType} on a ${crop}.
+      const prompt = `You are a world-class agricultural expert specializing in crops from Cox's Bazar, Bangladesh.
+      Analyze the provided image(s) of a ${crop} plant from ${upazila} Upazila.
       ${locationContext}
       
-      CRITICAL VALIDATION: 
-      1. Look at the image. Does it contain a ${crop}?
-      2. If NO, stop immediately and respond with 'Invalid' status.
-      3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar.
+      The user is specifically interested in ${analysisType}.
       
-      RESPONSE FORMAT: 
-      - Respond in JSON format.
-      - The 'diagnosis' field should be approximately 100 words, detailed and non-generalized.
-      - Include 'severity' (0-100) and 'confidence' (0-100).
-      - If it's a nutrient analysis, include 'nutrientLevels' (0-100 for N, P, K).
-      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - Use markdown for formatting inside the 'diagnosis' field.`;
+      Provide a comprehensive diagnosis in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      Your response must be approximately 100 words, detailed, and not generalized.
+      
+      If multiple images are provided, synthesize the information from all of them to provide a more accurate diagnosis.
+      
+      CRITICAL: Pay special attention to Nutrient Levels. Farmers rely on this for soil management. 
+      Provide specific percentages for Nitrogen (N), Phosphorus (P), and Potassium (K) based on visual symptoms like leaf yellowing (N), purple tints (P), or burnt edges (K).
+      
+      Return the response in the following JSON format:
+      {
+        "status": "Valid" | "Invalid",
+        "diagnosis": "Detailed markdown diagnosis and treatment plan (approx 100 words)",
+        "severity": number (0-100),
+        "confidence": number (0-100),
+        "verificationAdvice": "Specific advice on how to verify this diagnosis with a local expert or simple field test",
+        "nutrientLevels": {
+          "nitrogen": number (0-100),
+          "phosphorus": number (0-100),
+          "potassium": number (0-100)
+        }
+      }
+      
+      If the image is not related to agriculture or is too blurry, set status to "Invalid" and explain why in the diagnosis field.`;
       
       const config: any = {
         responseMimeType: 'application/json',
@@ -94,6 +106,7 @@ export const diagnoseCrop = async (
             diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
             severity: { type: Type.NUMBER, description: 'Severity percentage' },
             confidence: { type: Type.NUMBER, description: 'Confidence percentage' },
+            verificationAdvice: { type: Type.STRING, description: 'Advice for further verification' },
             nutrientLevels: {
               type: Type.OBJECT,
               properties: {
@@ -103,7 +116,7 @@ export const diagnoseCrop = async (
               }
             }
           },
-          required: ['status', 'diagnosis', 'severity', 'confidence']
+          required: ['status', 'diagnosis', 'severity', 'confidence', 'verificationAdvice']
         }
       };
       
@@ -117,11 +130,11 @@ export const diagnoseCrop = async (
         };
       }
 
+      const contents: any[] = images.map(img => ({ inlineData: { data: img.base64, mimeType: img.mimeType } }));
+      contents.push(prompt);
+
       const response = await callAiWithFallback({
-        contents: [
-          { inlineData: { data: imageBase64, mimeType } },
-          prompt
-        ],
+        contents,
         config
       }, getModelName(isAdvanced));
       

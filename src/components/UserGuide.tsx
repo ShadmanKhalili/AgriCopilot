@@ -58,7 +58,11 @@ export default function UserGuide({ lang }: Props) {
             <h3 className="text-2xl font-bold text-gray-900">{t.agriCopilot}</h3>
           </div>
           <ul className="space-y-5">
-            {[t.guideAgriCopilot1, t.guideAgriCopilot2, t.guideAgriCopilot3].map((step, i) => (
+            {[
+              lang === 'bn' ? 'আপনার ফসলের ১ থেকে ৩টি পরিষ্কার ছবি তুলুন বা আপলোড করুন (বিভিন্ন দিক থেকে ছবি তুললে ভালো ফলাফল পাওয়া যায়)।' : 'Take or upload 1 to 3 clear photos of your crop (multiple angles provide better results).',
+              t.guideAgriCopilot2,
+              lang === 'bn' ? 'এআই-এর পরামর্শ দেখুন এবং প্রয়োজনে "বিশেষজ্ঞের পরামর্শ নিন" বাটনে ক্লিক করে নিকটস্থ কৃষি কর্মকর্তার সাথে যোগাযোগ করুন।' : 'Review AI insights and click "Verify with Expert" if you need to contact a local agricultural officer.'
+            ].map((step, i) => (
               <li key={i} className="flex items-start">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-sm font-bold mr-4 border border-green-100 shadow-sm">
                   {i + 1}

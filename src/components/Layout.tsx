@@ -19,6 +19,22 @@ export default function Layout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [lang, setLang] = useState<Language>('bn');
+
+  // AgriCopilot State Persistence
+  const [agriImages, setAgriImages] = useState<{ base64: string; mimeType: string }[]>([]);
+  const [agriDiagnosis, setAgriDiagnosis] = useState<any | null>(null);
+  const [agriChatMessages, setAgriChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [agriChatSession, setAgriChatSession] = useState<any | null>(null);
+  const [agriAudioUrl, setAgriAudioUrl] = useState<string | null>(null);
+  const [agriUpazila, setAgriUpazila] = useState<string>('teknaf');
+  const [agriCrop, setAgriCrop] = useState<string>('tomato');
+  const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
+
+  // MarketConnect State Persistence
+  const [marketInsights, setMarketInsights] = useState<any | null>(null);
+  const [marketProduce, setMarketProduce] = useState<string>('tomato');
+  const [marketLocation, setMarketLocation] = useState<string>('kawranBazar');
+
   const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
   const { currentUsage, limit, tier } = useUsageTracking();
 
@@ -209,9 +225,39 @@ export default function Layout() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              {activeTab === 'agri-copilot' && <AgriCopilot lang={lang} />}
+              {activeTab === 'agri-copilot' && (
+                <AgriCopilot 
+                  lang={lang} 
+                  persistedImages={agriImages}
+                  setPersistedImages={setAgriImages}
+                  persistedDiagnosis={agriDiagnosis}
+                  setPersistedDiagnosis={setAgriDiagnosis}
+                  persistedChatMessages={agriChatMessages}
+                  setPersistedChatMessages={setAgriChatMessages}
+                  persistedChatSession={agriChatSession}
+                  setPersistedChatSession={setAgriChatSession}
+                  persistedAudioUrl={agriAudioUrl}
+                  setPersistedAudioUrl={setAgriAudioUrl}
+                  persistedUpazila={agriUpazila}
+                  setPersistedUpazila={setAgriUpazila}
+                  persistedCrop={agriCrop}
+                  setPersistedCrop={setAgriCrop}
+                  persistedAnalysisType={agriAnalysisType}
+                  setPersistedAnalysisType={setAgriAnalysisType}
+                />
+              )}
               {activeTab === 'smart-grade' && <SmartGrade lang={lang} />}
-              {activeTab === 'market-connect' && <MarketConnect lang={lang} />}
+              {activeTab === 'market-connect' && (
+                <MarketConnect 
+                  lang={lang} 
+                  persistedInsights={marketInsights}
+                  setPersistedInsights={setMarketInsights}
+                  persistedProduce={marketProduce}
+                  setPersistedProduce={setMarketProduce}
+                  persistedLocation={marketLocation}
+                  setPersistedLocation={setMarketLocation}
+                />
+              )}
               {activeTab === 'user-guide' && <UserGuide lang={lang} />}
               {activeTab === 'profile' && <Profile lang={lang} />}
             </motion.div>

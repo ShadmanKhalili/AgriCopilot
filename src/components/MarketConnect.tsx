@@ -28,13 +28,27 @@ const MARKET_LOCATIONS = [
 
 interface Props {
   lang: Language;
+  persistedInsights?: any | null;
+  setPersistedInsights?: (insights: any | null) => void;
+  persistedProduce?: string;
+  setPersistedProduce?: (produce: string) => void;
+  persistedLocation?: string;
+  setPersistedLocation?: (location: string) => void;
 }
 
-export default function MarketConnect({ lang }: Props) {
-  const [produce, setProduce] = useState(PRODUCE_TYPES[0]);
-  const [location, setLocation] = useState(MARKET_LOCATIONS[0]);
+export default function MarketConnect({ 
+  lang,
+  persistedInsights,
+  setPersistedInsights,
+  persistedProduce,
+  setPersistedProduce,
+  persistedLocation,
+  setPersistedLocation
+}: Props) {
+  const [produce, setProduce] = useState(persistedProduce || PRODUCE_TYPES[0]);
+  const [location, setLocation] = useState(persistedLocation || MARKET_LOCATIONS[0]);
   const [isLoading, setIsLoading] = useState(false);
-  const [insights, setInsights] = useState<any | null>(null);
+  const [insights, setInsights] = useState<any | null>(persistedInsights || null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -42,6 +56,19 @@ export default function MarketConnect({ lang }: Props) {
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
+
+  // Sync with persisted state
+  React.useEffect(() => {
+    if (setPersistedInsights) setPersistedInsights(insights);
+  }, [insights, setPersistedInsights]);
+
+  React.useEffect(() => {
+    if (setPersistedProduce) setPersistedProduce(produce);
+  }, [produce, setPersistedProduce]);
+
+  React.useEffect(() => {
+    if (setPersistedLocation) setPersistedLocation(location);
+  }, [location, setPersistedLocation]);
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
