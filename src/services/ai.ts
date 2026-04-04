@@ -12,7 +12,7 @@ const getAi = () => {
 
 const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
-const SEARCH_MODEL = 'gemini-2.5-flash-preview';
+const SEARCH_MODEL = 'gemini-3-flash-preview';
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
@@ -234,19 +234,21 @@ export const getMarketInsights = async (
   return await callAiWithRetry(async () => {
     try {
       const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+      const currentYear = new Date().getFullYear();
       const locationContext = coords 
         ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
         : `General Location: ${location}, Bangladesh.`;
 
       const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). 
       ${locationContext}
-      Search for official market reports, news articles, or agricultural bulletins.
-      Also use Google Maps to identify the nearest major wholesale markets (Aroths).
+      Search for official market reports, news articles, or agricultural bulletins from ${currentYear}.
+      If ${currentYear} data is absolutely unavailable, use data from ${currentYear - 1}.
       
       RESPONSE FORMAT:
       - Respond in JSON format.
       - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - 'priceTrend': array of 7 objects with 'date' (string) and 'price' (number) representing the last 7 days.
+      - 'priceTrend': array of 7 objects with 'date' (string, format YYYY-MM-DD) and 'price' (number) representing the last 7 days leading up to ${today}.
+      - CRITICAL: Ensure the dates in 'priceTrend' are from ${currentYear} (or ${currentYear - 1} if current data is missing). DO NOT use data from 2023 or earlier.
       - 'nearestMarkets': array of objects with 'name' and 'distance'.
       - Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown in 'insights'.`;
       
@@ -261,7 +263,7 @@ export const getMarketInsights = async (
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  date: { type: Type.STRING },
+                  date: { type: Type.STRING, description: 'Date in YYYY-MM-DD format' },
                   price: { type: Type.NUMBER }
                 }
               }
@@ -301,8 +303,9 @@ export const getMarketInsights = async (
         console.warn("Google Search tool failed, falling back to standard generation:", searchError);
         // Fallback without googleSearch
         const fallbackResponse = await callAiWithFallback({
-          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh. 
-          Return JSON with 'insights' (string) and 'priceTrend' (7 days array). 
+          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh for the period around ${today}. 
+          Return JSON with 'insights' (string) and 'priceTrend' (7 days array leading to ${today}). 
+          CRITICAL: Use dates from ${currentYear}.
           Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
           config: {
             responseMimeType: 'application/json',
