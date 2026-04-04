@@ -115,17 +115,21 @@ export default function AgriCopilot({
       const remainingSlots = 3 - images.length;
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-      for (const file of filesToProcess) {
-        try {
-          const optimizedDataUrl = await resizeImage(file, 800);
-          const base64Data = optimizedDataUrl.split(',')[1];
-          setImages(prev => [...prev, { base64: base64Data, mimeType: 'image/jpeg' }]);
-          setDiagnosis(null);
-          setAudioUrl(null);
-        } catch (error) {
-          console.error("Error optimizing image:", error);
-          alert("Failed to process image. Please try another one.");
-        }
+      try {
+        const processedImages = await Promise.all(
+          filesToProcess.map(async (file) => {
+            const optimizedDataUrl = await resizeImage(file, 800);
+            const base64Data = optimizedDataUrl.split(',')[1];
+            return { base64: base64Data, mimeType: 'image/jpeg' };
+          })
+        );
+        
+        setImages(prev => [...prev, ...processedImages]);
+        setDiagnosis(null);
+        setAudioUrl(null);
+      } catch (error) {
+        console.error("Error optimizing images:", error);
+        alert("Failed to process one or more images. Please try again.");
       }
     }
   };

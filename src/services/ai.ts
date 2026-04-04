@@ -245,6 +245,8 @@ export const getMarketInsights = async (
       Search for official market reports, news articles, or agricultural bulletins from ${currentYear}.
       If ${currentYear} data is absolutely unavailable, use data from ${currentYear - 1}.
       
+      CRITICAL: All prices must be in BDT (Taka) and per KG (Kilogram). If you find prices in Maunds (40kg), convert them to per KG.
+      
       RESPONSE FORMAT:
       - Respond in JSON format.
       - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
@@ -317,7 +319,7 @@ export const getMarketInsights = async (
         const fallbackResponse = await callAiWithFallback({
           contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh for the period around ${today}. 
           Return JSON with 'insights' (string) and 'priceTrend' (7 days array leading to ${today}). 
-          CRITICAL: Use dates from ${currentYear}.
+          CRITICAL: Use dates from ${currentYear}. All prices must be in BDT and per KG.
           Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
           config: {
             responseMimeType: 'application/json',

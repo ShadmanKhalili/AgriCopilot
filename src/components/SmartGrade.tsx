@@ -294,7 +294,7 @@ export default function SmartGrade({ lang }: Props) {
                       </Tooltip>
                     </div>
                     <div className="text-2xl font-black text-gray-900">
-                      ৳ {result.estimatedPriceBdt} <span className="text-sm font-semibold text-gray-400">/ kg</span>
+                      ৳ {result.estimatedPriceBdt} <span className="text-sm font-semibold text-gray-400">/ {t.perKg}</span>
                     </div>
                   </div>
                 </div>

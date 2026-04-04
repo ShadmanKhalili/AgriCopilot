@@ -6,6 +6,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
 import { useAuth } from './AuthProvider';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
@@ -124,7 +125,7 @@ export default function MarketConnect({
             createdAt: new Date().toISOString()
           });
         } catch (saveError) {
-          console.error("Failed to save market query:", saveError);
+          handleFirestoreError(saveError, OperationType.CREATE, 'market_queries');
         }
       }
     } catch (error: any) {
@@ -336,6 +337,9 @@ export default function MarketConnect({
                       <h4 className="font-bold text-gray-900 flex items-center">
                         <TrendingUp className="w-5 h-5 mr-2 text-purple-600" />
                         {lang === 'bn' ? 'মূল্যের প্রবণতা (৭ দিন)' : 'Price Trend (7 Days)'}
+                        <span className="ml-2 text-[10px] font-bold text-purple-400 uppercase tracking-widest bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
+                          {t.perKg}
+                        </span>
                       </h4>
                       {insights.priceTrend && insights.priceTrend.length > 1 && (
                         <div className={`flex items-center text-xs font-bold ${
@@ -373,7 +377,7 @@ export default function MarketConnect({
                           />
                           <RechartsTooltip 
                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                            formatter={(value: number) => [`৳${value}`, lang === 'bn' ? 'মূল্য' : 'Price']}
+                            formatter={(value: number) => [`৳${value} ${t.perKg}`, lang === 'bn' ? 'মূল্য' : 'Price']}
                           />
                           <Area 
                             type="monotone" 
