@@ -45,6 +45,16 @@ service cloud.firestore {
     //   - message: string (required)
     //   - createdAt: string (required, immutable)
     //
+    // Collection: market_queries
+    // Document ID: {queryId}
+    // Fields:
+    //   - userId: string (required, immutable)
+    //   - produce: string (required)
+    //   - location: string (required)
+    //   - insights: string (required)
+    //   - isAdvanced: boolean (required)
+    //   - createdAt: string (required, immutable)
+    //
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -127,6 +137,17 @@ service cloud.firestore {
              isValidDateString(data.createdAt);
     }
 
+    function isValidMarketQuery(data) {
+      return hasOnlyAllowedFields(['userId', 'produce', 'location', 'insights', 'isAdvanced', 'createdAt']) &&
+             hasRequiredFields(['userId', 'produce', 'location', 'insights', 'isAdvanced', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.produce is string && data.produce.size() > 0 && data.produce.size() < 100 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
+             data.insights is string && data.insights.size() > 0 && data.insights.size() < 5000 &&
+             data.isAdvanced is bool &&
+             isValidDateString(data.createdAt);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -189,6 +210,17 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidAlert(request.resource.data) &&
                     request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && isValidAlert(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    (request.auth.uid == resource.data.userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /market_queries/{queryId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && isValidMarketQuery(request.resource.data) &&
+                    request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidMarketQuery(request.resource.data) &&
                     request.resource.data.userId == resource.data.userId &&
                     request.resource.data.createdAt == resource.data.createdAt &&
                     (request.auth.uid == resource.data.userId || isAdmin());

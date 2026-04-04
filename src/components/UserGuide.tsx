@@ -100,9 +100,9 @@ export default function UserGuide({ lang }: Props) {
           </div>
           <ul className="space-y-5">
             {[
-              lang === 'bn' ? 'পণ্যের নাম এবং আপনার অবস্থান নির্বাচন করুন।' : 'Select the produce name and your location.',
-              lang === 'bn' ? '"বাজারের অন্তর্দৃষ্টি পান" এ ক্লিক করুন।' : 'Click "Get Market Insights".',
-              lang === 'bn' ? 'বর্তমান মূল্য এবং বিক্রির পরামর্শ পড়ুন।' : 'Read the current price and selling recommendations.'
+              t.guideMarketConnect1 || (lang === 'bn' ? 'পণ্যের নাম এবং আপনার অবস্থান নির্বাচন করুন।' : 'Select the produce name and your location.'),
+              t.guideMarketConnect2 || (lang === 'bn' ? '"বাজারের অন্তর্দৃষ্টি পান" এ ক্লিক করুন।' : 'Click "Get Market Insights".'),
+              t.guideMarketConnect3 || (lang === 'bn' ? 'বর্তমান মূল্য এবং বিক্রির পরামর্শ পড়ুন।' : 'Read the current price and selling recommendations.')
             ].map((step, i) => (
               <li key={i} className="flex items-start">
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-sm font-bold mr-4 border border-purple-100 shadow-sm">

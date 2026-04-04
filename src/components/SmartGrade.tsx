@@ -10,7 +10,7 @@ import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 
-const PRODUCE_TYPES = ['Tomato', 'Brinjal', 'Dry Fish'];
+const PRODUCE_TYPES = ['tomato', 'brinjal', 'dryFish', 'shrimp', 'salt', 'betelNut', 'mango', 'banana', 'coconut', 'chili'];
 
 interface GradeResult {
   grade: string;
@@ -61,7 +61,7 @@ export default function SmartGrade({ lang }: Props) {
 
     setIsLoading(true);
     try {
-      const gradeResult = await gradeProduce(image, mimeType, produce, isAdvanced);
+      const gradeResult = await gradeProduce(image, mimeType, t.produce[produce as keyof typeof t.produce], lang, isAdvanced);
       setResult(gradeResult);
       
       await incrementUsage();
@@ -146,7 +146,11 @@ export default function SmartGrade({ lang }: Props) {
               onChange={(e) => setProduce(e.target.value)}
               className="w-full rounded-xl border-gray-200 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-3 border transition-colors"
             >
-              {PRODUCE_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+              {PRODUCE_TYPES.map(p => (
+                <option key={p} value={p}>
+                  {t.produce[p as keyof typeof t.produce]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -223,7 +227,7 @@ export default function SmartGrade({ lang }: Props) {
                   <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                     <div>
                       <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.produceType}</p>
-                      <p className="font-bold text-gray-900 text-xl">{produce}</p>
+                      <p className="font-bold text-gray-900 text-xl">{t.produce[produce as keyof typeof t.produce]}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.assignedGrade}</p>

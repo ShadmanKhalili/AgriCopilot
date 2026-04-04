@@ -10,8 +10,8 @@ import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 
-const UPAZILAS = ['Teknaf', 'Ukhia', 'Moheshkhali', 'Kutubdia', 'Ramu', 'Cox\'s Bazar Sadar', 'Chakaria', 'Pekua'];
-const CROPS = ['Tomato', 'Brinjal', 'Paddy', 'Betel Leaf', 'Chili', 'Watermelon'];
+const UPAZILAS = ['sadar', 'chakaria', 'ukhiya', 'teknaf', 'ramu', 'peua', 'kutubdia', 'moheshkhali'];
+const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
 
 interface Props {
   lang: Language;
@@ -59,7 +59,11 @@ export default function AgriCopilot({ lang }: Props) {
     setIsLoading(true);
     try {
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.nutrient;
-      const resultText = await diagnoseCrop(image, mimeType, crop, upazila, analysisTypeStr, isAdvanced);
+      // Use English values for the AI prompt to ensure consistency, but we can pass the translated ones too
+      const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
+      const upazilaName = translations.en.upazilas[upazila as keyof typeof translations.en.upazilas];
+      
+      const resultText = await diagnoseCrop(image, mimeType, cropName, upazilaName, analysisTypeStr, lang, isAdvanced);
       setDiagnosis(resultText);
       
       await incrementUsage();
@@ -184,7 +188,11 @@ export default function AgriCopilot({ lang }: Props) {
                 onChange={(e) => setCrop(e.target.value)}
                 className="w-full rounded-xl border-gray-200 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-50 p-3 border transition-colors"
               >
-                {CROPS.map(c => <option key={c} value={c}>{c}</option>)}
+                {CROPS.map(c => (
+                  <option key={c} value={c}>
+                    {t.crops[c as keyof typeof t.crops]}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -194,7 +202,11 @@ export default function AgriCopilot({ lang }: Props) {
                 onChange={(e) => setUpazila(e.target.value)}
                 className="w-full rounded-xl border-gray-200 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-50 p-3 border transition-colors"
               >
-                {UPAZILAS.map(u => <option key={u} value={u}>{u}</option>)}
+                {UPAZILAS.map(u => (
+                  <option key={u} value={u}>
+                    {t.upazilas[u as keyof typeof t.upazilas]}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
 import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart } from 'lucide-react';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
 import { useAuth } from './AuthProvider';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
 
-const PRODUCE_TYPES = ['Tomato', 'Brinjal', 'Paddy', 'Betel Leaf', 'Chili', 'Watermelon', 'Potato', 'Onion'];
+const PRODUCE_TYPES = ['tomato', 'brinjal', 'paddy', 'betelLeaf', 'chili', 'watermelon', 'potato', 'onion'];
 const MARKET_LOCATIONS = [
-  'Kawran Bazar, Dhaka', 
-  'Shyambazar, Dhaka', 
-  'Khatunganj, Chittagong',
-  'Teknaf', 
-  'Ukhia', 
-  'Moheshkhali', 
-  'Kutubdia', 
-  'Ramu', 
-  'Cox\'s Bazar Sadar', 
-  'Chakaria', 
-  'Pekua'
+  'kawranBazar', 
+  'shyambazar', 
+  'khatunganj',
+  'teknaf', 
+  'ukhiya', 
+  'moheshkhali', 
+  'kutubdia', 
+  'ramu', 
+  'sadar', 
+  'chakaria', 
+  'pekua'
 ];
 
 interface Props {
@@ -47,9 +49,28 @@ export default function MarketConnect({ lang }: Props) {
     
     let result = null;
     try {
-      result = await getMarketInsights(produce, location, lang, isAdvanced);
+      const produceName = translations.en.crops[produce as keyof typeof translations.en.crops] || produce;
+      const locationName = translations.en.locations[location as keyof typeof translations.en.locations] || location;
+      
+      result = await getMarketInsights(produceName, locationName, lang, isAdvanced);
       setInsights(result);
       setLastUpdated(new Date().toLocaleString());
+
+      // Save query if user is logged in
+      if (user) {
+        try {
+          await addDoc(collection(db, 'market_queries'), {
+            userId: user.uid,
+            produce,
+            location,
+            insights: result,
+            isAdvanced,
+            createdAt: new Date().toISOString()
+          });
+        } catch (saveError) {
+          console.error("Failed to save market query:", saveError);
+        }
+      }
     } catch (error: any) {
       console.error("Market insights failed:", error);
       setInsights(error.message || "Error fetching market insights from AI. Please try again.");
@@ -105,7 +126,11 @@ export default function MarketConnect({ lang }: Props) {
                   onChange={(e) => setProduce(e.target.value)}
                   className="w-full rounded-xl border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-purple-50/50 p-3.5 border text-base font-medium transition-colors"
                 >
-                  {PRODUCE_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+                  {PRODUCE_TYPES.map(p => (
+                    <option key={p} value={p}>
+                      {t.crops[p as keyof typeof t.crops] || p}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -119,7 +144,11 @@ export default function MarketConnect({ lang }: Props) {
                   onChange={(e) => setLocation(e.target.value)}
                   className="w-full rounded-xl border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 bg-purple-50/50 p-3.5 border text-base font-medium transition-colors"
                 >
-                  {MARKET_LOCATIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                  {MARKET_LOCATIONS.map(u => (
+                    <option key={u} value={u}>
+                      {t.locations[u as keyof typeof t.locations] || u}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -212,7 +241,9 @@ export default function MarketConnect({ lang }: Props) {
                           <Sparkles className="w-6 h-6 text-purple-500" />
                         </div>
                         <div className="flex-1 space-y-4">
-                          <h4 className="font-black text-gray-900 text-2xl tracking-tight">{produce} <span className="text-purple-600 font-medium">in</span> {location}</h4>
+                          <h4 className="font-black text-gray-900 text-2xl tracking-tight">
+                            {t.crops[produce as keyof typeof t.crops] || produce} <span className="text-purple-600 font-medium">{lang === 'bn' ? 'মধ্যে' : 'in'}</span> {t.locations[location as keyof typeof t.locations] || location}
+                          </h4>
                           <div className="text-gray-800 leading-relaxed whitespace-pre-wrap prose prose-purple max-w-none text-base">
                             {insights}
                           </div>

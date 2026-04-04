@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
 import MarketConnect from './MarketConnect';
 import UserGuide from './UserGuide';
+import Profile from './Profile';
 import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'user-guide';
+type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'user-guide' | 'profile';
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -27,6 +28,7 @@ export default function Layout() {
     { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
     { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
     { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc },
+    { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc },
   ] as const;
 
   if (!isAuthReady) {
@@ -133,10 +135,15 @@ export default function Layout() {
           {/* Auth Section */}
           {user ? (
             <div className="flex items-center justify-between bg-green-900/30 p-3 rounded-xl">
-              <div className="text-sm">
-                <div className="font-medium truncate max-w-[140px]">{user.displayName}</div>
-                <div className="text-green-300 text-xs capitalize">{userRole}</div>
-              </div>
+              <button 
+                onClick={() => setActiveTab('profile')}
+                className="flex items-center space-x-3 text-left flex-1 hover:bg-green-700/50 p-1 rounded-lg transition-colors"
+              >
+                <div className="text-sm">
+                  <div className="font-medium truncate max-w-[120px]">{user.displayName}</div>
+                  <div className="text-green-300 text-xs capitalize">{userRole}</div>
+                </div>
+              </button>
               <button onClick={signOut} className="p-2 hover:bg-green-700 rounded-lg text-green-200 hover:text-white transition-colors" title={t.signOut}>
                 <LogOut className="w-5 h-5" />
               </button>
@@ -169,6 +176,7 @@ export default function Layout() {
               {activeTab === 'smart-grade' && <SmartGrade lang={lang} />}
               {activeTab === 'market-connect' && <MarketConnect lang={lang} />}
               {activeTab === 'user-guide' && <UserGuide lang={lang} />}
+              {activeTab === 'profile' && <Profile lang={lang} />}
             </motion.div>
           </AnimatePresence>
         </div>

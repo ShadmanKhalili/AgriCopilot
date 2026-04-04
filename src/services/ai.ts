@@ -52,7 +52,7 @@ const callAiWithFallback = async (params: any, primaryModel: string) => {
   }
 };
 
-export const diagnoseCrop = async (imageBase64: string, mimeType: string, crop: string, upazila: string, analysisType: string, isAdvanced?: boolean) => {
+export const diagnoseCrop = async (imageBase64: string, mimeType: string, crop: string, upazila: string, analysisType: string, lang: string, isAdvanced?: boolean) => {
   return await callAiWithRetry(async () => {
     try {
       const prompt = `You are a Bangladesh DAE agronomist. 
@@ -60,11 +60,11 @@ export const diagnoseCrop = async (imageBase64: string, mimeType: string, crop: 
       
       CRITICAL VALIDATION: 
       1. Look at the image. Does it contain a ${crop}?
-      2. If NO, stop immediately and respond ONLY with: 'এই ছবিটি নির্বাচিত ফসলের (${crop}) সাথে মিলছে না। অনুগ্রহ করে সঠিক ফসলের ছবি আপলোড করুন।'
+      2. If NO, stop immediately and respond ONLY with: ${lang === 'bn' ? "'এই ছবিটি নির্বাচিত ফসলের সাথে মিলছে না। অনুগ্রহ করে সঠিক ফসলের ছবি আপলোড করুন।'" : "'This image does not match the selected crop. Please upload a correct crop image.'"}
       3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar.
       
       RESPONSE FORMAT: 
-      - Respond in Bangla.
+      - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
       - Keep it under 100 words.`;
       
       const response = await callAiWithFallback({
@@ -110,7 +110,7 @@ export const generateSpeech = async (text: string) => {
   });
 };
 
-export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, isAdvanced?: boolean) => {
+export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, lang: string, isAdvanced?: boolean) => {
   return await callAiWithRetry(async () => {
     try {
       const prompt = `You are an expert agricultural quality inspector. 
@@ -118,12 +118,12 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
       
       CRITICAL VALIDATION:
       1. Look at the image. Does it contain ${produce}?
-      2. If NO, stop immediately. Set 'grade' to 'Invalid' and 'justification' to a Bangla message explaining that the image does not match the selected produce.
+      2. If NO, stop immediately. Set 'grade' to 'Invalid' and 'justification' to a ${lang === 'bn' ? 'Bangla' : 'English'} message explaining that the image does not match the selected produce.
       3. If YES, proceed to grade the batch (Grade A, Grade B, or Reject) based on visual quality, uniformity, and defects.
       
       RESPONSE FORMAT:
       - Respond in JSON format.
-      - Justification must be in Bangla.`;
+      - Justification must be in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
       
       const response = await callAiWithFallback({
         contents: [
@@ -136,7 +136,7 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
             type: Type.OBJECT,
             properties: {
               grade: { type: Type.STRING, description: 'Grade A, Grade B, Reject, or Invalid' },
-              justification: { type: Type.STRING, description: 'Short justification for the grade in Bangla' },
+              justification: { type: Type.STRING, description: `Short justification for the grade in ${lang === 'bn' ? 'Bangla' : 'English'}` },
               estimatedPriceBdt: { type: Type.NUMBER, description: 'Estimated price per kg in BDT' },
               shelfLife: { type: Type.STRING, description: 'Estimated shelf life (e.g., 3-5 days)' },
               bestMarket: { type: Type.STRING, description: 'Recommended market type (e.g., Local Bazaar, Supermarket, Export)' }
