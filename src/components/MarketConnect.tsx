@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar } from 'lucide-react';
+import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar, Navigation } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
@@ -35,9 +36,35 @@ export default function MarketConnect({ lang }: Props) {
   const [insights, setInsights] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        setIsDetectingLocation(false);
+      },
+      (error) => {
+        console.error("Error detecting location:", error);
+        setIsDetectingLocation(false);
+        alert(t.tooltips.locationError || "Failed to detect location. Please check permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const handleGetInsights = async () => {
     if (!canUse()) {
@@ -53,7 +80,7 @@ export default function MarketConnect({ lang }: Props) {
       const produceName = translations.en.crops[produce as keyof typeof translations.en.crops] || produce;
       const locationName = translations.en.locations[location as keyof typeof translations.en.locations] || location;
       
-      result = await getMarketInsights(produceName, locationName, lang, isAdvanced);
+      result = await getMarketInsights(produceName, locationName, lang, isAdvanced, coords || undefined);
       setInsights(result);
       setLastUpdated(new Date().toLocaleString());
 
@@ -103,7 +130,7 @@ export default function MarketConnect({ lang }: Props) {
         <p className="text-gray-500 text-lg">{t.marketConnectDesc}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Control Panel */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -111,7 +138,7 @@ export default function MarketConnect({ lang }: Props) {
           transition={{ delay: 0.1 }}
           className="lg:col-span-1 space-y-6"
         >
-          <div className="bg-white p-6 rounded-3xl border border-purple-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="bg-white p-5 md:p-8 rounded-3xl border border-purple-100 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="font-bold text-purple-900 mb-6 flex items-center text-xl">
               <div className="bg-purple-100 p-2 rounded-xl mr-3">
                 <Store className="w-6 h-6 text-purple-600" />
@@ -136,10 +163,32 @@ export default function MarketConnect({ lang }: Props) {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider flex items-center">
-                  <MapPin className="w-4 h-4 mr-1 text-purple-500" />
-                  {t.location}
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-bold text-gray-700 uppercase tracking-wider flex items-center">
+                    <MapPin className="w-4 h-4 mr-1 text-purple-500" />
+                    {t.location}
+                  </label>
+                  <Tooltip content={t.tooltips.locationDesc}>
+                    <button 
+                      onClick={handleDetectLocation}
+                      disabled={isDetectingLocation}
+                      className={`flex items-center space-x-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg transition-colors ${
+                        coords 
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200' 
+                          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                      }`}
+                    >
+                      {isDetectingLocation ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : coords ? (
+                        <Navigation className="w-3 h-3" />
+                      ) : (
+                        <MapPin className="w-3 h-3" />
+                      )}
+                      <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
+                    </button>
+                  </Tooltip>
+                </div>
                 <select 
                   value={location} 
                   onChange={(e) => setLocation(e.target.value)}
@@ -223,7 +272,7 @@ export default function MarketConnect({ lang }: Props) {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 className="bg-white rounded-3xl border border-purple-200 shadow-sm h-full flex flex-col relative overflow-hidden"
               >
-                <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-6 flex items-center justify-between relative overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-5 md:p-6 flex items-center justify-between relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-4">
                     <div className="flex items-center">
@@ -252,7 +301,7 @@ export default function MarketConnect({ lang }: Props) {
                   </div>
                 </div>
                 
-                <div className="p-8 flex-1 flex flex-col bg-gradient-to-b from-white to-purple-50/30">
+                <div className="p-5 md:p-8 flex-1 flex flex-col bg-gradient-to-b from-white to-purple-50/30">
                   <div className="space-y-6">
                     <div className="bg-purple-50/80 backdrop-blur-sm border border-purple-100/50 rounded-2xl p-6 shadow-sm">
                       <div className="flex items-start gap-5">
@@ -263,8 +312,8 @@ export default function MarketConnect({ lang }: Props) {
                           <h4 className="font-black text-gray-900 text-2xl tracking-tight">
                             {t.crops[produce as keyof typeof t.crops] || produce} <span className="text-purple-600 font-medium">{lang === 'bn' ? 'মধ্যে' : 'in'}</span> {t.locations[location as keyof typeof t.locations] || location}
                           </h4>
-                          <div className="text-gray-800 leading-relaxed whitespace-pre-wrap prose prose-purple max-w-none text-base">
-                            {insights}
+                          <div className="text-gray-800 leading-relaxed prose prose-purple max-w-none text-base markdown-body">
+                            <ReactMarkdown>{insights}</ReactMarkdown>
                           </div>
                         </div>
                       </div>

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Loader2, Award, FileCheck, DollarSign, Sparkles, HelpCircle, Calendar } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { gradeProduce } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -104,13 +105,13 @@ export default function SmartGrade({ lang }: Props) {
         <p className="text-gray-500 text-lg">{t.smartGradeDesc}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-6 bg-white p-6 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow"
+          className="space-y-6 bg-white p-5 md:p-8 rounded-3xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow"
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.captureBatch}</label>
@@ -223,7 +224,7 @@ export default function SmartGrade({ lang }: Props) {
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 className="bg-white rounded-3xl border border-blue-200 shadow-sm overflow-hidden flex flex-col h-full relative"
               >
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 flex items-center justify-between relative overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-5 md:p-6 flex items-center justify-between relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                   <div className="flex items-center space-x-3 relative z-10">
                     <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
@@ -237,7 +238,7 @@ export default function SmartGrade({ lang }: Props) {
                   </div>
                 </div>
                 
-                <div className="p-8 flex-1 flex flex-col space-y-6 bg-gradient-to-b from-white to-blue-50/30">
+                <div className="p-5 md:p-8 flex-1 flex flex-col space-y-6 bg-gradient-to-b from-white to-blue-50/30">
                   <div className="flex items-center justify-between border-b border-gray-100 pb-6">
                     <div>
                       <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.produceType}</p>
@@ -258,9 +259,9 @@ export default function SmartGrade({ lang }: Props) {
 
                   <div>
                     <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">{t.justification}</p>
-                    <p className="text-gray-800 bg-white p-4 rounded-2xl border border-gray-100 text-sm leading-relaxed shadow-sm">
-                      {result.justification}
-                    </p>
+                    <div className="text-gray-800 bg-white p-4 rounded-2xl border border-gray-100 text-sm leading-relaxed shadow-sm markdown-body">
+                      <ReactMarkdown>{result.justification}</ReactMarkdown>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

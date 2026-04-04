@@ -18,7 +18,7 @@ export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>('bn');
   const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
   const { currentUsage, limit, tier } = useUsageTracking();
 
@@ -49,37 +49,66 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
       {/* Mobile Header */}
-      <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-20">
+      <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-30 sticky top-0">
         <div className="flex items-center space-x-2">
-          <Leaf className="w-6 h-6" />
-          <span className="font-bold text-lg">{t.appTitle}</span>
+          <Leaf className="w-6 h-6 text-green-300" />
+          <span className="font-bold text-lg tracking-tight">Agri-Copilot</span>
         </div>
-        <div className="flex items-center space-x-4">
-          <button onClick={toggleLanguage} className="font-medium text-sm bg-green-800 px-2 py-1 rounded">
-            {lang === 'en' ? 'BN' : 'EN'}
+        <div className="flex items-center space-x-3">
+          <button 
+            onClick={toggleLanguage} 
+            className="flex items-center space-x-1 font-bold text-xs bg-green-800 px-2.5 py-1.5 rounded-lg border border-green-600 shadow-sm"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>{lang === 'en' ? 'BN' : 'EN'}</span>
           </button>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-1.5 bg-green-800 rounded-lg"
+          >
+            <Menu className="w-6 h-6" />
           </button>
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* Sidebar / Mobile Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <div className={`
         fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:relative md:translate-x-0 transition duration-200 ease-in-out
-        w-64 bg-green-800 text-white flex flex-col shadow-xl z-10
+        md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
+        w-72 bg-green-800 text-white flex flex-col shadow-2xl z-50 h-[100dvh]
       `}>
-        <div className="p-6 hidden md:flex items-center justify-between border-b border-green-700">
+        <div className="p-6 flex items-center justify-between border-b border-green-700/50">
           <div className="flex items-center space-x-3">
             <Leaf className="w-8 h-8 text-green-300" />
             <span className="font-bold text-xl tracking-tight">Agri-Copilot</span>
           </div>
-          <Tooltip content={lang === 'en' ? 'Switch to Bangla' : 'ইংরেজিতে পরিবর্তন করুন'} position="right">
-            <button onClick={toggleLanguage} className="text-green-200 hover:text-white transition-colors p-1.5 hover:bg-green-700 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={toggleLanguage} 
+              className="md:flex hidden text-green-200 hover:text-white transition-colors p-1.5 hover:bg-green-700 rounded-lg"
+              title="Toggle Language"
+            >
               <Globe className="w-5 h-5" />
             </button>
-          </Tooltip>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden p-2 bg-green-700/50 rounded-xl hover:bg-green-700 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -107,7 +136,7 @@ export default function Layout() {
           })}
         </nav>
         
-        <div className="p-4 border-t border-green-700 space-y-4">
+        <div className="p-4 border-t border-green-700/50 space-y-4 pb-8 md:pb-6">
           {/* Usage Stats */}
           <div className="bg-green-900/50 rounded-xl p-4 shadow-inner">
             <div className="flex justify-between items-center mb-2">
@@ -169,8 +198,8 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full max-w-6xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 md:p-8 min-h-[calc(100vh-2rem)] relative overflow-hidden">
+      <main className="flex-1 p-3 md:p-8 overflow-y-auto w-full max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-100 p-4 md:p-8 min-h-[calc(100vh-2rem)] relative overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -190,13 +219,7 @@ export default function Layout() {
         </div>
       </main>
       
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-0 md:hidden backdrop-blur-sm"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      {/* Mobile Overlay - Removed as it's handled by AnimatePresence above */}
 
       {/* Pricing Modal */}
       <PricingModal 

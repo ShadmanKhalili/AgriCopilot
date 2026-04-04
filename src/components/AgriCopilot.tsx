@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar } from 'lucide-react';
-import { diagnoseCrop, generateSpeech } from '../services/ai';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { diagnoseCrop, generateSpeech, startAgriChat } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -28,7 +29,14 @@ export default function AgriCopilot({ lang }: Props) {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [currentChatMessage, setCurrentChatMessage] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatSession, setChatSession] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
@@ -49,6 +57,53 @@ export default function AgriCopilot({ lang }: Props) {
     }
   };
 
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        setIsDetectingLocation(false);
+      },
+      (error) => {
+        console.error("Error detecting location:", error);
+        setIsDetectingLocation(false);
+        alert(t.tooltips.locationError || "Failed to detect location. Please check permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentChatMessage.trim() || !chatSession || isChatLoading) return;
+
+    const userMessage = currentChatMessage.trim();
+    setCurrentChatMessage('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+    setIsChatLoading(true);
+
+    try {
+      const response = await chatSession.sendMessage({ message: userMessage });
+      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      alert(t.tooltips.chatError);
+    } finally {
+      setIsChatLoading(false);
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
   const handleDiagnose = async () => {
     if (!image) return;
     
@@ -64,8 +119,22 @@ export default function AgriCopilot({ lang }: Props) {
       const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
       const upazilaName = translations.en.upazilas[upazila as keyof typeof translations.en.upazilas];
       
-      const resultText = await diagnoseCrop(image, mimeType, cropName, upazilaName, analysisTypeStr, lang, isAdvanced);
+      const resultText = await diagnoseCrop(
+        image, 
+        mimeType, 
+        cropName, 
+        upazilaName, 
+        analysisTypeStr, 
+        lang, 
+        isAdvanced,
+        coords || undefined
+      );
       setDiagnosis(resultText);
+      
+      // Initialize chat session
+      const session = startAgriChat(resultText, lang);
+      setChatSession(session);
+      setChatMessages([]);
       
       await incrementUsage();
 
@@ -145,13 +214,13 @@ export default function AgriCopilot({ lang }: Props) {
         <p className="text-gray-500 text-lg">{t.agriCopilotDesc}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
         {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-6 bg-white p-6 rounded-3xl border border-green-100 shadow-sm hover:shadow-md transition-shadow"
+          className="space-y-6 bg-white p-5 md:p-8 rounded-3xl border border-green-100 shadow-sm hover:shadow-md transition-shadow"
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t.captureImage}</label>
@@ -197,7 +266,29 @@ export default function AgriCopilot({ lang }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.upazila}</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">{t.upazila}</label>
+                <Tooltip content={t.tooltips.locationDesc}>
+                  <button 
+                    onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
+                    className={`flex items-center space-x-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg transition-colors ${
+                      coords 
+                        ? 'bg-green-100 text-green-700 border border-green-200' 
+                        : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {isDetectingLocation ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : coords ? (
+                      <Navigation className="w-3 h-3" />
+                    ) : (
+                      <MapPin className="w-3 h-3" />
+                    )}
+                    <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
+                  </button>
+                </Tooltip>
+              </div>
               <select 
                 value={upazila} 
                 onChange={(e) => setUpazila(e.target.value)}
@@ -296,7 +387,7 @@ export default function AgriCopilot({ lang }: Props) {
                 key="result"
                 initial={{ opacity: 0, x: 20, scale: 0.95 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
-                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl p-8 border border-green-100 h-full flex flex-col shadow-sm relative overflow-hidden"
+                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl p-5 md:p-8 border border-green-100 h-full flex flex-col shadow-sm relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                 <div className="flex items-center justify-between mb-6">
@@ -312,8 +403,10 @@ export default function AgriCopilot({ lang }: Props) {
                   </div>
                 </div>
                 
-                <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm prose prose-green max-w-none">
-                  <div className="whitespace-pre-wrap">{diagnosis}</div>
+                <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm max-w-none">
+                  <div className="markdown-body text-sm md:text-base">
+                    <ReactMarkdown>{diagnosis}</ReactMarkdown>
+                  </div>
                 </div>
 
                 {audioUrl && (
@@ -331,6 +424,74 @@ export default function AgriCopilot({ lang }: Props) {
                     </div>
                   </motion.div>
                 )}
+
+                {/* Chatbot Section */}
+                <div className="mt-8 pt-8 border-t border-green-200/50">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="bg-green-100 p-2 rounded-xl">
+                      <MessageSquare className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-sm">{t.tooltips.chatWithExpert}</h4>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">{t.tooltips.chatDesc}</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/50 backdrop-blur-sm rounded-2xl border border-green-100 overflow-hidden flex flex-col h-[350px] shadow-inner">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {chatMessages.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400">
+                          <Bot className="w-10 h-10 mb-3 opacity-20" />
+                          <p className="text-xs font-medium">{lang === 'bn' ? 'আপনার প্রশ্ন জিজ্ঞাসা করুন...' : 'Ask your follow-up questions here...'}</p>
+                        </div>
+                      )}
+                      {chatMessages.map((msg, idx) => (
+                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] p-3 rounded-2xl text-sm shadow-sm ${
+                            msg.role === 'user' 
+                              ? 'bg-green-600 text-white rounded-tr-none' 
+                              : 'bg-white text-gray-800 border border-green-50 rounded-tl-none'
+                          }`}>
+                            <div className="flex items-center space-x-2 mb-1 opacity-70 text-[10px] font-bold uppercase tracking-wider">
+                              {msg.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                              <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ' : 'Expert')}</span>
+                            </div>
+                              <div className="markdown-body leading-relaxed text-xs md:text-sm">
+                                <ReactMarkdown>{msg.text}</ReactMarkdown>
+                              </div>
+                          </div>
+                        </div>
+                      ))}
+                      {isChatLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-white border border-green-50 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center space-x-2">
+                            <Loader2 className="w-4 h-4 animate-spin text-green-600" />
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-2 bg-white border-t border-green-100 flex items-center space-x-2">
+                      <input 
+                        type="text"
+                        value={currentChatMessage}
+                        onChange={(e) => setCurrentChatMessage(e.target.value)}
+                        placeholder={t.tooltips.typeMessage}
+                        disabled={isChatLoading}
+                        className="flex-1 bg-gray-50 border-none focus:ring-2 focus:ring-green-500 rounded-xl px-4 py-2 text-sm"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={!currentChatMessage.trim() || isChatLoading}
+                        className="bg-green-600 text-white p-2 rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </form>
+                  </div>
+                </div>
               </motion.div>
             ) : (
               <motion.div 

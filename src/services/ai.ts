@@ -10,7 +10,7 @@ const getAi = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemma-4-31b' : 'gemma-4-31b';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
 const SEARCH_MODEL = 'gemini-2.5-flash-preview';
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
@@ -52,26 +52,52 @@ const callAiWithFallback = async (params: any, primaryModel: string) => {
   }
 };
 
-export const diagnoseCrop = async (imageBase64: string, mimeType: string, crop: string, upazila: string, analysisType: string, lang: string, isAdvanced?: boolean) => {
+export const diagnoseCrop = async (
+  imageBase64: string, 
+  mimeType: string, 
+  crop: string, 
+  upazila: string, 
+  analysisType: string, 
+  lang: string, 
+  isAdvanced?: boolean,
+  coords?: { latitude: number; longitude: number }
+) => {
   return await callAiWithRetry(async () => {
     try {
+      const locationContext = coords 
+        ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
+        : `General Location: ${upazila}, Cox's Bazar.`;
+
       const prompt = `You are a Bangladesh DAE agronomist. 
       TASK: Analyze the image for ${analysisType} on a ${crop}.
+      ${locationContext}
       
       CRITICAL VALIDATION: 
       1. Look at the image. Does it contain a ${crop}?
       2. If NO, stop immediately and respond ONLY with: ${lang === 'bn' ? "'এই ছবিটি নির্বাচিত ফসলের সাথে মিলছে না। অনুগ্রহ করে সঠিক ফসলের ছবি আপলোড করুন।'" : "'This image does not match the selected crop. Please upload a correct crop image.'"}
-      3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar.
+      3. If YES, proceed to analyze the ${analysisType} and recommend a chemical-free or climate-smart solution available locally in Cox's Bazar. Use Google Maps to find nearby agricultural supply stores or DAE offices if relevant.
       
       RESPONSE FORMAT: 
       - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - Keep it under 100 words.`;
+      - Use markdown for formatting (bolding, lists) to make it readable.
+      - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. Max 60 words.`;
       
+      const config: any = {};
+      if (coords) {
+        config.tools = [{ googleMaps: {} }];
+        config.toolConfig = {
+          retrievalConfig: {
+            latLng: coords
+          }
+        };
+      }
+
       const response = await callAiWithFallback({
         contents: [
           { inlineData: { data: imageBase64, mimeType } },
           prompt
-        ]
+        ],
+        config
       }, getModelName(isAdvanced));
       
       if (!response.text) {
@@ -123,7 +149,9 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
       
       RESPONSE FORMAT:
       - Respond in JSON format.
-      - Justification must be in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
+      - Justification must be in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      - Use markdown in the justification for better readability.
+      - CRITICAL: Keep the justification very short, sweet, and to the point.`;
       
       const response = await callAiWithFallback({
         contents: [
@@ -158,25 +186,53 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
   });
 };
 
-export const getMarketInsights = async (produce: string, location: string, lang: string, isAdvanced?: boolean) => {
+export const getMarketInsights = async (
+  produce: string, 
+  location: string, 
+  lang: string, 
+  isAdvanced?: boolean,
+  coords?: { latitude: number; longitude: number }
+) => {
   return await callAiWithRetry(async () => {
     try {
       const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
-      const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). Search for official market reports, news articles, or agricultural bulletins from today or the most recent available date. Provide a short market insight including the specific wholesale rate in BDT, the current demand level (High/Medium/Low), and a brief recommendation on whether to sell or hold. Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`;
+      const locationContext = coords 
+        ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
+        : `General Location: ${location}, Bangladesh.`;
+
+      const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). 
+      ${locationContext}
+      Search for official market reports, news articles, or agricultural bulletins from today or the most recent available date. 
+      Also use Google Maps to identify the nearest major wholesale markets (Aroths) to the user's location.
+      Provide a short market insight including the specific wholesale rate in BDT, the current demand level (High/Medium/Low), and a brief recommendation on whether to sell or hold. 
+      List the names and distances of the nearest 2-3 markets found via Google Maps.
+      Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown for better readability.
+      CRITICAL: Be extremely concise and to the point.`;
       
+      const config: any = {
+        tools: [{ googleSearch: {} }, { googleMaps: {} }],
+        toolConfig: {
+          includeServerSideToolInvocations: true
+        }
+      };
+
+      if (coords) {
+        config.toolConfig.retrievalConfig = {
+          latLng: coords
+        };
+      }
+
       try {
         const response = await callAiWithFallback({
           contents: prompt,
-          config: {
-            tools: [{ googleSearch: {} }]
-          }
+          config
         }, SEARCH_MODEL);
         return response.text || "No insights could be generated at this time.";
       } catch (searchError) {
         console.warn("Google Search tool failed, falling back to standard generation:", searchError);
         // Fallback without googleSearch
         const fallbackResponse = await callAiWithFallback({
-          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh, including an estimated price range and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Do not use markdown formatting.`
+          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh, including an estimated price range and demand level (High/Medium/Low). Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown for better readability.`
         }, BACKUP_MODEL);
         return fallbackResponse.text || "No insights could be generated at this time.";
       }
@@ -184,5 +240,22 @@ export const getMarketInsights = async (produce: string, location: string, lang:
       console.error("AI Service Error (Market Insights):", error);
       throw error;
     }
+  });
+};
+
+export const startAgriChat = (context: string, lang: string) => {
+  const ai = getAi();
+  return ai.chats.create({
+    model: 'gemini-3.1-flash-lite-preview',
+    config: {
+      systemInstruction: `You are a helpful agricultural expert in Bangladesh. 
+      CONTEXT: The user has just received a diagnosis for their crop: "${context}".
+      TASK: Answer follow-up questions from the user about this diagnosis. 
+      - Provide practical, chemical-free, or climate-smart advice.
+      - Use local context for Cox's Bazar, Bangladesh.
+      - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. 
+      - Use markdown for formatting to make it readable.`,
+    },
   });
 };

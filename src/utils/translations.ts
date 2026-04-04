@@ -101,7 +101,19 @@ export const translations = {
       grading: "Grade based on color, size, and defects",
       pricing: "Estimated wholesale market price",
       shelfLife: "Estimated days before produce spoils",
-      bestMarket: "Recommended selling destination"
+      bestMarket: "Recommended selling destination",
+      detectLocation: "Detect Location",
+      detecting: "Detecting...",
+      locationDetected: "Location Detected",
+      locationError: "Location Error",
+      locationDesc: "Use current GPS location for more accurate local analysis",
+      nearbyMarkets: "Nearby Markets",
+      chatWithExpert: "Chat with Agri-Expert",
+      chatDesc: "Ask follow-up questions about this diagnosis",
+      typeMessage: "Type your message...",
+      sending: "Sending...",
+      aiThinking: "AI is thinking...",
+      chatError: "Failed to send message. Please try again."
     },
     // Dropdown options
     crops: {
@@ -251,7 +263,19 @@ export const translations = {
       grading: "রঙ, আকার এবং ত্রুটির ওপর ভিত্তি করে গ্রেড",
       pricing: "পাইকারি বাজারের আনুমানিক মূল্য",
       shelfLife: "পণ্য নষ্ট হওয়ার আনুমানিক দিন",
-      bestMarket: "বিক্রির জন্য সুপারিশকৃত স্থান"
+      bestMarket: "বিক্রির জন্য সুপারিশকৃত স্থান",
+      detectLocation: "অবস্থান শনাক্ত করুন",
+      detecting: "শনাক্ত করা হচ্ছে...",
+      locationDetected: "অবস্থান শনাক্ত হয়েছে",
+      locationError: "অবস্থান ত্রুটি",
+      locationDesc: "আরও সঠিক স্থানীয় বিশ্লেষণের জন্য বর্তমান জিপিএস অবস্থান ব্যবহার করুন",
+      nearbyMarkets: "নিকটবর্তী বাজার",
+      chatWithExpert: "কৃষি-বিশেষজ্ঞের সাথে চ্যাট করুন",
+      chatDesc: "এই রোগ নির্ণয় সম্পর্কে আরও প্রশ্ন জিজ্ঞাসা করুন",
+      typeMessage: "আপনার বার্তা লিখুন...",
+      sending: "পাঠানো হচ্ছে...",
+      aiThinking: "এআই চিন্তা করছে...",
+      chatError: "বার্তা পাঠাতে ব্যর্থ হয়েছে। আবার চেষ্টা করুন।"
     },
     // Dropdown options
     crops: {

@@ -125,10 +125,10 @@ export default function Profile({ lang }: Props) {
         <p className="text-gray-500 text-lg">{t.profileDesc}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         {/* Account Info */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-sm">
+          <div className="bg-white p-5 md:p-8 rounded-3xl border border-indigo-100 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
               <User className="w-5 h-5 mr-2 text-indigo-600" />
               {t.accountInfo}
@@ -155,7 +155,7 @@ export default function Profile({ lang }: Props) {
         {/* History */}
         <div className="lg:col-span-2 space-y-8">
           {/* Diagnoses History */}
-          <div className="bg-white p-6 rounded-3xl border border-green-100 shadow-sm">
+          <div className="bg-white p-5 md:p-8 rounded-3xl border border-green-100 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
               <FileText className="w-5 h-5 mr-2 text-green-600" />
               {t.diagnosesHistory}
