@@ -91,6 +91,18 @@ export const translations = {
     email: "Email",
     role: "Role",
     memberSince: "Member Since",
+    // Tooltips
+    tooltips: {
+      disease: "Identify crop diseases from images",
+      pest: "Identify insects and pests",
+      nutrient: "Identify soil/plant nutrient deficiencies",
+      advanced: "Uses more powerful AI for deeper analysis",
+      usage: "Daily limit for your current plan",
+      grading: "Grade based on color, size, and defects",
+      pricing: "Estimated wholesale market price",
+      shelfLife: "Estimated days before produce spoils",
+      bestMarket: "Recommended selling destination"
+    },
     // Dropdown options
     crops: {
       tomato: "Tomato",
@@ -145,7 +157,7 @@ export const translations = {
     agriCopilot: "এগ্রি-কোপাইলট",
     agriCopilotDesc: "এআই ফসলের রোগ নির্ণয়",
     smartGrade: "স্মার্ট-গ্রেড",
-    smartGradeDesc: "এআই গুণমান শংসাপত্র",
+    smartGradeDesc: "এআই গুণমান সনদপত্র",
     userGuide: "ব্যবহারিকা",
     userGuideDesc: "কিভাবে টুলস ব্যবহার করবেন",
     signIn: "লগ ইন করুন",
@@ -163,9 +175,9 @@ export const translations = {
     playAudio: "কৃষকের জন্য বাজান (বাংলা)",
     produceType: "পণ্যের ধরন",
     captureBatch: "ব্যাচের ছবি তুলুন",
-    generateCert: "গুণমান শংসাপত্র তৈরি করুন",
+    generateCert: "গুণমান সনদপত্র তৈরি করুন",
     gradingBatch: "গ্রেডিং করা হচ্ছে...",
-    certTitle: "ডিজিটাল গুণমান শংসাপত্র",
+    certTitle: "ডিজিটাল গুণমান সনদপত্র",
     assignedGrade: "নির্ধারিত গ্রেড",
     justification: "যুক্তি",
     estimatedPrice: "আনুমানিক মূল্য",
@@ -197,7 +209,7 @@ export const translations = {
     guideAgriCopilot3: "এআই-উত্পাদিত চিকিত্সা পরিকল্পনা এবং কৃষকদের জন্য বাজানোর জন্য একটি অডিও সংস্করণ পেতে 'রোগ নির্ণয় করুন' এ ক্লিক করুন।",
     guideSmartGrade1: "সংগৃহীত পণ্যের একটি ব্যাচের ছবি তুলুন।",
     guideSmartGrade2: "ড্রপডাউন থেকে পণ্যের ধরন নির্বাচন করুন।",
-    guideSmartGrade3: "এআই-নির্ধারিত গ্রেড এবং আনুমানিক বাজার মূল্য পেতে 'গুণমান শংসাপত্র তৈরি করুন' এ ক্লিক করুন।",
+    guideSmartGrade3: "এআই-নির্ধারিত গ্রেড এবং আনুমানিক বাজার মূল্য পেতে 'গুণমান সনদপত্র তৈরি করুন' এ ক্লিক করুন।",
     guideMarketConnect1: "পণ্যের নাম এবং আপনার অবস্থান নির্বাচন করুন।",
     guideMarketConnect2: '"বাজারের অন্তর্দৃষ্টি পান" এ ক্লিক করুন।',
     guideMarketConnect3: "বর্তমান মূল্য এবং বিক্রির পরামর্শ পড়ুন।",
@@ -229,6 +241,18 @@ export const translations = {
     email: "ইমেল",
     role: "ভূমিকা",
     memberSince: "সদস্য হওয়ার তারিখ",
+    // Tooltips
+    tooltips: {
+      disease: "ছবি থেকে ফসলের রোগ শনাক্ত করুন",
+      pest: "পোকামাকড় এবং কীট শনাক্ত করুন",
+      nutrient: "মাটি বা উদ্ভিদের পুষ্টির অভাব শনাক্ত করুন",
+      advanced: "গভীর বিশ্লেষণের জন্য আরও শক্তিশালী এআই ব্যবহার করে",
+      usage: "আপনার বর্তমান প্ল্যানের জন্য দৈনিক সীমা",
+      grading: "রঙ, আকার এবং ত্রুটির ওপর ভিত্তি করে গ্রেড",
+      pricing: "পাইকারি বাজারের আনুমানিক মূল্য",
+      shelfLife: "পণ্য নষ্ট হওয়ার আনুমানিক দিন",
+      bestMarket: "বিক্রির জন্য সুপারিশকৃত স্থান"
+    },
     // Dropdown options
     crops: {
       tomato: "টমেটো",

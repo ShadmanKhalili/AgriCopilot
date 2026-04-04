@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Loader2, Award, FileCheck, DollarSign, Sparkles } from 'lucide-react';
+import { Camera, Loader2, Award, FileCheck, DollarSign, Sparkles, HelpCircle, Calendar } from 'lucide-react';
 import { gradeProduce } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -9,6 +9,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
+import Tooltip from './Tooltip';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'dryFish', 'shrimp', 'salt', 'betelNut', 'mango', 'banana', 'coconut', 'chili'];
 
@@ -154,24 +155,34 @@ export default function SmartGrade({ lang }: Props) {
             </select>
           </div>
 
-          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <input 
-              type="checkbox" 
-              id="advancedGrade" 
-              checked={isAdvanced}
-              onChange={(e) => setIsAdvanced(e.target.checked)}
-              disabled={tier !== 'premium'}
-              className="rounded text-blue-600 focus:ring-blue-500 disabled:opacity-50 w-4 h-4"
-            />
-            <label htmlFor="advancedGrade" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
-              <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
-              {t.advancedAnalysis}
-            </label>
+          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="advancedGrade" 
+                checked={isAdvanced}
+                onChange={(e) => setIsAdvanced(e.target.checked)}
+                disabled={tier !== 'premium'}
+                className="rounded text-blue-600 focus:ring-blue-500 disabled:opacity-50 w-4 h-4"
+              />
+              <label htmlFor="advancedGrade" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
+                <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
+                {t.advancedAnalysis}
+              </label>
+            </div>
+            <Tooltip content={t.tooltips.advanced}>
+              <HelpCircle className="w-4 h-4 text-gray-400" />
+            </Tooltip>
           </div>
 
           <div className="pt-2">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+              <div className="flex items-center space-x-1">
+                <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+                <Tooltip content={t.tooltips.usage}>
+                  <HelpCircle className="w-3 h-3 text-gray-400" />
+                </Tooltip>
+              </div>
               <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
             </div>
             <div className="w-full bg-blue-100 rounded-full h-1.5 overflow-hidden">
@@ -220,7 +231,10 @@ export default function SmartGrade({ lang }: Props) {
                     </div>
                     <span className="font-bold text-xl">{t.certTitle}</span>
                   </div>
-                  <span className="text-blue-100 text-sm font-medium relative z-10 bg-black/10 px-3 py-1 rounded-full">{new Date().toLocaleDateString()}</span>
+                  <div className="flex items-center text-xs font-bold text-blue-100 bg-black/10 px-3 py-1.5 rounded-full relative z-10">
+                    <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                    {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </div>
                 </div>
                 
                 <div className="p-8 flex-1 flex flex-col space-y-6 bg-gradient-to-b from-white to-blue-50/30">
@@ -230,7 +244,12 @@ export default function SmartGrade({ lang }: Props) {
                       <p className="font-bold text-gray-900 text-xl">{t.produce[produce as keyof typeof t.produce]}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-1">{t.assignedGrade}</p>
+                      <div className="flex items-center justify-end space-x-1 mb-1">
+                        <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{t.assignedGrade}</p>
+                        <Tooltip content={t.tooltips.grading}>
+                          <HelpCircle className="w-3 h-3 text-gray-400" />
+                        </Tooltip>
+                      </div>
                       <p className={`font-black text-4xl drop-shadow-sm ${result.grade.includes('A') ? 'text-green-600' : result.grade.includes('B') ? 'text-yellow-600' : 'text-red-600'}`}>
                         {result.grade}
                       </p>
@@ -246,11 +265,21 @@ export default function SmartGrade({ lang }: Props) {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-blue-50/80 backdrop-blur-sm p-4 rounded-2xl border border-blue-100/50">
-                      <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">{t.shelfLife}</p>
+                      <div className="flex items-center space-x-1 mb-1">
+                        <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">{t.shelfLife}</p>
+                        <Tooltip content={t.tooltips.shelfLife}>
+                          <HelpCircle className="w-3 h-3 text-blue-400" />
+                        </Tooltip>
+                      </div>
                       <p className="text-sm font-bold text-blue-900">{result.shelfLife}</p>
                     </div>
                     <div className="bg-indigo-50/80 backdrop-blur-sm p-4 rounded-2xl border border-indigo-100/50">
-                      <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider mb-1">{t.bestMarket}</p>
+                      <div className="flex items-center space-x-1 mb-1">
+                        <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider">{t.bestMarket}</p>
+                        <Tooltip content={t.tooltips.bestMarket}>
+                          <HelpCircle className="w-3 h-3 text-indigo-400" />
+                        </Tooltip>
+                      </div>
                       <p className="text-sm font-bold text-indigo-900">{result.bestMarket}</p>
                     </div>
                   </div>
@@ -259,6 +288,9 @@ export default function SmartGrade({ lang }: Props) {
                     <div className="flex items-center space-x-2 text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full">
                       <DollarSign className="w-4 h-4 text-green-600" />
                       <span className="text-sm font-bold">{t.estimatedPrice}</span>
+                      <Tooltip content={t.tooltips.pricing}>
+                        <HelpCircle className="w-3 h-3 text-gray-400" />
+                      </Tooltip>
                     </div>
                     <div className="text-2xl font-black text-gray-900">
                       ৳ {result.estimatedPriceBdt} <span className="text-sm font-semibold text-gray-400">/ kg</span>

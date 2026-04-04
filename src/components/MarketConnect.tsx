@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart } from 'lucide-react';
+import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
@@ -7,6 +7,7 @@ import { useAuth } from './AuthProvider';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
+import Tooltip from './Tooltip';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'paddy', 'betelLeaf', 'chili', 'watermelon', 'potato', 'onion'];
 const MARKET_LOCATIONS = [
@@ -152,24 +153,34 @@ export default function MarketConnect({ lang }: Props) {
                 </select>
               </div>
 
-              <div className="flex items-center space-x-3 pt-2 bg-purple-50/50 p-3.5 rounded-xl border border-purple-100">
-                <input 
-                  type="checkbox" 
-                  id="advancedMarket" 
-                  checked={isAdvanced}
-                  onChange={(e) => setIsAdvanced(e.target.checked)}
-                  disabled={tier !== 'premium'}
-                  className="rounded text-purple-600 focus:ring-purple-500 disabled:opacity-50 w-4 h-4"
-                />
-                <label htmlFor="advancedMarket" className={`text-sm font-bold flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
-                  <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" />
-                  {t.advancedAnalysis}
-                </label>
+              <div className="flex items-center justify-between pt-2 bg-purple-50/50 p-3.5 rounded-xl border border-purple-100">
+                <div className="flex items-center space-x-3">
+                  <input 
+                    type="checkbox" 
+                    id="advancedMarket" 
+                    checked={isAdvanced}
+                    onChange={(e) => setIsAdvanced(e.target.checked)}
+                    disabled={tier !== 'premium'}
+                    className="rounded text-purple-600 focus:ring-purple-500 disabled:opacity-50 w-4 h-4"
+                  />
+                  <label htmlFor="advancedMarket" className={`text-sm font-bold flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
+                    <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" />
+                    {t.advancedAnalysis}
+                  </label>
+                </div>
+                <Tooltip content={t.tooltips.advanced}>
+                  <HelpCircle className="w-4 h-4 text-gray-400" />
+                </Tooltip>
               </div>
 
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+                    <Tooltip content={t.tooltips.usage}>
+                      <HelpCircle className="w-3 h-3 text-gray-400" />
+                    </Tooltip>
+                  </div>
                   <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
                 </div>
                 <div className="w-full bg-purple-100 rounded-full h-1.5 overflow-hidden">
@@ -214,23 +225,31 @@ export default function MarketConnect({ lang }: Props) {
               >
                 <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-6 flex items-center justify-between relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-                  <div className="relative z-10">
-                    <h3 className="font-bold text-xl flex items-center">
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-4">
+                    <div className="flex items-center">
                       <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm mr-3">
                         <BarChart className="w-6 h-6" />
                       </div>
-                      {t.marketInsights}
-                    </h3>
-                    {lastUpdated && (
-                      <p className="text-[10px] text-purple-100 mt-1 ml-14 font-medium uppercase tracking-widest opacity-80">
-                        Updated: {lastUpdated}
-                      </p>
-                    )}
+                      <div>
+                        <h3 className="font-bold text-xl">{t.marketInsights}</h3>
+                        {lastUpdated && (
+                          <p className="text-[10px] text-purple-100 mt-0.5 font-medium uppercase tracking-widest opacity-80">
+                            Updated: {lastUpdated}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center text-xs font-bold text-purple-100 bg-black/10 px-3 py-1.5 rounded-full">
+                        <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                        {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                      <span className="text-xs font-bold bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span>
+                        Live Data
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full relative z-10 flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span>
-                    Live Data
-                  </span>
                 </div>
                 
                 <div className="p-8 flex-1 flex flex-col bg-gradient-to-b from-white to-purple-50/30">

@@ -1,7 +1,8 @@
 import React from 'react';
 import { translations, Language } from '../utils/translations';
-import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import Tooltip from './Tooltip';
 
 interface Props {
   lang: Language;
@@ -129,27 +130,33 @@ export default function UserGuide({ lang }: Props) {
         </p>
         
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-gray-200 flex items-center space-x-3 shadow-sm">
-            <CheckCircle2 className="w-5 h-5 text-gray-400" />
-            <div>
-              <p className="font-semibold text-gray-900">{lang === 'bn' ? 'অজ্ঞাত' : 'Anonymous'}</p>
-              <p className="text-xs text-gray-500">{lang === 'bn' ? '৫টি ব্যবহার' : '5 uses total'}</p>
+          <Tooltip content={lang === 'bn' ? 'কোনো অ্যাকাউন্ট ছাড়াই ব্যবহার করুন' : 'Use without an account'}>
+            <div className="bg-white p-4 rounded-2xl border border-gray-200 flex items-center space-x-3 shadow-sm w-full">
+              <CheckCircle2 className="w-5 h-5 text-gray-400" />
+              <div>
+                <p className="font-semibold text-gray-900">{lang === 'bn' ? 'অজ্ঞাত' : 'Anonymous'}</p>
+                <p className="text-xs text-gray-500">{lang === 'bn' ? '৫টি ব্যবহার' : '5 uses total'}</p>
+              </div>
             </div>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-green-200 flex items-center space-x-3 shadow-sm">
-            <CheckCircle2 className="w-5 h-5 text-green-500" />
-            <div>
-              <p className="font-semibold text-gray-900">{lang === 'bn' ? 'ফ্রি' : 'Free Account'}</p>
-              <p className="text-xs text-gray-500">{lang === 'bn' ? '১০টি ব্যবহার' : '10 uses total'}</p>
+          </Tooltip>
+          <Tooltip content={lang === 'bn' ? 'লগ ইন করে আরও সুবিধা পান' : 'Get more benefits by logging in'}>
+            <div className="bg-white p-4 rounded-2xl border border-green-200 flex items-center space-x-3 shadow-sm w-full">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="font-semibold text-gray-900">{lang === 'bn' ? 'ফ্রি' : 'Free Account'}</p>
+                <p className="text-xs text-gray-500">{lang === 'bn' ? '১০টি ব্যবহার' : '10 uses total'}</p>
+              </div>
             </div>
-          </div>
-          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-2xl border border-yellow-200 flex items-center space-x-3 shadow-sm">
-            <CheckCircle2 className="w-5 h-5 text-yellow-600" />
-            <div>
-              <p className="font-semibold text-gray-900">{lang === 'bn' ? 'প্রিমিয়াম' : 'Premium'}</p>
-              <p className="text-xs text-gray-500">{lang === 'bn' ? '৫০টি ব্যবহার' : '50 uses total'}</p>
+          </Tooltip>
+          <Tooltip content={lang === 'bn' ? 'সর্বোচ্চ সুবিধা এবং এআই শক্তি' : 'Maximum benefits and AI power'}>
+            <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 p-4 rounded-2xl border border-yellow-200 flex items-center space-x-3 shadow-sm w-full">
+              <CheckCircle2 className="w-5 h-5 text-yellow-600" />
+              <div>
+                <p className="font-semibold text-gray-900">{lang === 'bn' ? 'প্রিমিয়াম' : 'Premium'}</p>
+                <p className="text-xs text-gray-500">{lang === 'bn' ? '৫০টি ব্যবহার' : '50 uses total'}</p>
+              </div>
             </div>
-          </div>
+          </Tooltip>
         </div>
       </motion.div>
     </motion.div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
@@ -10,6 +10,7 @@ import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
+import Tooltip from './Tooltip';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'user-guide' | 'profile';
 
@@ -72,11 +73,13 @@ export default function Layout() {
         <div className="p-6 hidden md:flex items-center justify-between border-b border-green-700">
           <div className="flex items-center space-x-3">
             <Leaf className="w-8 h-8 text-green-300" />
-            <span className="font-bold text-xl tracking-tight">Agri-Tools</span>
+            <span className="font-bold text-xl tracking-tight">Agri-Copilot</span>
           </div>
-          <button onClick={toggleLanguage} className="text-green-200 hover:text-white transition-colors" title="Toggle Language">
-            <Globe className="w-5 h-5" />
-          </button>
+          <Tooltip content={lang === 'en' ? 'Switch to Bangla' : 'ইংরেজিতে পরিবর্তন করুন'} position="right">
+            <button onClick={toggleLanguage} className="text-green-200 hover:text-white transition-colors p-1.5 hover:bg-green-700 rounded-lg">
+              <Globe className="w-5 h-5" />
+            </button>
+          </Tooltip>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
@@ -108,7 +111,12 @@ export default function Layout() {
           {/* Usage Stats */}
           <div className="bg-green-900/50 rounded-xl p-4 shadow-inner">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-medium text-green-200">{t.usage} ({getTierName()})</span>
+              <div className="flex items-center space-x-1">
+                <span className="text-xs font-medium text-green-200">{t.usage} ({getTierName()})</span>
+                <Tooltip content={t.tooltips.usage} position="right">
+                  <HelpCircle className="w-3 h-3 text-green-400" />
+                </Tooltip>
+              </div>
               <span className="text-xs font-bold text-white">
                 {currentUsage} / {limit === Infinity ? '∞' : limit}
               </span>

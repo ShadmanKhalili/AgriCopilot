@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar } from 'lucide-react';
 import { diagnoseCrop, generateSpeech } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -9,6 +9,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
+import Tooltip from './Tooltip';
 
 const UPAZILAS = ['sadar', 'chakaria', 'ukhiya', 'teknaf', 'ramu', 'peua', 'kutubdia', 'moheshkhali'];
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
@@ -212,7 +213,12 @@ export default function AgriCopilot({ lang }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.analysisType}</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">{t.analysisType}</label>
+              <Tooltip content={t.tooltips[analysisType as keyof typeof t.tooltips]}>
+                <HelpCircle className="w-4 h-4 text-gray-400" />
+              </Tooltip>
+            </div>
             <select 
               value={analysisType} 
               onChange={(e) => setAnalysisType(e.target.value)}
@@ -224,24 +230,34 @@ export default function AgriCopilot({ lang }: Props) {
             </select>
           </div>
 
-          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <input 
-              type="checkbox" 
-              id="advanced" 
-              checked={isAdvanced}
-              onChange={(e) => setIsAdvanced(e.target.checked)}
-              disabled={tier !== 'premium'}
-              className="rounded text-green-600 focus:ring-green-500 disabled:opacity-50 w-4 h-4"
-            />
-            <label htmlFor="advanced" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
-              <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
-              {t.advancedAnalysis}
-            </label>
+          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="advanced" 
+                checked={isAdvanced}
+                onChange={(e) => setIsAdvanced(e.target.checked)}
+                disabled={tier !== 'premium'}
+                className="rounded text-green-600 focus:ring-green-500 disabled:opacity-50 w-4 h-4"
+              />
+              <label htmlFor="advanced" className={`text-sm font-medium flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
+                <Sparkles className="w-4 h-4 mr-1 text-yellow-500" />
+                {t.advancedAnalysis}
+              </label>
+            </div>
+            <Tooltip content={t.tooltips.advanced}>
+              <HelpCircle className="w-4 h-4 text-gray-400" />
+            </Tooltip>
           </div>
 
           <div className="pt-2">
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[10px] font-black text-green-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+              <div className="flex items-center space-x-1">
+                <span className="text-[10px] font-black text-green-900 uppercase tracking-widest">{t.usage} (Daily)</span>
+                <Tooltip content={t.tooltips.usage}>
+                  <HelpCircle className="w-3 h-3 text-gray-400" />
+                </Tooltip>
+              </div>
               <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
             </div>
             <div className="w-full bg-green-100 rounded-full h-1.5 overflow-hidden">
@@ -283,12 +299,18 @@ export default function AgriCopilot({ lang }: Props) {
                 className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl p-8 border border-green-100 h-full flex flex-col shadow-sm relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-                <h3 className="text-2xl font-bold text-green-900 mb-6 flex items-center">
-                  <div className="bg-green-100 p-2 rounded-xl mr-3">
-                    <Leaf className="w-6 h-6 text-green-600" />
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-green-900 flex items-center">
+                    <div className="bg-green-100 p-2 rounded-xl mr-3">
+                      <Leaf className="w-6 h-6 text-green-600" />
+                    </div>
+                    {t.diagnosisResult}
+                  </h3>
+                  <div className="flex items-center text-xs font-bold text-green-600 bg-green-100/50 px-3 py-1.5 rounded-full">
+                    <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                    {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
-                  {t.diagnosisResult}
-                </h3>
+                </div>
                 
                 <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-green-200/50 text-gray-800 leading-relaxed shadow-sm prose prose-green max-w-none">
                   <div className="whitespace-pre-wrap">{diagnosis}</div>
