@@ -13,6 +13,7 @@ const getAi = () => {
 const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
 const SEARCH_MODEL = 'gemini-3-flash-preview';
+const SEARCH_BACKUP_MODEL = 'gemini-2.5-flash-preview';
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
@@ -294,13 +295,24 @@ export const getMarketInsights = async (
       }
 
       try {
-        const response = await callAiWithFallback({
-          contents: prompt,
-          config
-        }, SEARCH_MODEL);
-        return JSON.parse(response.text || '{}');
+        // Try primary search model (Gemini 3)
+        try {
+          const response = await callAiWithFallback({
+            contents: prompt,
+            config
+          }, SEARCH_MODEL);
+          return JSON.parse(response.text || '{}');
+        } catch (primarySearchError) {
+          console.warn(`Primary search model ${SEARCH_MODEL} failed, trying ${SEARCH_BACKUP_MODEL}:`, primarySearchError);
+          // Try backup search model (Gemini 2.5)
+          const response = await callAiWithFallback({
+            contents: prompt,
+            config
+          }, SEARCH_BACKUP_MODEL);
+          return JSON.parse(response.text || '{}');
+        }
       } catch (searchError) {
-        console.warn("Google Search tool failed, falling back to standard generation:", searchError);
+        console.warn("Both Google Search models failed, falling back to standard generation:", searchError);
         // Fallback without googleSearch
         const fallbackResponse = await callAiWithFallback({
           contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh for the period around ${today}. 
