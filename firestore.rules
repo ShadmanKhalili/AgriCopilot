@@ -23,6 +23,7 @@ service cloud.firestore {
     //   - userId: string (required, immutable)
     //   - crop: string (required)
     //   - upazila: string (required)
+    //   - analysisType: string (required)
     //   - diagnosisText: string (required)
     //   - createdAt: string (required, immutable)
     //
@@ -58,8 +59,8 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.token.email == "sadmankhalili@gmail.com" && request.auth.token.email_verified == true));
+        ((request.auth.token.email == "sadmankhalili@gmail.com" && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
     
     function hasOnlyAllowedFields(fields) {
@@ -96,11 +97,12 @@ service cloud.firestore {
     }
     
     function isValidDiagnosis(data) {
-      return hasOnlyAllowedFields(['userId', 'crop', 'upazila', 'diagnosisText', 'createdAt']) &&
-             hasRequiredFields(['userId', 'crop', 'upazila', 'diagnosisText', 'createdAt']) &&
+      return hasOnlyAllowedFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'createdAt']) &&
+             hasRequiredFields(['userId', 'crop', 'upazila', 'analysisType', 'diagnosisText', 'createdAt']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
              data.upazila is string && data.upazila.size() > 0 && data.upazila.size() < 100 &&
+             data.analysisType is string && data.analysisType.size() > 0 && data.analysisType.size() < 100 &&
              data.diagnosisText is string && data.diagnosisText.size() > 0 && data.diagnosisText.size() < 2000 &&
              isValidDateString(data.createdAt);
     }

@@ -44,12 +44,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    let unsubSnapshot: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Cleanup previous snapshot if it exists
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
+      }
+
       setUser(currentUser);
       if (currentUser) {
         try {
           const userDocRef = doc(db, 'users', currentUser.uid);
-          const userDoc = await getDoc(userDocRef);
+          
+          // Initial check for profile
+          let userDoc;
+          try {
+            userDoc = await getDoc(userDocRef);
+          } catch (error: any) {
+            // If it's a permission error, it might be transient during sign-in
+            if (error.message?.includes('insufficient permissions')) {
+              console.warn("Initial getDoc failed with permission error, retrying in 1s...");
+              await new Promise(res => setTimeout(res, 1000));
+              userDoc = await getDoc(userDocRef);
+            } else {
+              throw error;
+            }
+          }
           
           if (!userDoc.exists()) {
             const newProfile: UserProfile = {
@@ -66,18 +88,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           // Listen for profile updates
-          onSnapshot(userDocRef, (snapshot) => {
+          unsubSnapshot = onSnapshot(userDocRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data() as UserProfile;
               setUserProfile(data);
               setUserRole(data.role);
             }
           }, (error) => {
-            handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+            // Only report error if user is still logged in and it's not a transient permission error
+            if (auth.currentUser && !error.message?.includes('insufficient permissions')) {
+              handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+            }
           });
 
         } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+          if (auth.currentUser) {
+            handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+          }
         }
       } else {
         setUserRole(null);
@@ -86,7 +113,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthReady(true);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
   const upgradeToPremium = async () => {

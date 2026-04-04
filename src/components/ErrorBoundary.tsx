@@ -1,8 +1,8 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import * as React from 'react';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface Props {
-  children?: ReactNode;
+  children: React.ReactNode;
 }
 
 interface State {
@@ -10,28 +10,36 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+export class ErrorBoundary extends (React.Component as any) {
+  state: State = {
     hasError: false,
-    error: null
+    error: null,
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
   }
 
+  private handleReset = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
   public render() {
     if (this.state.hasError) {
-      let errorMessage = "An unexpected error occurred.";
+      let errorMessage = "Something went wrong.";
+      let isFirestoreError = false;
+
       try {
         if (this.state.error?.message) {
-          const parsedError = JSON.parse(this.state.error.message);
-          if (parsedError.error) {
-            errorMessage = `Firestore Error: ${parsedError.error}`;
+          const parsed = JSON.parse(this.state.error.message);
+          if (parsed.error && parsed.operationType) {
+            errorMessage = `Firestore Error: ${parsed.error} (${parsed.operationType} on ${parsed.path})`;
+            isFirestoreError = true;
           }
         }
       } catch (e) {
@@ -40,23 +48,31 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-red-100 max-w-md w-full text-center">
-            <div className="mx-auto bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-red-100 p-8 text-center">
+            <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertTriangle className="w-8 h-8 text-red-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-            <p className="text-sm text-gray-600 mb-6">{errorMessage}</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Application Error</h2>
+            <p className="text-gray-600 mb-8 leading-relaxed">
+              {errorMessage}
+            </p>
+            {isFirestoreError && (
+              <p className="text-xs text-gray-400 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 font-mono break-all">
+                {this.state.error?.message}
+              </p>
+            )}
             <button
-              onClick={() => window.location.reload()}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+              onClick={this.handleReset}
+              className="w-full bg-green-600 text-white font-bold py-4 rounded-xl hover:bg-green-500 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-green-200"
             >
-              Reload Application
+              <RefreshCcw className="w-5 h-5" />
+              <span>Reload Application</span>
             </button>
           </div>
         </div>
       );
     }
 
-    return (this as any).props.children;
+    return this.props.children;
   }
 }

@@ -50,9 +50,9 @@ export default function MarketConnect({ lang }: Props) {
       result = await getMarketInsights(produce, location, lang, isAdvanced);
       setInsights(result);
       setLastUpdated(new Date().toLocaleString());
-    } catch (error) {
+    } catch (error: any) {
       console.error("Market insights failed:", error);
-      setInsights("Error fetching market insights from AI. Please try again.");
+      setInsights(error.message || "Error fetching market insights from AI. Please try again.");
       setIsLoading(false);
       return;
     }

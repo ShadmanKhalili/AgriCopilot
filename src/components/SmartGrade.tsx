@@ -81,9 +81,9 @@ export default function SmartGrade({ lang }: Props) {
           handleFirestoreError(error, OperationType.CREATE, 'certificates');
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Grading failed:", error);
-      alert("Error connecting to AI service. Please try again.");
+      alert(error.message || "Error connecting to AI service. Please try again.");
     } finally {
       setIsLoading(false);
     }

@@ -118,9 +118,9 @@ export default function AgriCopilot({ lang }: Props) {
         const blob = addWavHeader(bytes, 24000);
         setAudioUrl(URL.createObjectURL(blob));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Diagnosis failed:", error);
-      setDiagnosis("Error connecting to AI service. Please try again.");
+      setDiagnosis(error.message || "Error connecting to AI service. Please try again.");
     } finally {
       setIsLoading(false);
     }
