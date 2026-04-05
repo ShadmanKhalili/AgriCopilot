@@ -85,7 +85,8 @@ export const handler: Handler = async (event) => {
               timeRange: {
                 from: fromDateStr,
                 to: toDateStr
-              }
+              },
+              maxCloudCoverage: 30
             }
           }]
         },
@@ -101,7 +102,7 @@ export const handler: Handler = async (event) => {
             //VERSION=3
             function setup() {
               return {
-                input: ["B04", "B08", "B11", "dataMask"],
+                input: ["B04", "B08", "B11", "SCL", "dataMask"],
                 output: [
                   { id: "ndvi", bands: 1, sampleType: "FLOAT32" },
                   { id: "ndmi", bands: 1, sampleType: "FLOAT32" },
@@ -110,16 +111,25 @@ export const handler: Handler = async (event) => {
               };
             }
             function evaluatePixel(sample) {
-              let ndviDenom = sample.B08 + sample.B04;
-              let ndvi = ndviDenom === 0 ? 0 : (sample.B08 - sample.B04) / ndviDenom;
-              
-              let ndmiDenom = sample.B08 + sample.B11;
-              let ndmi = ndmiDenom === 0 ? 0 : (sample.B08 - sample.B11) / ndmiDenom;
+              // SCL: 3=Cloud shadow, 8=Cloud medium prob, 9=Cloud high prob, 10=Thin cirrus
+              let isCloud = [3, 8, 9, 10].includes(sample.SCL);
+              let valid = sample.dataMask === 1 && !isCloud;
+
+              let ndvi = 0;
+              let ndmi = 0;
+
+              if (valid) {
+                let ndviDenom = sample.B08 + sample.B04;
+                ndvi = ndviDenom === 0 ? 0 : (sample.B08 - sample.B04) / ndviDenom;
+                
+                let ndmiDenom = sample.B08 + sample.B11;
+                ndmi = ndmiDenom === 0 ? 0 : (sample.B08 - sample.B11) / ndmiDenom;
+              }
 
               return {
                 ndvi: [ndvi],
                 ndmi: [ndmi],
-                dataMask: [sample.dataMask]
+                dataMask: [valid ? 1 : 0]
               };
             }
           `,

@@ -28,14 +28,14 @@ export default function Layout() {
   const [agriChatMessages, setAgriChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [agriChatSession, setAgriChatSession] = useState<any | null>(null);
   const [agriAudioUrl, setAgriAudioUrl] = useState<string | null>(null);
-  const [agriUpazila, setAgriUpazila] = useState<string>('teknaf');
+  const [agriCropStage, setAgriCropStage] = useState<string>('vegetative');
   const [agriCrop, setAgriCrop] = useState<string>('tomato');
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
 
   // MarketConnect State Persistence
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
-  const [marketLocation, setMarketLocation] = useState<string>('kawranBazar');
+  const [marketQuantity, setMarketQuantity] = useState<string>('100');
 
   const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
   const { currentUsage, limit, tier } = useUsageTracking();
@@ -289,8 +289,8 @@ export default function Layout() {
                   setPersistedChatSession={setAgriChatSession}
                   persistedAudioUrl={agriAudioUrl}
                   setPersistedAudioUrl={setAgriAudioUrl}
-                  persistedUpazila={agriUpazila}
-                  setPersistedUpazila={setAgriUpazila}
+                  persistedCropStage={agriCropStage}
+                  setPersistedCropStage={setAgriCropStage}
                   persistedCrop={agriCrop}
                   setPersistedCrop={setAgriCrop}
                   persistedAnalysisType={agriAnalysisType}
@@ -305,8 +305,8 @@ export default function Layout() {
                   setPersistedInsights={setMarketInsights}
                   persistedProduce={marketProduce}
                   setPersistedProduce={setMarketProduce}
-                  persistedLocation={marketLocation}
-                  setPersistedLocation={setMarketLocation}
+                  persistedQuantity={marketQuantity}
+                  setPersistedQuantity={setMarketQuantity}
                 />
               )}
               {activeTab === 'weather-advisory' && (

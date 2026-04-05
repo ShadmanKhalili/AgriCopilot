@@ -3,6 +3,7 @@ import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Spa
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
+import LocationDisplay from './LocationDisplay';
 import ReactMarkdown from 'react-markdown';
 import { GoogleGenAI } from '@google/genai';
 
@@ -166,6 +167,12 @@ export default function WeatherAdvisory({ lang }: Props) {
                   <Navigation className="w-5 h-5" />
                 </button>
               </div>
+
+              {coords && (
+                <div className="mb-8">
+                  <LocationDisplay coords={coords} lang={lang} color="blue" />
+                </div>
+              )}
 
               {weather ? (
                 <div className="space-y-10">

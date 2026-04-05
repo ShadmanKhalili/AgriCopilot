@@ -56,7 +56,7 @@ const callAiWithFallback = async (params: any, primaryModel: string) => {
 export const diagnoseCrop = async (
   images: { base64: string; mimeType: string }[], 
   crop: string, 
-  upazila: string, 
+  cropStage: string, 
   analysisType: string, 
   lang: string, 
   isAdvanced?: boolean,
@@ -66,10 +66,10 @@ export const diagnoseCrop = async (
     try {
       const locationContext = coords 
         ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
-        : `General Location: ${upazila}, Cox's Bazar.`;
+        : `Location: Unknown (Please advise based on general best practices).`;
 
-      const prompt = `You are a world-class agricultural expert specializing in crops from Cox's Bazar, Bangladesh.
-      Analyze the provided image(s) of a ${crop} plant from ${upazila} Upazila.
+      const prompt = `You are a world-class agricultural expert specializing in crops from Bangladesh.
+      Analyze the provided image(s) of a ${crop} plant at the ${cropStage} stage.
       ${locationContext}
       
       The user is specifically interested in ${analysisType}.
@@ -241,7 +241,7 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
 
 export const getMarketInsights = async (
   produce: string, 
-  location: string, 
+  quantity: string, 
   lang: string, 
   isAdvanced?: boolean,
   coords?: { latitude: number; longitude: number }
@@ -252,10 +252,11 @@ export const getMarketInsights = async (
       const currentYear = new Date().getFullYear();
       const locationContext = coords 
         ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
-        : `General Location: ${location}, Bangladesh.`;
+        : `Location: Unknown (Please advise based on general Bangladesh market trends).`;
 
-      const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in ${location}, Bangladesh for TODAY (${today}). 
+      const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in Bangladesh for TODAY (${today}). 
       ${locationContext}
+      The user wants to sell a quantity of ${quantity} kg.
       Search for official market reports, news articles, or agricultural bulletins from ${currentYear}.
       If ${currentYear} data is absolutely unavailable, use data from ${currentYear - 1}.
       

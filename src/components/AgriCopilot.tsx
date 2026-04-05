@@ -12,6 +12,7 @@ import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
+import LocationDisplay from './LocationDisplay';
 
 const UPAZILAS = ['sadar', 'chakaria', 'ukhiya', 'teknaf', 'ramu', 'peua', 'kutubdia', 'moheshkhali', 'others'];
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
@@ -28,8 +29,8 @@ interface Props {
   setPersistedChatSession?: (session: any | null) => void;
   persistedAudioUrl?: string | null;
   setPersistedAudioUrl?: (url: string | null) => void;
-  persistedUpazila?: string;
-  setPersistedUpazila?: (upazila: string) => void;
+  persistedCropStage?: string;
+  setPersistedCropStage?: (stage: string) => void;
   persistedCrop?: string;
   setPersistedCrop?: (crop: string) => void;
   persistedAnalysisType?: string;
@@ -48,15 +49,15 @@ export default function AgriCopilot({
   setPersistedChatSession,
   persistedAudioUrl,
   setPersistedAudioUrl,
-  persistedUpazila,
-  setPersistedUpazila,
+  persistedCropStage,
+  setPersistedCropStage,
   persistedCrop,
   setPersistedCrop,
   persistedAnalysisType,
   setPersistedAnalysisType
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
-  const [upazila, setUpazila] = useState(persistedUpazila || UPAZILAS[0]);
+  const [cropStage, setCropStage] = useState(persistedCropStage || 'vegetative');
   const [crop, setCrop] = useState(persistedCrop || CROPS[0]);
   const [analysisType, setAnalysisType] = useState(persistedAnalysisType || 'disease');
   const [isLoading, setIsLoading] = useState(false);
@@ -98,8 +99,8 @@ export default function AgriCopilot({
   }, [audioUrl, setPersistedAudioUrl]);
 
   useEffect(() => {
-    if (setPersistedUpazila) setPersistedUpazila(upazila);
-  }, [upazila, setPersistedUpazila]);
+    if (setPersistedCropStage) setPersistedCropStage(cropStage);
+  }, [cropStage, setPersistedCropStage]);
 
   useEffect(() => {
     if (setPersistedCrop) setPersistedCrop(crop);
@@ -210,12 +211,12 @@ export default function AgriCopilot({
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.nutrient;
       // Use English values for the AI prompt to ensure consistency, but we can pass the translated ones too
       const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
-      const upazilaName = translations.en.upazilas[upazila as keyof typeof translations.en.upazilas];
+      const stageName = translations.en.stages[cropStage as keyof typeof translations.en.stages];
       
       const result = await diagnoseCrop(
         images, 
         cropName, 
-        upazilaName, 
+        stageName, 
         analysisTypeStr, 
         lang, 
         isAdvanced,
@@ -236,7 +237,7 @@ export default function AgriCopilot({
           await addDoc(collection(db, 'diagnoses'), {
             userId: user.uid,
             crop,
-            upazila,
+            cropStage,
             analysisType,
             diagnosisText: result.diagnosis,
             severity: result.severity,
@@ -393,7 +394,7 @@ export default function AgriCopilot({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropType}</label>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
                 <select 
                   value={crop} 
                   onChange={(e) => setCrop(e.target.value)}
@@ -408,7 +409,7 @@ export default function AgriCopilot({
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.upazila}</label>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropStage}</label>
                   <Tooltip content={t.tooltips.locationDesc}>
                     <button 
                       onClick={handleDetectLocation}
@@ -431,28 +432,22 @@ export default function AgriCopilot({
                   </Tooltip>
                 </div>
                 <select 
-                  value={upazila} 
-                  onChange={(e) => setUpazila(e.target.value)}
+                  value={cropStage} 
+                  onChange={(e) => setCropStage(e.target.value)}
                   className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
                 >
-                  {UPAZILAS.map(u => (
-                    <option key={u} value={u}>
-                      {t.upazilas[u as keyof typeof t.upazilas]}
+                  {Object.keys(translations.en.stages).map(s => (
+                    <option key={s} value={s}>
+                      {t.stages[s as keyof typeof t.stages]}
                     </option>
                   ))}
                 </select>
-                {coords && upazila === 'others' && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-2 text-[10px] text-green-600 font-black uppercase tracking-widest flex items-center bg-green-50 px-3 py-2 rounded-xl border border-green-100"
-                  >
-                    <Navigation className="w-3 h-3 mr-2" />
-                    GPS: {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
-                  </motion.div>
-                )}
               </div>
             </div>
+
+            {coords && (
+              <LocationDisplay coords={coords} lang={lang} color="green" />
+            )}
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">

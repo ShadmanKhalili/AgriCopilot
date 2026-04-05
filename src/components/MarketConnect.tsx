@@ -11,6 +11,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
+import LocationDisplay from './LocationDisplay';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'paddy', 'betelLeaf', 'chili', 'watermelon', 'potato', 'onion'];
 const MARKET_LOCATIONS = [
@@ -34,8 +35,8 @@ interface Props {
   setPersistedInsights?: (insights: any | null) => void;
   persistedProduce?: string;
   setPersistedProduce?: (produce: string) => void;
-  persistedLocation?: string;
-  setPersistedLocation?: (location: string) => void;
+  persistedQuantity?: string;
+  setPersistedQuantity?: (quantity: string) => void;
 }
 
 export default function MarketConnect({ 
@@ -44,11 +45,11 @@ export default function MarketConnect({
   setPersistedInsights,
   persistedProduce,
   setPersistedProduce,
-  persistedLocation,
-  setPersistedLocation
+  persistedQuantity,
+  setPersistedQuantity
 }: Props) {
   const [produce, setProduce] = useState(persistedProduce || PRODUCE_TYPES[0]);
-  const [location, setLocation] = useState(persistedLocation || MARKET_LOCATIONS[0]);
+  const [quantity, setQuantity] = useState(persistedQuantity || '100');
   const [isLoading, setIsLoading] = useState(false);
   const [insights, setInsights] = useState<any | null>(persistedInsights || null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -69,8 +70,8 @@ export default function MarketConnect({
   }, [produce, setPersistedProduce]);
 
   React.useEffect(() => {
-    if (setPersistedLocation) setPersistedLocation(location);
-  }, [location, setPersistedLocation]);
+    if (setPersistedQuantity) setPersistedQuantity(quantity);
+  }, [quantity, setPersistedQuantity]);
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -108,9 +109,8 @@ export default function MarketConnect({
     let result = null;
     try {
       const produceName = translations.en.crops[produce as keyof typeof translations.en.crops] || produce;
-      const locationName = translations.en.locations[location as keyof typeof translations.en.locations] || location;
       
-      result = await getMarketInsights(produceName, locationName, lang, isAdvanced, coords || undefined);
+      result = await getMarketInsights(produceName, quantity, lang, isAdvanced, coords || undefined);
       setInsights(result);
       setLastUpdated(new Date().toLocaleString());
 
@@ -120,7 +120,7 @@ export default function MarketConnect({
           await addDoc(collection(db, 'market_queries'), {
             userId: user.uid,
             produce,
-            location,
+            quantity,
             insights: result.insights,
             isAdvanced,
             createdAt: new Date().toISOString()
@@ -192,7 +192,7 @@ export default function MarketConnect({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.location}</label>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.quantity}</label>
                 <button 
                   onClick={handleDetectLocation}
                   disabled={isDetectingLocation}
@@ -212,28 +212,18 @@ export default function MarketConnect({
                   <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
                 </button>
               </div>
-              <select 
-                value={location} 
-                onChange={(e) => setLocation(e.target.value)}
+              <input 
+                type="number"
+                value={quantity} 
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="e.g. 100"
                 className="w-full rounded-2xl border-orange-100 shadow-sm focus:border-orange-500 focus:ring-orange-500 bg-orange-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
-              >
-                {MARKET_LOCATIONS.map(u => (
-                  <option key={u} value={u}>
-                    {t.locations[u as keyof typeof t.locations] || u}
-                  </option>
-                ))}
-              </select>
-              {coords && location === 'others' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-[10px] text-orange-600 font-black uppercase tracking-widest flex items-center bg-orange-50 px-3 py-2 rounded-xl border border-orange-100"
-                >
-                  <Navigation className="w-3 h-3 mr-2" />
-                  GPS: {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
-                </motion.div>
-              )}
+              />
             </div>
+
+            {coords && (
+              <LocationDisplay coords={coords} lang={lang} color="orange" />
+            )}
 
             <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-white p-4 rounded-2xl border border-orange-100 shadow-inner">
               <div className="flex items-center space-x-3">

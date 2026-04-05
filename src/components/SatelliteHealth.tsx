@@ -3,6 +3,7 @@ import { translations, Language } from '../utils/translations';
 import { Satellite, MapPin, RefreshCw, AlertTriangle, CheckCircle2, Info, Leaf, Cloud, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
+import LocationDisplay from './LocationDisplay';
 
 interface Props {
   lang: Language;
@@ -94,7 +95,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
   };
 
   return (
@@ -140,16 +141,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
 
           {location ? (
             <div className="space-y-6 relative z-10">
-              <div className="bg-indigo-50/80 rounded-3xl p-6 border border-indigo-100/50 space-y-4 shadow-inner">
-                <div className="flex justify-between items-center text-gray-600 text-sm font-bold uppercase tracking-wider">
-                  <span>{t.latitude}</span>
-                  <span className="text-gray-900 font-black font-mono text-lg">{location.lat.toFixed(6)}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-600 text-sm font-bold uppercase tracking-wider">
-                  <span>{t.longitude}</span>
-                  <span className="text-gray-900 font-black font-mono text-lg">{location.lng.toFixed(6)}</span>
-                </div>
-              </div>
+              <LocationDisplay coords={{ latitude: location.lat, longitude: location.lng }} lang={lang} color="indigo" />
               <button
                 onClick={fetchNdvi}
                 disabled={loading}
