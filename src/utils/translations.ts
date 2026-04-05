@@ -152,6 +152,15 @@ export const translations = {
     insightMoistureLow: "Moisture levels are dropping. Consider scheduling irrigation soon to prevent water stress.",
     insightMoistureDrought: "Severe water stress detected. Immediate irrigation is required to prevent yield loss.",
     insightMoistureHigh: "High moisture detected. Ensure proper drainage to prevent root rot or fungal diseases.",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    detectPrompt: "Detect your location to start monitoring",
+    noDataYet: "No data available yet",
+    dismiss: "Dismiss",
+    whatIsNdvi: "What are these indices?",
+    ndviExplanation: "NDVI (Normalized Difference Vegetation Index) measures plant health based on how they reflect light. Healthy plants reflect more near-infrared light. NDMI (Normalized Difference Moisture Index) measures the water content in the crop canopy.",
+    veryHealthy: "Very Healthy",
+    nonVegetated: "Non-vegetated",
     // Tooltips
     tooltips: {
       disease: "Identify crop diseases from images",
@@ -377,6 +386,15 @@ export const translations = {
     insightMoistureLow: "আর্দ্রতা কমে যাচ্ছে। পানির অভাব রোধ করতে দ্রুত সেচ দেওয়ার ব্যবস্থা করুন।",
     insightMoistureDrought: "তীব্র পানির অভাব দেখা যাচ্ছে। ফসলের ক্ষতি এড়াতে এখনই সেচ দেওয়া প্রয়োজন।",
     insightMoistureHigh: "অতিরিক্ত আর্দ্রতা দেখা যাচ্ছে। শিকড় পচা বা ছত্রাকজনিত রোগ এড়াতে পানি নিষ্কাশনের ব্যবস্থা করুন।",
+    latitude: "অক্ষাংশ (Latitude)",
+    longitude: "দ্রাঘিমাংশ (Longitude)",
+    detectPrompt: "পর্যবেক্ষণ শুরু করতে আপনার এলাকা খুঁজুন",
+    noDataYet: "এখনো কোনো তথ্য পাওয়া যায়নি",
+    dismiss: "বাতিল করুন",
+    whatIsNdvi: "এই সূচকগুলো কী?",
+    ndviExplanation: "NDVI আলোর প্রতিফলনের ওপর ভিত্তি করে গাছের স্বাস্থ্য পরিমাপ করে। সুস্থ গাছ বেশি ইনফ্রারেড আলো প্রতিফলিত করে। NDMI গাছের পাতার পানির পরিমাণ পরিমাপ করে।",
+    veryHealthy: "খুবই সুস্থ",
+    nonVegetated: "গাছপালা নেই",
     // Tooltips
     tooltips: {
       disease: "ছবি থেকে ফসলের রোগ শনাক্ত করুন",
