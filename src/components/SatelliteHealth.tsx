@@ -7,12 +7,13 @@ import LocationDisplay from './LocationDisplay';
 
 interface Props {
   lang: Language;
+  globalLocation: { latitude: number; longitude: number } | null;
+  setGlobalLocation: (loc: { latitude: number; longitude: number }) => void;
 }
 
-const SatelliteHealth: React.FC<Props> = ({ lang }) => {
+const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocation }) => {
   const t = translations[lang];
   const [loading, setLoading] = useState(false);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [ndvi, setNdvi] = useState<number | null>(null);
   const [ndmi, setNdmi] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +24,9 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
+          setGlobalLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
           });
           setLoading(false);
         },
@@ -41,17 +42,23 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
   };
 
   const fetchNdvi = async () => {
-    if (!location) return;
+    if (!globalLocation) return;
     setLoading(true);
     setError(null);
     try {
       const response = await fetch('/.netlify/functions/sentinel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(location)
+        body: JSON.stringify({ lat: globalLocation.latitude, lng: globalLocation.longitude })
       });
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      if (data.error) {
+        const detailStr = data.details ? (typeof data.details === 'object' ? JSON.stringify(data.details) : data.details) : '';
+        if (data.error === 'invalid_client' || detailStr.includes('invalid_client')) {
+          throw new Error("Sentinel Hub API credentials are not configured or invalid. Please set SENTINEL_HUB_CLIENT_ID and SENTINEL_HUB_CLIENT_SECRET in your environment variables.");
+        }
+        throw new Error(`${data.error}${detailStr ? ': ' + detailStr : ''}`);
+      }
       setNdvi(data.ndvi);
       setNdmi(data.ndmi);
     } catch (err: any) {
@@ -139,9 +146,9 @@ const SatelliteHealth: React.FC<Props> = ({ lang }) => {
             </button>
           </div>
 
-          {location ? (
+          {globalLocation ? (
             <div className="space-y-6 relative z-10">
-              <LocationDisplay coords={{ latitude: location.lat, longitude: location.lng }} lang={lang} color="indigo" />
+              <LocationDisplay coords={{ latitude: globalLocation.latitude, longitude: globalLocation.longitude }} lang={lang} color="indigo" />
               <button
                 onClick={fetchNdvi}
                 disabled={loading}

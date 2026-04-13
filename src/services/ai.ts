@@ -135,16 +135,6 @@ export const diagnoseCrop = async (
         }
       };
       
-      if (coords) {
-        config.tools = [{ googleMaps: {} }];
-        config.toolConfig = {
-          retrievalConfig: {
-            latLng: coords
-          },
-          includeServerSideToolInvocations: true
-        };
-      }
-
       const contents: any[] = images.map(img => ({ inlineData: { data: img.base64, mimeType: img.mimeType } }));
       contents.push(prompt);
 
@@ -165,6 +155,80 @@ export const diagnoseCrop = async (
   });
 };
 
+export const translateText = async (text: string, targetLang: string) => {
+  return await callAiWithRetry(async () => {
+    try {
+      const prompt = `Translate the following text to ${targetLang}. Keep the exact same markdown formatting.
+
+Text to translate:
+${text}`;
+
+      const response = await callAiWithFallback({
+        contents: prompt
+      }, BACKUP_MODEL);
+      
+      return response.text || '';
+    } catch (error) {
+      console.error("AI Service Error (Translate Text):", error);
+      throw error;
+    }
+  });
+};
+
+export const generateWeatherAdvisory = async (
+  weatherData: any, 
+  lang: string, 
+  coords: { latitude: number; longitude: number }
+) => {
+  return await callAiWithRetry(async () => {
+    try {
+      let climateContext = "";
+      if (weatherData.historicalAvgTemp) {
+        const diff = weatherData.temp - weatherData.historicalAvgTemp;
+        const diffText = Math.abs(diff).toFixed(1);
+        const direction = diff > 0 ? "hotter" : "cooler";
+        climateContext = `Climate Context: This month's historical average temperature is ${weatherData.historicalAvgTemp.toFixed(1)}°C. Currently, it is ${diffText}°C ${direction} than the historical average.`;
+      }
+
+      let soilContext = "";
+      if (weatherData.soilMoisture !== undefined || weatherData.soilPH !== undefined) {
+        soilContext = `Soil & Hydrology Context:
+        - Soil Moisture (0-7cm): ${weatherData.soilMoisture !== undefined ? weatherData.soilMoisture + ' m³/m³' : 'N/A'}
+        - Evapotranspiration: ${weatherData.evapotranspiration !== undefined ? weatherData.evapotranspiration + ' mm/day' : 'N/A'}
+        - Soil pH: ${weatherData.soilPH !== undefined ? weatherData.soilPH : 'N/A'}
+        - Soil Nitrogen: ${weatherData.soilNitrogen !== undefined ? weatherData.soilNitrogen + ' g/kg' : 'N/A'}
+        - Soil Organic Carbon: ${weatherData.soilCarbon !== undefined ? weatherData.soilCarbon + ' g/kg' : 'N/A'}`;
+      }
+
+      const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
+      Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
+      Temp: ${weatherData.temp.toFixed(1)}°C, Condition: ${weatherData.condition}, Humidity: ${weatherData.humidity}%, Wind: ${weatherData.windSpeed}km/h, Rain: ${weatherData.rainfall}mm.
+      Safe Spraying Window: ${weatherData.safeSprayingWindow}
+      ${climateContext}
+      ${soilContext}
+      
+      Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80-100 words).
+      Focus on:
+      - Irrigation needs (use soil moisture and evapotranspiration data if available)
+      - Fertilizer/Soil health advice (use soil pH, Nitrogen, Carbon data if available)
+      - Pest/Disease risk based on humidity and temperature
+      - Sowing/Harvesting timing
+      - Use of the Safe Spraying Window for pesticide application.
+      
+      Use markdown for formatting. Be direct and practical.`;
+
+      const response = await callAiWithFallback({
+        contents: prompt
+      }, BACKUP_MODEL);
+      
+      return response.text || '';
+    } catch (error) {
+      console.error("AI Service Error (Weather Advisory):", error);
+      throw error;
+    }
+  });
+};
+
 export const generateSpeech = async (text: string) => {
   return await callAiWithRetry(async () => {
     try {
@@ -178,10 +242,49 @@ export const generateSpeech = async (text: string) => {
             },
           },
         },
-      }, 'gemini-2.5-flash-preview-tts'); // TTS model is specific, but we use fallback logic
+      }, 'gemini-2.5-flash-preview-tts');
       
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      return base64Audio;
+      if (!base64Audio) return null;
+
+      // Gemini TTS returns raw 16-bit PCM at 24000Hz. 
+      // We add a WAV header so the browser can play it easily.
+      const binary = atob(base64Audio);
+      const pcmData = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        pcmData[i] = binary.charCodeAt(i);
+      }
+
+      const sampleRate = 24000;
+      const buffer = new ArrayBuffer(44 + pcmData.length);
+      const view = new DataView(buffer);
+      
+      const writeString = (offset: number, string: string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + pcmData.length, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, pcmData.length, true);
+      new Uint8Array(buffer, 44).set(pcmData);
+
+      // Convert back to base64
+      const wavBase64 = btoa(
+        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+      return wavBase64;
     } catch (error) {
       console.error("AI Service Error (Generate Speech):", error);
       throw error;
@@ -299,17 +402,11 @@ export const getMarketInsights = async (
           },
           required: ['insights', 'priceTrend']
         },
-        tools: [{ googleSearch: {} }, { googleMaps: {} }],
+        tools: [{ googleSearch: {} }],
         toolConfig: {
           includeServerSideToolInvocations: true
         }
       };
-
-      if (coords) {
-        config.toolConfig.retrievalConfig = {
-          latLng: coords
-        };
-      }
 
       try {
         // Try primary search model (Gemini 3)
@@ -350,7 +447,7 @@ export const getMarketInsights = async (
   });
 };
 
-export const startAgriChat = (context: string, lang: string) => {
+export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
   const ai = getAi();
   return ai.chats.create({
     model: 'gemini-3.1-flash-lite-preview',
@@ -359,7 +456,7 @@ export const startAgriChat = (context: string, lang: string) => {
       CONTEXT: The user has just received a diagnosis for their crop: "${context}".
       TASK: Answer follow-up questions from the user about this diagnosis. 
       - Provide practical, chemical-free, or climate-smart advice.
-      - Use local context for Cox's Bazar, Bangladesh.
+      - Use local context for ${locationContext}.
       - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
       - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. 
       - Use markdown for formatting to make it readable.`,

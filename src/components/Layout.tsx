@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
 import MarketConnect from './MarketConnect';
 import WeatherAdvisory from './WeatherAdvisory';
 import SatelliteHealth from './SatelliteHealth';
+import MacroTrends from './MacroTrends';
 import UserGuide from './UserGuide';
 import Profile from './Profile';
 import PricingModal from './PricingModal';
@@ -14,7 +15,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'user-guide' | 'profile';
+type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'user-guide' | 'profile';
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -37,6 +38,9 @@ export default function Layout() {
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
   const [marketQuantity, setMarketQuantity] = useState<string>('100');
 
+  // Global Location State
+  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
   const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
   const { currentUsage, limit, tier } = useUsageTracking();
 
@@ -44,10 +48,11 @@ export default function Layout() {
 
   const tabs = [
     { id: 'agri-copilot', name: t.agriCopilot, icon: Leaf, description: t.agriCopilotDesc },
-    { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
-    { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
     { id: 'weather-advisory', name: t.weatherAdvisory, icon: Cloud, description: t.weatherAdvisoryDesc },
     { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc },
+    { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
+    { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
+    { id: 'macro-trends', name: lang === 'bn' ? 'জাতীয় প্রবণতা' : 'National Trends', icon: BarChart3, description: lang === 'bn' ? 'বিশ্বব্যাংকের সামষ্টিক অর্থনৈতিক তথ্য' : 'World Bank Macro-Economic Data' },
     { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc },
     { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc },
   ] as const;
@@ -72,7 +77,7 @@ export default function Layout() {
       <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-30 sticky top-0">
         <div className="flex items-center space-x-2">
           <Leaf className="w-6 h-6 text-green-300" />
-          <span className="font-bold text-lg tracking-tight">Agri-Copilot</span>
+          <span className="font-bold text-lg tracking-tight">{t.agriCopilot}</span>
         </div>
         <div className="flex items-center space-x-3">
           <button 
@@ -106,7 +111,7 @@ export default function Layout() {
 
       <div className={`
         fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:relative md:translate-x-0 transition-transform duration-500 ease-in-out
+        md:sticky md:top-0 md:translate-x-0 transition-transform duration-500 ease-in-out
         w-80 bg-gradient-to-b from-green-900 via-green-800 to-emerald-900 text-white flex flex-col shadow-2xl z-50 h-[100dvh]
       `}>
         <div className="p-8 flex items-center justify-between border-b border-white/10">
@@ -117,7 +122,7 @@ export default function Layout() {
             >
               <Leaf className="w-8 h-8 text-green-300" />
             </motion.div>
-            <span className="font-black text-2xl tracking-tighter uppercase italic">Agri-Copilot</span>
+            <span className="font-black text-2xl tracking-tighter uppercase italic">{t.agriCopilot}</span>
           </div>
           <div className="flex items-center space-x-2">
             <button 
@@ -263,62 +268,66 @@ export default function Layout() {
         </div>
 
         <div className="relative z-10 min-h-full flex flex-col">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 30, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -30, scale: 0.98 }}
-              transition={{ 
-                type: "spring",
-                stiffness: 100,
-                damping: 20
-              }}
-              className="flex-1"
-            >
-              {activeTab === 'agri-copilot' && (
-                <AgriCopilot 
-                  lang={lang} 
-                  persistedImages={agriImages}
-                  setPersistedImages={setAgriImages}
-                  persistedDiagnosis={agriDiagnosis}
-                  setPersistedDiagnosis={setAgriDiagnosis}
-                  persistedChatMessages={agriChatMessages}
-                  setPersistedChatMessages={setAgriChatMessages}
-                  persistedChatSession={agriChatSession}
-                  setPersistedChatSession={setAgriChatSession}
-                  persistedAudioUrl={agriAudioUrl}
-                  setPersistedAudioUrl={setAgriAudioUrl}
-                  persistedCropStage={agriCropStage}
-                  setPersistedCropStage={setAgriCropStage}
-                  persistedCrop={agriCrop}
-                  setPersistedCrop={setAgriCrop}
-                  persistedAnalysisType={agriAnalysisType}
-                  setPersistedAnalysisType={setAgriAnalysisType}
-                />
-              )}
-              {activeTab === 'smart-grade' && <SmartGrade lang={lang} />}
-              {activeTab === 'market-connect' && (
-                <MarketConnect 
-                  lang={lang} 
-                  persistedInsights={marketInsights}
-                  setPersistedInsights={setMarketInsights}
-                  persistedProduce={marketProduce}
-                  setPersistedProduce={setMarketProduce}
-                  persistedQuantity={marketQuantity}
-                  setPersistedQuantity={setMarketQuantity}
-                />
-              )}
-              {activeTab === 'weather-advisory' && (
-                <WeatherAdvisory lang={lang} />
-              )}
-              {activeTab === 'crop-health' && (
-                <SatelliteHealth lang={lang} />
-              )}
-              {activeTab === 'user-guide' && <UserGuide lang={lang} />}
-              {activeTab === 'profile' && <Profile lang={lang} />}
-            </motion.div>
-          </AnimatePresence>
+          <div className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
+            <AgriCopilot 
+              lang={lang} 
+              globalLocation={globalLocation}
+              setGlobalLocation={setGlobalLocation}
+              persistedImages={agriImages}
+              setPersistedImages={setAgriImages}
+              persistedDiagnosis={agriDiagnosis}
+              setPersistedDiagnosis={setAgriDiagnosis}
+              persistedChatMessages={agriChatMessages}
+              setPersistedChatMessages={setAgriChatMessages}
+              persistedChatSession={agriChatSession}
+              setPersistedChatSession={setAgriChatSession}
+              persistedAudioUrl={agriAudioUrl}
+              setPersistedAudioUrl={setAgriAudioUrl}
+              persistedCropStage={agriCropStage}
+              setPersistedCropStage={setAgriCropStage}
+              persistedCrop={agriCrop}
+              setPersistedCrop={setAgriCrop}
+              persistedAnalysisType={agriAnalysisType}
+              setPersistedAnalysisType={setAgriAnalysisType}
+            />
+          </div>
+          <div className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
+            <WeatherAdvisory 
+              lang={lang} 
+              globalLocation={globalLocation}
+              setGlobalLocation={setGlobalLocation}
+            />
+          </div>
+          <div className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
+            <SatelliteHealth 
+              lang={lang} 
+              globalLocation={globalLocation}
+              setGlobalLocation={setGlobalLocation}
+            />
+          </div>
+          <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
+            <SmartGrade lang={lang} />
+          </div>
+          <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
+            <MarketConnect 
+              lang={lang} 
+              persistedInsights={marketInsights}
+              setPersistedInsights={setMarketInsights}
+              persistedProduce={marketProduce}
+              setPersistedProduce={setMarketProduce}
+              persistedQuantity={marketQuantity}
+              setPersistedQuantity={setMarketQuantity}
+            />
+          </div>
+          <div className={activeTab === 'macro-trends' ? 'block flex-1' : 'hidden'}>
+            <MacroTrends lang={lang} />
+          </div>
+          <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
+            <UserGuide lang={lang} />
+          </div>
+          <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
+            <Profile lang={lang} />
+          </div>
         </div>
       </main>
       

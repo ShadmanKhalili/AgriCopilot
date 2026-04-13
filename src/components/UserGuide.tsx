@@ -52,6 +52,55 @@ export default function UserGuide({ lang }: Props) {
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Weather Advisory Guide */}
+        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-cyan-100 shadow-xl shadow-cyan-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+          <div className="flex items-center space-x-5 mb-10 relative z-10">
+            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-4 rounded-2xl text-white shadow-lg shadow-cyan-100">
+              <Cloud className="w-7 h-7" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.weatherAdvisory}</h3>
+          </div>
+          <ul className="space-y-8 relative z-10">
+            {[
+              t.guideWeather1 || (lang === 'bn' ? 'আপনার জিপিএস লোকেশন আপডেট করুন।' : 'Update your GPS location.'),
+              t.guideWeather2 || (lang === 'bn' ? 'বর্তমান আবহাওয়া এবং মাটির আর্দ্রতা দেখুন।' : 'View current weather conditions and soil moisture.')
+            ].map((step, i) => (
+              <li key={i} className="flex items-start group/item">
+                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-sm font-black mr-5 border border-cyan-100 shadow-sm group-hover/item:scale-110 transition-transform">
+                  {i + 1}
+                </span>
+                <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
+        {/* Satellite Health Guide */}
+        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-indigo-100 shadow-xl shadow-indigo-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+          <div className="flex items-center space-x-5 mb-10 relative z-10">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-100">
+              <Satellite className="w-7 h-7" />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.cropHealth}</h3>
+          </div>
+          <ul className="space-y-8 relative z-10">
+            {[
+              t.guideSatellite1 || (lang === 'bn' ? 'আপনার জিপিএস লোকেশন আপডেট করুন।' : 'Update your GPS location.'),
+              t.guideSatellite2 || (lang === 'bn' ? 'স্যাটেলাইট ডেটা রিফ্রেশ করতে বাটনে ক্লিক করুন।' : 'Click the refresh button to fetch Sentinel Hub satellite data.'),
+              t.guideSatellite3 || (lang === 'bn' ? 'ফসলের স্বাস্থ্য (NDVI) এবং আর্দ্রতা (NDMI) সূচক বিশ্লেষণ করুন।' : 'Analyze crop health (NDVI) and moisture (NDMI) indices.')
+            ].map((step, i) => (
+              <li key={i} className="flex items-start group/item">
+                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-black mr-5 border border-indigo-100 shadow-sm group-hover/item:scale-110 transition-transform">
+                  {i + 1}
+                </span>
+                <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+
         {/* Agri-Copilot Guide */}
         <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-48 h-48 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
@@ -63,9 +112,9 @@ export default function UserGuide({ lang }: Props) {
           </div>
           <ul className="space-y-8 relative z-10">
             {[
-              lang === 'bn' ? 'আপনার ফসলের ১ থেকে ৩টি পরিষ্কার ছবি তুলুন বা আপলোড করুন (বিভিন্ন দিক থেকে ছবি তুললে ভালো ফলাফল পাওয়া যায়)।' : 'Take or upload 1 to 3 clear photos of your crop (multiple angles provide better results).',
+              t.guideAgriCopilot1 || (lang === 'bn' ? 'আপনার ফসলের ১ থেকে ৩টি পরিষ্কার ছবি তুলুন বা আপলোড করুন (বিভিন্ন দিক থেকে ছবি তুললে ভালো ফলাফল পাওয়া যায়)।' : 'Take or upload 1 to 3 clear photos of your crop (multiple angles provide better results).'),
               t.guideAgriCopilot2,
-              lang === 'bn' ? 'এআই-এর পরামর্শ দেখুন এবং "নিশ্চিত হওয়ার উপায়" সেকশনে দেওয়া ধাপগুলো অনুসরণ করে নিশ্চিত হোন। প্রয়োজনে কৃষি অফিসারের সাথে আলাপ করুন।' : 'Review AI insights and follow the specific steps in "Verification Advice" to confirm. Contact a local officer if needed.'
+              t.guideAgriCopilot3 || (lang === 'bn' ? 'এআই-এর পরামর্শ দেখুন এবং "নিশ্চিত হওয়ার উপায়" সেকশনে দেওয়া ধাপগুলো অনুসরণ করে নিশ্চিত হোন। প্রয়োজনে কৃষি অফিসারের সাথে আলাপ করুন।' : 'Review AI insights and follow the specific steps in "Verification Advice" to confirm. Contact a local officer if needed.')
             ].map((step, i) => (
               <li key={i} className="flex items-start group/item">
                 <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center text-sm font-black mr-5 border border-green-100 shadow-sm group-hover/item:scale-110 transition-transform">
@@ -123,40 +172,23 @@ export default function UserGuide({ lang }: Props) {
           </ul>
         </motion.div>
 
-        {/* Satellite Health Guide */}
-        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-indigo-100 shadow-xl shadow-indigo-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+        {/* Macro Trends Guide */}
+        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-amber-100 shadow-xl shadow-amber-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
           <div className="flex items-center space-x-5 mb-10 relative z-10">
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-100">
-              <Satellite className="w-7 h-7" />
+            <div className="bg-gradient-to-br from-amber-400 to-yellow-500 p-4 rounded-2xl text-white shadow-lg shadow-amber-100">
+              <TrendingUp className="w-7 h-7" />
             </div>
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.guideSatelliteTitle}</h3>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{lang === 'bn' ? 'জাতীয় প্রবণতা' : 'National Trends'}</h3>
           </div>
           <ul className="space-y-8 relative z-10">
-            {[t.guideSatellite1, t.guideSatellite2, t.guideSatellite3].map((step, i) => (
+            {[
+              lang === 'bn' ? 'বিশ্বব্যাংকের ডেটা থেকে বাংলাদেশের কৃষির সামষ্টিক অর্থনৈতিক তথ্য দেখুন।' : 'View macro-economic data for Bangladesh agriculture from the World Bank.',
+              lang === 'bn' ? 'গত ৩০ বছরের ঐতিহাসিক প্রবণতা বিশ্লেষণ করুন।' : 'Analyze historical trends over the last 30 years.',
+              lang === 'bn' ? 'কৃষি খাতের জিডিপি অবদান এবং কর্মসংস্থান সম্পর্কে জানুন।' : 'Understand GDP contribution and employment in the agricultural sector.'
+            ].map((step, i) => (
               <li key={i} className="flex items-start group/item">
-                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-black mr-5 border border-indigo-100 shadow-sm group-hover/item:scale-110 transition-transform">
-                  {i + 1}
-                </span>
-                <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-
-        {/* Weather Advisory Guide */}
-        <motion.div variants={itemVariants} className="bg-white p-10 rounded-[40px] border border-cyan-100 shadow-xl shadow-cyan-50/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
-          <div className="flex items-center space-x-5 mb-10 relative z-10">
-            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-4 rounded-2xl text-white shadow-lg shadow-cyan-100">
-              <Cloud className="w-7 h-7" />
-            </div>
-            <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase">{t.guideWeatherTitle}</h3>
-          </div>
-          <ul className="space-y-8 relative z-10">
-            {[t.guideWeather1, t.guideWeather2, t.guideWeather3].map((step, i) => (
-              <li key={i} className="flex items-start group/item">
-                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center text-sm font-black mr-5 border border-cyan-100 shadow-sm group-hover/item:scale-110 transition-transform">
+                <span className="flex-shrink-0 w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-black mr-5 border border-amber-100 shadow-sm group-hover/item:scale-110 transition-transform">
                   {i + 1}
                 </span>
                 <p className="text-gray-600 text-sm font-bold leading-relaxed pt-1.5">{step}</p>

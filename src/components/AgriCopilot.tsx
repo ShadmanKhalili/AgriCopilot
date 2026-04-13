@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { diagnoseCrop, generateSpeech, startAgriChat } from '../services/ai';
+import { diagnoseCrop, generateSpeech, startAgriChat, translateText } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -19,6 +19,8 @@ const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'o
 
 interface Props {
   lang: Language;
+  globalLocation: { latitude: number; longitude: number } | null;
+  setGlobalLocation: (loc: { latitude: number; longitude: number }) => void;
   persistedImages?: { base64: string; mimeType: string }[];
   setPersistedImages?: (images: { base64: string; mimeType: string }[]) => void;
   persistedDiagnosis?: any | null;
@@ -39,6 +41,8 @@ interface Props {
 
 export default function AgriCopilot({ 
   lang,
+  globalLocation,
+  setGlobalLocation,
   persistedImages,
   setPersistedImages,
   persistedDiagnosis,
@@ -65,7 +69,6 @@ export default function AgriCopilot({
   const [diagnosis, setDiagnosis] = useState<any | null>(persistedDiagnosis || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(persistedAudioUrl || null);
   const [isAdvanced, setIsAdvanced] = useState(false);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
@@ -141,9 +144,15 @@ export default function AgriCopilot({
 
   const handleVerifyWithExpert = () => {
     setIsFindingExpert(true);
-    // Simulate finding expert or open maps directly
-    const query = encodeURIComponent("Department of Agricultural Extension Cox's Bazar");
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    // Open maps directly with coordinates if available, otherwise general search
+    let mapsUrl = '';
+    if (globalLocation) {
+      const query = encodeURIComponent("Department of Agricultural Extension");
+      mapsUrl = `https://www.google.com/maps/search/${query}/@${globalLocation.latitude},${globalLocation.longitude},12z`;
+    } else {
+      const query = encodeURIComponent("Department of Agricultural Extension Bangladesh");
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    }
     
     setTimeout(() => {
       window.open(mapsUrl, '_blank');
@@ -160,7 +169,7 @@ export default function AgriCopilot({
     setIsDetectingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setCoords({
+        setGlobalLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         });
@@ -173,6 +182,48 @@ export default function AgriCopilot({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+  };
+
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const handleTranslate = async () => {
+    if (!diagnosis) return;
+    setIsTranslating(true);
+    try {
+      const targetLang = lang === 'en' ? 'English' : 'Bengali';
+      
+      // Translate diagnosis
+      const translatedDiagnosis = await translateText(diagnosis.diagnosis, targetLang);
+      const translatedAdvice = await translateText(diagnosis.verificationAdvice, targetLang);
+      
+      setDiagnosis(prev => prev ? {
+        ...prev,
+        diagnosis: translatedDiagnosis,
+        verificationAdvice: translatedAdvice
+      } : null);
+
+      // Generate new TTS
+      try {
+        const base64Audio = await generateSpeech(translatedDiagnosis);
+        if (base64Audio) {
+          const binary = atob(base64Audio);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          
+          const blob = new Blob([bytes], { type: 'audio/wav' });
+          setAudioUrl(URL.createObjectURL(blob));
+        }
+      } catch (ttsError) {
+        console.error("TTS generation failed after translation:", ttsError);
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      alert("Failed to translate content.");
+    } finally {
+      setIsTranslating(false);
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -220,12 +271,13 @@ export default function AgriCopilot({
         analysisTypeStr, 
         lang, 
         isAdvanced,
-        coords || undefined
+        globalLocation || undefined
       );
       setDiagnosis(result);
       
       // Initialize chat session
-      const session = startAgriChat(result.diagnosis, lang);
+      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      const session = startAgriChat(result.diagnosis, lang, locationContext);
       setChatSession(session);
       setChatMessages([]);
       
@@ -259,33 +311,7 @@ export default function AgriCopilot({
           bytes[i] = binary.charCodeAt(i);
         }
         
-        // Gemini TTS returns raw 16-bit PCM at 24000Hz. We must add a WAV header for the <audio> tag to play it.
-        const addWavHeader = (pcmData: Uint8Array, sampleRate: number) => {
-          const buffer = new ArrayBuffer(44 + pcmData.length);
-          const view = new DataView(buffer);
-          const writeString = (offset: number, string: string) => {
-            for (let i = 0; i < string.length; i++) {
-              view.setUint8(offset + i, string.charCodeAt(i));
-            }
-          };
-          writeString(0, 'RIFF');
-          view.setUint32(4, 36 + pcmData.length, true);
-          writeString(8, 'WAVE');
-          writeString(12, 'fmt ');
-          view.setUint32(16, 16, true);
-          view.setUint16(20, 1, true);
-          view.setUint16(22, 1, true);
-          view.setUint32(24, sampleRate, true);
-          view.setUint32(28, sampleRate * 2, true);
-          view.setUint16(32, 2, true);
-          view.setUint16(34, 16, true);
-          writeString(36, 'data');
-          view.setUint32(40, pcmData.length, true);
-          new Uint8Array(buffer, 44).set(pcmData);
-          return new Blob([buffer], { type: 'audio/wav' });
-        };
-
-        const blob = addWavHeader(bytes, 24000);
+        const blob = new Blob([bytes], { type: 'audio/wav' });
         setAudioUrl(URL.createObjectURL(blob));
       }
     } catch (error: any) {
@@ -331,43 +357,47 @@ export default function AgriCopilot({
                 <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 uppercase tracking-widest">{images.length}/3 {t.photoLimit}</span>
               </div>
               
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {images.map((img, idx) => (
-                  <motion.div 
-                    key={idx} 
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="relative aspect-square rounded-2xl overflow-hidden border-2 border-green-100 group shadow-sm"
-                  >
-                    <img 
-                      src={`data:${img.mimeType};base64,${img.base64}`} 
-                      alt={`Upload ${idx + 1}`} 
-                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                    />
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeImage(idx);
-                      }}
-                      className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white p-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
+              {images.length > 0 && (
+                <div className="space-y-4 mb-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {images.map((img, idx) => (
+                      <motion.div 
+                        key={idx} 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="relative aspect-square rounded-2xl overflow-hidden border-2 border-green-100 group shadow-sm"
+                      >
+                        <img 
+                          src={`data:${img.mimeType};base64,${img.base64}`} 
+                          alt={`Upload ${idx + 1}`} 
+                          className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                          referrerPolicy="no-referrer"
+                        />
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(idx);
+                          }}
+                          className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white p-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                  {images.length < 3 && (
+                    <motion.label 
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      className="w-full py-3 rounded-2xl border-2 border-dashed border-green-200 flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all bg-green-50/30"
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </motion.div>
-                ))}
-                {images.length < 3 && (
-                  <motion.label 
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="aspect-square rounded-2xl border-2 border-dashed border-green-200 flex flex-col items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all bg-green-50/30"
-                  >
-                    <Plus className="w-8 h-8 text-green-400 mb-1" />
-                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{t.addPhoto}</span>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" multiple={images.length === 0} />
-                  </motion.label>
-                )}
-              </div>
+                      <Plus className="w-5 h-5 text-green-500 mr-2" />
+                      <span className="text-xs font-black text-green-600 uppercase tracking-widest">{t.addPhoto}</span>
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" multiple={images.length === 0} />
+                    </motion.label>
+                  )}
+                </div>
+              )}
 
               {images.length === 0 && (
                 <motion.div 
@@ -408,29 +438,7 @@ export default function AgriCopilot({
                 </select>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropStage}</label>
-                  <Tooltip content={t.tooltips.locationDesc}>
-                    <button 
-                      onClick={handleDetectLocation}
-                      disabled={isDetectingLocation}
-                      className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-all ${
-                        coords 
-                          ? 'bg-green-100 text-green-700 border border-green-200' 
-                          : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
-                      }`}
-                    >
-                      {isDetectingLocation ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : coords ? (
-                        <Navigation className="w-3 h-3" />
-                      ) : (
-                        <MapPin className="w-3 h-3" />
-                      )}
-                      <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
-                    </button>
-                  </Tooltip>
-                </div>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropStage}</label>
                 <select 
                   value={cropStage} 
                   onChange={(e) => setCropStage(e.target.value)}
@@ -445,8 +453,33 @@ export default function AgriCopilot({
               </div>
             </div>
 
-            {coords && (
-              <LocationDisplay coords={coords} lang={lang} color="green" />
+            <div className="bg-white p-5 rounded-3xl border border-green-100 shadow-sm flex items-center justify-between">
+              <div>
+                <h4 className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
+                <p className="text-xs text-gray-500 font-medium">{globalLocation ? t.tooltips.locationDetected : t.tooltips.locationDesc}</p>
+              </div>
+              <button 
+                onClick={handleDetectLocation}
+                disabled={isDetectingLocation}
+                className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm ${
+                  globalLocation 
+                    ? 'bg-green-50 text-green-700 hover:bg-green-100' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {isDetectingLocation ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : globalLocation ? (
+                  <Navigation className="w-4 h-4" />
+                ) : (
+                  <MapPin className="w-4 h-4" />
+                )}
+                <span className="text-xs">{isDetectingLocation ? t.tooltips.detecting : globalLocation ? 'Update' : t.tooltips.detectLocation}</span>
+              </button>
+            </div>
+
+            {globalLocation && (
+              <LocationDisplay coords={globalLocation} lang={lang} color="green" />
             )}
 
             <div className="space-y-2">
@@ -574,6 +607,14 @@ export default function AgriCopilot({
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={handleTranslate}
+                          disabled={isTranslating}
+                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all"
+                        >
+                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                          <span>{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
+                        </button>
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                         <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-widest">AI Verified</span>
                       </div>
@@ -593,39 +634,81 @@ export default function AgriCopilot({
                         </motion.div>
                       ) : (
                         <>
+                          {/* 1. AI Suggestion (Diagnosis Text) */}
+                          <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="bg-white rounded-[32px] p-8 md:p-10 border border-gray-100 text-gray-800 shadow-sm relative overflow-hidden"
+                          >
+                            <div className="absolute top-0 left-0 w-1 h-full bg-green-500 opacity-20"></div>
+                            <div className="markdown-body text-base md:text-lg leading-relaxed prose prose-green max-w-none">
+                              <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
+                            </div>
+                            
+                            {/* TTS Audio Player */}
+                            {audioUrl && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-100 shadow-inner flex items-center space-x-4"
+                              >
+                                <motion.div 
+                                  animate={{ scale: [1, 1.1, 1] }}
+                                  transition={{ duration: 2, repeat: Infinity }}
+                                  className="bg-white p-3 rounded-xl text-green-600 shadow-sm"
+                                >
+                                  <Volume2 className="w-6 h-6" />
+                                </motion.div>
+                                <div className="flex-1">
+                                  <p className="text-[10px] font-black text-green-900 uppercase tracking-widest mb-2">{t.playAudio}</p>
+                                  <audio controls src={audioUrl} className="w-full h-8 rounded-lg" />
+                                </div>
+                              </motion.div>
+                            )}
+                          </motion.div>
+
+                          {/* 2. Verification Advice */}
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[32px] p-8 shadow-inner">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="bg-white p-2 rounded-xl shadow-sm">
+                                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
+                            </div>
+                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-6 prose-sm prose-blue leading-relaxed">
+                              <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
+                            </div>
+                            
+                            {diagnosis.confidence < 70 && (
+                              <div className="flex items-center space-x-2 text-amber-600 bg-amber-100/50 px-4 py-2 rounded-xl border border-amber-200 w-fit">
+                                <AlertTriangle className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{t.lowConfidenceWarning}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Severity% and Confidence% */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {/* Severity Gauge */}
                             <motion.div 
                               whileHover={{ y: -5 }}
-                              className="bg-gradient-to-br from-white to-gray-50 rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center relative overflow-hidden"
+                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center relative overflow-hidden"
                             >
-                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-20"></div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
-                              <div className="w-full h-32 relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <PieChart>
-                                    <Pie
-                                      data={[
-                                        { value: diagnosis.severity },
-                                        { value: 100 - diagnosis.severity }
-                                      ]}
-                                      cx="50%"
-                                      cy="100%"
-                                      startAngle={180}
-                                      endAngle={0}
-                                      innerRadius={45}
-                                      outerRadius={65}
-                                      paddingAngle={0}
-                                      dataKey="value"
-                                      stroke="none"
-                                    >
-                                      <Cell fill={diagnosis.severity > 70 ? '#ef4444' : diagnosis.severity > 40 ? '#f59e0b' : '#10b981'} />
-                                      <Cell fill="#f3f4f6" />
-                                    </Pie>
-                                  </PieChart>
-                                </ResponsiveContainer>
-                                <div className="absolute inset-0 flex flex-col items-center justify-end pb-2">
-                                  <span className="text-4xl font-black text-gray-900 tracking-tighter">{diagnosis.severity}%</span>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
+                              <div className="relative w-32 h-32 flex items-center justify-center mb-2">
+                                <svg className="w-full h-full transform -rotate-90">
+                                  <circle cx="64" cy="64" r="56" className="stroke-gray-100" strokeWidth="12" fill="none" />
+                                  <circle 
+                                    cx="64" cy="64" r="56" 
+                                    className={diagnosis.severity > 70 ? 'stroke-red-500' : diagnosis.severity > 40 ? 'stroke-amber-500' : 'stroke-green-500'} 
+                                    strokeWidth="12" fill="none" 
+                                    strokeDasharray={2 * Math.PI * 56} 
+                                    strokeDashoffset={(2 * Math.PI * 56) - (diagnosis.severity / 100) * (2 * Math.PI * 56)} 
+                                    strokeLinecap="round" 
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                  <span className="text-3xl font-black text-gray-900 tracking-tighter">{diagnosis.severity}%</span>
                                 </div>
                               </div>
                             </motion.div>
@@ -633,20 +716,47 @@ export default function AgriCopilot({
                             {/* Confidence Score */}
                             <motion.div 
                               whileHover={{ y: -5 }}
-                              className="bg-gradient-to-br from-white to-gray-50 rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center relative overflow-hidden"
+                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center relative overflow-hidden"
                             >
-                              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-20"></div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'নির্ভরযোগ্যতা' : 'Confidence'}</p>
-                              <div className="flex flex-col items-center">
-                                <div className="bg-green-50 p-4 rounded-full mb-3 shadow-inner">
-                                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{lang === 'bn' ? 'নির্ভরযোগ্যতা' : 'Confidence'}</p>
+                              <div className="relative w-32 h-32 flex items-center justify-center mb-2">
+                                <svg className="w-full h-full transform -rotate-90">
+                                  <circle cx="64" cy="64" r="56" className="stroke-gray-100" strokeWidth="12" fill="none" />
+                                  <circle 
+                                    cx="64" cy="64" r="56" 
+                                    className={diagnosis.confidence > 70 ? 'stroke-green-500' : diagnosis.confidence > 40 ? 'stroke-amber-500' : 'stroke-red-500'} 
+                                    strokeWidth="12" fill="none" 
+                                    strokeDasharray={2 * Math.PI * 56} 
+                                    strokeDashoffset={(2 * Math.PI * 56) - (diagnosis.confidence / 100) * (2 * Math.PI * 56)} 
+                                    strokeLinecap="round" 
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                  <span className="text-3xl font-black text-gray-900 tracking-tighter">{diagnosis.confidence}%</span>
                                 </div>
-                                <span className="text-4xl font-black text-gray-900 tracking-tighter">{diagnosis.confidence}%</span>
                               </div>
                             </motion.div>
                           </div>
 
-                          {/* Nutrient Chart */}
+                          {/* 4. Chat with Expert (Search DAE) - Indicative */}
+                          <div className="flex justify-center pt-2 pb-4">
+                            <motion.button 
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={handleVerifyWithExpert}
+                              disabled={isFindingExpert}
+                              className="text-gray-500 hover:text-blue-600 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 transition-all border border-transparent hover:border-blue-100 hover:bg-blue-50"
+                            >
+                              {isFindingExpert ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                              <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert} (Indicative)</span>
+                            </motion.button>
+                          </div>
+
+                          {/* 5. Nutrient Chart */}
                           {diagnosis.nutrientLevels && (
                             <motion.div 
                               initial={{ opacity: 0, y: 20 }}
@@ -693,75 +803,9 @@ export default function AgriCopilot({
                               </div>
                             </motion.div>
                           )}
-
-                          {/* Verification Advice */}
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[32px] p-8 shadow-inner">
-                            <div className="flex items-center space-x-3 mb-4">
-                              <div className="bg-white p-2 rounded-xl shadow-sm">
-                                <ShieldAlert className="w-5 h-5 text-blue-500" />
-                              </div>
-                              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
-                            </div>
-                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-6 prose-sm prose-blue leading-relaxed">
-                              <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
-                            </div>
-                            
-                            {diagnosis.confidence < 70 && (
-                              <div className="flex items-center space-x-2 text-amber-600 mb-6 bg-amber-100/50 px-4 py-2 rounded-xl border border-amber-200 w-fit">
-                                <AlertTriangle className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{t.lowConfidenceWarning}</span>
-                              </div>
-                            )}
-
-                            <motion.button 
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={handleVerifyWithExpert}
-                              disabled={isFindingExpert}
-                              className="w-full bg-white text-blue-600 py-4 rounded-2xl text-sm font-black uppercase tracking-widest flex items-center justify-center space-x-3 shadow-sm hover:shadow-md transition-all border border-blue-100"
-                            >
-                              {isFindingExpert ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                              ) : (
-                                <Search className="w-5 h-5" />
-                              )}
-                              <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert}</span>
-                            </motion.button>
-                          </div>
-
-                          <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="bg-white rounded-[32px] p-8 md:p-10 border border-gray-100 text-gray-800 shadow-sm relative overflow-hidden"
-                          >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-green-500 opacity-20"></div>
-                            <div className="markdown-body text-base md:text-lg leading-relaxed prose prose-green max-w-none">
-                              <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
-                            </div>
-                          </motion.div>
                         </>
                       )}
                     </div>
-
-                    {audioUrl && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-[32px] p-6 border border-green-100 shadow-inner flex items-center space-x-6"
-                      >
-                        <motion.div 
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                          className="bg-white p-4 rounded-2xl text-green-600 shadow-md"
-                        >
-                          <Volume2 className="w-8 h-8" />
-                        </motion.div>
-                        <div className="flex-1">
-                          <p className="text-xs font-black text-green-900 uppercase tracking-widest mb-3">{t.playAudio}</p>
-                          <audio controls src={audioUrl} className="w-full h-10 rounded-xl" />
-                        </div>
-                      </motion.div>
-                    )}
 
                     {/* Chatbot Section */}
                     <div className="mt-12 pt-10 border-t border-gray-100">

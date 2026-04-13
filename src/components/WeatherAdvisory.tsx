@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import ReactMarkdown from 'react-markdown';
-import { GoogleGenAI } from '@google/genai';
+import { translateText, generateWeatherAdvisory, generateSpeech } from '../services/ai';
 
 interface Props {
   lang: Language;
+  globalLocation: { latitude: number; longitude: number } | null;
+  setGlobalLocation: (loc: { latitude: number; longitude: number }) => void;
 }
 
 interface WeatherData {
@@ -20,16 +22,50 @@ interface WeatherData {
   rainChance: number;
   uvIndex: number;
   locationName: string;
+  historicalAvgTemp?: number;
+  soilMoisture?: number;
+  evapotranspiration?: number;
+  soilPH?: number;
+  soilNitrogen?: number;
+  soilCarbon?: number;
+  safeSprayingWindow?: string;
 }
 
-export default function WeatherAdvisory({ lang }: Props) {
+export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocation }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [advisory, setAdvisory] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const audioRef = React.useRef<HTMLAudioElement>(null);
   const t = translations[lang];
+
+  const handleTranslate = async () => {
+    if (!advisory) return;
+    setIsTranslating(true);
+    try {
+      const targetLang = lang === 'en' ? 'English' : 'Bengali';
+      const translatedText = await translateText(advisory, targetLang);
+      setAdvisory(translatedText);
+      
+      // Stop current speech if any
+      if (isSpeaking) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+        setIsSpeaking(false);
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -39,7 +75,7 @@ export default function WeatherAdvisory({ lang }: Props) {
     setIsDetecting(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setCoords({
+        setGlobalLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         });
@@ -52,40 +88,190 @@ export default function WeatherAdvisory({ lang }: Props) {
     );
   };
 
+  const toggleSpeech = async () => {
+    if (!advisory) return;
+
+    if (isSpeaking) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsSpeaking(false);
+      return;
+    }
+
+    setIsAudioLoading(true);
+    try {
+      const plainText = advisory.replace(/[*#_]/g, '');
+      const base64Audio = await generateSpeech(plainText);
+      
+      if (base64Audio) {
+        const binaryString = atob(base64Audio);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        
+        if (audioRef.current) {
+          audioRef.current.src = url;
+          audioRef.current.play();
+          setIsSpeaking(true);
+        }
+      }
+    } catch (error) {
+      console.error("Speech error:", error);
+    } finally {
+      setIsAudioLoading(false);
+    }
+  };
+
   const fetchWeatherAndAdvisory = async () => {
-    if (!coords) return;
+    if (!globalLocation) return;
     setIsLoading(true);
     
     try {
-      const mockWeather: WeatherData = {
-        temp: 28 + Math.random() * 5,
-        condition: Math.random() > 0.5 ? 'Cloudy' : 'Sunny',
-        humidity: 65 + Math.random() * 10,
-        windSpeed: 12 + Math.random() * 5,
-        rainfall: Math.random() > 0.7 ? 5 : 0,
-        rainChance: Math.floor(Math.random() * 100),
-        uvIndex: Math.floor(Math.random() * 11),
-        locationName: "Cox's Bazar Area"
+      // 1. Fetch Current Weather, Soil Moisture, and Hourly Forecast from Open-Meteo
+      const weatherRes = await fetch(`/api/weather?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
+      const weatherData = await weatherRes.json();
+      
+      // Calculate Safe Spraying Window
+      let safeSprayingWindow = "No safe window in the next 24 hours";
+      if (weatherData.hourly) {
+        const times = weatherData.hourly.time;
+        const temps = weatherData.hourly.temperature_2m;
+        const rainProbs = weatherData.hourly.precipitation_probability;
+        const windSpeeds = weatherData.hourly.wind_speed_10m;
+        
+        // Find current hour index
+        const now = new Date();
+        let startIndex = 0;
+        for (let i = 0; i < times.length; i++) {
+          if (new Date(times[i]) >= now) {
+            startIndex = i;
+            break;
+          }
+        }
+
+        // Look for a 3-hour contiguous block in the next 24 hours
+        for (let i = startIndex; i < Math.min(startIndex + 24, times.length - 2); i++) {
+          let isSafe = true;
+          for (let j = 0; j < 3; j++) {
+            const idx = i + j;
+            if (
+              rainProbs[idx] > 20 || // Too much rain risk
+              windSpeeds[idx] > 15 || // Too windy (drift risk)
+              temps[idx] > 30 || // Too hot (evaporation/burn risk)
+              temps[idx] < 10 // Too cold
+            ) {
+              isSafe = false;
+              break;
+            }
+          }
+          
+          if (isSafe) {
+            const startWindow = new Date(times[i]);
+            const endWindow = new Date(times[i + 2]);
+            const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            
+            const dayStr = startWindow.getDate() === now.getDate() ? "Today" : "Tomorrow";
+            safeSprayingWindow = `${dayStr}, ${formatTime(startWindow)} - ${formatTime(endWindow)}`;
+            break;
+          }
+        }
+      }
+      
+      // 2. Fetch Historical Climate Data (Last 5 years for the current month)
+      const date = new Date();
+      const currentMonth = String(date.getMonth() + 1).padStart(2, '0');
+      const endYear = date.getFullYear() - 1;
+      const startYear = endYear - 4;
+      const lastDay = new Date(startYear, date.getMonth() + 1, 0).getDate();
+      
+      const startDate = `${startYear}-${currentMonth}-01`;
+      const endDate = `${endYear}-${currentMonth}-${lastDay}`;
+      
+      let historicalAvgTemp = undefined;
+      try {
+        const climateRes = await fetch(`/api/climate?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
+        const climateData = await climateRes.json();
+        
+        const temps = climateData.daily.temperature_2m_mean;
+        const times = climateData.daily.time;
+        
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < times.length; i++) {
+          if (times[i].split('-')[1] === currentMonth && temps[i] !== null) {
+            sum += temps[i];
+            count++;
+          }
+        }
+        if (count > 0) {
+          historicalAvgTemp = sum / count;
+        }
+      } catch (e) {
+        console.error("Failed to fetch historical climate data", e);
+      }
+
+      // 3. Fetch SoilGrids Data
+      let soilPH, soilNitrogen, soilCarbon;
+      try {
+        const soilRes = await fetch(`/api/soil?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`);
+        const soilData = await soilRes.json();
+        
+        const layers = soilData.properties?.layers || [];
+        const phLayer = layers.find((l: any) => l.name === 'phh2o');
+        const nLayer = layers.find((l: any) => l.name === 'nitrogen');
+        const cLayer = layers.find((l: any) => l.name === 'soc');
+        
+        if (phLayer && phLayer.depths[0].values.mean) soilPH = phLayer.depths[0].values.mean / 10;
+        if (nLayer && nLayer.depths[0].values.mean) soilNitrogen = nLayer.depths[0].values.mean / 100;
+        if (cLayer && cLayer.depths[0].values.mean) soilCarbon = cLayer.depths[0].values.mean / 10;
+      } catch (e) {
+        console.error("Failed to fetch soil data", e);
+      }
+
+      // Map WMO weather code to condition
+      const code = weatherData.current.weather_code;
+      let condition = 'Sunny';
+      if (code >= 1 && code <= 3) condition = 'Partly Cloudy';
+      if (code >= 45 && code <= 48) condition = 'Foggy';
+      if (code >= 51 && code <= 67) condition = 'Rainy';
+      if (code >= 71 && code <= 77) condition = 'Snowy';
+      if (code >= 80 && code <= 82) condition = 'Showers';
+      if (code >= 95 && code <= 99) condition = 'Thunderstorm';
+
+      const currentTemp = weatherData.current.temperature_2m;
+
+      const newWeather: WeatherData = {
+        temp: currentTemp,
+        condition: condition,
+        humidity: weatherData.current.relative_humidity_2m,
+        windSpeed: weatherData.current.wind_speed_10m,
+        rainfall: weatherData.current.precipitation,
+        rainChance: weatherData.daily.precipitation_probability_max[0] || 0,
+        uvIndex: weatherData.daily.uv_index_max[0] || 0,
+        locationName: "Local Area",
+        historicalAvgTemp,
+        soilMoisture: weatherData.current.soil_moisture_0_to_7cm,
+        evapotranspiration: weatherData.daily.et0_fao_evapotranspiration[0],
+        soilPH,
+        soilNitrogen,
+        soilCarbon,
+        safeSprayingWindow
       };
-      setWeather(mockWeather);
+      
+      setWeather(newWeather);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `You are an expert agricultural meteorologist in Bangladesh.
-        Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
-        Temp: ${mockWeather.temp.toFixed(1)}°C, Condition: ${mockWeather.condition}, Humidity: ${mockWeather.humidity}%, Wind: ${mockWeather.windSpeed}km/h, Rain: ${mockWeather.rainfall}mm.
-        
-        Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80 words).
-        Focus on:
-        - Irrigation needs
-        - Pesticide/Fertilizer application safety (based on wind/rain)
-        - Harvesting or sowing advice
-        Use markdown for bullet points.`
-      });
-      
-      setAdvisory(response.text);
+      // 4. Generate AI Advisory
+      const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
+      setAdvisory(advisoryText);
     } catch (error) {
       console.error("Weather/Advisory error:", error);
     } finally {
@@ -94,10 +280,10 @@ export default function WeatherAdvisory({ lang }: Props) {
   };
 
   useEffect(() => {
-    if (coords) {
+    if (globalLocation) {
       fetchWeatherAndAdvisory();
     }
-  }, [coords]);
+  }, [globalLocation]);
 
   return (
     <motion.div 
@@ -117,7 +303,7 @@ export default function WeatherAdvisory({ lang }: Props) {
         <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto">{t.weatherAdvisoryDesc}</p>
       </div>
 
-      {!coords ? (
+      {!globalLocation ? (
         <motion.div 
           whileHover={{ y: -5 }}
           className="bg-white p-16 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 text-center relative overflow-hidden group"
@@ -168,9 +354,9 @@ export default function WeatherAdvisory({ lang }: Props) {
                 </button>
               </div>
 
-              {coords && (
+              {globalLocation && (
                 <div className="mb-8">
-                  <LocationDisplay coords={coords} lang={lang} color="blue" />
+                  <LocationDisplay coords={globalLocation} lang={lang} color="blue" />
                 </div>
               )}
 
@@ -206,97 +392,110 @@ export default function WeatherAdvisory({ lang }: Props) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <motion.div 
-                      whileHover={{ scale: 1.02 }}
-                      className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-100/50 shadow-sm"
-                    >
-                      <div className="flex items-center text-blue-500 mb-3">
-                        <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                          <Droplets className="w-5 h-5" />
+                      <motion.div 
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-100/50 shadow-sm h-full"
+                      >
+                        <div className="flex items-center text-blue-500 mb-3">
+                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                            <Droplets className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-wider">{t.humidity}</span>
                         </div>
-                        <span className="text-xs font-black uppercase tracking-wider">{t.humidity}</span>
-                      </div>
-                      <span className="text-3xl font-black text-gray-900">{weather.humidity.toFixed(2)}%</span>
-                    </motion.div>
+                        <span className="text-3xl font-black text-gray-900">{weather.humidity.toFixed(2)}%</span>
+                      </motion.div>
                     
-                    <motion.div 
-                      whileHover={{ scale: 1.02 }}
-                      className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-100/50 shadow-sm"
-                    >
-                      <div className="flex items-center text-indigo-500 mb-3">
-                        <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                          <Wind className="w-5 h-5" />
+                      <motion.div 
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-100/50 shadow-sm h-full"
+                      >
+                        <div className="flex items-center text-indigo-500 mb-3">
+                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                            <Wind className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-wider">{t.windSpeed}</span>
                         </div>
-                        <span className="text-xs font-black uppercase tracking-wider">{t.windSpeed}</span>
-                      </div>
-                      <span className="text-3xl font-black text-gray-900">{weather.windSpeed.toFixed(1)}</span>
-                      <span className="text-xs font-bold text-gray-400 ml-1">km/h</span>
-                    </motion.div>
+                        <span className="text-3xl font-black text-gray-900">{weather.windSpeed.toFixed(1)}</span>
+                        <span className="text-xs font-bold text-gray-400 ml-1">km/h</span>
+                      </motion.div>
 
-                    <motion.div 
-                      whileHover={{ scale: 1.02 }}
-                      className="bg-gradient-to-br from-cyan-50 to-white p-5 rounded-3xl border border-cyan-100/50 shadow-sm"
-                    >
-                      <div className="flex items-center text-cyan-500 mb-3">
-                        <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                          <CloudRain className="w-5 h-5" />
+                      <motion.div 
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-gradient-to-br from-cyan-50 to-white p-5 rounded-3xl border border-cyan-100/50 shadow-sm h-full"
+                      >
+                        <div className="flex items-center text-cyan-500 mb-3">
+                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                            <CloudRain className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-wider">{t.rainChance}</span>
                         </div>
-                        <span className="text-xs font-black uppercase tracking-wider">{t.rainChance}</span>
-                      </div>
-                      <span className="text-3xl font-black text-gray-900">{weather.rainChance}%</span>
-                    </motion.div>
+                        <span className="text-3xl font-black text-gray-900">{weather.rainChance}%</span>
+                      </motion.div>
 
-                    <motion.div 
-                      whileHover={{ scale: 1.02 }}
-                      className="bg-gradient-to-br from-orange-50 to-white p-5 rounded-3xl border border-orange-100/50 shadow-sm"
-                    >
-                      <div className="flex items-center text-orange-500 mb-3">
-                        <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                          <Sun className="w-5 h-5" />
+                      <motion.div 
+                        whileHover={{ scale: 1.02 }}
+                        className="bg-gradient-to-br from-orange-50 to-white p-5 rounded-3xl border border-orange-100/50 shadow-sm h-full"
+                      >
+                        <div className="flex items-center text-orange-500 mb-3">
+                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                            <Sun className="w-5 h-5" />
+                          </div>
+                          <span className="text-xs font-black uppercase tracking-wider">{t.uvIndex}</span>
                         </div>
-                        <span className="text-xs font-black uppercase tracking-wider">{t.uvIndex}</span>
-                      </div>
-                      <span className="text-3xl font-black text-gray-900">{weather.uvIndex}</span>
-                    </motion.div>
+                        <span className="text-3xl font-black text-gray-900">{weather.uvIndex}</span>
+                      </motion.div>
                   </div>
 
-                  {/* Weather Insights Section */}
-                  <div className="mt-8 pt-6 border-t border-blue-50">
-                    <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                      <HelpCircle className="w-5 h-5 text-blue-500" />
-                      {t.weatherInsightsTitle}
-                    </h4>
-                    <div className="space-y-4">
-                      <div className="flex gap-3">
-                        <Droplets className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-gray-700">{t.humidity}</p>
-                          <p className="text-sm text-gray-500">{t.humidityInsight}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <Wind className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-gray-700">{t.windSpeed}</p>
-                          <p className="text-sm text-gray-500">{t.windInsight}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <CloudRain className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-gray-700">{t.rainChance}</p>
-                          <p className="text-sm text-gray-500">{t.rainChanceInsight}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <Sun className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-gray-700">{t.uvIndex}</p>
-                          <p className="text-sm text-gray-500">{t.uvInsight}</p>
-                        </div>
+                  {/* Soil & Hydrology Insights Section */}
+                  {(weather.soilMoisture !== undefined || weather.soilPH !== undefined) && (
+                    <div className="mt-8 pt-6 border-t border-blue-50">
+                      <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-green-500" />
+                        Soil & Hydrology Insights
+                      </h4>
+                      <div className="space-y-4">
+                        {weather.soilMoisture !== undefined && (
+                          <div className="flex gap-3">
+                            <Droplets className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-700">Soil Moisture (0-7cm)</p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="font-bold">{weather.soilMoisture} m³/m³</span>. 
+                                {weather.evapotranspiration !== undefined && ` Evapotranspiration is ${weather.evapotranspiration} mm/day.`}
+                              </p>
+                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Data: Open-Meteo Agronomic</p>
+                            </div>
+                          </div>
+                        )}
+                        {weather.soilPH !== undefined && (
+                          <div className="flex gap-3">
+                            <Thermometer className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-700">Soil Health Properties</p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                pH: <span className="font-bold">{weather.soilPH}</span> | 
+                                Nitrogen: <span className="font-bold">{weather.soilNitrogen} g/kg</span> | 
+                                Organic Carbon: <span className="font-bold">{weather.soilCarbon} g/kg</span>
+                              </p>
+                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Data: ISRIC SoilGrids</p>
+                            </div>
+                          </div>
+                        )}
+                        {weather.safeSprayingWindow && (
+                          <div className="flex gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100 mt-2">
+                            <TestTube className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-700">Safe Spraying Window</p>
+                              <p className="text-sm text-gray-600 mt-1">
+                                <span className="font-bold text-green-700">{weather.safeSprayingWindow}</span>
+                              </p>
+                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Based on Wind & Rain Forecast</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {lastUpdated && (
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
@@ -332,6 +531,36 @@ export default function WeatherAdvisory({ lang }: Props) {
                       <p className="text-xs font-bold text-blue-500 uppercase tracking-widest mt-0.5">AI-Powered Insights</p>
                     </div>
                   </div>
+                  {advisory && (
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={handleTranslate}
+                        disabled={isTranslating}
+                        className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all"
+                      >
+                        {isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                        <span className="hidden sm:inline">{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
+                      </button>
+                      <button
+                        onClick={toggleSpeech}
+                        disabled={isAudioLoading}
+                        className={`p-3 rounded-2xl transition-all duration-300 ${
+                          isSpeaking 
+                            ? 'bg-red-100 text-red-600 shadow-inner' 
+                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100 shadow-sm'
+                        } ${isAudioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isSpeaking ? "Stop listening" : "Listen to advisory"}
+                      >
+                        {isAudioLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : isSpeaking ? (
+                          <VolumeX className="w-5 h-5" />
+                        ) : (
+                          <Volume2 className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1">
@@ -383,6 +612,12 @@ export default function WeatherAdvisory({ lang }: Props) {
           </div>
         </div>
       )}
+      {/* Hidden Audio for TTS */}
+      <audio 
+        ref={audioRef} 
+        onEnded={() => setIsSpeaking(false)} 
+        className="hidden" 
+      />
     </motion.div>
   );
 }
