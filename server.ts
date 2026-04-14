@@ -16,6 +16,17 @@ async function startServer() {
 
   app.use(express.json());
 
+  // AdSense & Bot verification
+  app.get("/ads.txt", (req, res) => {
+    res.type("text/plain");
+    res.send("google.com, pub-8294149074042302, DIRECT, f08c47fec0942fa0");
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    res.type("text/plain");
+    res.send("User-agent: *\nAllow: /");
+  });
+
   // Sentinel Hub Proxy
   app.post("/.netlify/functions/sentinel", async (req, res) => {
     try {
@@ -236,12 +247,36 @@ async function startServer() {
   app.get("/api/worldbank", async (req, res) => {
     try {
       const { country, indicator, ...rest } = req.query;
-      const response = await axios.get(`https://api.worldbank.org/v2/country/${country}/indicator/${indicator}`, {
-        params: rest
+      
+      if (!country || !indicator) {
+        return res.status(400).json({ error: "Missing country or indicator parameter" });
+      }
+
+      const url = `https://api.worldbank.org/v2/country/${country}/indicator/${indicator}`;
+      console.log(`Proxying World Bank request to: ${url}`);
+
+      const response = await axios.get(url, {
+        params: {
+          ...rest,
+          format: 'json'
+        },
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json'
+        },
+        timeout: 20000 // Increased to 20s
       });
+      
       res.json(response.data);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("World Bank Proxy Error:", error.message);
+      if (error.response) {
+        console.error("World Bank API Response Error:", error.response.status, error.response.data);
+      }
+      res.status(error.response?.status || 500).json({ 
+        error: error.message,
+        details: error.response?.data 
+      });
     }
   });
 

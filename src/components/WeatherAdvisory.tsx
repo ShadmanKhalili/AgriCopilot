@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
@@ -285,6 +285,32 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     }
   }, [globalLocation]);
 
+  const getHumidityTooltip = (val: number) => {
+    if (val < 30) return t.weatherTooltips?.humidityLow;
+    if (val <= 60) return t.weatherTooltips?.humidityComfortable;
+    return t.weatherTooltips?.humidityHigh;
+  };
+
+  const getWindTooltip = (val: number) => {
+    if (val < 10) return t.weatherTooltips?.windCalm;
+    if (val <= 25) return t.weatherTooltips?.windModerate;
+    return t.weatherTooltips?.windStrong;
+  };
+
+  const getRainTooltip = (val: number) => {
+    if (val === 0) return t.weatherTooltips?.rainNone;
+    if (val <= 30) return t.weatherTooltips?.rainSlight;
+    if (val <= 70) return t.weatherTooltips?.rainModerate;
+    return t.weatherTooltips?.rainHigh;
+  };
+
+  const getUvTooltip = (val: number) => {
+    if (val < 3) return t.weatherTooltips?.uvLow;
+    if (val <= 5) return t.weatherTooltips?.uvModerate;
+    if (val <= 7) return t.weatherTooltips?.uvHigh;
+    return t.weatherTooltips?.uvVeryHigh;
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -392,58 +418,66 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                      <motion.div 
-                        whileHover={{ scale: 1.02 }}
-                        className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-100/50 shadow-sm h-full"
-                      >
-                        <div className="flex items-center text-blue-500 mb-3">
-                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                            <Droplets className="w-5 h-5" />
+                      <Tooltip content={getHumidityTooltip(weather.humidity) || ""}>
+                        <motion.div 
+                          whileHover={{ scale: 1.02 }}
+                          className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-100/50 shadow-sm h-full"
+                        >
+                          <div className="flex items-center text-blue-500 mb-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                              <Droplets className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">{t.humidity}</span>
                           </div>
-                          <span className="text-xs font-black uppercase tracking-wider">{t.humidity}</span>
-                        </div>
-                        <span className="text-3xl font-black text-gray-900">{weather.humidity.toFixed(2)}%</span>
-                      </motion.div>
+                          <span className="text-3xl font-black text-gray-900">{weather.humidity.toFixed(2)}%</span>
+                        </motion.div>
+                      </Tooltip>
                     
-                      <motion.div 
-                        whileHover={{ scale: 1.02 }}
-                        className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-100/50 shadow-sm h-full"
-                      >
-                        <div className="flex items-center text-indigo-500 mb-3">
-                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                            <Wind className="w-5 h-5" />
+                      <Tooltip content={getWindTooltip(weather.windSpeed) || ""}>
+                        <motion.div 
+                          whileHover={{ scale: 1.02 }}
+                          className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-100/50 shadow-sm h-full"
+                        >
+                          <div className="flex items-center text-indigo-500 mb-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                              <Wind className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">{t.windSpeed}</span>
                           </div>
-                          <span className="text-xs font-black uppercase tracking-wider">{t.windSpeed}</span>
-                        </div>
-                        <span className="text-3xl font-black text-gray-900">{weather.windSpeed.toFixed(1)}</span>
-                        <span className="text-xs font-bold text-gray-400 ml-1">km/h</span>
-                      </motion.div>
+                          <span className="text-3xl font-black text-gray-900">{weather.windSpeed.toFixed(1)}</span>
+                          <span className="text-xs font-bold text-gray-400 ml-1">km/h</span>
+                        </motion.div>
+                      </Tooltip>
 
-                      <motion.div 
-                        whileHover={{ scale: 1.02 }}
-                        className="bg-gradient-to-br from-cyan-50 to-white p-5 rounded-3xl border border-cyan-100/50 shadow-sm h-full"
-                      >
-                        <div className="flex items-center text-cyan-500 mb-3">
-                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                            <CloudRain className="w-5 h-5" />
+                      <Tooltip content={getRainTooltip(weather.rainChance) || ""}>
+                        <motion.div 
+                          whileHover={{ scale: 1.02 }}
+                          className="bg-gradient-to-br from-cyan-50 to-white p-5 rounded-3xl border border-cyan-100/50 shadow-sm h-full"
+                        >
+                          <div className="flex items-center text-cyan-500 mb-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                              <CloudRain className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">{t.rainChance}</span>
                           </div>
-                          <span className="text-xs font-black uppercase tracking-wider">{t.rainChance}</span>
-                        </div>
-                        <span className="text-3xl font-black text-gray-900">{weather.rainChance}%</span>
-                      </motion.div>
+                          <span className="text-3xl font-black text-gray-900">{weather.rainChance}%</span>
+                        </motion.div>
+                      </Tooltip>
 
-                      <motion.div 
-                        whileHover={{ scale: 1.02 }}
-                        className="bg-gradient-to-br from-orange-50 to-white p-5 rounded-3xl border border-orange-100/50 shadow-sm h-full"
-                      >
-                        <div className="flex items-center text-orange-500 mb-3">
-                          <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                            <Sun className="w-5 h-5" />
+                      <Tooltip content={getUvTooltip(weather.uvIndex) || ""}>
+                        <motion.div 
+                          whileHover={{ scale: 1.02 }}
+                          className="bg-gradient-to-br from-orange-50 to-white p-5 rounded-3xl border border-orange-100/50 shadow-sm h-full"
+                        >
+                          <div className="flex items-center text-orange-500 mb-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
+                              <Sun className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-wider">{t.uvIndex}</span>
                           </div>
-                          <span className="text-xs font-black uppercase tracking-wider">{t.uvIndex}</span>
-                        </div>
-                        <span className="text-3xl font-black text-gray-900">{weather.uvIndex}</span>
-                      </motion.div>
+                          <span className="text-3xl font-black text-gray-900">{weather.uvIndex}</span>
+                        </motion.div>
+                      </Tooltip>
                   </div>
 
                   {/* Soil & Hydrology Insights Section */}
@@ -514,13 +548,52 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
 
           {/* AI Advisory Card */}
-          <div className="lg:col-span-7">
+          <div className="lg:col-span-7 space-y-6">
+            {/* Historical Climate Comparison */}
+            {weather?.historicalAvgTemp !== undefined && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <History className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-bold text-gray-900">{lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}</h4>
+                </div>
+                <p className="text-sm text-gray-600">
+                  {lang === 'bn' 
+                    ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
+                    : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
+                </p>
+              </motion.div>
+            )}
+
             <motion.div 
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               className="bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-1 rounded-[40px] shadow-2xl shadow-blue-200 h-full"
             >
-              <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col">
+              <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
+                {/* Translation Loading Overlay */}
+                <AnimatePresence>
+                  {isTranslating && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4"
+                    >
+                      <div className="relative">
+                        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+                        <Globe className="w-6 h-6 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                      </div>
+                      <p className="text-blue-600 font-black uppercase tracking-widest text-xs animate-pulse">
+                        {lang === 'bn' ? 'অনুবাদ করা হচ্ছে...' : 'Translating...'}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center space-x-4">
                     <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-2xl shadow-lg shadow-blue-100">

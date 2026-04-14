@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 
-const getAi = () => {
+export const getAi = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error("GEMINI_API_KEY is not defined in the environment.");

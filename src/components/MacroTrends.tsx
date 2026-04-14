@@ -29,7 +29,7 @@ export default function MacroTrends({ lang }: Props) {
   const t = translations[lang];
 
   // World Bank API Indicators for Bangladesh
-  const INDICATORS = [
+  const INDICATORS: Omit<IndicatorData, 'data'>[] = [
     {
       id: 'AG.CON.FERT.ZS',
       name: 'Fertilizer Consumption',
@@ -59,35 +59,51 @@ export default function MacroTrends({ lang }: Props) {
       setError(null);
       
       try {
-        const fetchedIndicators: IndicatorData[] = [];
-        
-        for (const ind of INDICATORS) {
-          // Fetch last 30 years of data for Bangladesh
-          const res = await fetch(`/api/worldbank?country=BGD&indicator=${ind.id}&format=json&per_page=30`);
-          const data = await res.json();
-          
-          if (data && data[1]) {
-            // World Bank returns data newest first, we want oldest first for charts
-            const rawData = data[1];
-            const chartData: DataPoint[] = rawData
-              .filter((item: any) => item.value !== null)
-              .map((item: any) => ({
-                year: item.date,
-                value: Number(item.value.toFixed(2))
-              }))
-              .reverse();
-              
-            fetchedIndicators.push({
-              ...ind,
-              data: chartData
-            });
+        const fetchPromises = INDICATORS.map(async (ind) => {
+          try {
+            const res = await fetch(`/api/worldbank?country=BGD&indicator=${ind.id}&per_page=30`);
+            
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({}));
+              console.warn(`Failed to fetch ${ind.name}:`, errorData.error || res.statusText);
+              return null;
+            }
+            
+            const data = await res.json();
+            
+            if (data && data[1] && Array.isArray(data[1])) {
+              const rawData = data[1];
+              const chartData: DataPoint[] = rawData
+                .filter((item: any) => item.value !== null)
+                .map((item: any) => ({
+                  year: item.date,
+                  value: Number(item.value.toFixed(2))
+                }))
+                .reverse();
+                
+              return {
+                ...ind,
+                data: chartData
+              };
+            }
+            return null;
+          } catch (individualErr) {
+            console.error(`Error fetching indicator ${ind.id}:`, individualErr);
+            return null;
           }
-        }
+        });
+
+        const results = await Promise.all(fetchPromises);
+        const fetchedIndicators = results.filter((ind): ind is IndicatorData => ind !== null);
         
+        if (fetchedIndicators.length === 0) {
+          throw new Error("Could not retrieve any data from the World Bank. The API might be temporarily unavailable.");
+        }
+
         setIndicators(fetchedIndicators);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to fetch World Bank data:", err);
-        setError("Failed to load macro-economic data. Please try again later.");
+        setError(err.message || "Failed to load macro-economic data. Please try again later.");
       } finally {
         setIsLoading(false);
       }
