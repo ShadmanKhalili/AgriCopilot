@@ -450,7 +450,7 @@ export const getMarketInsights = async (
 export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
   const ai = getAi();
   return ai.chats.create({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: 'gemma-4-31b',
     config: {
       systemInstruction: `You are a helpful agricultural expert in Bangladesh. 
       CONTEXT: The user has just received a diagnosis for their crop: "${context}".
