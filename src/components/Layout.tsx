@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3 } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
@@ -7,6 +7,8 @@ import MarketConnect from './MarketConnect';
 import WeatherAdvisory from './WeatherAdvisory';
 import SatelliteHealth from './SatelliteHealth';
 import MacroTrends from './MacroTrends';
+import CommunityRadar from './CommunityRadar';
+import GovSchemes from './GovSchemes';
 import UserGuide from './UserGuide';
 import Profile from './Profile';
 import PricingModal from './PricingModal';
@@ -15,7 +17,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'user-guide' | 'profile';
+type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile';
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -52,6 +54,8 @@ export default function Layout() {
     { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc },
     { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
     { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
+    { id: 'community-radar', name: t.communityRadar, icon: Radar, description: t.communityRadarDesc },
+    { id: 'gov-schemes', name: t.govSchemes, icon: Landmark, description: t.govSchemesDesc },
     { id: 'macro-trends', name: lang === 'bn' ? 'জাতীয় প্রবণতা' : 'National Trends', icon: BarChart3, description: lang === 'bn' ? 'বিশ্বব্যাংকের সামষ্টিক অর্থনৈতিক তথ্য' : 'World Bank Macro-Economic Data' },
     { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc },
     { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc },
@@ -321,6 +325,12 @@ export default function Layout() {
           </div>
           <div className={activeTab === 'macro-trends' ? 'block flex-1' : 'hidden'}>
             <MacroTrends lang={lang} />
+          </div>
+          <div className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
+            <CommunityRadar lang={lang} />
+          </div>
+          <div className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
+            <GovSchemes lang={lang} globalLocation={globalLocation} />
           </div>
           <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
             <UserGuide lang={lang} />

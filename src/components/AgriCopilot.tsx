@@ -287,15 +287,18 @@ export default function AgriCopilot({
       // Save to Firestore if user is logged in
       if (user) {
         try {
+          const allowedSeverities = ['Low', 'Medium', 'High'];
+          const severity = allowedSeverities.includes(result.qualitativeSeverity) ? result.qualitativeSeverity : 'Medium';
+
           await addDoc(collection(db, 'diagnoses'), {
             userId: user.uid,
             crop,
             cropStage,
             analysisType,
-            diagnosisText: result.diagnosis,
-            severity: result.severity,
-            confidence: result.confidence,
-            verificationAdvice: result.verificationAdvice,
+            diagnosisText: result.diagnosis || 'No diagnosis provided',
+            qualitativeSeverity: severity,
+            symptomsBreakdown: Array.isArray(result.symptomsBreakdown) ? result.symptomsBreakdown : [],
+            verificationAdvice: result.verificationAdvice || 'Consult an expert.',
             createdAt: new Date().toISOString()
           });
         } catch (error) {
@@ -819,55 +822,37 @@ export default function AgriCopilot({
                             )}
                           </div>
 
-                          {/* 3. Severity% and Confidence% */}
+                          {/* 3. Symptoms and Severity */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {/* Severity Gauge */}
-                            <motion.div 
-                              whileHover={{ y: -5 }}
-                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center relative overflow-hidden"
-                            >
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
-                              <div className="relative w-32 h-32 flex items-center justify-center mb-2">
-                                <svg className="w-full h-full transform -rotate-90">
-                                  <circle cx="64" cy="64" r="56" className="stroke-gray-100" strokeWidth="12" fill="none" />
-                                  <circle 
-                                    cx="64" cy="64" r="56" 
-                                    className={diagnosis.severity > 70 ? 'stroke-red-500' : diagnosis.severity > 40 ? 'stroke-amber-500' : 'stroke-green-500'} 
-                                    strokeWidth="12" fill="none" 
-                                    strokeDasharray={2 * Math.PI * 56} 
-                                    strokeDashoffset={(2 * Math.PI * 56) - ((diagnosis.severity || 0) / 100) * (2 * Math.PI * 56)} 
-                                    strokeLinecap="round" 
-                                  />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                  <span className="text-3xl font-black text-gray-900 tracking-tighter">{diagnosis.severity || 0}%</span>
-                                </div>
-                              </div>
-                            </motion.div>
-
-                            {/* Confidence Score */}
+                            {/* Severity */}
                             <motion.div 
                               whileHover={{ y: -5 }}
                               className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center relative overflow-hidden"
                             >
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{lang === 'bn' ? 'নির্ভরযোগ্যতা' : 'Confidence'}</p>
-                              <div className="relative w-32 h-32 flex items-center justify-center mb-2">
-                                <svg className="w-full h-full transform -rotate-90">
-                                  <circle cx="64" cy="64" r="56" className="stroke-gray-100" strokeWidth="12" fill="none" />
-                                  <circle 
-                                    cx="64" cy="64" r="56" 
-                                    className={(diagnosis.confidence || 0) > 70 ? 'stroke-green-500' : (diagnosis.confidence || 0) > 40 ? 'stroke-amber-500' : 'stroke-red-500'} 
-                                    strokeWidth="12" fill="none" 
-                                    strokeDasharray={2 * Math.PI * 56} 
-                                    strokeDashoffset={(2 * Math.PI * 56) - ((diagnosis.confidence || 0) / 100) * (2 * Math.PI * 56)} 
-                                    strokeLinecap="round" 
-                                  />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                  <span className="text-3xl font-black text-gray-900 tracking-tighter">{diagnosis.confidence || 0}%</span>
-
-                                </div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
+                              <div className={`px-6 py-3 rounded-2xl font-black text-xl ${
+                                diagnosis.qualitativeSeverity === 'High' ? 'bg-red-100 text-red-600' : 
+                                diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-100 text-amber-600' : 
+                                'bg-green-100 text-green-600'
+                              }`}>
+                                {diagnosis.qualitativeSeverity || 'Unknown'}
                               </div>
+                            </motion.div>
+
+                            {/* Symptoms Breakdown */}
+                            <motion.div 
+                              whileHover={{ y: -5 }}
+                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden"
+                            >
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'লক্ষণসমূহ' : 'Visible Symptoms'}</p>
+                              <ul className="space-y-2">
+                                {diagnosis.symptomsBreakdown?.map((symptom: string, idx: number) => (
+                                  <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700 font-medium">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 shrink-0"></div>
+                                    <span>{symptom}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             </motion.div>
                           </div>
 
@@ -888,54 +873,6 @@ export default function AgriCopilot({
                               <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert} (Indicative)</span>
                             </motion.button>
                           </div>
-
-                          {/* 5. Nutrient Chart */}
-                          {diagnosis.nutrientLevels && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden"
-                            >
-                              <div className="flex items-center justify-between mb-8">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{lang === 'bn' ? 'পুষ্টির মাত্রা' : 'Nutrient Levels'}</p>
-                                <div className="flex space-x-3">
-                                  {['N', 'P', 'K'].map((n, i) => (
-                                    <div key={n} className="flex items-center space-x-1">
-                                      <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-500' : i === 1 ? 'bg-purple-500' : 'bg-orange-500'}`}></div>
-                                      <span className="text-[10px] font-bold text-gray-400">{n}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="w-full h-56">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart
-                                    data={[
-                                      { name: 'N', value: diagnosis.nutrientLevels.nitrogen, ideal: diagnosis.idealNutrientLevels?.nitrogen, fill: '#3b82f6' },
-                                      { name: 'P', value: diagnosis.nutrientLevels.phosphorus, ideal: diagnosis.idealNutrientLevels?.phosphorus, fill: '#8b5cf6' },
-                                      { name: 'K', value: diagnosis.nutrientLevels.potassium, ideal: diagnosis.idealNutrientLevels?.potassium, fill: '#f59e0b' }
-                                    ]}
-                                    margin={{ top: 5, right: 20, left: -20, bottom: 5 }}
-                                  >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: '900', fill: '#9ca3af' }} />
-                                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                                    <RechartsTooltip 
-                                      cursor={{ fill: '#f9fafb', radius: 8 }}
-                                      contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                                      formatter={(value: any, name: string, props: any) => {
-                                        if (name === 'value') {
-                                          return [`${value}% (${t.idealLevel}: ${props.payload.ideal || 'N/A'})`, t.detectedLevel];
-                                        }
-                                        return [value, name];
-                                      }}
-                                    />
-                                    <Bar dataKey="value" radius={[12, 12, 4, 4]} barSize={50} />
-                                  </BarChart>
-                                </ResponsiveContainer>
-                              </div>
-                            </motion.div>
-                          )}
                         </>
                       )}
                     </div>

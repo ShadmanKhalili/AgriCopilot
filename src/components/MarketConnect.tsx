@@ -325,68 +325,29 @@ export default function MarketConnect({
                     </div>
 
                     <div className="space-y-6 flex-1">
-                      {/* Price Trend Chart */}
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between mb-8">
-                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                            <TrendingUp className="w-4 h-4 mr-2 text-orange-600" />
-                            {lang === 'bn' ? 'মূল্যের প্রবণতা (৭ দিন)' : 'Price Trend (7 Days)'}
-                          </h4>
-                          {insights.priceTrend && insights.priceTrend.length > 1 && (
-                            <div className={`flex items-center text-xs font-black ${
-                              insights.priceTrend[insights.priceTrend.length - 1].price >= insights.priceTrend[0].price 
-                                ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {insights.priceTrend[insights.priceTrend.length - 1].price >= insights.priceTrend[0].price 
-                                ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
-                              {Math.abs(((insights.priceTrend[insights.priceTrend.length - 1].price - insights.priceTrend[0].price) / insights.priceTrend[0].price) * 100).toFixed(1)}%
-                            </div>
-                          )}
-                        </div>
-                        <div className="w-full h-64">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={insights.priceTrend}>
-                              <defs>
-                                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.1}/>
-                                  <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                              <XAxis 
-                                dataKey="date" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fontSize: 10, fontWeight: '900', fill: '#9ca3af' }}
-                              />
-                              <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fontSize: 10, fill: '#9ca3af' }}
-                                tickFormatter={(value) => `৳${value}`}
-                              />
-                              <RechartsTooltip 
-                                contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '16px' }}
-                                formatter={(value: number) => [`৳${value} ${t.perKg}`, lang === 'bn' ? 'মূল্য' : 'Price']}
-                              />
-                              <Area 
-                                type="monotone" 
-                                dataKey="price" 
-                                stroke="#f97316" 
-                                strokeWidth={4}
-                                fillOpacity={1} 
-                                fill="url(#colorPrice)" 
-                                dot={{ r: 4, fill: '#f97316', strokeWidth: 2, stroke: '#fff' }}
-                                activeDot={{ r: 6, strokeWidth: 0 }}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </motion.div>
+                      {/* Price Drivers */}
+                      {insights.priceDrivers && insights.priceDrivers.length > 0 && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between mb-6">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                              <TrendingUp className="w-4 h-4 mr-2 text-orange-600" />
+                              {lang === 'bn' ? 'মূল্যের প্রধান কারণসমূহ' : 'Key Price Drivers'}
+                            </h4>
+                          </div>
+                          <ul className="space-y-3">
+                            {insights.priceDrivers.map((driver: string, idx: number) => (
+                              <li key={idx} className="flex items-start space-x-3 text-sm text-gray-700 font-medium bg-orange-50/50 p-4 rounded-2xl border border-orange-100/50">
+                                <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0"></div>
+                                <span>{driver}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </motion.div>
+                      )}
 
                       <motion.div 
                         initial={{ opacity: 0, y: 20 }}

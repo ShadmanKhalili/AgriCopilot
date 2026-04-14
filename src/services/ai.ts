@@ -87,19 +87,9 @@ export const diagnoseCrop = async (
       {
         "status": "Valid" | "Invalid",
         "diagnosis": "Detailed markdown diagnosis and treatment plan (approx 100 words)",
-        "severity": number (0-100),
-        "confidence": number (0-100),
-        "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers).",
-        "nutrientLevels": {
-          "nitrogen": number (0-100),
-          "phosphorus": number (0-100),
-          "potassium": number (0-100)
-        },
-        "idealNutrientLevels": {
-          "nitrogen": "ideal range string (e.g., '40-60%')",
-          "phosphorus": "ideal range string",
-          "potassium": "ideal range string"
-        }
+        "qualitativeSeverity": "Low" | "Medium" | "High",
+        "symptomsBreakdown": ["Symptom 1", "Symptom 2", "Symptom 3"],
+        "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers)."
       }
       
       If the image is not related to agriculture or is too blurry, set status to "Invalid" and explain why in the diagnosis field.`;
@@ -111,27 +101,15 @@ export const diagnoseCrop = async (
           properties: {
             status: { type: Type.STRING, description: 'Valid or Invalid' },
             diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
-            severity: { type: Type.NUMBER, description: 'Severity percentage' },
-            confidence: { type: Type.NUMBER, description: 'Confidence percentage' },
-            verificationAdvice: { type: Type.STRING, description: 'Advice for further verification' },
-            nutrientLevels: {
-              type: Type.OBJECT,
-              properties: {
-                nitrogen: { type: Type.NUMBER },
-                phosphorus: { type: Type.NUMBER },
-                potassium: { type: Type.NUMBER }
-              }
+            qualitativeSeverity: { type: Type.STRING, description: 'Low, Medium, or High' },
+            symptomsBreakdown: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING },
+              description: 'List of visible symptoms'
             },
-            idealNutrientLevels: {
-              type: Type.OBJECT,
-              properties: {
-                nitrogen: { type: Type.STRING },
-                phosphorus: { type: Type.STRING },
-                potassium: { type: Type.STRING }
-              }
-            }
+            verificationAdvice: { type: Type.STRING, description: 'Advice for further verification' }
           },
-          required: ['status', 'diagnosis', 'severity', 'confidence', 'verificationAdvice']
+          required: ['status', 'diagnosis', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice']
         }
       };
       
@@ -182,12 +160,19 @@ export const generateWeatherAdvisory = async (
 ) => {
   return await callAiWithRetry(async () => {
     try {
+      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
       let climateContext = "";
       if (weatherData.historicalAvgTemp) {
         const diff = weatherData.temp - weatherData.historicalAvgTemp;
         const diffText = Math.abs(diff).toFixed(1);
         const direction = diff > 0 ? "hotter" : "cooler";
-        climateContext = `Climate Context: This month's historical average temperature is ${weatherData.historicalAvgTemp.toFixed(1)}°C. Currently, it is ${diffText}°C ${direction} than the historical average.`;
+        climateContext = `Climate Context: This month's historical average temperature over the last 5 years is ${weatherData.historicalAvgTemp.toFixed(1)}°C. Currently, it is ${diffText}°C ${direction} than the historical average.`;
+      }
+
+      let historicalTodayContext = "";
+      if (weatherData.historicalToday) {
+        historicalTodayContext = `Last Year Today's Weather: Max ${weatherData.historicalToday.maxTemp}°C, Min ${weatherData.historicalToday.minTemp}°C, Rain ${weatherData.historicalToday.rain}mm.`;
       }
 
       let soilContext = "";
@@ -201,14 +186,17 @@ export const generateWeatherAdvisory = async (
       }
 
       const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
+      Current Time: ${currentTime}
       Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
       Temp: ${weatherData.temp.toFixed(1)}°C, Condition: ${weatherData.condition}, Humidity: ${weatherData.humidity}%, Wind: ${weatherData.windSpeed}km/h, Rain: ${weatherData.rainfall}mm.
       Safe Spraying Window: ${weatherData.safeSprayingWindow}
       ${climateContext}
+      ${historicalTodayContext}
       ${soilContext}
       
       Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80-100 words).
       Focus on:
+      - Time of day: Adjust your advice based on the current time (${currentTime}). For example, do not advise spraying in the middle of the night or during peak midday heat.
       - Irrigation needs (use soil moisture and evapotranspiration data if available)
       - Fertilizer/Soil health advice (use soil pH, Nitrogen, Carbon data if available)
       - Pest/Disease risk based on humidity and temperature
@@ -368,8 +356,7 @@ export const getMarketInsights = async (
       RESPONSE FORMAT:
       - Respond in JSON format.
       - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - 'priceTrend': array of 7 objects with 'date' (string, format YYYY-MM-DD) and 'price' (number) representing the last 7 days leading up to ${today}.
-      - CRITICAL: Ensure the dates in 'priceTrend' are from ${currentYear} (or ${currentYear - 1} if current data is missing). DO NOT use data from 2023 or earlier.
+      - 'priceDrivers': array of 3-5 strings explaining the key factors currently affecting the price of this produce (e.g., "Recent heavy rains in northern districts", "High transport costs").
       - 'nearestMarkets': array of objects with 'name' and 'distance'.
       - Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown in 'insights'.`;
       
@@ -379,15 +366,9 @@ export const getMarketInsights = async (
           type: Type.OBJECT,
           properties: {
             insights: { type: Type.STRING },
-            priceTrend: {
+            priceDrivers: {
               type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  date: { type: Type.STRING, description: 'Date in YYYY-MM-DD format' },
-                  price: { type: Type.NUMBER }
-                }
-              }
+              items: { type: Type.STRING }
             },
             nearestMarkets: {
               type: Type.ARRAY,
@@ -400,7 +381,7 @@ export const getMarketInsights = async (
               }
             }
           },
-          required: ['insights', 'priceTrend']
+          required: ['insights', 'priceDrivers']
         },
         tools: [{ googleSearch: {} }],
         toolConfig: {
@@ -430,8 +411,8 @@ export const getMarketInsights = async (
         // Fallback without googleSearch
         const fallbackResponse = await callAiWithFallback({
           contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh for the period around ${today}. 
-          Return JSON with 'insights' (string) and 'priceTrend' (7 days array leading to ${today}). 
-          CRITICAL: Use dates from ${currentYear}. All prices must be in BDT and per KG.
+          Return JSON with 'insights' (string) and 'priceDrivers' (array of strings). 
+          CRITICAL: All prices must be in BDT and per KG.
           Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
           config: {
             responseMimeType: 'application/json',
@@ -442,6 +423,78 @@ export const getMarketInsights = async (
       }
     } catch (error) {
       console.error("AI Service Error (Market Insights):", error);
+      throw error;
+    }
+  });
+};
+
+export const findGovernmentSchemes = async (
+  location: string, 
+  crop: string, 
+  lang: string
+) => {
+  return await callAiWithRetry(async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const prompt = `Use Google Search to find the LATEST agricultural subsidies, government schemes, or low-interest loans available for farmers in ${location}, Bangladesh, specifically for ${crop} farming or general agriculture in ${currentYear}.
+      Focus on programs from the Department of Agricultural Extension (DAE), Bangladesh Bank, or Ministry of Agriculture.
+      
+      RESPONSE FORMAT:
+      - Respond in JSON format.
+      - 'schemes': array of objects with 'title', 'description', 'eligibility', and 'howToApply'.
+      - 'sourceLinks': array of strings (URLs) where the user can find more info.
+      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
+      - CRITICAL: Keep descriptions practical and actionable.`;
+      
+      const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            schemes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  eligibility: { type: Type.STRING },
+                  howToApply: { type: Type.STRING }
+                }
+              }
+            },
+            sourceLinks: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ['schemes']
+        },
+        tools: [{ googleSearch: {} }],
+        toolConfig: {
+          includeServerSideToolInvocations: true
+        }
+      };
+
+      try {
+        const response = await callAiWithFallback({
+          contents: prompt,
+          config
+        }, SEARCH_MODEL);
+        return JSON.parse(response.text || '{}');
+      } catch (searchError) {
+        console.warn("Search model failed for schemes, falling back:", searchError);
+        const fallbackResponse = await callAiWithFallback({
+          contents: `Provide general information about common agricultural subsidies and schemes in Bangladesh for ${crop} farmers. Return JSON with 'schemes' array. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: config.responseSchema
+          }
+        }, BACKUP_MODEL);
+        return JSON.parse(fallbackResponse.text || '{}');
+      }
+    } catch (error) {
+      console.error("AI Service Error (Gov Schemes):", error);
       throw error;
     }
   });

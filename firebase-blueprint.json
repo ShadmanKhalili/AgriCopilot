@@ -22,11 +22,18 @@
       "properties": {
         "userId": { "type": "string", "description": "ID of the Agri-Preneur" },
         "crop": { "type": "string" },
-        "upazila": { "type": "string" },
+        "cropStage": { "type": "string" },
+        "analysisType": { "type": "string" },
         "diagnosisText": { "type": "string" },
+        "qualitativeSeverity": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "symptomsBreakdown": { 
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "verificationAdvice": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "crop", "upazila", "diagnosisText", "createdAt"]
+      "required": ["userId", "crop", "cropStage", "analysisType", "diagnosisText", "qualitativeSeverity", "symptomsBreakdown", "verificationAdvice", "createdAt"]
     },
     "QualityCertificate": {
       "title": "QualityCertificate",
@@ -53,6 +60,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "scenario", "message", "createdAt"]
+    },
+    "MarketQuery": {
+      "title": "MarketQuery",
+      "description": "Record of a market insight query",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who queried" },
+        "produce": { "type": "string" },
+        "quantity": { "type": "string" },
+        "insights": { "type": "string" },
+        "isAdvanced": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "produce", "quantity", "insights", "isAdvanced", "createdAt"]
     }
   },
   "firestore": {
@@ -71,6 +92,10 @@
     "/alerts/{alertId}": {
       "schema": { "$ref": "#/entities/WeatherAlert" },
       "description": "Stores weather alerts"
+    },
+    "/market_queries/{queryId}": {
+      "schema": { "$ref": "#/entities/MarketQuery" },
+      "description": "Stores market insight queries"
     }
   }
 }

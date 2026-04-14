@@ -23,6 +23,11 @@ interface WeatherData {
   uvIndex: number;
   locationName: string;
   historicalAvgTemp?: number;
+  historicalToday?: {
+    maxTemp: number;
+    minTemp: number;
+    rain: number;
+  };
   soilMoisture?: number;
   evapotranspiration?: number;
   soilPH?: number;
@@ -195,7 +200,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       const startDate = `${startYear}-${currentMonth}-01`;
       const endDate = `${endYear}-${currentMonth}-${lastDay}`;
       
+      // Calculate exactly one year ago today
+      const lastYearToday = new Date();
+      lastYearToday.setFullYear(lastYearToday.getFullYear() - 1);
+      const lastYearTodayStr = lastYearToday.toISOString().split('T')[0];
+
       let historicalAvgTemp = undefined;
+      let historicalToday = undefined;
+
       try {
         const climateRes = await fetch(`/api/climate?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
         const climateData = await climateRes.json();
@@ -216,6 +228,21 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         }
       } catch (e) {
         console.error("Failed to fetch historical climate data", e);
+      }
+
+      try {
+        const lastYearRes = await fetch(`/api/climate?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
+        const lastYearData = await lastYearRes.json();
+        
+        if (lastYearData.daily && lastYearData.daily.temperature_2m_max.length > 0) {
+          historicalToday = {
+            maxTemp: lastYearData.daily.temperature_2m_max[0],
+            minTemp: lastYearData.daily.temperature_2m_min[0],
+            rain: lastYearData.daily.precipitation_sum[0]
+          };
+        }
+      } catch (e) {
+        console.error("Failed to fetch last year's data", e);
       }
 
       // 3. Fetch SoilGrids Data
@@ -258,6 +285,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         uvIndex: weatherData.daily.uv_index_max[0] || 0,
         locationName: "Local Area",
         historicalAvgTemp,
+        historicalToday,
         soilMoisture: weatherData.current.soil_moisture_0_to_7cm,
         evapotranspiration: weatherData.daily.et0_fao_evapotranspiration[0],
         soilPH,
@@ -550,21 +578,39 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           {/* AI Advisory Card */}
           <div className="lg:col-span-7 space-y-6">
             {/* Historical Climate Comparison */}
-            {weather?.historicalAvgTemp !== undefined && (
+            {(weather?.historicalAvgTemp !== undefined || weather?.historicalToday !== undefined) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm"
               >
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-4">
                   <History className="w-5 h-5 text-blue-500" />
                   <h4 className="font-bold text-gray-900">{lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}</h4>
                 </div>
-                <p className="text-sm text-gray-600">
-                  {lang === 'bn' 
-                    ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
-                    : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
-                </p>
+                
+                <div className="space-y-4">
+                  {weather.historicalToday && (
+                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+                      <p className="text-sm font-bold text-blue-900 mb-2">
+                        {lang === 'bn' ? 'গত বছর আজকের দিনে' : 'Last Year on This Day'}
+                      </p>
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-700">
+                        <span className="flex items-center gap-1"><Thermometer className="w-4 h-4 text-red-400" /> Max: {weather.historicalToday.maxTemp}°C</span>
+                        <span className="flex items-center gap-1"><Thermometer className="w-4 h-4 text-blue-400" /> Min: {weather.historicalToday.minTemp}°C</span>
+                        <span className="flex items-center gap-1"><CloudRain className="w-4 h-4 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {weather.historicalAvgTemp !== undefined && (
+                    <p className="text-sm text-gray-600 px-1">
+                      {lang === 'bn' 
+                        ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
+                        : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
+                    </p>
+                  )}
+                </div>
               </motion.div>
             )}
 

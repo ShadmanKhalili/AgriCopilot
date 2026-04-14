@@ -110,15 +110,15 @@ service cloud.firestore {
     }
     
     function isValidDiagnosis(data) {
-      return hasOnlyAllowedFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'verificationAdvice', 'createdAt']) &&
-             hasRequiredFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'severity', 'confidence', 'verificationAdvice', 'createdAt']) &&
+      return hasOnlyAllowedFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
+             hasRequiredFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
              data.cropStage is string && data.cropStage.size() > 0 && data.cropStage.size() < 100 &&
              data.analysisType is string && data.analysisType.size() > 0 && data.analysisType.size() < 100 &&
              data.diagnosisText is string && data.diagnosisText.size() > 0 && data.diagnosisText.size() < 5000 &&
-             data.severity is number && data.severity >= 0 && data.severity <= 100 &&
-             data.confidence is number && data.confidence >= 0 && data.confidence <= 100 &&
+             data.qualitativeSeverity is string && data.qualitativeSeverity in ['Low', 'Medium', 'High'] &&
+             data.symptomsBreakdown is list && data.symptomsBreakdown.size() >= 0 && data.symptomsBreakdown.size() < 20 &&
              data.verificationAdvice is string && data.verificationAdvice.size() > 0 && data.verificationAdvice.size() < 2000 &&
              isValidDateString(data.createdAt);
     }
@@ -144,11 +144,11 @@ service cloud.firestore {
     }
 
     function isValidMarketQuery(data) {
-      return hasOnlyAllowedFields(['userId', 'produce', 'location', 'insights', 'isAdvanced', 'createdAt']) &&
-             hasRequiredFields(['userId', 'produce', 'location', 'insights', 'isAdvanced', 'createdAt']) &&
+      return hasOnlyAllowedFields(['userId', 'produce', 'quantity', 'insights', 'isAdvanced', 'createdAt']) &&
+             hasRequiredFields(['userId', 'produce', 'quantity', 'insights', 'isAdvanced', 'createdAt']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
              data.produce is string && data.produce.size() > 0 && data.produce.size() < 100 &&
-             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
+             data.quantity is string && data.quantity.size() > 0 && data.quantity.size() < 100 &&
              data.insights is string && data.insights.size() > 0 && data.insights.size() < 5000 &&
              data.isAdvanced is bool &&
              isValidDateString(data.createdAt);
@@ -190,7 +190,7 @@ service cloud.firestore {
     }
     
     match /diagnoses/{diagnosisId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if true;
       allow create: if isAuthenticated() && isValidDiagnosis(request.resource.data) &&
                     request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && isValidDiagnosis(request.resource.data) &&
