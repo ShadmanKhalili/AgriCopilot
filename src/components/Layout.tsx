@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
+import SmartPlanting from './SmartPlanting';
 import MarketConnect from './MarketConnect';
 import WeatherAdvisory from './WeatherAdvisory';
 import SatelliteHealth from './SatelliteHealth';
@@ -17,7 +18,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile';
+type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile';
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -50,6 +51,7 @@ export default function Layout() {
 
   const tabs = [
     { id: 'agri-copilot', name: t.agriCopilot, icon: Leaf, description: t.agriCopilotDesc },
+    { id: 'smart-planting', name: t.smartPlanting, icon: Sprout, description: t.smartPlantingDesc },
     { id: 'weather-advisory', name: t.weatherAdvisory, icon: Cloud, description: t.weatherAdvisoryDesc },
     { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc },
     { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
@@ -311,6 +313,13 @@ export default function Layout() {
           </div>
           <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
             <SmartGrade lang={lang} />
+          </div>
+          <div className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
+            <SmartPlanting 
+              lang={lang} 
+              globalLocation={globalLocation}
+              setGlobalLocation={setGlobalLocation}
+            />
           </div>
           <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
             <MarketConnect 

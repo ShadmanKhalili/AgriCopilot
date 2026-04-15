@@ -500,6 +500,153 @@ export const findGovernmentSchemes = async (
   });
 };
 
+export const getPlantingRecommendations = async (
+  coords: { latitude: number; longitude: number },
+  landType: string,
+  landSize: string,
+  irrigation: string,
+  previousCrop: string,
+  budget: string,
+  targetTime: string,
+  weatherData: any,
+  satelliteData: any,
+  lang: string,
+  isAdvanced?: boolean
+) => {
+  return await callAiWithRetry(async () => {
+    try {
+      const today = new Date().toLocaleDateString('en-GB');
+      
+      let weatherContext = "";
+      if (weatherData && weatherData.current) {
+        weatherContext = `CURRENT WEATHER: Temp: ${weatherData.current.temperature_2m}°C, Humidity: ${weatherData.current.relative_humidity_2m}%, Rain: ${weatherData.current.precipitation}mm.`;
+      }
+
+      let satelliteContext = "";
+      if (satelliteData) {
+        satelliteContext = `SATELLITE DATA (30-day avg): NDVI (Vegetation Health): ${satelliteData.ndvi?.toFixed(2)}, NDMI (Moisture): ${satelliteData.ndmi?.toFixed(2)}.`;
+      }
+
+      const prompt = `You are an expert agricultural recommendation engine for Bangladesh.
+      Apply a 5-layer scoring system to recommend what crops a farmer should plant next.
+      
+      TODAY's DATE: ${today}
+      
+      FARMER PROFILE:
+      - Location: GPS (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})
+      - Land Type: ${landType} (e.g., High, Medium High, Medium Low, Low, Very Low)
+      - Land Size: ${landSize} decimals
+      - Irrigation System: ${irrigation}
+      - Previous Crop: ${previousCrop} (Consider crop rotation benefits)
+      - Investment Budget: ${budget}
+      - Target Planting Time: ${targetTime} (Calculate the exact season based on today's date and this target time)
+
+      ENVIRONMENTAL DATA:
+      ${weatherContext}
+      ${satelliteContext}
+
+      LOGIC LAYERS:
+      Layer 1 (Eligibility): Filter crops suitable for this specific GPS location (AEZ), land type, and the calculated season.
+      Layer 2 (Supply Saturation): Consider the risk of oversupply if everyone plants the same thing. Suggest crops that are less likely to be over-planted.
+      Layer 3 (Profitability): Estimate net margin per decimal in BDT. Consider expected yield, expected harvest-month price, and input costs based on the budget.
+      Layer 4 (Demand Intelligence): Consider import substitution, export opportunities, or domestic policy priorities.
+      Layer 5 (Risk): Assess basic risks (price volatility, major weather risks like flood/drought for that specific region/season based on weather/satellite data).
+
+      OUTPUT REQUIREMENTS:
+      - Recommend the Top 3 crops (green).
+      - Suggest 1-2 crops to AVOID (red) due to high risk or oversupply.
+      - Suggest 1 diversification crop (moderate margin, low risk).
+      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
+
+      RESPONSE FORMAT (JSON):
+      {
+        "recommended": [
+          {
+            "crop": "Crop Name",
+            "expectedMargin": "Estimated net margin per decimal in BDT (e.g., '1500 BDT')",
+            "reasons": ["Reason 1", "Reason 2"],
+            "detailedAnalysis": "A detailed 2-3 sentence analysis explaining WHY this crop was chosen based on the 5 layers (Eligibility, Supply, Profit, Demand, Risk).",
+            "riskLevel": "Low" | "Medium" | "High",
+            "riskReason": "One sentence reason for risk",
+            "macroWarning": "Optional warning about macro factors"
+          }
+        ],
+        "avoid": [
+          {
+            "crop": "Crop Name",
+            "evidence": "Detailed explanation of why to avoid, referencing specific risks or market trends."
+          }
+        ],
+        "diversification": {
+          "crop": "Crop Name",
+          "reasons": ["Reason 1"],
+          "detailedAnalysis": "Analysis of why this is a good diversification option.",
+          "riskLevel": "Low" | "Medium" | "High",
+          "riskReason": "..."
+        }
+      }`;
+
+      const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            recommended: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  crop: { type: Type.STRING },
+                  expectedMargin: { type: Type.STRING },
+                  reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  detailedAnalysis: { type: Type.STRING },
+                  riskLevel: { type: Type.STRING },
+                  riskReason: { type: Type.STRING },
+                  macroWarning: { type: Type.STRING }
+                },
+                required: ['crop', 'expectedMargin', 'reasons', 'detailedAnalysis', 'riskLevel', 'riskReason']
+              }
+            },
+            avoid: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  crop: { type: Type.STRING },
+                  evidence: { type: Type.STRING }
+                },
+                required: ['crop', 'evidence']
+              }
+            },
+            diversification: {
+              type: Type.OBJECT,
+              properties: {
+                crop: { type: Type.STRING },
+                reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
+                detailedAnalysis: { type: Type.STRING },
+                riskLevel: { type: Type.STRING },
+                riskReason: { type: Type.STRING }
+              },
+              required: ['crop', 'reasons', 'detailedAnalysis', 'riskLevel', 'riskReason']
+            }
+          },
+          required: ['recommended', 'avoid', 'diversification']
+        }
+      };
+
+      const response = await callAiWithFallback({
+        contents: prompt,
+        config
+      }, getModelName(isAdvanced));
+      
+      return JSON.parse(response.text || '{}');
+    } catch (error) {
+      console.error("AI Service Error (Planting Recommendations):", error);
+      throw error;
+    }
+  });
+};
+
 export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
   const ai = getAi();
   return ai.chats.create({

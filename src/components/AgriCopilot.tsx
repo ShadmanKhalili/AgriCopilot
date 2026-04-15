@@ -14,8 +14,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { LiveExpertCall } from './LiveExpertCall';
+import { geoData } from '../utils/geoData';
+import { detectUserLocation } from '../utils/geolocation';
 
-const UPAZILAS = ['sadar', 'chakaria', 'ukhiya', 'teknaf', 'ramu', 'peua', 'kutubdia', 'moheshkhali', 'others'];
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
 
 interface Props {
@@ -71,6 +72,10 @@ export default function AgriCopilot({
   const [audioUrl, setAudioUrl] = useState<string | null>(persistedAudioUrl || null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isManualLocation, setIsManualLocation] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
+  const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -161,28 +166,38 @@ export default function AgriCopilot({
     }, 1500);
   };
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
-    }
+  const activeDistrict = geoData.find(d => d.id === selectedDistrict);
+  const activeUpazila = activeDistrict?.upazilas.find(u => u.id === selectedUpazila);
 
+  const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setGlobalLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-        setIsDetectingLocation(false);
-      },
-      (error) => {
-        console.error("Error detecting location:", error);
-        setIsDetectingLocation(false);
-        alert(t.tooltips.locationError || "Failed to detect location. Please check permissions.");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    setLocationError(null);
+    setIsManualLocation(false);
+
+    try {
+      const coords = await detectUserLocation();
+      setGlobalLocation(coords);
+      setIsDetectingLocation(false);
+    } catch (error: any) {
+      console.error("Error detecting location:", error);
+      let msg = t.tooltips?.locationError || "Failed to detect location.";
+      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (error.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      setLocationError(msg);
+      setIsDetectingLocation(false);
+      setIsManualLocation(true);
+    }
+  };
+
+  const handleManualLocationChange = (upazilaId: string) => {
+    setSelectedUpazila(upazilaId);
+    const upazila = activeDistrict?.upazilas.find(u => u.id === upazilaId);
+    if (upazila) {
+      setGlobalLocation({
+        latitude: upazila.lat,
+        longitude: upazila.lng
+      });
+    }
   };
 
   const [isTranslating, setIsTranslating] = useState(false);
@@ -457,29 +472,81 @@ export default function AgriCopilot({
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl border border-green-100 shadow-sm flex items-center justify-between">
-              <div>
-                <h4 className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
-                <p className="text-xs text-gray-500 font-medium">{globalLocation ? t.tooltips.locationDetected : t.tooltips.locationDesc}</p>
+            <div className="bg-white p-5 rounded-3xl border border-green-100 shadow-sm flex flex-col space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
+                  <p className="text-xs text-gray-500 font-medium">{globalLocation ? t.tooltips.locationDetected : t.tooltips.locationDesc}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsManualLocation(!isManualLocation)}
+                    className={`p-2 rounded-xl transition-colors border ${
+                      isManualLocation 
+                        ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                    title={isManualLocation ? "Use GPS" : "Set Manually"}
+                  >
+                    <Navigation className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
+                    className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm ${
+                      globalLocation 
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {isDetectingLocation ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : globalLocation ? (
+                      <Navigation className="w-4 h-4" />
+                    ) : (
+                      <MapPin className="w-4 h-4" />
+                    )}
+                    <span className="text-xs">{isDetectingLocation ? t.tooltips.detecting : globalLocation ? 'Update' : t.tooltips.detectLocation}</span>
+                  </button>
+                </div>
               </div>
-              <button 
-                onClick={handleDetectLocation}
-                disabled={isDetectingLocation}
-                className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm ${
-                  globalLocation 
-                    ? 'bg-green-50 text-green-700 hover:bg-green-100' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {isDetectingLocation ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : globalLocation ? (
-                  <Navigation className="w-4 h-4" />
-                ) : (
-                  <MapPin className="w-4 h-4" />
-                )}
-                <span className="text-xs">{isDetectingLocation ? t.tooltips.detecting : globalLocation ? 'Update' : t.tooltips.detectLocation}</span>
-              </button>
+
+              {isManualLocation && (
+                <div className="pt-2 border-t border-green-50 flex flex-col gap-2">
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => {
+                      setSelectedDistrict(e.target.value);
+                      const newDistrict = geoData.find(d => d.id === e.target.value);
+                      if (newDistrict && newDistrict.upazilas.length > 0) {
+                        handleManualLocationChange(newDistrict.upazilas[0].id);
+                      } else {
+                        setSelectedUpazila('');
+                      }
+                    }}
+                    className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                  >
+                    {geoData.map(d => (
+                      <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedUpazila}
+                    onChange={(e) => handleManualLocationChange(e.target.value)}
+                    className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                    disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+                  >
+                    {activeDistrict?.upazilas.map(u => (
+                      <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-green-600 mt-2 font-medium">
+                    {t.manualLocationNotice}
+                  </p>
+                </div>
+              )}
+
+              {locationError && <p className="text-[10px] text-red-500 font-bold">{locationError}</p>}
             </div>
 
             {globalLocation && (

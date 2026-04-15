@@ -5,6 +5,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getMarketInsights } from '../services/ai';
+import { detectUserLocation } from '../utils/geolocation';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
@@ -73,28 +74,19 @@ export default function MarketConnect({
     if (setPersistedQuantity) setPersistedQuantity(quantity);
   }, [quantity, setPersistedQuantity]);
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
-    }
-
+  const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-        setIsDetectingLocation(false);
-      },
-      (error) => {
-        console.error("Error detecting location:", error);
-        setIsDetectingLocation(false);
-        alert(t.tooltips.locationError || "Failed to detect location. Please check permissions.");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    try {
+      const coords = await detectUserLocation();
+      setCoords(coords);
+      setIsDetectingLocation(false);
+    } catch (error: any) {
+      console.error("Error detecting location:", error);
+      setIsDetectingLocation(false);
+      let msg = t.tooltips?.locationError || "Failed to detect location.";
+      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      alert(msg);
+    }
   };
 
   const handleGetInsights = async () => {

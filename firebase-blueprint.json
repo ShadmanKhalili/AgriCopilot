@@ -74,6 +74,25 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "produce", "quantity", "insights", "isAdvanced", "createdAt"]
+    },
+    "PlantingIntent": {
+      "title": "PlantingIntent",
+      "description": "Record of a farmer's planting intent and recommendation",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "landType": { "type": "string" },
+        "landSize": { "type": "string" },
+        "irrigation": { "type": "string" },
+        "previousCrop": { "type": "string" },
+        "budget": { "type": "string" },
+        "targetTime": { "type": "string" },
+        "recommendedCrop": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "latitude", "longitude", "landType", "landSize", "irrigation", "previousCrop", "budget", "targetTime", "recommendedCrop", "createdAt"]
     }
   },
   "firestore": {
@@ -96,6 +115,10 @@
     "/market_queries/{queryId}": {
       "schema": { "$ref": "#/entities/MarketQuery" },
       "description": "Stores market insight queries"
+    },
+    "/planting_intents/{intentId}": {
+      "schema": { "$ref": "#/entities/PlantingIntent" },
+      "description": "Stores farmer planting intents and recommendations"
     }
   }
 }

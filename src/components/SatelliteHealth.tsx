@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { translations, Language } from '../utils/translations';
-import { Satellite, MapPin, RefreshCw, AlertTriangle, CheckCircle2, Info, Leaf, Cloud, Activity } from 'lucide-react';
+import { Satellite, MapPin, RefreshCw, AlertTriangle, CheckCircle2, Info, Leaf, Cloud, Activity, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import LocationDisplay from './LocationDisplay';
+import { geoData } from '../utils/geoData';
+import { detectUserLocation } from '../utils/geolocation';
 
 interface Props {
   lang: Language;
@@ -14,30 +16,47 @@ interface Props {
 const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocation }) => {
   const t = translations[lang];
   const [loading, setLoading] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isManualLocation, setIsManualLocation] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
+  const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [ndvi, setNdvi] = useState<number | null>(null);
   const [ndmi, setNdmi] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const detectLocation = () => {
+  const activeDistrict = geoData.find(d => d.id === selectedDistrict);
+  const activeUpazila = activeDistrict?.upazilas.find(u => u.id === selectedUpazila);
+
+  const detectLocation = async () => {
     setLoading(true);
     setError(null);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGlobalLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          });
-          setLoading(false);
-        },
-        (err) => {
-          setError(t.tooltips.locationError);
-          setLoading(false);
-        }
-      );
-    } else {
-      setError("Geolocation not supported");
+    setLocationError(null);
+    setIsManualLocation(false);
+
+    try {
+      const coords = await detectUserLocation();
+      setGlobalLocation(coords);
       setLoading(false);
+    } catch (err: any) {
+      console.error("Location error:", err);
+      let msg = t.tooltips?.locationError || "Failed to detect location.";
+      if (err.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (err.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      setLocationError(msg);
+      setError(msg);
+      setLoading(false);
+      setIsManualLocation(true);
+    }
+  };
+
+  const handleManualLocationChange = (upazilaId: string) => {
+    setSelectedUpazila(upazilaId);
+    const upazila = activeDistrict?.upazilas.find(u => u.id === upazilaId);
+    if (upazila) {
+      setGlobalLocation({
+        latitude: upazila.lat,
+        longitude: upazila.lng
+      });
     }
   };
 
@@ -137,14 +156,59 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
               <MapPin className="w-7 h-7 text-indigo-500" />
               {t.location}
             </h3>
-            <button
-              onClick={detectLocation}
-              disabled={loading}
-              className="p-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
-            >
-              <RefreshCw className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsManualLocation(!isManualLocation)}
+                className={`p-3 rounded-2xl transition-colors border ${
+                  isManualLocation 
+                    ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+                title={isManualLocation ? "Use GPS" : "Set Manually"}
+              >
+                <Navigation className="w-5 h-5" />
+              </button>
+              <button
+                onClick={detectLocation}
+                disabled={loading}
+                className="p-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
+              >
+                <RefreshCw className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
+
+          {isManualLocation && (
+            <div className="mb-6 relative z-10 flex flex-col gap-3">
+              <select
+                value={selectedDistrict}
+                onChange={(e) => {
+                  setSelectedDistrict(e.target.value);
+                  const newDistrict = geoData.find(d => d.id === e.target.value);
+                  if (newDistrict && newDistrict.upazilas.length > 0) {
+                    handleManualLocationChange(newDistrict.upazilas[0].id);
+                  } else {
+                    setSelectedUpazila('');
+                  }
+                }}
+                className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 py-3 text-lg font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/20 outline-none shadow-sm"
+              >
+                {geoData.map(d => (
+                  <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
+                ))}
+              </select>
+              <select
+                value={selectedUpazila}
+                onChange={(e) => handleManualLocationChange(e.target.value)}
+                className="w-full bg-white border-2 border-indigo-100 rounded-2xl px-4 py-3 text-lg font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/20 outline-none shadow-sm"
+                disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+              >
+                {activeDistrict?.upazilas.map(u => (
+                  <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {globalLocation ? (
             <div className="space-y-6 relative z-10">

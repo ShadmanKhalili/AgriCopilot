@@ -6,6 +6,8 @@ import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import ReactMarkdown from 'react-markdown';
 import { translateText, generateWeatherAdvisory, generateSpeech } from '../services/ai';
+import { geoData } from '../utils/geoData';
+import { detectUserLocation } from '../utils/geolocation';
 
 interface Props {
   lang: Language;
@@ -41,6 +43,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [advisory, setAdvisory] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isManualLocation, setIsManualLocation] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
+  const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isAudioLoading, setIsAudioLoading] = useState(false);
@@ -72,25 +78,38 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     }
   };
 
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported");
-      return;
-    }
+  const activeDistrict = geoData.find(d => d.id === selectedDistrict);
+  const activeUpazila = activeDistrict?.upazilas.find(u => u.id === selectedUpazila);
+
+  const handleDetectLocation = async () => {
     setIsDetecting(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setGlobalLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        });
-        setIsDetecting(false);
-      },
-      (error) => {
-        console.error("Location error:", error);
-        setIsDetecting(false);
-      }
-    );
+    setLocationError(null);
+    setIsManualLocation(false);
+
+    try {
+      const coords = await detectUserLocation();
+      setGlobalLocation(coords);
+      setIsDetecting(false);
+    } catch (error: any) {
+      console.error("Location error:", error);
+      let msg = t.tooltips?.locationError || "Failed to detect location.";
+      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (error.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      setLocationError(msg);
+      setIsDetecting(false);
+      setIsManualLocation(true);
+    }
+  };
+
+  const handleManualLocationChange = (upazilaId: string) => {
+    setSelectedUpazila(upazilaId);
+    const upazila = activeDistrict?.upazilas.find(u => u.id === upazilaId);
+    if (upazila) {
+      setGlobalLocation({
+        latitude: upazila.lat,
+        longitude: upazila.lng
+      });
+    }
   };
 
   const toggleSpeech = async () => {
@@ -368,19 +387,74 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               <MapPin className="w-10 h-10 text-blue-500" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-3">{t.location}</h3>
-            <p className="text-gray-500 mb-8 text-lg max-w-md mx-auto">{t.tooltips.locationDesc}</p>
-            <button 
-              onClick={handleDetectLocation}
-              disabled={isDetecting}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-10 rounded-2xl hover:shadow-lg hover:shadow-blue-200 transition-all flex items-center justify-center mx-auto space-x-3 group"
-            >
-              {isDetecting ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                <Navigation className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+            
+            {isManualLocation ? (
+              <div className="mb-8 flex flex-col items-center gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => {
+                      setSelectedDistrict(e.target.value);
+                      const newDistrict = geoData.find(d => d.id === e.target.value);
+                      if (newDistrict && newDistrict.upazilas.length > 0) {
+                        handleManualLocationChange(newDistrict.upazilas[0].id);
+                      } else {
+                        setSelectedUpazila('');
+                      }
+                    }}
+                    className="bg-white border-2 border-blue-100 rounded-2xl px-6 py-3 text-lg font-bold text-gray-900 focus:ring-4 focus:ring-blue-500/20 outline-none shadow-sm"
+                  >
+                    {geoData.map(d => (
+                      <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedUpazila}
+                    onChange={(e) => handleManualLocationChange(e.target.value)}
+                    className="bg-white border-2 border-blue-100 rounded-2xl px-6 py-3 text-lg font-bold text-gray-900 focus:ring-4 focus:ring-blue-500/20 outline-none shadow-sm"
+                    disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+                  >
+                    {activeDistrict?.upazilas.map(u => (
+                      <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={() => setIsManualLocation(false)}
+                  className="text-blue-600 font-bold text-sm hover:underline"
+                >
+                  {t.tryGpsAgain}
+                </button>
+              </div>
+            ) : (
+              <p className="text-gray-500 mb-8 text-lg max-w-md mx-auto">{t.tooltips.locationDesc}</p>
+            )}
+
+            {locationError && <p className="text-sm text-red-500 mb-4">{locationError}</p>}
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button 
+                onClick={handleDetectLocation}
+                disabled={isDetecting}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-4 px-10 rounded-2xl hover:shadow-lg hover:shadow-blue-200 transition-all flex items-center justify-center space-x-3 group"
+              >
+                {isDetecting ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <Navigation className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                )}
+                <span className="text-lg">{isDetecting ? t.tooltips.detecting : t.tooltips.detectLocation}</span>
+              </button>
+
+              {!isManualLocation && (
+                <button 
+                  onClick={() => setIsManualLocation(true)}
+                  className="bg-white border-2 border-blue-100 text-blue-600 font-bold py-4 px-10 rounded-2xl hover:bg-blue-50 transition-all"
+                >
+                  {t.setManually}
+                </button>
               )}
-              <span className="text-lg">{isDetecting ? t.tooltips.detecting : t.tooltips.detectLocation}</span>
-            </button>
+            </div>
           </div>
         </motion.div>
       ) : (
