@@ -667,7 +667,7 @@ export default function AgriCopilot({
               {diagnosis && (
                 <div className="mb-6">
                   <LiveExpertCall 
-                    diagnosisContext={diagnosis.diagnosis} 
+                    diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
                     lang={lang} 
                     locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
                   />

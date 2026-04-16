@@ -431,7 +431,15 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
             </div>
             <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
               <LiveExpertCall 
-                diagnosisContext={`User wants to plant on a ${landSize} decimal ${landType} land with ${irrigation} irrigation and a ${budget} budget. Top recommendation: ${results.recommended?.[0]?.crop}. Other options: ${results.recommended?.slice(1).map((r:any)=>r.crop).join(', ')}. Avoid: ${results.avoid?.map((r:any)=>r.crop).join(', ')}.`}
+                diagnosisContext={`User Profile: ${landSize} decimal ${landType} land, ${irrigation} irrigation, budget: ${budget}. 
+Top Recommendations:
+${results.recommended?.map((r:any)=> `- ${r.crop}: ${r.detailedAnalysis} (Margin: ${r.expectedMargin}, Risk: ${r.riskLevel} - ${r.riskReason})`).join('\n')}
+
+Diversification Option:
+${results.diversification?.crop}: ${results.diversification?.detailedAnalysis}
+
+Crops to Avoid:
+${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                 lang={lang}
                 locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"}
               />
