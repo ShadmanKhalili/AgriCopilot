@@ -319,8 +319,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       // 4. Generate AI Advisory
       const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
       setAdvisory(advisoryText);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Weather/Advisory error:", error);
+      setAdvisory(`Failed to load weather data. Please try again later. (Debug: ${error.message || 'Unknown error'})`);
     } finally {
       setIsLoading(false);
     }

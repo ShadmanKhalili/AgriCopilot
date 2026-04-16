@@ -160,7 +160,9 @@ export const generateWeatherAdvisory = async (
 ) => {
   return await callAiWithRetry(async () => {
     try {
-      const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const currentDate = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       
       let climateContext = "";
       if (weatherData.historicalAvgTemp) {
@@ -186,6 +188,7 @@ export const generateWeatherAdvisory = async (
       }
 
       const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
+      Current Date: ${currentDate}
       Current Time: ${currentTime}
       Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
       Temp: ${weatherData.temp.toFixed(1)}°C, Condition: ${weatherData.condition}, Humidity: ${weatherData.humidity}%, Wind: ${weatherData.windSpeed}km/h, Rain: ${weatherData.rainfall}mm.

@@ -59,45 +59,78 @@ export default function MacroTrends({ lang }: Props) {
       setError(null);
       
       try {
+        const fetchErrors: string[] = [];
         const fetchPromises = INDICATORS.map(async (ind) => {
-          try {
-            const res = await fetch(`/api/worldbank?country=BGD&indicator=${ind.id}&per_page=30`);
-            
-            if (!res.ok) {
-              const errorData = await res.json().catch(() => ({}));
-              console.warn(`Failed to fetch ${ind.name}:`, errorData.error || res.statusText);
-              return null;
+          let retries = 3;
+          let lastError: any = null;
+
+          while (retries > 0) {
+            try {
+              let res;
+              try {
+                // Try proxy first
+                res = await fetch(`/api/stats?country=BGD&ind=${ind.id}&per_page=30`);
+              } catch (proxyErr: any) {
+                console.warn(`Proxy fetch threw error for ${ind.name}, trying direct API...`, proxyErr);
+                res = await fetch(`https://api.worldbank.org/v2/country/BGD/indicator/${ind.id}?format=json&per_page=30`);
+              }
+              
+              // If proxy returned 500, try direct API (World Bank supports CORS)
+              if (!res.ok) {
+                console.warn(`Proxy returned ${res.status} for ${ind.name}, trying direct API...`);
+                res = await fetch(`https://api.worldbank.org/v2/country/BGD/indicator/${ind.id}?format=json&per_page=30`);
+              }
+              
+              if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const errMsg = errorData.error || res.statusText;
+                console.warn(`Failed to fetch ${ind.name}:`, errMsg);
+                throw new Error(`HTTP ${res.status}: ${errMsg}`);
+              }
+              
+              const data = await res.json();
+              
+              if (data && data[1] && Array.isArray(data[1])) {
+                const rawData = data[1];
+                const chartData: DataPoint[] = rawData
+                  .filter((item: any) => item.value !== null)
+                  .map((item: any) => ({
+                    year: item.date,
+                    value: Number(item.value.toFixed(2))
+                  }))
+                  .reverse();
+                  
+                if (chartData.length > 0) {
+                  return {
+                    ...ind,
+                    data: chartData
+                  };
+                } else {
+                  throw new Error("No valid data points found");
+                }
+              } else {
+                throw new Error("Invalid data format received");
+              }
+            } catch (individualErr: any) {
+              lastError = individualErr;
+              retries--;
+              if (retries > 0) {
+                // Wait before retrying (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, (3 - retries) * 1000));
+              }
             }
-            
-            const data = await res.json();
-            
-            if (data && data[1] && Array.isArray(data[1])) {
-              const rawData = data[1];
-              const chartData: DataPoint[] = rawData
-                .filter((item: any) => item.value !== null)
-                .map((item: any) => ({
-                  year: item.date,
-                  value: Number(item.value.toFixed(2))
-                }))
-                .reverse();
-                
-              return {
-                ...ind,
-                data: chartData
-              };
-            }
-            return null;
-          } catch (individualErr) {
-            console.error(`Error fetching indicator ${ind.id}:`, individualErr);
-            return null;
           }
+          
+          console.error(`Error fetching indicator ${ind.id} after retries:`, lastError);
+          fetchErrors.push(`${ind.id}: ${lastError?.message || 'Unknown error'}`);
+          return null;
         });
 
         const results = await Promise.all(fetchPromises);
         const fetchedIndicators = results.filter((ind): ind is IndicatorData => ind !== null);
         
         if (fetchedIndicators.length === 0) {
-          throw new Error("Could not retrieve any data from the World Bank. The API might be temporarily unavailable.");
+          throw new Error(`Could not retrieve any data from the World Bank. The API might be temporarily unavailable. (Debug: ${fetchErrors.join(', ')})`);
         }
 
         setIndicators(fetchedIndicators);

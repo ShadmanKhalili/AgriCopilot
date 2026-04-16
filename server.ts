@@ -244,15 +244,15 @@ async function startServer() {
   });
 
   // Proxy for World Bank API
-  app.get("/api/worldbank", async (req, res) => {
+  app.get("/api/stats", async (req, res) => {
     try {
-      const { country, indicator, ...rest } = req.query;
+      const { country, ind, ...rest } = req.query;
       
-      if (!country || !indicator) {
+      if (!country || !ind) {
         return res.status(400).json({ error: "Missing country or indicator parameter" });
       }
 
-      const url = `https://api.worldbank.org/v2/country/${country}/indicator/${indicator}`;
+      const url = `https://api.worldbank.org/v2/country/${country}/indicator/${ind}`;
       console.log(`Proxying World Bank request to: ${url}`);
 
       const response = await axios.get(url, {
