@@ -161,8 +161,18 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     try {
       // 1. Fetch Current Weather, Soil Moisture, and Hourly Forecast from Open-Meteo
       const weatherRes = await fetch(`/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
+      
+      if (!weatherRes.ok) {
+        const errJson = await weatherRes.json().catch(() => ({}));
+        throw new Error(errJson.error || `Weather server returned ${weatherRes.status}`);
+      }
+
       const weatherData = await weatherRes.json();
       
+      if (!weatherData.current) {
+        throw new Error("Invalid weather data format received");
+      }
+
       // Calculate Safe Spraying Window
       let safeSprayingWindow = "No safe window in the next 24 hours";
       if (weatherData.hourly) {
@@ -283,7 +293,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       }
 
       // Map WMO weather code to condition
-      const code = weatherData.current.weather_code;
+      const code = weatherData.current?.weather_code || 0;
       let condition = 'Sunny';
       if (code >= 1 && code <= 3) condition = 'Partly Cloudy';
       if (code >= 45 && code <= 48) condition = 'Foggy';
@@ -292,21 +302,21 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       if (code >= 80 && code <= 82) condition = 'Showers';
       if (code >= 95 && code <= 99) condition = 'Thunderstorm';
 
-      const currentTemp = weatherData.current.temperature_2m;
+      const currentTemp = weatherData.current?.temperature_2m || 0;
 
       const newWeather: WeatherData = {
         temp: currentTemp,
         condition: condition,
-        humidity: weatherData.current.relative_humidity_2m,
-        windSpeed: weatherData.current.wind_speed_10m,
-        rainfall: weatherData.current.precipitation,
-        rainChance: weatherData.daily.precipitation_probability_max[0] || 0,
-        uvIndex: weatherData.daily.uv_index_max[0] || 0,
+        humidity: weatherData.current?.relative_humidity_2m || 0,
+        windSpeed: weatherData.current?.wind_speed_10m || 0,
+        rainfall: weatherData.current?.precipitation || 0,
+        rainChance: weatherData.daily?.precipitation_probability_max?.[0] || 0,
+        uvIndex: weatherData.daily?.uv_index_max?.[0] || 0,
         locationName: "Local Area",
         historicalAvgTemp,
         historicalToday,
-        soilMoisture: weatherData.current.soil_moisture_0_to_7cm,
-        evapotranspiration: weatherData.daily.et0_fao_evapotranspiration[0],
+        soilMoisture: weatherData.current?.soil_moisture_0_to_7cm,
+        evapotranspiration: weatherData.daily?.et0_fao_evapotranspiration?.[0],
         soilPH,
         soilNitrogen,
         soilCarbon,
@@ -317,11 +327,16 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
       // 4. Generate AI Advisory
-      const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
-      setAdvisory(advisoryText);
+      try {
+        const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
+        setAdvisory(advisoryText);
+      } catch (aiError) {
+        console.error("Advisory generation failed", aiError);
+        setAdvisory("Weather data loaded, but we couldn't generate a personalized AI advisory at this moment. Please check the stats below.");
+      }
     } catch (error: any) {
       console.error("Weather/Advisory error:", error);
-      setAdvisory(`Failed to load weather data. Please try again later. (Debug: ${error.message || 'Unknown error'})`);
+      setAdvisory(`Failed to load weather data. Please try again later. (Debug: ${error.message || 'Network error or server timeout. Check your connection.'})`);
     } finally {
       setIsLoading(false);
     }

@@ -71,7 +71,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       nextPlayTimeRef.current = audioCtx.currentTime;
 
       const systemInstruction = `You are a helpful agricultural expert in Bangladesh. 
-      CONTEXT: The user has just received a diagnosis for their crop: "${diagnosisContext}".
+      CONTEXT: The user has just received the following agricultural advice/results: "${diagnosisContext}".
       TASK: Answer follow-up questions from the user via voice. 
       - Provide practical, chemical-free, or climate-smart advice.
       - Use local context for ${locationContext}.

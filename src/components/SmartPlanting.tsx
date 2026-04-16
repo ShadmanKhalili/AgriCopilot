@@ -10,6 +10,7 @@ import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import { LiveExpertCall } from './LiveExpertCall';
 
 interface SmartPlantingProps {
   lang: Language;
@@ -422,6 +423,21 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          {/* AI Voice Call Section */}
+          <div className="bg-gradient-to-br from-green-900 to-emerald-900 rounded-[32px] p-6 shadow-xl border border-green-800 text-white">
+            <div className="mb-4">
+              <h3 className="text-xl font-black mb-1">{lang === 'bn' ? 'মাস্টার এগ্রোনমিস্টের সাথে কথা বলুন' : 'Discuss Your Plan with AI'}</h3>
+              <p className="text-green-200 text-sm">{lang === 'bn' ? 'আপনার প্ল্যান সম্পর্কে এআই এর সাথে সরাসরি কথা বলুন' : 'Have a live conversation with our AI expert about these crop recommendations.'}</p>
+            </div>
+            <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
+              <LiveExpertCall 
+                diagnosisContext={`User wants to plant on a ${landSize} decimal ${landType} land with ${irrigation} irrigation and a ${budget} budget. Top recommendation: ${results.recommended?.[0]?.crop}. Other options: ${results.recommended?.slice(1).map((r:any)=>r.crop).join(', ')}. Avoid: ${results.avoid?.map((r:any)=>r.crop).join(', ')}.`}
+                lang={lang}
+                locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"}
+              />
+            </div>
+          </div>
+
           {/* Recommended Crops */}
           <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-xl shadow-green-900/5 border border-green-100">
             <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center space-x-2">

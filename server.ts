@@ -186,6 +186,16 @@ async function startServer() {
     }
   });
 
+  // Proxy for IP Geolocation fallback
+  app.get("/api/ip-location", async (req, res) => {
+    try {
+      const response = await axios.get('https://get.geojs.io/v1/ip/geo.json', { timeout: 5000 });
+      res.json(response.data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Proxy for Reverse Geocoding
   app.get("/api/loc-lookup", async (req, res) => {
     try {
@@ -201,32 +211,43 @@ async function startServer() {
   // Proxy for Weather API
   app.get("/api/daily-forecast", async (req, res) => {
     try {
+      console.log(`Proxying Weather request to Open-Meteo for lat: ${req.query.latitude}, lng: ${req.query.longitude}`);
       const response = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
-        params: req.query
+        params: req.query,
+        timeout: 10000 // 10s timeout
       });
       res.json(response.data);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Weather Proxy Error:", error.message);
+      res.status(500).json({ 
+        error: "Failed to fetch weather data from Open-Meteo",
+        details: error.message
+      });
     }
   });
 
   // Proxy for Climate API
   app.get("/api/historical-data", async (req, res) => {
     try {
+      console.log(`Proxying Climate request to Open-Meteo for lat: ${req.query.latitude}, lng: ${req.query.longitude}`);
       const response = await axios.get(`https://archive-api.open-meteo.com/v1/archive`, {
-        params: req.query
+        params: req.query,
+        timeout: 15000 // 15s timeout
       });
       res.json(response.data);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Climate Proxy Error:", error.message);
+      res.status(500).json({ 
+        error: "Failed to fetch historical climate data from Open-Meteo",
+        details: error.message 
+      });
     }
   });
 
   // Proxy for Soil API
   app.get("/api/soil-properties", async (req, res) => {
     try {
-      // Axios handles array params like property=phh2o&property=nitrogen correctly if passed as an array
-      // However, req.query might already be parsed correctly by Express
+      console.log(`Proxying Soil request to ISRIC for lat: ${req.query.lat}, lng: ${req.query.lon}`);
       const params = new URLSearchParams();
       for (const key in req.query) {
         const value = req.query[key];
@@ -236,10 +257,16 @@ async function startServer() {
           params.append(key, value as string);
         }
       }
-      const response = await axios.get(`https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`);
+      const response = await axios.get(`https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`, {
+        timeout: 20000 // 20s timeout (SoilGrids is slow)
+      });
       res.json(response.data);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error("Soil Proxy Error:", error.message);
+      res.status(500).json({ 
+        error: "Failed to fetch soil properties from ISRIC SoilGrids",
+        details: error.message 
+      });
     }
   });
 

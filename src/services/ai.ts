@@ -199,7 +199,7 @@ export const generateWeatherAdvisory = async (
       
       Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80-100 words).
       Focus on:
-      - Time of day: Adjust your advice based on the current time (${currentTime}). For example, do not advise spraying in the middle of the night or during peak midday heat.
+      - Time of day: Adjust your advice based on the current time (${currentTime}).
       - Irrigation needs (use soil moisture and evapotranspiration data if available)
       - Fertilizer/Soil health advice (use soil pH, Nitrogen, Carbon data if available)
       - Pest/Disease risk based on humidity and temperature
@@ -210,7 +210,7 @@ export const generateWeatherAdvisory = async (
 
       const response = await callAiWithFallback({
         contents: prompt
-      }, BACKUP_MODEL);
+      }, SEARCH_MODEL); // Use SEARCH_MODEL (gemini-3-flash-preview)
       
       return response.text || '';
     } catch (error) {

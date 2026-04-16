@@ -1,6 +1,6 @@
 export async function getFallbackLocation(): Promise<{latitude: number, longitude: number}> {
   try {
-    const response = await fetch('https://get.geojs.io/v1/ip/geo.json');
+    const response = await fetch('/api/ip-location');
     if (!response.ok) throw new Error('IP location failed');
     const data = await response.json();
     return {
