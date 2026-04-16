@@ -160,7 +160,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     
     try {
       // 1. Fetch Current Weather, Soil Moisture, and Hourly Forecast from Open-Meteo
-      const weatherRes = await fetch(`/api/weather?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
+      const weatherRes = await fetch(`/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
       const weatherData = await weatherRes.json();
       
       // Calculate Safe Spraying Window
@@ -228,7 +228,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       let historicalToday = undefined;
 
       try {
-        const climateRes = await fetch(`/api/climate?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
+        const climateRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
         const climateData = await climateRes.json();
         
         const temps = climateData.daily.temperature_2m_mean;
@@ -250,7 +250,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       }
 
       try {
-        const lastYearRes = await fetch(`/api/climate?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
+        const lastYearRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
         const lastYearData = await lastYearRes.json();
         
         if (lastYearData.daily && lastYearData.daily.temperature_2m_max.length > 0) {
@@ -267,7 +267,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       // 3. Fetch SoilGrids Data
       let soilPH, soilNitrogen, soilCarbon;
       try {
-        const soilRes = await fetch(`/api/soil?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`);
+        const soilRes = await fetch(`/api/soil-properties?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`);
         const soilData = await soilRes.json();
         
         const layers = soilData.properties?.layers || [];

@@ -85,7 +85,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
       // Fetch Weather Data
       let weatherData = null;
       try {
-        const weatherRes = await fetch(`/api/weather?latitude=${activeLocation.latitude}&longitude=${activeLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto`);
+        const weatherRes = await fetch(`/api/daily-forecast?latitude=${activeLocation.latitude}&longitude=${activeLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto`);
         weatherData = await weatherRes.json();
       } catch (e) {
         console.warn("Failed to fetch weather data", e);

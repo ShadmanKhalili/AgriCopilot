@@ -69,7 +69,7 @@ export default function MacroTrends({ lang }: Props) {
               let res;
               try {
                 // Try proxy first
-                res = await fetch(`/api/stats?country=BGD&ind=${ind.id}&per_page=30`);
+                res = await fetch(`/api/wb-indicators?country=BGD&ind=${ind.id}&per_page=30`);
               } catch (proxyErr: any) {
                 console.warn(`Proxy fetch threw error for ${ind.name}, trying direct API...`, proxyErr);
                 res = await fetch(`https://api.worldbank.org/v2/country/BGD/indicator/${ind.id}?format=json&per_page=30`);

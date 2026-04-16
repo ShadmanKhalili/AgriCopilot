@@ -233,7 +233,7 @@ export const generateSpeech = async (text: string) => {
             },
           },
         },
-      }, 'gemini-2.5-flash-preview-tts');
+      }, 'gemini-3.1-flash-tts-preview');
       
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!base64Audio) return null;
@@ -653,7 +653,7 @@ export const getPlantingRecommendations = async (
 export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
   const ai = getAi();
   return ai.chats.create({
-    model: 'gemma-4-31b',
+    model: 'gemini-3-flash-preview',
     config: {
       systemInstruction: `You are a helpful agricultural expert in Bangladesh. 
       CONTEXT: The user has just received a diagnosis for their crop: "${context}".

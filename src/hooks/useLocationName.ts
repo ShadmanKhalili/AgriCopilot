@@ -16,7 +16,7 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
     const fetchLocation = async () => {
       try {
         // Using proxy for BigDataCloud reverse geocoding API
-        const response = await fetch(`/api/reverse-geocode?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=${lang}`);
+        const response = await fetch(`/api/loc-lookup?latitude=${coords.latitude}&longitude=${coords.longitude}&localityLanguage=${lang}`);
         const data = await response.json();
         
         if (isMounted) {

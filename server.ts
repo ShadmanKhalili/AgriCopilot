@@ -187,7 +187,7 @@ async function startServer() {
   });
 
   // Proxy for Reverse Geocoding
-  app.get("/api/reverse-geocode", async (req, res) => {
+  app.get("/api/loc-lookup", async (req, res) => {
     try {
       const response = await axios.get(`https://api.bigdatacloud.net/data/reverse-geocode-client`, {
         params: req.query
@@ -199,7 +199,7 @@ async function startServer() {
   });
 
   // Proxy for Weather API
-  app.get("/api/weather", async (req, res) => {
+  app.get("/api/daily-forecast", async (req, res) => {
     try {
       const response = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
         params: req.query
@@ -211,7 +211,7 @@ async function startServer() {
   });
 
   // Proxy for Climate API
-  app.get("/api/climate", async (req, res) => {
+  app.get("/api/historical-data", async (req, res) => {
     try {
       const response = await axios.get(`https://archive-api.open-meteo.com/v1/archive`, {
         params: req.query
@@ -223,7 +223,7 @@ async function startServer() {
   });
 
   // Proxy for Soil API
-  app.get("/api/soil", async (req, res) => {
+  app.get("/api/soil-properties", async (req, res) => {
     try {
       // Axios handles array params like property=phh2o&property=nitrogen correctly if passed as an array
       // However, req.query might already be parsed correctly by Express
@@ -244,7 +244,7 @@ async function startServer() {
   });
 
   // Proxy for World Bank API
-  app.get("/api/stats", async (req, res) => {
+  app.get("/api/wb-indicators", async (req, res) => {
     try {
       const { country, ind, ...rest } = req.query;
       
