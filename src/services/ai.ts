@@ -1,4 +1,6 @@
 import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { db } from '../firebase';
+import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
 
 export const getAi = () => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -662,5 +664,151 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
       - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. 
       - Use markdown for formatting to make it readable.`,
     },
+  });
+};
+
+export const syncCuratedSchemes = async () => {
+  return await callAiWithRetry(async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const today = new Date().toISOString();
+      const prompt = `Use Google Search to find the LATEST and most DETAILED agricultural subsidies, government schemes, or financial relief programs for farmers in Bangladesh as of ${currentYear}.
+
+      CRITICAL INSTRUCTIONS FOR CONTENT QUALITY & TONE:
+      - LANGUAGE: Use conversational, friendly, and extremely simple language that a farmer with basic education would understand.
+      - ELIGIBILITY: Instead of saying "Criteria: Land owner", say something like "If you have a farmer card and own even a little land, you are eligible."
+      - APPLY MODE: Be very specific about LOCAL CONTACTS. Use phrases like: "Contact your local Upazila Agriculture Officer (Krishi Office)", "Talk to your Union Parishad Chairman or Member", "Go to the nearest government bank (Sonali/Krishi Bank) with your NID card".
+      - BENEFITS: Clearly state how much money or discount they get in simple terms.
+      
+      Look for:
+      - Farmers' Card updates (MoA + Sonali Bank)
+      - Machinery subsidies from DAE (50-70%)
+      - Irrigation scheme benefits (MoA)
+      - Paddy/Rice procurement windows (Directorate of Food)
+      - Loan waivers or relief packages
+      - Krishi Call Centre (16123) info
+      - BRAC or NGO agricultural support programs
+      - Crop insurance (Green Delta, etc.)
+      
+      For each scheme, provide:
+      1. TITLE and DESCRIPTION.
+      2. ELIGIBILITY and APPLY MODE (Use the "farmer-friendly local contact" tone).
+      3. KEY BENEFITS (e.g., specific subsidy amounts, loan interest rates).
+      4. DEADLINE or validity period if available.
+      5. CONTACT INFO (official helplines or office names).
+      6. CATEGORY TAGS (e.g., "Seed Help", "Money Support", "Insurance").
+      
+      Look for official news from the Ministry of Agriculture, Daily Star, Prothom Alo, or BADC.
+      
+      RESPONSE FORMAT:
+      - Respond in JSON format.
+      - 'schemes': array of objects.
+      - Each object should have: 'id' (short unique slug), 'title' {en, bn}, 'description' {en, bn}, 'provider', 'status', 'eligibility' {en, bn}, 'howToApply' {en, bn}, 'benefits' {en, bn}, 'deadline' {en, bn}, 'contactInfo' {en, bn}, 'tags' (array of strings), 'crops' (array of slugs), 'districts' (array of slugs), 'sourceLinks' (array of URLs).
+      - Include robust translations for all fields.`;
+      
+      const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            schemes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  description: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  provider: { type: Type.STRING },
+                  status: { type: Type.STRING },
+                  eligibility: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  howToApply: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  benefits: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  deadline: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  contactInfo: {
+                    type: Type.OBJECT,
+                    properties: {
+                      en: { type: Type.STRING },
+                      bn: { type: Type.STRING }
+                    }
+                  },
+                  tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  crops: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  districts: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  sourceLinks: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ['id', 'title', 'description', 'eligibility', 'howToApply', 'crops', 'districts']
+              }
+            }
+          },
+          required: ['schemes']
+        },
+        tools: [{ googleSearch: {} }],
+        toolConfig: { includeServerSideToolInvocations: true }
+      };
+
+      const response = await callAiWithFallback({
+        contents: prompt,
+        config
+      }, SEARCH_MODEL);
+
+      const parsed = JSON.parse(response.text || '{}');
+      if (parsed.schemes && Array.isArray(parsed.schemes)) {
+        const batch = writeBatch(db);
+        const colRef = collection(db, 'gov_schemes');
+        
+        parsed.schemes.forEach((scheme: any) => {
+          const { id, ...data } = scheme;
+          const docRef = doc(colRef, id);
+          batch.set(docRef, {
+            ...data,
+            lastUpdated: today
+          });
+        });
+        
+        await batch.commit();
+        return parsed.schemes.length;
+      }
+      return 0;
+    } catch (error) {
+      console.error("AI Service Error (Sync Schemes):", error);
+      throw error;
+    }
   });
 };

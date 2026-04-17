@@ -74,12 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           if (!userDoc.exists()) {
+            const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com';
             const newProfile: UserProfile = {
               uid: currentUser.uid,
               email: currentUser.email || '',
               name: currentUser.displayName || '',
-              role: 'agri-preneur',
-              tier: 'free',
+              role: isAdminEmail ? 'admin' : 'agri-preneur',
+              tier: isAdminEmail ? 'premium' : 'free',
               usageCount: 0,
               lastUsedDate: new Date().toISOString().split('T')[0],
               createdAt: new Date().toISOString()

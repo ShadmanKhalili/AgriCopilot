@@ -8,17 +8,29 @@ export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
+let isSigningIn = false;
+
 export const signInWithGoogle = async () => {
+  if (isSigningIn) {
+    console.warn("Sign-in already in progress.");
+    return;
+  }
+  
+  isSigningIn = true;
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (error: any) {
     if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-      // User closed the popup or cancelled the request, no need to log as error or throw
       console.warn("Sign-in popup closed by user.");
       return;
     }
+    if (error.code === 'auth/popup-blocked') {
+      alert("The sign-in popup was blocked by your browser. Please allow popups for this site and try again, or open the app in a new tab.");
+    }
     console.error("Error signing in with Google", error);
     throw error;
+  } finally {
+    isSigningIn = false;
   }
 };
 

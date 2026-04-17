@@ -68,12 +68,11 @@
       "properties": {
         "userId": { "type": "string", "description": "ID of the user who queried" },
         "produce": { "type": "string" },
-        "quantity": { "type": "string" },
         "insights": { "type": "string" },
         "isAdvanced": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "produce", "quantity", "insights", "isAdvanced", "createdAt"]
+      "required": ["userId", "produce", "insights", "isAdvanced", "createdAt"]
     },
     "PlantingIntent": {
       "title": "PlantingIntent",
@@ -93,6 +92,57 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "latitude", "longitude", "landType", "landSize", "irrigation", "previousCrop", "budget", "targetTime", "recommendedCrop", "createdAt"]
+    },
+    "GovScheme": {
+      "title": "GovScheme",
+      "description": "A curated government scheme or farmer benefit",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "object",
+          "properties": {
+            "en": { "type": "string" },
+            "bn": { "type": "string" }
+          }
+        },
+        "description": {
+          "type": "object",
+          "properties": {
+            "en": { "type": "string" },
+            "bn": { "type": "string" }
+          }
+        },
+        "provider": { "type": "string" },
+        "status": { "type": "string" },
+        "eligibility": {
+          "type": "object",
+          "properties": {
+            "en": { "type": "string" },
+            "bn": { "type": "string" }
+          }
+        },
+        "howToApply": {
+          "type": "object",
+          "properties": {
+            "en": { "type": "string" },
+            "bn": { "type": "string" }
+          }
+        },
+        "crops": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "districts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sourceLinks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "eligibility", "howToApply", "crops", "districts", "lastUpdated"]
     }
   },
   "firestore": {
@@ -119,6 +169,10 @@
     "/planting_intents/{intentId}": {
       "schema": { "$ref": "#/entities/PlantingIntent" },
       "description": "Stores farmer planting intents and recommendations"
+    },
+    "/gov_schemes/{schemeId}": {
+      "schema": { "$ref": "#/entities/GovScheme" },
+      "description": "Stores curated government schemes for farmers"
     }
   }
 }

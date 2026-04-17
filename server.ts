@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import axios from "axios";
 import dotenv from "dotenv";
+import https from "https";
 
 dotenv.config();
 
@@ -304,6 +305,114 @@ async function startServer() {
         error: error.message,
         details: error.response?.data 
       });
+    }
+  });
+
+  // Link Preview Helper
+  app.get("/api/link-preview", async (req, res) => {
+    const { url } = req.query;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: "URL is required" });
+    }
+
+    let urlObj: URL;
+    try {
+      urlObj = new URL(url);
+    } catch {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    try {
+      console.log(`Fetching link preview for: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'max-age=0',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Referer': urlObj.origin + '/'
+        },
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false
+        }),
+        timeout: 10000,
+        maxRedirects: 10,
+        validateStatus: (status) => status < 500
+      });
+
+      const contentType = response.headers['content-type'] || '';
+      
+      if (response.status === 403 || response.status === 404 || !contentType.includes('text/html')) {
+        return res.json({
+          title: response.status === 404 ? "Portal Not Found" : "Portal Access Restricted",
+          description: !contentType.includes('text/html') && response.status === 200 
+            ? "This link leads to a document or secure portal. Click below to view it directly."
+            : "This portal requires a direct visit for security verification. Please use the link below to access the official website.",
+          siteName: urlObj.hostname,
+          url: url,
+          isRestricted: true
+        });
+      }
+
+      const html = typeof response.data === 'string' ? response.data : '';
+      
+      // Basic meta tag extraction via regex (simple and effective for most OG sites)
+      const getMeta = (property: string) => {
+        const regex = new RegExp(`<meta [^>]*property=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
+        const match = html.match(regex);
+        if (match) return match[1];
+        
+        // Try fallback for name attribute
+        const regexName = new RegExp(`<meta [^>]*name=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
+        const matchName = html.match(regexName);
+        return matchName ? matchName[1] : null;
+      };
+
+      const title = getMeta('og:title') || getMeta('title') || html.match(/<title>([^<]*)<\/title>/i)?.[1];
+      const description = getMeta('og:description') || getMeta('description');
+      const image = getMeta('og:image') || getMeta('twitter:image');
+      const siteName = getMeta('og:site_name');
+
+      res.json({
+        title: title?.trim(),
+        description: description?.trim(),
+        image: image,
+        siteName: siteName,
+        url: url
+      });
+
+    } catch (error: any) {
+      const statusCode = error.response?.status;
+      const statusText = error.response?.statusText || error.message;
+      
+      // Silence logs for expected restricted states
+      if (statusCode !== 403 && statusCode !== 404) {
+        console.error(`Link Preview Error [${statusCode || 'NETWORK'}]:`, statusText);
+      }
+      
+      // Secondary fallback in case validateStatus was bypassed or something else threw
+      if (statusCode === 403 || statusCode === 404) {
+        return res.json({
+          title: statusCode === 404 ? "Portal Not Found" : "Portal Access Restricted",
+          description: "This portal requires a direct visit to view its content. Click the link below to access the official website.",
+          siteName: urlObj.hostname,
+          url: url,
+          isRestricted: true
+        });
+      }
+      
+      res.status(500).json({ error: "Failed to fetch link preview" });
     }
   });
 

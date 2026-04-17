@@ -1,12 +1,150 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock } from 'lucide-react';
+
+interface LinkMetadata {
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  url: string;
+  isRestricted?: boolean;
+}
+
+function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
+  const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMetadata = async () => {
+      try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (!data.error) setMetadata(data);
+      } catch (err) {
+        console.error("Link preview error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMetadata();
+  }, [url]);
+
+  if (loading) return (
+    <div className="animate-pulse bg-white/5 h-24 rounded-2xl border border-white/10 p-4 flex gap-4 items-center">
+      <div className="w-16 h-16 bg-white/10 rounded-xl"></div>
+      <div className="flex-1 space-y-2">
+        <div className="h-3 bg-white/10 rounded w-1/2"></div>
+        <div className="h-2 bg-white/10 rounded w-3/4"></div>
+      </div>
+    </div>
+  );
+
+  if (!metadata) return (
+    <motion.a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      whileHover={{ y: -2 }}
+      className="flex items-center justify-between w-full bg-white/5 hover:bg-white/10 p-5 rounded-2xl border border-white/10 transition-colors"
+    >
+      <div className="flex items-center gap-3">
+        <Globe className="w-5 h-5 text-blue-400" />
+        <span className="text-xs font-black uppercase tracking-widest">{lang === 'bn' ? 'অফিসিয়াল পোর্টাল' : 'Official Portal'}</span>
+      </div>
+      <ExternalLink className="w-4 h-4 text-blue-400" />
+    </motion.a>
+  );
+
+  if (metadata.isRestricted) {
+    return (
+      <motion.a 
+        href={url} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.08)' }}
+        className="block group/link bg-orange-500/5 rounded-[2rem] overflow-hidden border border-orange-500/20 transition-all shadow-2xl p-6"
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 bg-orange-500/20 rounded-lg">
+            <UserCheck className="w-4 h-4 text-orange-400" />
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">{metadata.siteName || 'Official Website'}</span>
+        </div>
+        <h5 className="font-black text-white text-sm leading-snug group-hover/link:text-orange-400 transition-colors line-clamp-2 mb-2">{metadata.title}</h5>
+        <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 font-medium mb-3">{metadata.description}</p>
+        <div className="flex items-center justify-between">
+           <span className="text-[9px] font-bold text-orange-500/80 uppercase tracking-widest">{lang === 'bn' ? 'পোর্টাল দেখুন' : 'VIEW PORTAL'}</span>
+           <ExternalLink className="w-3 h-3 text-orange-400" />
+        </div>
+      </motion.a>
+    );
+  }
+
+  return (
+    <motion.a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.08)' }}
+      className="block group/link bg-white/10 rounded-[2rem] overflow-hidden border border-white/20 transition-all shadow-2xl"
+    >
+      {metadata.image && (
+        <div className="relative aspect-video overflow-hidden">
+          <img 
+            src={metadata.image} 
+            alt={metadata.title} 
+            className="w-full h-full object-cover transition-transform group-hover/link:scale-110"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+          <div className="absolute bottom-4 left-4 right-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 truncate">{metadata.siteName || 'Official Website'}</p>
+          </div>
+        </div>
+      )}
+      <div className="p-6 space-y-2">
+        <h5 className="font-black text-white text-sm leading-snug group-hover/link:text-blue-400 transition-colors line-clamp-2">{metadata.title}</h5>
+        {metadata.description && (
+          <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 font-medium">{metadata.description}</p>
+        )}
+        <div className="pt-2 flex items-center justify-between">
+           <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'দেখুন' : 'VISIT PORTAL'}</span>
+           <ExternalLink className="w-3 h-3 text-blue-400" />
+        </div>
+      </div>
+    </motion.a>
+  );
+}
 import { translations, Language } from '../utils/translations';
-import { govSchemesDB, GovScheme } from '../data/govSchemesDB';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from './AuthProvider';
+import { syncCuratedSchemes } from '../services/ai';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
 
 interface Props {
   lang: Language;
   globalLocation: { latitude: number; longitude: number } | null;
+}
+
+export interface GovScheme {
+  id: string;
+  title: { en: string; bn: string; };
+  description: { en: string; bn: string; };
+  eligibility: { en: string; bn: string; };
+  howToApply: { en: string; bn: string; };
+  benefits?: { en: string; bn: string; };
+  deadline?: { en: string; bn: string; };
+  contactInfo?: { en: string; bn: string; };
+  tags?: string[];
+  crops: string[];
+  districts: string[];
+  sourceLinks: string[];
+  provider?: string;
+  status?: string;
+  lastUpdated: string;
 }
 
 const DISTRICTS = [
@@ -14,175 +152,304 @@ const DISTRICTS = [
 ];
 
 export default function GovSchemes({ lang, globalLocation }: Props) {
-  const [crop, setCrop] = useState('paddy');
-  const [district, setDistrict] = useState('all');
-  const [isLoading, setIsLoading] = useState(false);
-  const [filteredSchemes, setFilteredSchemes] = useState<GovScheme[] | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [allSchemes, setAllSchemes] = useState<GovScheme[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string>('All');
+  const { userProfile } = useAuth();
   const t = translations[lang];
 
-  const CROPS = ['all', 'tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
+  // Derive unique tags
+  const rawSchemes = allSchemes.length > 0 ? allSchemes : (CURRENT_PDF_SCHEMES as GovScheme[]);
+  const uniqueTags = ['All', ...Array.from(new Set(rawSchemes.flatMap(s => s.tags || [])))];
 
-  const handleSearch = () => {
-    setIsLoading(true);
-    
-    // Simulate a slight network delay for UX
-    setTimeout(() => {
-      const results = govSchemesDB.filter(scheme => {
-        const cropMatch = scheme.crops.includes('all') || scheme.crops.includes(crop) || crop === 'all';
-        const districtMatch = scheme.districts.includes('all') || scheme.districts.includes(district) || district === 'all';
-        return cropMatch && districtMatch;
+  const filteredSchemes = selectedTag === 'All' 
+    ? rawSchemes 
+    : rawSchemes.filter(s => s.tags?.includes(selectedTag));
+
+  // Real-time listener for schemes
+  useEffect(() => {
+    const q = query(collection(db, 'gov_schemes'), orderBy('lastUpdated', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const schemes: GovScheme[] = [];
+      snapshot.forEach((doc) => {
+        schemes.push({ id: doc.id, ...doc.data() } as GovScheme);
       });
-      
-      setFilteredSchemes(results);
-      setIsLoading(false);
-    }, 600);
+      setAllSchemes(schemes);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'gov_schemes');
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleSync = async () => {
+    if (!window.confirm(lang === 'bn' ? "গুগল সার্চের মাধ্যমে প্রকল্পগুলো আপডেট করবেন? এটি এআই ব্যবহার করে এবং কিছুটা সময় নিতে পারে।" : "Sync curated schemes with Google Search? This uses AI and takes a few moments.")) return;
+    setIsSyncing(true);
+    try {
+      const count = await syncCuratedSchemes();
+      alert(lang === 'bn' ? `সফলভাবে ${count}টি প্রকল্প আপডেট করা হয়েছে!` : `Successfully synced ${count} schemes from the latest search!`);
+    } catch (error) {
+      console.error("Sync failed:", error);
+      alert(lang === 'bn' ? "আপডেট করতে ব্যর্থ হয়েছে। কনসোল দেখুন।" : "Failed to sync schemes. check console.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  // Auto-search on initial load
-  useEffect(() => {
-    handleSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleReset = async () => {
+    if (!window.confirm(lang === 'bn' ? "আপনি কি নিশ্চিত যে আপনি প্রকল্পসমূহ পুনরায় সেট করতে চান? এটি বর্তমান তালিকা মুছে দেবে এবং পিডিএফ থেকে সংগৃহীত মূল ডেটা পুনরুদ্ধার করবে।" : "Are you sure you want to reset the schemes? This will restore the original curated list from our official catalog.")) return;
+    setIsSyncing(true);
+    try {
+      await seedGovSchemes();
+      alert(lang === 'bn' ? "সফলভাবে মূল ক্যাটালগ পুনরুদ্ধার করা হয়েছে!" : "Original curated catalog successfully restored!");
+    } catch (error) {
+      console.error("Reset failed:", error);
+      alert(lang === 'bn' ? "পুনরায় সেট করতে ব্যর্থ হয়েছে।" : "Failed to reset schemes.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8 max-w-5xl mx-auto"
+      className="space-y-12 max-w-6xl mx-auto px-4"
     >
-      <div className="text-center mb-12">
+      <div className="text-center mb-16 relative">
+        <div className="absolute inset-0 -top-20 -z-10 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05)_0%,transparent_70%)] blur-3xl"></div>
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-6 shadow-lg shadow-blue-200"
+          className="inline-flex items-center justify-center p-5 bg-white border border-blue-100 rounded-[2rem] mb-6 shadow-2xl shadow-blue-500/10"
         >
-          <Landmark className="w-10 h-10 text-white" />
+          <Landmark className="w-12 h-12 text-blue-600" />
         </motion.div>
-        <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">{t.govSchemes}</h2>
-        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto">{t.govSchemesDesc}</p>
+        <h2 className="text-5xl font-black text-gray-900 mb-4 tracking-tighter uppercase italic drop-shadow-sm font-display">{t.govSchemes}</h2>
+        <p className="text-gray-400 text-xl font-medium max-w-2xl mx-auto tracking-tight">{t.govSchemesDesc}</p>
       </div>
 
-      <div className="bg-white p-8 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="space-y-2">
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
-            <select 
-              value={crop} 
-              onChange={(e) => setCrop(e.target.value)}
-              className="w-full rounded-2xl border-blue-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
-            >
-              {CROPS.map(c => (
-                <option key={c} value={c}>
-                  {c === 'all' ? (lang === 'bn' ? 'সব ফসল' : 'All Crops') : t.crops[c as keyof typeof t.crops]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.location}</label>
-            <select 
-              value={district} 
-              onChange={(e) => setDistrict(e.target.value)}
-              className="w-full rounded-2xl border-blue-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50/30 p-4 border text-base font-bold text-gray-900 transition-all capitalize"
-            >
-              {DISTRICTS.map(d => (
-                <option key={d} value={d}>
-                  {d === 'all' ? (lang === 'bn' ? 'সারা বাংলাদেশ' : 'All Bangladesh') : d}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleSearch}
-          disabled={isLoading}
-          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-50 flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-7 h-7 animate-spin" />
-              <span>{lang === 'bn' ? 'খোঁজা হচ্ছে...' : 'Searching...'}</span>
-            </>
-          ) : (
-            <>
-              <Search className="w-7 h-7" />
-              <span>{lang === 'bn' ? 'সুবিধা খুঁজুন' : 'Find Schemes'}</span>
-            </>
-          )}
-        </motion.button>
-      </div>
-
-      {filteredSchemes && filteredSchemes.length === 0 && !isLoading && (
-        <div className="text-center py-12 bg-white rounded-3xl border border-gray-100 shadow-sm">
-          <Landmark className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">{lang === 'bn' ? 'কোনো প্রকল্প পাওয়া যায়নি' : 'No Schemes Found'}</h3>
-          <p className="text-gray-500">{lang === 'bn' ? 'আপনার নির্বাচিত ফসল বা এলাকার জন্য বর্তমানে কোনো প্রকল্প নেই।' : 'There are currently no schemes for your selected crop or district.'}</p>
-        </div>
-      )}
-
-      {filteredSchemes && filteredSchemes.length > 0 && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between mb-2 px-2">
-            <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm">
-              {lang === 'bn' ? 'উপলব্ধ প্রকল্পসমূহ' : 'Available Schemes'}
-            </h3>
-            <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">
-              {filteredSchemes.length} {lang === 'bn' ? 'টি পাওয়া গেছে' : 'Found'}
-            </span>
-          </div>
-          
-          {filteredSchemes.map((scheme, idx) => (
-            <motion.div 
-              key={scheme.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm hover:shadow-md transition-all"
-            >
-              <h3 className="text-2xl font-black text-gray-900 mb-4 text-blue-900 break-words">{scheme.title[lang]}</h3>
-              <p className="text-gray-600 mb-6 leading-relaxed break-words">{scheme.description[lang]}</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-50/50 rounded-2xl p-5 border border-blue-100/50">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-black text-blue-900 uppercase tracking-widest text-xs">{lang === 'bn' ? 'যোগ্যতা' : 'Eligibility'}</h4>
+      <div className="flex flex-col space-y-6">
+        {userProfile?.role === 'admin' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900 rounded-[2.5rem] p-8 border border-white/10 shadow-3xl overflow-hidden relative"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-xl">
+                    <ShieldCheck className="w-5 h-5 text-blue-400" />
                   </div>
-                  <p className="text-sm text-gray-700 font-medium break-words">{scheme.eligibility[lang]}</p>
+                  <h2 className="text-xl font-black text-white uppercase tracking-tighter">Admin Control Center</h2>
                 </div>
-                
-                <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100/50">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <ExternalLink className="w-5 h-5 text-indigo-600" />
-                    <h4 className="font-black text-indigo-900 uppercase tracking-widest text-xs">{lang === 'bn' ? 'কিভাবে আবেদন করবেন' : 'How to Apply'}</h4>
-                  </div>
-                  <p className="text-sm text-gray-700 font-medium break-words">{scheme.howToApply[lang]}</p>
-                </div>
+                <p className="text-gray-400 text-xs font-medium tracking-wide uppercase">Managing {allSchemes.length} Curated Government Portals</p>
               </div>
 
-              {scheme.sourceLinks && scheme.sourceLinks.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-50 flex flex-wrap gap-2">
-                  {scheme.sourceLinks.map((link, linkIdx) => (
-                    <a 
-                      key={linkIdx} 
-                      href={link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors flex items-center"
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      {lang === 'bn' ? 'অফিসিয়াল ওয়েবসাইট' : 'Official Website'}
-                    </a>
-                  ))}
+              <div className="flex flex-wrap items-center gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="flex items-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em] bg-blue-500/10 text-blue-400 px-8 py-5 rounded-2xl border border-blue-500/20 transition-all disabled:opacity-50"
+                >
+                  {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+                  <span>{isSyncing ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'AI SYNCING...') : (lang === 'bn' ? 'এআই দিয়ে সিঙ্ক করুন' : 'AI SMART SYNC')}</span>
+                </motion.button>
+                
+                <motion.button
+                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleReset}
+                  disabled={isSyncing}
+                  className="flex items-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em] bg-red-500/5 text-red-400 px-8 py-5 rounded-2xl border border-red-500/10 transition-all disabled:opacity-50"
+                >
+                  <Database className="w-4 h-4" />
+                  <span>{lang === 'bn' ? 'মূল ক্যাটালগে ফিরে যান' : 'RESTORE CURATED'}</span>
+                </motion.button>
+              </div>
+            </div>
+            
+            <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-white/5 pt-8">
+              {[
+                { label: 'Total Portals', value: allSchemes.length, icon: Globe },
+                { label: 'Sync Status', value: 'Active', icon: Search },
+                { label: 'Admin Access', value: 'Verified', icon: UserCheck },
+                { label: 'Last Sync', value: 'Today', icon: Clock }
+              ].map((stat, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <stat.icon className="w-4 h-4 text-gray-500" />
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</p>
+                    <p className="text-sm font-black text-white">{stat.value}</p>
+                  </div>
                 </div>
-              )}
-            </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-gray-100 gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="bg-blue-600 text-white font-black px-5 py-2 rounded-2xl text-lg shadow-lg shadow-blue-500/20">
+              {filteredSchemes.length}
+            </div>
+            <div>
+              <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm">
+                {lang === 'bn' ? 'উপলব্ধ প্রকল্পসমূহ' : 'Available Schemes'}
+              </h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                {selectedTag === 'All' ? (lang === 'bn' ? 'সব বিভাগ' : 'ALL CATEGORIES') : selectedTag.toUpperCase()}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tag Filter */}
+        <div className="flex flex-wrap items-center gap-3 px-2">
+          {uniqueTags.map((tag) => (
+            <motion.button
+              key={tag}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setSelectedTag(tag)}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                selectedTag === tag 
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30' 
+                  : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
+              }`}
+            >
+              {tag}
+            </motion.button>
           ))}
         </div>
-      )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-12">
+        {filteredSchemes.map((scheme, idx) => (
+          <motion.div 
+            key={scheme.id}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            className="group relative"
+          >
+            {/* Background decorative element */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity -z-10"></div>
+            
+            <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-gray-100 shadow-xl shadow-gray-200/20 hover:shadow-blue-500/10 transition-all flex flex-col lg:flex-row gap-12">
+              <div className="flex-1 space-y-8">
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {scheme.tags?.map((tag, tagIdx) => (
+                      <span key={tagIdx} className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+                        {tag}
+                      </span>
+                    )) || (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                        {lang === 'bn' ? 'কৃষি সেবা' : 'Agri Service'}
+                      </span>
+                    )}
+                    {allSchemes.length === 0 && (
+                      <span className="text-[9px] font-black uppercase tracking-widest text-orange-500 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                        {lang === 'bn' ? 'ডিফল্ট ক্যাটালগ' : 'Default Catalog'}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <h3 className="text-4xl font-black text-gray-900 mb-6 tracking-tighter leading-none group-hover:text-blue-600 transition-colors uppercase italic font-display">{scheme.title[lang]}</h3>
+                  <p className="text-gray-400 text-lg font-medium leading-relaxed max-w-2xl">{scheme.description[lang]}</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <motion.div 
+                    whileHover={{ scale: 1.01 }}
+                    className="p-8 bg-blue-50/50 rounded-[2.5rem] border border-blue-100/50 relative group/info"
+                  >
+                    <div className="absolute top-6 right-8 opacity-20 group-hover/info:opacity-40 transition-opacity">
+                       <UserCheck className="w-12 h-12 text-blue-600" />
+                    </div>
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                       <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                       {lang === 'bn' ? 'আপনি আবেদন করতে পারবেন কি?' : 'Can You Apply?'}
+                    </h4>
+                    <p className="text-lg text-gray-900 font-black leading-tight tracking-tight">{scheme.eligibility[lang]}</p>
+                  </motion.div>
+
+                  <motion.div 
+                    whileHover={{ scale: 1.01 }}
+                    className="p-8 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100/50 relative group/info"
+                  >
+                    <div className="absolute top-6 right-8 opacity-20 group-hover/info:opacity-40 transition-opacity">
+                       <HelpCircle className="w-12 h-12 text-indigo-600" />
+                    </div>
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                       <span className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span>
+                       {lang === 'bn' ? 'কিভাবে শুরু করবেন?' : 'How to Start?'}
+                    </h4>
+                    <p className="text-lg text-gray-900 font-black leading-tight tracking-tight">{scheme.howToApply[lang]}</p>
+                  </motion.div>
+                </div>
+
+                {scheme.benefits && (
+                  <div className="p-8 bg-blue-600 text-white rounded-[2.5rem] shadow-xl shadow-blue-500/20 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-70">{lang === 'bn' ? 'মূল সুবিধাগুলো' : 'Key Benefits'}</h4>
+                    <p className="text-xl font-black italic tracking-tight">{scheme.benefits[lang]}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full lg:w-80 flex flex-col gap-6">
+                <div className="bg-gray-900 text-white p-8 rounded-[2.5rem] flex-1 flex flex-col justify-between shadow-2xl">
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-6">{lang === 'bn' ? 'অফিসিয়াল তথ্য' : 'Official Info'}</h4>
+                    
+                    <div className="space-y-6">
+                      {scheme.provider && (
+                        <div>
+                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'প্রদানকারী' : 'Provider'}</p>
+                          <p className="text-sm font-black text-white">{scheme.provider}</p>
+                        </div>
+                      )}
+                      
+                      {scheme.deadline && (
+                        <div>
+                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'সময়সীমা' : 'Deadline'}</p>
+                          <p className="text-sm font-black text-orange-400">{scheme.deadline[lang]}</p>
+                        </div>
+                      )}
+
+                      {scheme.contactInfo && (
+                        <div>
+                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'যোগাযোগ' : 'Contact'}</p>
+                          <p className="text-sm font-bold text-gray-300">{scheme.contactInfo[lang]}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-8 space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 px-2">{lang === 'bn' ? 'সরাসরি লিঙ্ক ও প্রিভিউ' : 'Direct Link & Preview'}</h4>
+                    {scheme.sourceLinks?.map((link, linkIdx) => (
+                      <LinkPreviewCard key={linkIdx} url={link} lang={lang} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center p-4">
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                    {scheme.lastUpdated ? (lang === 'bn' ? `যাচাইকৃত: ${new Date(scheme.lastUpdated).toLocaleDateString()}` : `Verified: ${new Date(scheme.lastUpdated).toLocaleDateString()}`) : 'TRUSTED'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
     </motion.div>
   );
 }

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { User, History, FileText, Award, Calendar, ChevronRight, UserCircle, TrendingUp } from 'lucide-react';
+import { User, History, FileText, Award, Calendar, ChevronRight, UserCircle, TrendingUp, Database, Loader2 } from 'lucide-react';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { translations, Language } from '../utils/translations';
 import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { seedGovSchemes } from '../data/seedSchemes';
 
 interface Props {
   lang: Language;
@@ -40,7 +41,23 @@ export default function Profile({ lang }: Props) {
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
   const [marketQueries, setMarketQueries] = useState<MarketQueryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const t = translations[lang];
+
+  const handleSeed = async () => {
+    if (!window.confirm("Seed the curated government schemes database with initial PDF data?")) return;
+    setSeeding(true);
+    try {
+      await seedGovSchemes();
+      alert("Database seeded successfully!");
+    } catch (error: any) {
+      console.error("Seeding failed detailed error:", error);
+      const errorMessage = error.message || String(error);
+      alert(`Failed to seed database: ${errorMessage}`);
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -164,6 +181,22 @@ export default function Profile({ lang }: Props) {
                   {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
+
+              {(userProfile?.role === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
+                <div className="pt-6 border-t border-indigo-50">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Admin Controls</p>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSeed}
+                    disabled={seeding}
+                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-colors disabled:opacity-50 text-xs uppercase tracking-widest"
+                  >
+                    {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                    <span>Seed Schemes DB</span>
+                  </motion.button>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
