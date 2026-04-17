@@ -260,75 +260,98 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full mt-6 mb-4">
       {!isConnected && !isCalling ? (
-        <button
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={startCall}
-          className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:shadow-lg hover:shadow-green-200 transition-all active:scale-95"
+          className="w-full flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-600 to-emerald-800 text-white p-6 rounded-3xl shadow-xl shadow-green-900/20 border border-green-500/30 transition-all cursor-pointer relative overflow-hidden group"
         >
-          <Phone className="w-4 h-4" />
-          <span>{lang === 'bn' ? 'ভয়েস কল করুন' : 'Call Expert'}</span>
-        </button>
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner">
+            <Phone className="w-8 h-8 text-white" />
+          </div>
+          <span className="font-black uppercase tracking-widest text-lg lg:text-xl drop-shadow-sm">
+            {lang === 'bn' ? 'ভয়েস কল শুরু করুন' : 'Start Voice Chat'}
+          </span>
+          <span className="text-green-100 text-xs font-medium">
+            {lang === 'bn' ? 'এগিয়ে যান এবং এআই বিশেষজ্ঞের সাথে কথা বলুন' : 'Tap to speak with your AI Agronomist'}
+          </span>
+        </motion.button>
       ) : (
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-gray-900 rounded-2xl p-6 w-full shadow-2xl border border-gray-800 relative overflow-hidden"
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="bg-gray-900 rounded-[32px] p-8 w-full shadow-2xl border border-gray-800 relative overflow-hidden"
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-green-900/30 to-transparent pointer-events-none"></div>
           
-          <div className="flex flex-col items-center space-y-6 relative z-10">
+          <div className="flex flex-col items-center space-y-8 relative z-10">
             <div className="text-center">
-              <h4 className="text-white font-black text-lg tracking-tight">
+              <h4 className="text-white font-black text-2xl tracking-tight mb-2">
                 {lang === 'bn' ? 'কৃষি বিশেষজ্ঞ' : 'Agri Expert'}
               </h4>
-              <p className="text-green-400 text-[10px] uppercase tracking-widest font-bold mt-1">
-                {isCalling ? (lang === 'bn' ? 'সংযুক্ত হচ্ছে...' : 'Connecting...') : (lang === 'bn' ? 'সংযুক্ত' : 'Connected')}
-              </p>
+              <div className="flex items-center justify-center space-x-2">
+                {isCalling && <Loader2 className="w-4 h-4 text-green-400 animate-spin" />}
+                <p className={`text-xs uppercase tracking-widest font-black ${isCalling ? 'text-green-400 animate-pulse' : 'text-green-500'}`}>
+                  {isCalling ? (lang === 'bn' ? 'সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...' : 'Establishing Connection, Please Wait...') : (lang === 'bn' ? 'সংযুক্ত - কথা বলুন' : 'Connected - Speak Now')}
+                </p>
+              </div>
             </div>
 
-            <div className="relative flex items-center justify-center w-full h-24">
-              <div className="absolute inset-0 flex items-center justify-center gap-1">
+            <div className="relative flex items-center justify-center w-full h-32">
+              <div className="absolute inset-0 flex items-center justify-center gap-1.5">
                 {audioLevel.map((level, i) => (
                   <motion.div
                     key={i}
                     animate={{ 
-                      height: isSpeaking ? Math.max(4, level * 60) : 4,
-                      opacity: isSpeaking ? 0.8 : 0.2
+                      height: isSpeaking ? Math.max(4, level * 80) : 4,
+                      opacity: isSpeaking ? 1 : 0.3
                     }}
-                    className="w-1.5 bg-green-500 rounded-full"
+                    className="w-2 bg-gradient-to-t from-green-600 to-green-400 rounded-full"
                   />
                 ))}
               </div>
               
-              <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center border-2 border-gray-700 z-10 shadow-inner">
+              <div className={`w-28 h-28 rounded-full flex items-center justify-center z-10 shadow-inner transition-all duration-500 ${isCalling ? 'bg-gray-800 border-2 border-gray-700' : 'bg-green-900/40 border-2 border-green-500/50 shadow-[0_0_30px_rgba(34,197,94,0.3)]'}`}>
                 {isCalling ? (
-                  <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+                  <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
                 ) : (
-                  <Volume2 className={`w-8 h-8 transition-colors duration-300 ${isSpeaking ? 'text-green-400' : 'text-gray-500'}`} />
+                  <Volume2 className={`w-12 h-12 transition-colors duration-300 ${isSpeaking ? 'text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'text-green-700'}`} />
                 )}
               </div>
             </div>
 
-            <div className="flex items-center space-x-6">
-              <button
-                onClick={toggleMute}
-                disabled={isCalling}
-                className={`p-4 rounded-full transition-all ${
-                  isMuted 
-                    ? 'bg-gray-800 text-red-400 hover:bg-gray-700' 
-                    : 'bg-gray-800 text-white hover:bg-gray-700'
-                } disabled:opacity-50`}
-              >
-                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-              </button>
+            <div className="flex items-center justify-center space-x-8 w-full pt-4">
+              <div className="flex flex-col items-center space-y-2">
+                <button
+                  onClick={toggleMute}
+                  disabled={isCalling}
+                  className={`p-6 rounded-full transition-all ${
+                    isMuted 
+                      ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50' 
+                      : 'bg-gray-800 text-white hover:bg-gray-700 border border-gray-700'
+                  } disabled:opacity-50`}
+                >
+                  {isMuted ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+                </button>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+                  {isMuted ? (lang === 'bn' ? 'আনমিউট' : 'Unmute') : (lang === 'bn' ? 'মিউট' : 'Mute')}
+                </span>
+              </div>
               
-              <button
-                onClick={endCall}
-                className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all shadow-lg shadow-red-500/30"
-              >
-                <PhoneOff className="w-6 h-6" />
-              </button>
+              <div className="flex flex-col items-center space-y-2">
+                <button
+                  onClick={endCall}
+                  className="p-6 rounded-full bg-red-600 text-white hover:bg-red-500 transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:shadow-[0_0_30px_rgba(239,68,68,0.6)]"
+                >
+                  <PhoneOff className="w-8 h-8" />
+                </button>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+                  {lang === 'bn' ? 'কল কাটুন' : 'End Call'}
+                </span>
+              </div>
             </div>
           </div>
         </motion.div>

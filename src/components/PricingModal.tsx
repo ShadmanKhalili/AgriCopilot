@@ -148,7 +148,7 @@ export default function PricingModal({ isOpen, onClose, lang }: Props) {
                   whileHover={{ y: -5 }}
                   className="bg-gray-900 rounded-[32px] p-8 border border-gray-800 shadow-xl shadow-black/20 flex flex-col relative overflow-hidden group"
                 >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 opacity-20"></div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-full -translate-y-1/2 translate-x-1/3"></div>
 
                   <div className="mb-8 relative z-10">
                     <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest mb-2">Pro & Enterprise</h3>

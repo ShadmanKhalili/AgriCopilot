@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
@@ -22,9 +22,14 @@ type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'market-connect' 
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['agri-copilot']));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [lang, setLang] = useState<Language>('bn');
+
+  useEffect(() => {
+    setVisitedTabs(prev => new Set(prev).add(activeTab));
+  }, [activeTab]);
 
   // AgriCopilot State Persistence
   const [agriImages, setAgriImages] = useState<{ base64: string; mimeType: string }[]>([]);
@@ -70,9 +75,9 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
+    <div className="h-[100dvh] w-full bg-gray-50 flex flex-col md:flex-row font-sans overflow-hidden">
       {/* Mobile Header */}
-      <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-30 sticky top-0">
+      <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-30 shrink-0">
         <div className="flex items-center space-x-2">
           <Leaf className="w-6 h-6 text-green-300" />
           <span className="font-bold text-lg tracking-tight">{t.agriCopilot}</span>
@@ -101,6 +106,7 @@ export default function Layout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
           />
@@ -109,8 +115,8 @@ export default function Layout() {
 
       <div className={`
         fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:sticky md:top-0 md:translate-x-0 transition-transform duration-500 ease-in-out
-        w-80 bg-gradient-to-b from-green-900 via-green-800 to-emerald-900 text-white flex flex-col shadow-2xl z-50 h-[100dvh]
+        md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
+        w-80 bg-gradient-to-b from-green-900 via-green-800 to-emerald-900 text-white flex flex-col shadow-2xl z-50 h-full shrink-0
       `}>
         <div className="p-8 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center space-x-4">
@@ -152,7 +158,7 @@ export default function Layout() {
                   setActiveTab(tab.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center space-x-4 px-5 py-4 rounded-[24px] transition-all duration-300 text-left relative overflow-hidden group ${
+                className={`w-full flex items-center space-x-4 px-5 py-3.5 mt-1 rounded-[24px] transition-all duration-200 text-left relative overflow-hidden group ${
                   isActive 
                     ? 'bg-white text-green-900 shadow-xl shadow-green-950/20' 
                     : 'text-green-100 hover:bg-white/10'
@@ -162,7 +168,7 @@ export default function Layout() {
                   <motion.div 
                     layoutId="activeTabBg"
                     className="absolute inset-0 bg-white"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    transition={{ type: "spring", bounce: 0, duration: 0.2 }}
                   />
                 )}
                 <div className="relative z-10 flex items-center space-x-4">
@@ -224,84 +230,94 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full max-w-7xl mx-auto relative">
+      <main className="flex-1 p-4 md:p-10 overflow-y-auto custom-scrollbar w-full max-w-7xl mx-auto relative">
         {/* Background Decorative Elements */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-          <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-green-100/50 rounded-full blur-[120px]"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-100/50 rounded-full blur-[120px]"></div>
+          <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-gradient-to-br from-green-100/50 to-transparent rounded-full blur-3xl"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-gradient-to-tr from-emerald-100/50 to-transparent rounded-full blur-3xl"></div>
         </div>
 
         <div className="relative z-10 min-h-full flex flex-col">
           <div className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
-            <AgriCopilot 
-              lang={lang} 
-              globalLocation={globalLocation}
-              setGlobalLocation={setGlobalLocation}
-              persistedImages={agriImages}
-              setPersistedImages={setAgriImages}
-              persistedDiagnosis={agriDiagnosis}
-              setPersistedDiagnosis={setAgriDiagnosis}
-              persistedChatMessages={agriChatMessages}
-              setPersistedChatMessages={setAgriChatMessages}
-              persistedChatSession={agriChatSession}
-              setPersistedChatSession={setAgriChatSession}
-              persistedAudioUrl={agriAudioUrl}
-              setPersistedAudioUrl={setAgriAudioUrl}
-              persistedCropStage={agriCropStage}
-              setPersistedCropStage={setAgriCropStage}
-              persistedCrop={agriCrop}
-              setPersistedCrop={setAgriCrop}
-              persistedAnalysisType={agriAnalysisType}
-              setPersistedAnalysisType={setAgriAnalysisType}
-            />
+            {visitedTabs.has('agri-copilot') && (
+              <AgriCopilot 
+                lang={lang} 
+                globalLocation={globalLocation}
+                setGlobalLocation={setGlobalLocation}
+                persistedImages={agriImages}
+                setPersistedImages={setAgriImages}
+                persistedDiagnosis={agriDiagnosis}
+                setPersistedDiagnosis={setAgriDiagnosis}
+                persistedChatMessages={agriChatMessages}
+                setPersistedChatMessages={setAgriChatMessages}
+                persistedChatSession={agriChatSession}
+                setPersistedChatSession={setAgriChatSession}
+                persistedAudioUrl={agriAudioUrl}
+                setPersistedAudioUrl={setAgriAudioUrl}
+                persistedCropStage={agriCropStage}
+                setPersistedCropStage={setAgriCropStage}
+                persistedCrop={agriCrop}
+                setPersistedCrop={setAgriCrop}
+                persistedAnalysisType={agriAnalysisType}
+                setPersistedAnalysisType={setAgriAnalysisType}
+              />
+            )}
           </div>
           <div className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
-            <WeatherAdvisory 
-              lang={lang} 
-              globalLocation={globalLocation}
-              setGlobalLocation={setGlobalLocation}
-            />
+            {visitedTabs.has('weather-advisory') && (
+              <WeatherAdvisory 
+                lang={lang} 
+                globalLocation={globalLocation}
+                setGlobalLocation={setGlobalLocation}
+              />
+            )}
           </div>
           <div className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
-            <SatelliteHealth 
-              lang={lang} 
-              globalLocation={globalLocation}
-              setGlobalLocation={setGlobalLocation}
-            />
+            {visitedTabs.has('crop-health') && (
+              <SatelliteHealth 
+                lang={lang} 
+                globalLocation={globalLocation}
+                setGlobalLocation={setGlobalLocation}
+              />
+            )}
           </div>
           <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
-            <SmartGrade lang={lang} />
+            {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
           </div>
           <div className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
-            <SmartPlanting 
-              lang={lang} 
-              globalLocation={globalLocation}
-              setGlobalLocation={setGlobalLocation}
-            />
+            {visitedTabs.has('smart-planting') && (
+              <SmartPlanting 
+                lang={lang} 
+                globalLocation={globalLocation}
+                setGlobalLocation={setGlobalLocation}
+              />
+            )}
           </div>
           <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
-            <MarketConnect 
-              lang={lang} 
-              persistedInsights={marketInsights}
-              setPersistedInsights={setMarketInsights}
-              persistedProduce={marketProduce}
-              setPersistedProduce={setMarketProduce}
-            />
+            {visitedTabs.has('market-connect') && (
+              <MarketConnect 
+                lang={lang} 
+                persistedInsights={marketInsights}
+                setPersistedInsights={setMarketInsights}
+                persistedProduce={marketProduce}
+                setPersistedProduce={setMarketProduce}
+              />
+            )}
           </div>
           <div className={activeTab === 'macro-trends' ? 'block flex-1' : 'hidden'}>
-            <MacroTrends lang={lang} />
+             {visitedTabs.has('macro-trends') && <MacroTrends lang={lang} />}
           </div>
           <div className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
-            <CommunityRadar lang={lang} />
+             {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
           </div>
           <div className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
-            <GovSchemes lang={lang} globalLocation={globalLocation} />
+             {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
           </div>
           <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
-            <UserGuide lang={lang} />
+             {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
           </div>
           <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
-            <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />
+             {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
           </div>
 
           <GoogleAd lang={lang} className="mt-12 mb-4" />

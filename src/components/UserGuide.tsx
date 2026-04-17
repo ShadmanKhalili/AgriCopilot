@@ -196,8 +196,8 @@ export default function UserGuide({ lang }: Props) {
 
         {/* Pricing & Usage Guide */}
       <motion.div variants={itemVariants} className="mt-16 bg-white p-10 md:p-12 rounded-[48px] border border-gray-100 shadow-2xl shadow-gray-200/50 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-green-50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-50 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3 opacity-50 pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-green-50/80 to-transparent rounded-full -translate-y-1/2 translate-x-1/3 opacity-80 pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-50/80 to-transparent rounded-full translate-y-1/2 -translate-x-1/3 opacity-80 pointer-events-none"></div>
         
         <div className="flex items-center space-x-6 mb-8 relative z-10">
           <div className="bg-gray-100 p-4 rounded-3xl text-gray-700 shadow-inner">

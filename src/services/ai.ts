@@ -13,9 +13,9 @@ export const getAi = () => {
 };
 
 const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
-const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
-const SEARCH_MODEL = 'gemini-3-flash-preview';
-const SEARCH_BACKUP_MODEL = 'gemini-2.5-flash-preview';
+const BACKUP_MODEL = 'gemini-3.1-pro-preview';
+const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
+const SEARCH_BACKUP_MODEL = 'gemini-3.1-pro-preview';
 const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {

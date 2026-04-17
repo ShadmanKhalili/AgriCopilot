@@ -918,18 +918,23 @@ export default function AgriCopilot({
                               <motion.div 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-100 shadow-inner flex items-center space-x-4"
+                                className="mt-10 bg-gradient-to-r from-emerald-100 to-green-100 rounded-[2rem] p-6 md:p-8 border-2 border-green-200/50 shadow-xl shadow-green-900/5 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 relative overflow-hidden"
                               >
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
                                 <motion.div 
-                                  animate={{ scale: [1, 1.1, 1] }}
-                                  transition={{ duration: 2, repeat: Infinity }}
-                                  className="bg-white p-3 rounded-xl text-green-600 shadow-sm"
+                                  animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                  className="bg-white p-5 rounded-2xl text-green-600 shadow-md relative z-10 border border-green-50"
                                 >
-                                  <Volume2 className="w-6 h-6" />
+                                  <Volume2 className="w-10 h-10" />
                                 </motion.div>
-                                <div className="flex-1">
-                                  <p className="text-[10px] font-black text-green-900 uppercase tracking-widest mb-2">{t.playAudio}</p>
-                                  <audio controls src={audioUrl} className="w-full h-8 rounded-lg" />
+                                <div className="flex-1 w-full text-center md:text-left relative z-10">
+                                  <p className="text-sm font-black text-green-900 uppercase tracking-widest mb-3 drop-shadow-sm">
+                                    {lang === 'bn' ? 'এআই অডিও শুনুন' : 'Listen to AI Analysis'}
+                                  </p>
+                                  <div className="bg-white/60 p-2 rounded-2xl shadow-inner border border-green-100/50">
+                                    <audio controls src={audioUrl} className="w-full h-12 rounded-xl" />
+                                  </div>
                                 </div>
                               </motion.div>
                             )}

@@ -235,9 +235,9 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 rounded-[2.5rem] p-10 border-4 border-blue-500/50 shadow-[0_20px_50px_rgba(59,130,246,0.2)] overflow-hidden relative"
           >
-            {/* Pulsing light effect */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/20 blur-[120px] rounded-full -mr-32 -mt-32 animate-pulse" />
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-400/20 blur-[120px] rounded-full -ml-32 -mb-32 animate-pulse" />
+            {/* Minimal static gradients instead of GPU-heavy blurs */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-blue-400/20 to-transparent rounded-full -mr-32 -mt-32" />
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-indigo-400/20 to-transparent rounded-full -ml-32 -mb-32" />
             
             <div className="relative z-10">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-10">

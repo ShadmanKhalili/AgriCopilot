@@ -420,7 +420,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           whileHover={{ y: -5 }}
           className="bg-white p-16 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 text-center relative overflow-hidden group"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-50/80 to-transparent rounded-full -translate-y-1/2 translate-x-1/3 opacity-80 transition-opacity"></div>
           <div className="relative z-10">
             <div className="bg-blue-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6">
               <MapPin className="w-10 h-10 text-blue-500" />
@@ -773,24 +773,27 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         {isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
                         <span className="hidden sm:inline">{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
                       </button>
-                      <button
-                        onClick={toggleSpeech}
-                        disabled={isAudioLoading}
-                        className={`p-3 rounded-2xl transition-all duration-300 ${
-                          isSpeaking 
-                            ? 'bg-red-100 text-red-600 shadow-inner' 
-                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100 shadow-sm'
-                        } ${isAudioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={isSpeaking ? "Stop listening" : "Listen to advisory"}
-                      >
-                        {isAudioLoading ? (
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : isSpeaking ? (
-                          <VolumeX className="w-5 h-5" />
-                        ) : (
-                          <Volume2 className="w-5 h-5" />
-                        )}
-                      </button>
+                        <button
+                          onClick={toggleSpeech}
+                          disabled={isAudioLoading}
+                          className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 font-black uppercase text-[10px] tracking-widest ${
+                            isSpeaking 
+                              ? 'bg-red-100 text-red-600 shadow-inner' 
+                              : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-lg hover:shadow-green-500/30'
+                          } ${isAudioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          title={isSpeaking ? "Stop listening" : "Listen to advisory"}
+                        >
+                          {isAudioLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : isSpeaking ? (
+                            <VolumeX className="w-5 h-5" />
+                          ) : (
+                            <Volume2 className="w-5 h-5" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {isSpeaking ? (lang === 'bn' ? 'থামান' : 'Stop') : (lang === 'bn' ? 'শুনুন' : 'Listen')}
+                          </span>
+                        </button>
                     </div>
                   )}
                 </div>
