@@ -17,6 +17,7 @@ import { useAuth } from './AuthProvider';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
+import GoogleAd from './GoogleAd';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile';
 
@@ -347,11 +348,11 @@ export default function Layout() {
           <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
             <Profile lang={lang} />
           </div>
+
+          <GoogleAd lang={lang} className="mt-12 mb-4" />
         </div>
       </main>
       
-      {/* Mobile Overlay - Removed as it's handled by AnimatePresence above */}
-
       {/* Pricing Modal */}
       <PricingModal 
         isOpen={isPricingOpen} 

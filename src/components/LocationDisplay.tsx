@@ -7,7 +7,7 @@ import { translations, Language } from '../utils/translations';
 interface Props {
   coords: { latitude: number; longitude: number };
   lang: Language;
-  color: 'green' | 'orange' | 'blue' | 'indigo';
+  color: 'green' | 'orange' | 'blue' | 'indigo' | 'emerald';
 }
 
 export default function LocationDisplay({ coords, lang, color }: Props) {
@@ -17,6 +17,7 @@ export default function LocationDisplay({ coords, lang, color }: Props) {
   const colorStyles = {
     green: 'bg-green-50 border-green-200 text-green-800',
     orange: 'bg-orange-50 border-orange-200 text-orange-800',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-800',
     blue: 'bg-blue-50 border-blue-200 text-blue-800',
     indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800',
   };

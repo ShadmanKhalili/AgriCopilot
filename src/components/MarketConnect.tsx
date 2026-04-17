@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Calendar, Navigation, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Navigation, Package, Scale, DollarSign, Activity, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 import { collection, addDoc } from 'firebase/firestore';
@@ -142,18 +142,18 @@ export default function MarketConnect({
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="max-w-6xl mx-auto space-y-8"
     >
-      <div className="text-center mb-12">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl mb-6 shadow-lg shadow-orange-200"
-        >
-          <TrendingUp className="w-10 h-10 text-white animate-pulse" />
-        </motion.div>
-        <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">{t.marketConnect}</h2>
-        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto">{t.marketConnectDesc}</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[32px] border border-orange-100 shadow-sm">
+        <div className="flex items-center space-x-4">
+          <div className="bg-orange-50 p-4 rounded-2xl">
+            <TrendingUp className="w-8 h-8 text-orange-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">{t.marketConnect}</h2>
+            <p className="text-gray-500 font-medium text-sm mt-1">{t.marketConnectDesc}</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -162,238 +162,248 @@ export default function MarketConnect({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-4 space-y-6 bg-white p-8 rounded-[40px] border border-orange-100 shadow-xl shadow-orange-50/50 relative overflow-hidden"
+          className="lg:col-span-4"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
-          
-          <div className="relative z-10 space-y-6">
-            <div className="space-y-2">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceName}</label>
-              <select 
-                value={produce} 
-                onChange={(e) => setProduce(e.target.value)}
-                className="w-full rounded-2xl border-orange-100 shadow-sm focus:border-orange-500 focus:ring-orange-500 bg-orange-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
-              >
-                {PRODUCE_TYPES.map(p => (
-                  <option key={p} value={p}>
-                    {t.crops[p as keyof typeof t.crops] || p}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.quantity}</label>
-                <button 
-                  onClick={handleDetectLocation}
-                  disabled={isDetectingLocation}
-                  className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-all ${
-                    coords 
-                      ? 'bg-orange-100 text-orange-700 border border-orange-200' 
-                      : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
-                  }`}
-                >
-                  {isDetectingLocation ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : coords ? (
-                    <Navigation className="w-3 h-3" />
-                  ) : (
-                    <MapPin className="w-3 h-3" />
-                  )}
-                  <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
-                </button>
-              </div>
-              <input 
-                type="number"
-                value={quantity} 
-                onChange={(e) => setQuantity(e.target.value)}
-                placeholder="e.g. 100"
-                className="w-full rounded-2xl border-orange-100 shadow-sm focus:border-orange-500 focus:ring-orange-500 bg-orange-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
-              />
-            </div>
-
-            {coords && (
-              <LocationDisplay coords={coords} lang={lang} color="orange" />
-            )}
-
-            <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-white p-4 rounded-2xl border border-orange-100 shadow-inner">
-              <div className="flex items-center space-x-3">
-                <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    id="advancedMarket" 
-                    checked={isAdvanced}
-                    onChange={(e) => setIsAdvanced(e.target.checked)}
-                    disabled={tier !== 'premium'}
-                    className="absolute w-6 h-6 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full appearance-none cursor-pointer checked:translate-x-4 checked:border-orange-500 focus:outline-none disabled:opacity-50"
-                  />
-                  <label htmlFor="advancedMarket" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-orange-400' : ''}`}></label>
-                </div>
-                <label htmlFor="advancedMarket" className={`text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
-                  <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" />
-                  {t.advancedAnalysis}
+          <div className="bg-white rounded-[32px] p-6 lg:p-8 shadow-xl shadow-orange-900/5 border border-orange-100 relative overflow-hidden space-y-6">
+            <div className="space-y-6 relative z-10">
+              
+              {/* Product Selection */}
+              <div className="space-y-3">
+                <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
+                  <Package className="w-4 h-4 mr-2 text-orange-500" />
+                  {t.produceName}
                 </label>
-              </div>
-              <Tooltip content={t.tooltips.advanced}>
-                <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
-              </Tooltip>
-            </div>
-
-            <div className="pt-2">
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center space-x-1">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
-                  <Tooltip content={t.tooltips.usage}>
-                    <HelpCircle className="w-3 h-3 text-gray-300" />
-                  </Tooltip>
+                <div className="relative">
+                  <select 
+                    value={produce} 
+                    onChange={(e) => setProduce(e.target.value)}
+                    className="w-full appearance-none rounded-2xl border border-gray-200 shadow-sm focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 bg-gray-50 p-4 pr-10 text-base font-bold text-gray-900 transition-all outline-none"
+                  >
+                    {PRODUCE_TYPES.map(p => (
+                      <option key={p} value={p}>
+                        {t.crops[p as keyof typeof t.crops] || p}
+                      </option>
+                    ))}
+                  </select>
+                  <ArrowDownRight className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
-                <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
               </div>
-              <div className="w-full bg-orange-100/50 rounded-full h-2 overflow-hidden shadow-inner">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(currentUsage / limit) * 100}%` }}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 h-full rounded-full"
-                />
-              </div>
-            </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleGetInsights}
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-orange-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-7 h-7 animate-spin" />
-                  <span>{t.fetchingInsights}</span>
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="w-7 h-7" />
-                  <span>{t.getInsights}</span>
-                </>
-              )}
-            </motion.button>
+              {/* Quantity */}
+              <div className="space-y-3">
+                <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
+                  <Scale className="w-4 h-4 mr-2 text-blue-500" />
+                  {t.quantity}
+                </label>
+                <div className="relative">
+                  <input 
+                    type="number"
+                    value={quantity} 
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="e.g. 100"
+                    className="w-full rounded-2xl border border-gray-200 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-gray-50 p-4 pr-16 text-base font-bold text-gray-900 transition-all outline-none"
+                  />
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 p-1 px-2 bg-blue-100 text-blue-700 font-bold text-xs rounded-lg">
+                    KG
+                  </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
+                    <MapPin className="w-4 h-4 mr-2 text-emerald-500" />
+                    Market Region
+                  </label>
+                  <button 
+                    onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
+                    className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-all ${
+                      coords 
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {isDetectingLocation ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : coords ? (
+                      <Navigation className="w-3 h-3" />
+                    ) : (
+                      <MapPin className="w-3 h-3" />
+                    )}
+                    <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
+                  </button>
+                </div>
+                {coords ? (
+                  <LocationDisplay coords={coords} lang={lang} color="emerald" />
+                ) : (
+                  <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-2xl text-center">
+                    <p className="text-gray-500 text-xs font-medium">Use your location to find the nearest wholesale rates.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Advanced Toggle */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-2xl border border-amber-100 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      id="advancedMarket" 
+                      checked={isAdvanced}
+                      onChange={(e) => setIsAdvanced(e.target.checked)}
+                      disabled={tier !== 'premium'}
+                      className="absolute w-6 h-6 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full appearance-none cursor-pointer checked:translate-x-4 checked:border-amber-500 focus:outline-none disabled:opacity-50"
+                    />
+                    <label htmlFor="advancedMarket" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-amber-400' : ''}`}></label>
+                  </div>
+                  <label htmlFor="advancedMarket" className={`text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-800' : 'text-gray-400'}`}>
+                    <Sparkles className="w-4 h-4 mr-1.5 text-amber-500" />
+                    {t.advancedAnalysis}
+                  </label>
+                </div>
+                <Tooltip content={t.tooltips.advanced}>
+                  <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
+                </Tooltip>
+              </div>
+
+              {/* Usage Bar */}
+              <div className="py-2">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
+                  <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(currentUsage / limit) * 100}%` }}
+                    className="bg-orange-500 h-full rounded-full"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <motion.button
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleGetInsights}
+                disabled={isLoading}
+                className="w-full bg-gray-900 text-white font-bold py-4 px-6 rounded-2xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-colors text-lg"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>{t.fetchingInsights}</span>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-5 h-5" />
+                    <span>{t.getInsights}</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
           </div>
         </motion.div>
 
-        {/* Insights Output */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* Insights Output (Bento Box Layout) */}
+        <div className="lg:col-span-8">
           <AnimatePresence mode="wait">
             {insights ? (
               <motion.div 
                 key="insights"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="bg-gradient-to-br from-orange-600 via-red-600 to-orange-700 p-1 rounded-[40px] shadow-2xl shadow-orange-200 h-full"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full"
               >
-                <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-orange-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
-                  
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-10">
-                      <div className="flex items-center space-x-4">
-                        <div className="bg-gradient-to-br from-orange-500 to-red-600 p-3 rounded-2xl shadow-lg shadow-orange-100">
-                          <TrendingUp className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.marketInsights}</h3>
-                          <div className="flex items-center mt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Market Pulse</span>
-                          </div>
-                        </div>
+                {/* Main Executive Summary */}
+                <div className="md:col-span-2 bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-orange-50 p-2.5 rounded-xl text-orange-600">
+                        <TrendingUp className="w-6 h-6" />
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Updated</p>
-                        <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100 uppercase tracking-widest">
-                          {lastUpdated || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                      <div>
+                        <h3 className="text-xl font-black text-gray-900 tracking-tight">Market Analytics</h3>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">Live Assessment</p>
                       </div>
                     </div>
-
-                    <div className="space-y-6 flex-1">
-                      {/* Price Drivers */}
-                      {insights.priceDrivers && insights.priceDrivers.length > 0 && (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm relative overflow-hidden"
-                        >
-                          <div className="flex items-center justify-between mb-6">
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                              <TrendingUp className="w-4 h-4 mr-2 text-orange-600" />
-                              {lang === 'bn' ? 'মূল্যের প্রধান কারণসমূহ' : 'Key Price Drivers'}
-                            </h4>
-                          </div>
-                          <ul className="space-y-3">
-                            {insights.priceDrivers.map((driver: string, idx: number) => (
-                              <li key={idx} className="flex items-start space-x-3 text-sm text-gray-700 font-medium bg-orange-50/50 p-4 rounded-2xl border border-orange-100/50">
-                                <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0"></div>
-                                <span>{driver}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </motion.div>
-                      )}
-
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-[32px] p-8 md:p-10 border border-gray-100 shadow-sm relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-orange-500 opacity-20"></div>
-                        <div className="markdown-body text-base md:text-lg leading-relaxed prose prose-orange max-w-none">
-                          <ReactMarkdown>{insights.insights}</ReactMarkdown>
-                        </div>
-                      </motion.div>
-
-                      {/* Nearest Markets */}
-                      {insights.nearestMarkets && (
-                        <div className="bg-gray-50/50 backdrop-blur-sm rounded-[32px] p-8 border border-gray-100">
-                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center">
-                            <MapPin className="w-4 h-4 mr-2 text-orange-600" />
-                            {lang === 'bn' ? 'নিকটস্থ বাজার' : 'Nearest Markets'}
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {insights.nearestMarkets.map((m: any, idx: number) => (
-                              <motion.div 
-                                key={idx} 
-                                whileHover={{ scale: 1.02 }}
-                                className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 shadow-sm group"
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <div className="bg-orange-50 p-2 rounded-xl text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                                    <Store className="w-4 h-4" />
-                                  </div>
-                                  <span className="font-black text-gray-800 text-sm">{m.name}</span>
-                                </div>
-                                <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full">{m.distance}</span>
-                              </motion.div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100 uppercase tracking-widest">
+                      Updated {lastUpdated || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="markdown-body text-base leading-relaxed prose prose-orange max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-orange-600">
+                    <ReactMarkdown>{insights.insights}</ReactMarkdown>
                   </div>
                 </div>
+
+                {/* Price Drivers */}
+                {insights.priceDrivers && insights.priceDrivers.length > 0 && (
+                  <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm flex flex-col">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 mr-3">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                        {lang === 'bn' ? 'মূল্যের গতিপথ' : 'Price Drivers'}
+                      </h4>
+                    </div>
+                    <ul className="space-y-4 flex-1">
+                      {insights.priceDrivers.map((driver: string, idx: number) => (
+                        <li key={idx} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <AlertCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700 font-medium leading-relaxed">{driver}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Nearest Markets */}
+                {insights.nearestMarkets && (
+                  <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm flex flex-col">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600 mr-3">
+                        <Store className="w-5 h-5" />
+                      </div>
+                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                        {lang === 'bn' ? 'নিকটস্থ পাইকারি বাজার' : 'Nearest Wholesale Hubs'}
+                      </h4>
+                    </div>
+                    <div className="space-y-3 flex-1 overflow-y-auto">
+                      {insights.nearestMarkets.map((m: any, idx: number) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 group hover:bg-emerald-50 transition-colors"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Store className="w-4 h-4 text-emerald-600" />
+                            <span className="font-bold text-gray-800 text-sm">{m.name}</span>
+                          </div>
+                          <span className="text-[10px] font-black text-emerald-700 bg-white shadow-sm px-3 py-1.5 rounded-xl border border-emerald-100 uppercase overflow-hidden whitespace-nowrap">
+                            {m.distance}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div 
                 key="empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="bg-white rounded-[40px] p-16 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center relative overflow-hidden"
+                className="bg-white rounded-[40px] border border-gray-200 h-full min-h-[500px] flex flex-col items-center justify-center p-10 text-center shadow-sm"
               >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gray-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
-                <div className="bg-gray-50 p-10 rounded-[32px] mb-8 shadow-inner relative z-10">
-                  <TrendingUp className="w-20 h-20 text-gray-200" />
+                <div className="bg-gray-50 p-6 rounded-[24px] mb-6">
+                  <BarChart className="w-12 h-12 text-gray-300" />
                 </div>
-                <p className="text-2xl font-black text-gray-300 max-w-sm leading-tight relative z-10 tracking-tight">Select produce and location to get real-time market insights and pricing trends.</p>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Market Intelligence</h3>
+                <p className="text-sm font-medium text-gray-500 max-w-sm leading-relaxed">
+                  Enter your produce, quantity, and location to fetch real-time market insights and nearby wholesale pricing.
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
