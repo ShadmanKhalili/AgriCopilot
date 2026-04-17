@@ -168,15 +168,17 @@ export default function MacroTrends({ lang }: Props) {
 
   return (
     <div className="space-y-8">
-      <div className="bg-white rounded-[40px] p-8 md:p-12 shadow-xl shadow-gray-200/50 border border-gray-100">
-        <div className="max-w-3xl mb-10">
-          <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-4">
-            National Agricultural Trends
-          </h2>
-          <p className="text-lg text-gray-600 leading-relaxed">
-            Macro-economic data and historical trends for Bangladesh's agricultural sector, sourced directly from the World Bank API.
-          </p>
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-blue-900/5 border border-blue-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-blue-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <TrendingUp className="w-6 h-6 md:w-8 h-8 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">National Agricultural Trends</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium">Macro-economic data and historical trends for Bangladesh's agricultural sector.</p>
+          </div>
         </div>
+      </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {indicators.map((indicator, index) => (
@@ -238,6 +240,5 @@ export default function MacroTrends({ lang }: Props) {
           ))}
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

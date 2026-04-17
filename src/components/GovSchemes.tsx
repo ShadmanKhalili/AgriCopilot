@@ -216,17 +216,16 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-12 max-w-6xl mx-auto px-4"
     >
-      <div className="text-center mb-16 relative">
-        <div className="absolute inset-0 -top-20 -z-10 bg-[radial-gradient(circle_at_50%_50%,rgba(59,130,246,0.05)_0%,transparent_70%)] blur-3xl"></div>
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center p-5 bg-white border border-blue-100 rounded-[2rem] mb-6 shadow-2xl shadow-blue-500/10"
-        >
-          <Landmark className="w-12 h-12 text-blue-600" />
-        </motion.div>
-        <h2 className="text-5xl font-black text-gray-900 mb-4 tracking-tighter uppercase italic drop-shadow-sm font-display">{t.govSchemes}</h2>
-        <p className="text-gray-400 text-xl font-medium max-w-2xl mx-auto tracking-tight">{t.govSchemesDesc}</p>
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-blue-900/5 border border-blue-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-blue-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <Landmark className="w-6 h-6 md:w-8 h-8 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.govSchemes}</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium">{t.govSchemesDesc}</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col space-y-6">

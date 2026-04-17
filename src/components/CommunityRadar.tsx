@@ -67,21 +67,16 @@ export default function CommunityRadar({ lang }: Props) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 max-w-5xl mx-auto"
     >
-      <div className="text-center mb-12">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-red-500 to-orange-600 rounded-3xl mb-6 shadow-lg shadow-red-200 relative"
-        >
-          <motion.div 
-            animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="absolute inset-0 bg-red-400 rounded-3xl"
-          />
-          <Radar className="w-10 h-10 text-white relative z-10" />
-        </motion.div>
-        <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">{t.communityRadar}</h2>
-        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto">{t.communityRadarDesc}</p>
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-red-900/5 border border-red-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-red-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <Radar className="w-6 h-6 md:w-8 h-8 text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.communityRadar}</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium">{t.communityRadarDesc}</p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-red-50/50 border border-red-100 rounded-3xl p-6 flex items-start space-x-4 mb-8">

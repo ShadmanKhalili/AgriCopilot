@@ -285,6 +285,30 @@ export const generateSpeech = async (text: string) => {
   });
 };
 
+export const summarizeConversation = async (messages: { role: string; text: string }[], lang: string) => {
+  return await callAiWithRetry(async () => {
+    try {
+      const chatStr = messages.map(m => `${m.role === 'user' ? 'Farmer' : 'Expert'}: ${m.text}`).join('\n');
+      const prompt = `Summarize the following agricultural consultation conversation into a few key bullet points and a short summary paragraph. 
+      Focus on the diagnosis discussed and the specific advice given. 
+      Maintain a helpful and professional tone.
+      Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      
+      Conversation History:
+      ${chatStr}`;
+
+      const response = await callAiWithFallback({
+        contents: prompt
+      }, BACKUP_MODEL);
+      
+      return response.text || '';
+    } catch (error) {
+      console.error("AI Service Error (Summarize Conversation):", error);
+      throw error;
+    }
+  });
+};
+
 export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, lang: string, isAdvanced?: boolean) => {
   return await callAiWithRetry(async () => {
     try {

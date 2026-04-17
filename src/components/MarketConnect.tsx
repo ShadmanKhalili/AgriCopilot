@@ -137,14 +137,14 @@ export default function MarketConnect({
       animate={{ opacity: 1, y: 0 }}
       className="max-w-6xl mx-auto space-y-8"
     >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[32px] border border-orange-100 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="bg-orange-50 p-4 rounded-2xl">
-            <TrendingUp className="w-8 h-8 text-orange-600" />
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-orange-900/5 border border-orange-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-orange-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <TrendingUp className="w-6 h-6 md:w-8 h-8 text-orange-600" />
           </div>
           <div>
-            <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">{t.marketConnect}</h2>
-            <p className="text-gray-500 font-medium text-sm mt-1">{t.marketConnectDesc}</p>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.marketConnect}</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium">{t.marketConnectDesc}</p>
           </div>
         </div>
       </div>

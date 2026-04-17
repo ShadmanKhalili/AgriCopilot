@@ -131,15 +131,15 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
       animate="show"
       className="space-y-8"
     >
-      <motion.div variants={itemVariants} className="flex items-center justify-between mb-2">
-        <div>
-          <h2 className="text-4xl font-black text-gray-900 flex items-center gap-4 tracking-tight">
-            <div className="p-4 bg-indigo-100 rounded-3xl shadow-inner">
-              <Satellite className="w-10 h-10 text-indigo-600" />
-            </div>
-            {t.cropHealth}
-          </h2>
-          <p className="text-gray-500 text-xl font-medium mt-3">{t.cropHealthDesc}</p>
+      <motion.div variants={itemVariants} className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-indigo-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <Satellite className="w-6 h-6 md:w-8 h-8 text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium leading-relaxed">{t.cropHealthDesc}</p>
+          </div>
         </div>
       </motion.div>
 

@@ -165,20 +165,21 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-xl shadow-green-900/5 border border-green-100">
-        <div className="flex items-center space-x-4 mb-8">
-          <div className="bg-green-100 p-3 rounded-2xl">
-            <Sprout className="w-8 h-8 text-green-600" />
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-green-900/5 border border-green-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-green-100 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <Sprout className="w-6 h-6 md:w-8 h-8 text-green-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">
               {lang === 'bn' ? 'স্মার্ট প্ল্যানার' : 'Smart Planner'}
             </h2>
-            <p className="text-gray-500 font-medium">
+            <p className="text-gray-500 text-xs md:text-base font-medium">
               {lang === 'bn' ? 'পরবর্তী মৌসুমে কী চাষ করবেন তার এআই ভিত্তিক পরামর্শ' : 'AI-driven recommendations for your next crop cycle'}
             </p>
           </div>
         </div>
+      </div>
 
         {/* Location Section */}
         <div className="mb-8 p-6 bg-gray-50 rounded-2xl border border-gray-200">
@@ -437,7 +438,6 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
             </>
           )}
         </button>
-      </div>
 
       {results && (
         <motion.div 

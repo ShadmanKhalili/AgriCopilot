@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -25,7 +26,7 @@ export const signInWithGoogle = async () => {
       return;
     }
     if (error.code === 'auth/popup-blocked') {
-      alert("The sign-in popup was blocked by your browser. Please allow popups for this site and try again, or open the app in a new tab.");
+      toast.error("Sign-in popup blocked. Please allow popups or open in a new tab.", { duration: 5000 });
     }
     console.error("Error signing in with Google", error);
     throw error;

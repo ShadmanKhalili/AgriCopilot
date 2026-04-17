@@ -214,7 +214,11 @@ export const translations = {
       typeMessage: "Type your message...",
       sending: "Sending...",
       aiThinking: "AI is thinking...",
-      chatError: "Failed to send message. Please try again."
+      chatError: "Failed to send message. Please try again.",
+      summarizing: "Summarizing conversation...",
+      saveSummary: "Save Consultation Summary",
+      chatSummaryTitle: "Consultation Summary",
+      summarySaved: "Consultation summary saved successfully!"
     },
     // Dropdown options
     crops: {
@@ -479,7 +483,11 @@ export const translations = {
       typeMessage: "আপনার প্রশ্ন লিখুন...",
       sending: "পাঠানো হচ্ছে...",
       aiThinking: "এআই ভাবছে...",
-      chatError: "বার্তা পাঠানো যায়নি। আবার চেষ্টা করুন।"
+      chatError: "বার্তা পাঠানো যায়নি। আবার চেষ্টা করুন।",
+      summarizing: "কথোপকথন সংক্ষেপ করা হচ্ছে...",
+      saveSummary: "পরামর্শের সারাংশ সংরক্ষণ করুন",
+      chatSummaryTitle: "পরামর্শের সারাংশ",
+      summarySaved: "পরামর্শের সারাংশ সফলভাবে সংরক্ষিত হয়েছে!"
     },
     // Dropdown options
     crops: {

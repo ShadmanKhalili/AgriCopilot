@@ -222,17 +222,41 @@ async function startServer() {
   // Proxy for Weather API
   app.get("/api/daily-forecast", async (req, res) => {
     try {
-      console.log(`Proxying Weather request to Open-Meteo for lat: ${req.query.latitude}, lng: ${req.query.longitude}`);
-      const response = await axios.get(`https://api.open-meteo.com/v1/forecast`, {
-        params: req.query,
+      const { latitude, longitude, ...rest } = req.query;
+      
+      if (!latitude || !longitude) {
+        return res.status(400).json({ error: "Latitude and longitude are required" });
+      }
+
+      const lat = parseFloat(latitude as string);
+      const lon = parseFloat(longitude as string);
+
+      if (isNaN(lat) || isNaN(lon)) {
+        return res.status(400).json({ error: "Invalid latitude or longitude" });
+      }
+
+      const url = `https://api.open-meteo.com/v1/forecast`;
+      console.log(`Proxying Weather request to Open-Meteo: ${url} with params:`, { latitude: lat, longitude: lon, ...rest });
+      const response = await axios.get(url, {
+        params: {
+          latitude: lat,
+          longitude: lon,
+          ...rest
+        },
         timeout: 10000 // 10s timeout
       });
       res.json(response.data);
     } catch (error: any) {
-      console.error("Weather Proxy Error:", error.message);
+      const fullUrl = error.config?.url + '?' + new URLSearchParams(error.config?.params).toString();
+      console.error("Weather Proxy Error:", error.message, "URL:", fullUrl);
+      if (error.response?.data) {
+        console.error("Open-Meteo API Error Response:", JSON.stringify(error.response.data));
+      }
       res.status(500).json({ 
         error: "Failed to fetch weather data from Open-Meteo",
-        details: error.message
+        details: error.message,
+        apiError: error.response?.data,
+        requestedUrl: fullUrl
       });
     }
   });
@@ -240,17 +264,31 @@ async function startServer() {
   // Proxy for Climate API
   app.get("/api/historical-data", async (req, res) => {
     try {
-      console.log(`Proxying Climate request to Open-Meteo for lat: ${req.query.latitude}, lng: ${req.query.longitude}`);
-      const response = await axios.get(`https://archive-api.open-meteo.com/v1/archive`, {
+      const { latitude, longitude, ...rest } = req.query;
+      
+      if (!latitude || !longitude) {
+        return res.status(400).json({ error: "Latitude and longitude are required" });
+      }
+
+      const url = `https://archive-api.open-meteo.com/v1/archive`;
+      console.log(`Proxying Climate request to Open-Meteo: ${url} with params:`, { latitude, longitude, ...rest });
+      
+      const response = await axios.get(url, {
         params: req.query,
         timeout: 15000 // 15s timeout
       });
       res.json(response.data);
     } catch (error: any) {
-      console.error("Climate Proxy Error:", error.message);
+      const fullUrl = error.config?.url + '?' + new URLSearchParams(error.config?.params).toString();
+      console.error("Climate Proxy Error:", error.message, "URL:", fullUrl);
+      if (error.response?.data) {
+        console.error("Open-Meteo Archive API Error Response:", JSON.stringify(error.response.data));
+      }
       res.status(500).json({ 
         error: "Failed to fetch historical climate data from Open-Meteo",
-        details: error.message 
+        details: error.message,
+        apiError: error.response?.data,
+        requestedUrl: fullUrl
       });
     }
   });

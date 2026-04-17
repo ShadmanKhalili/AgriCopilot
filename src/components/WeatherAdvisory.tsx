@@ -388,16 +388,17 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      <div className="text-center mb-12">
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-6 shadow-lg shadow-blue-200"
-        >
-          <Cloud className="w-10 h-10 text-white animate-pulse" />
-        </motion.div>
-        <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">{t.weatherAdvisory}</h2>
-        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto mb-6">{t.weatherAdvisoryDesc}</p>
+      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-blue-900/5 border border-blue-100 mb-6 md:mb-8">
+        <div className="flex items-center space-x-3 md:space-x-4">
+          <div className="bg-blue-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
+            <Cloud className="w-6 h-6 md:w-8 h-8 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.weatherAdvisory}</h2>
+            <p className="text-gray-500 text-xs md:text-base font-medium">{t.weatherAdvisoryDesc}</p>
+          </div>
+        </div>
+      </div>
         
         {globalLocation && (
           <motion.button
@@ -413,7 +414,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             <span>{lang === 'bn' ? 'পুনরায় লোড করুন' : 'Refresh Data'}</span>
           </motion.button>
         )}
-      </div>
 
       {!globalLocation ? (
         <motion.div 

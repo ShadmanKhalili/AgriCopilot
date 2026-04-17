@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, ShieldCheck } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
@@ -14,7 +14,6 @@ import UserGuide from './UserGuide';
 import Profile from './Profile';
 import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
-import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import GoogleAd from './GoogleAd';
@@ -45,7 +44,6 @@ export default function Layout() {
   const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
-  const { currentUsage, limit, tier } = useUsageTracking();
 
   const t = translations[lang];
 
@@ -69,12 +67,6 @@ export default function Layout() {
 
   const toggleLanguage = () => {
     setLang(prev => prev === 'en' ? 'bn' : 'en');
-  };
-
-  const getTierName = () => {
-    if (tier === 'premium') return t.premiumTier;
-    if (tier === 'free') return t.freeTier;
-    return t.anonTier;
   };
 
   return (
@@ -190,43 +182,6 @@ export default function Layout() {
         </nav>
         
         <div className="p-6 border-t border-white/10 space-y-6 pb-10 md:pb-8">
-          {/* Usage Stats */}
-          <div className="bg-black/20 backdrop-blur-md rounded-[32px] p-6 border border-white/10 shadow-inner">
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center space-x-2">
-                <span className="text-[10px] font-black text-green-300 uppercase tracking-widest">{t.usage}</span>
-                <Tooltip content={t.tooltips.usage} position="right">
-                  <HelpCircle className="w-3 h-3 text-green-500 cursor-help" />
-                </Tooltip>
-              </div>
-              <span className="text-[10px] font-black text-white bg-white/10 px-2 py-1 rounded-lg">
-                {currentUsage} / {limit === Infinity ? '∞' : limit}
-              </span>
-            </div>
-            <div className="w-full bg-black/30 rounded-full h-2.5 overflow-hidden shadow-inner p-0.5">
-              <motion.div 
-                className={`h-full rounded-full shadow-sm ${tier === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-400' : 'bg-gradient-to-r from-green-400 to-emerald-400'}`} 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min((currentUsage / (limit === Infinity ? 1 : limit)) * 100, 100)}%` }}
-                transition={{ duration: 1.5, ease: "circOut" }}
-              />
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-[10px] font-black text-green-400 uppercase tracking-widest">{getTierName()}</span>
-              {tier !== 'premium' && (
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={user ? () => setIsPricingOpen(true) : signIn}
-                  className="flex items-center space-x-1.5 text-[10px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black px-3 py-1.5 rounded-full shadow-lg shadow-orange-900/20 transition-all"
-                >
-                  <Crown className="w-3 h-3" />
-                  <span className="uppercase tracking-widest">{t.upgrade}</span>
-                </motion.button>
-              )}
-            </div>
-          </div>
-
           {/* Auth Section */}
           {user ? (
             <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/10">
@@ -346,7 +301,7 @@ export default function Layout() {
             <UserGuide lang={lang} />
           </div>
           <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
-            <Profile lang={lang} />
+            <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />
           </div>
 
           <GoogleAd lang={lang} className="mt-12 mb-4" />

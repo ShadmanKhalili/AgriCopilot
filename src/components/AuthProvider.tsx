@@ -63,17 +63,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             userDoc = await getDoc(userDocRef);
           } catch (error: any) {
-            // If it's a permission error, it might be transient during sign-in
-            if (error.message?.includes('insufficient permissions')) {
-              console.warn("Initial getDoc failed with permission error, retrying in 1s...");
-              await new Promise(res => setTimeout(res, 1000));
-              userDoc = await getDoc(userDocRef);
+            console.warn("Initial getDoc failed:", error.message);
+            // If it's a permission or offline error, it might be transient. Retry.
+            if (error.message?.includes('insufficient permissions') || error.message?.includes('client is offline')) {
+              console.warn("Retrying in 2s...");
+              await new Promise(res => setTimeout(res, 2000));
+              try {
+                userDoc = await getDoc(userDocRef);
+              } catch (retryError: any) {
+                console.error("Retry failed:", retryError.message);
+                if (!retryError.message?.includes('client is offline')) {
+                  handleFirestoreError(retryError, OperationType.GET, userDocRef.path);
+                }
+              }
             } else {
-              throw error;
+              handleFirestoreError(error, OperationType.GET, userDocRef.path);
             }
           }
           
-          if (!userDoc.exists()) {
+          if (userDoc && !userDoc.exists()) {
             const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com';
             const newProfile: UserProfile = {
               uid: currentUser.uid,
@@ -96,22 +104,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUserRole(data.role);
             }
           }, (error) => {
-            // Only report error if user is still logged in and it's not a transient permission error
-            if (auth.currentUser && !error.message?.includes('insufficient permissions')) {
+            // Only report error if user is still logged in and it's not a transient connection/permission error
+            if (auth.currentUser && !error.message?.includes('insufficient permissions') && !error.message?.includes('client is offline')) {
               handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
             }
           });
 
-        } catch (error) {
+        } catch (error: any) {
           if (auth.currentUser) {
-            handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+            if (error.message?.includes('client is offline')) {
+              console.warn("Could not create/fetch profile: Client is offline");
+            } else {
+              handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+            }
           }
+        } finally {
+          setIsAuthReady(true);
         }
       } else {
         setUserRole(null);
         setUserProfile(null);
+        setIsAuthReady(true);
       }
-      setIsAuthReady(true);
     });
 
     return () => {
