@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout } from 'lucide-react';
+import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, Crown, TrendingUp, UserCircle, HelpCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AgriCopilot from './AgriCopilot';
 import SmartGrade from './SmartGrade';
@@ -238,7 +238,10 @@ export default function Layout() {
                   {user.displayName?.charAt(0) || 'U'}
                 </div>
                 <div className="text-sm">
-                  <div className="font-black tracking-tight truncate max-w-[100px]">{user.displayName}</div>
+                  <div className="font-black tracking-tight truncate max-w-[100px] flex items-center gap-1.5">
+                    {user.displayName}
+                    {userRole === 'admin' && <ShieldCheck className="w-3 h-3 text-blue-400" />}
+                  </div>
                   <div className="text-green-400 text-[10px] font-bold uppercase tracking-widest">{userRole}</div>
                 </div>
               </button>

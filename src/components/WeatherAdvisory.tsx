@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe, History } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe, History, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
-import ReactMarkdown from 'react-markdown';
+import Markdown from 'react-markdown';
 import { translateText, generateWeatherAdvisory, generateSpeech } from '../services/ai';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
@@ -159,48 +159,51 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     setIsLoading(true);
     
     try {
-      // 1. Fetch Current Weather, Soil Moisture, and Hourly Forecast from Open-Meteo
-      const weatherRes = await fetch(`/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,soil_moisture_0_to_7cm&hourly=temperature_2m,precipitation_probability,wind_speed_10m&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
+      // 1. Fetch Current Weather, Hourly Forecast (including Soil Moisture) from Open-Meteo
+      // soil_moisture_0_to_7cm is moved to hourly as it's not supported in current variables by default Open-Meteo API
+      const weatherRes = await fetch(`/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
       
       if (!weatherRes.ok) {
         const errJson = await weatherRes.json().catch(() => ({}));
+        console.error("Weather API Error Response:", weatherRes.status, errJson);
         throw new Error(errJson.error || `Weather server returned ${weatherRes.status}`);
       }
 
       const weatherData = await weatherRes.json();
       
       if (!weatherData.current) {
-        throw new Error("Invalid weather data format received");
+        throw new Error("Invalid weather data format received from Open-Meteo");
       }
 
-      // Calculate Safe Spraying Window
+      // Calculate Safe Spraying Window & Current hour-based data
       let safeSprayingWindow = "No safe window in the next 24 hours";
+      let currentIndex = 0;
+      
       if (weatherData.hourly) {
         const times = weatherData.hourly.time;
         const temps = weatherData.hourly.temperature_2m;
         const rainProbs = weatherData.hourly.precipitation_probability;
         const windSpeeds = weatherData.hourly.wind_speed_10m;
         
-        // Find current hour index
-        const now = new Date();
-        let startIndex = 0;
+        // Find current hour index based on current time from API (to avoid timezone issues)
+        const referenceTime = weatherData.current.time;
         for (let i = 0; i < times.length; i++) {
-          if (new Date(times[i]) >= now) {
-            startIndex = i;
+          if (times[i] >= referenceTime) {
+            currentIndex = i;
             break;
           }
         }
 
         // Look for a 3-hour contiguous block in the next 24 hours
-        for (let i = startIndex; i < Math.min(startIndex + 24, times.length - 2); i++) {
+        for (let i = currentIndex; i < Math.min(currentIndex + 24, times.length - 2); i++) {
           let isSafe = true;
           for (let j = 0; j < 3; j++) {
             const idx = i + j;
             if (
-              rainProbs[idx] > 20 || // Too much rain risk
-              windSpeeds[idx] > 15 || // Too windy (drift risk)
-              temps[idx] > 30 || // Too hot (evaporation/burn risk)
-              temps[idx] < 10 // Too cold
+              (rainProbs[idx] || 0) > 20 || // Too much rain risk
+              (windSpeeds[idx] || 0) > 15 || // Too windy (drift risk)
+              (temps[idx] || 0) > 30 || // Too hot (evaporation/burn risk)
+              (temps[idx] || 0) < 10 // Too cold
             ) {
               isSafe = false;
               break;
@@ -212,7 +215,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             const endWindow = new Date(times[i + 2]);
             const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
             
-            const dayStr = startWindow.getDate() === now.getDate() ? "Today" : "Tomorrow";
+            const startDay = new Date(times[i]).getDate();
+            const refDay = new Date(referenceTime).getDate();
+            const dayStr = startDay === refDay ? (lang === 'bn' ? "আজ" : "Today") : (lang === 'bn' ? "আগামীকাল" : "Tomorrow");
             safeSprayingWindow = `${dayStr}, ${formatTime(startWindow)} - ${formatTime(endWindow)}`;
             break;
           }
@@ -304,6 +309,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
       const currentTemp = weatherData.current?.temperature_2m || 0;
 
+      // Extract current soil moisture from hourly if available (takes the first value which is for the current hour usually)
+      const currentSoilMoisture = weatherData.hourly?.soil_moisture_0_to_7cm ? weatherData.hourly.soil_moisture_0_to_7cm[currentIndex] : undefined;
+
       const newWeather: WeatherData = {
         temp: currentTemp,
         condition: condition,
@@ -315,7 +323,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         locationName: "Local Area",
         historicalAvgTemp,
         historicalToday,
-        soilMoisture: weatherData.current?.soil_moisture_0_to_7cm,
+        soilMoisture: currentSoilMoisture,
         evapotranspiration: weatherData.daily?.et0_fao_evapotranspiration?.[0],
         soilPH,
         soilNitrogen,
@@ -389,7 +397,22 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           <Cloud className="w-10 h-10 text-white animate-pulse" />
         </motion.div>
         <h2 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">{t.weatherAdvisory}</h2>
-        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto">{t.weatherAdvisoryDesc}</p>
+        <p className="text-gray-500 text-xl font-medium max-w-2xl mx-auto mb-6">{t.weatherAdvisoryDesc}</p>
+        
+        {globalLocation && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setAdvisory(null);
+              fetchWeatherAndAdvisory();
+            }}
+            className="inline-flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 px-4 py-2 rounded-full border border-blue-100 hover:bg-blue-100 transition-colors"
+          >
+            <RefreshCcw className="w-3 h-3" />
+            <span>{lang === 'bn' ? 'পুনরায় লোড করুন' : 'Refresh Data'}</span>
+          </motion.button>
+        )}
       </div>
 
       {!globalLocation ? (
@@ -791,7 +814,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       className="bg-blue-50/50 rounded-3xl p-8 border border-blue-100 shadow-inner"
                     >
                       <div className="markdown-body text-gray-800 leading-relaxed prose prose-blue max-w-none">
-                        <ReactMarkdown>{advisory}</ReactMarkdown>
+                        <Markdown>{advisory}</Markdown>
                       </div>
                     </motion.div>
                   ) : (

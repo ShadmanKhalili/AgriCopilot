@@ -23,6 +23,16 @@ async function startServer() {
     res.send("google.com, pub-8294149074042302, DIRECT, f08c47fec0942fa0");
   });
 
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // Request logger for API
+  app.use("/api", (req, res, next) => {
+    console.log(`[API Request] ${req.method} ${req.url}`);
+    next();
+  });
+
   app.get("/robots.txt", (req, res) => {
     res.type("text/plain");
     res.send("User-agent: *\nAllow: /");

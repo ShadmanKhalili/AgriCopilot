@@ -234,97 +234,116 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-900 rounded-[2.5rem] p-8 border border-white/10 shadow-3xl overflow-hidden relative"
+            className="bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 rounded-[2.5rem] p-10 border-4 border-blue-500/50 shadow-[0_20px_50px_rgba(59,130,246,0.2)] overflow-hidden relative"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/20 rounded-xl">
-                    <ShieldCheck className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <h2 className="text-xl font-black text-white uppercase tracking-tighter">Admin Control Center</h2>
-                </div>
-                <p className="text-gray-400 text-xs font-medium tracking-wide uppercase">Managing {allSchemes.length} Curated Government Portals</p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <motion.button
-                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(59, 130, 246, 0.2)' }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="flex items-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em] bg-blue-500/10 text-blue-400 px-8 py-5 rounded-2xl border border-blue-500/20 transition-all disabled:opacity-50"
-                >
-                  {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-                  <span>{isSyncing ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'AI SYNCING...') : (lang === 'bn' ? 'এআই দিয়ে সিঙ্ক করুন' : 'AI SMART SYNC')}</span>
-                </motion.button>
-                
-                <motion.button
-                  whileHover={{ scale: 1.02, backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleReset}
-                  disabled={isSyncing}
-                  className="flex items-center space-x-3 text-[11px] font-black uppercase tracking-[0.2em] bg-red-500/5 text-red-400 px-8 py-5 rounded-2xl border border-red-500/10 transition-all disabled:opacity-50"
-                >
-                  <Database className="w-4 h-4" />
-                  <span>{lang === 'bn' ? 'মূল ক্যাটালগে ফিরে যান' : 'RESTORE CURATED'}</span>
-                </motion.button>
-              </div>
-            </div>
+            {/* Pulsing light effect */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/20 blur-[120px] rounded-full -mr-32 -mt-32 animate-pulse" />
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-400/20 blur-[120px] rounded-full -ml-32 -mb-32 animate-pulse" />
             
-            <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-white/5 pt-8">
-              {[
-                { label: 'Total Portals', value: allSchemes.length, icon: Globe },
-                { label: 'Sync Status', value: 'Active', icon: Search },
-                { label: 'Admin Access', value: 'Verified', icon: UserCheck },
-                { label: 'Last Sync', value: 'Today', icon: Clock }
-              ].map((stat, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <stat.icon className="w-4 h-4 text-gray-500" />
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{stat.label}</p>
-                    <p className="text-sm font-black text-white">{stat.value}</p>
+            <div className="relative z-10">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-10">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-blue-500/30 rounded-2xl border border-blue-400/50 shadow-inner">
+                      <ShieldCheck className="w-8 h-8 text-blue-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-green-400 animate-ping"></span>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">System Administrator Dashboard</h2>
+                      </div>
+                      <p className="text-blue-300 text-sm font-bold tracking-[0.1em] uppercase opacity-80">Full Authority: {allSchemes.length} Live Governance Systems</p>
+                    </div>
                   </div>
                 </div>
-              ))}
+
+                <div className="flex flex-wrap items-center gap-4">
+                  <motion.button
+                    whileHover={{ scale: 1.05, backgroundColor: 'rgba(59, 130, 246, 0.4)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className="flex items-center space-x-4 text-[12px] font-black uppercase tracking-[0.25em] bg-blue-500/30 text-white px-10 py-6 rounded-[2rem] border-2 border-blue-400/50 transition-all disabled:opacity-50 shadow-xl shadow-blue-500/20"
+                  >
+                    {isSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCcw className="w-5 h-5" />}
+                    <span>{isSyncing ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'AI SYNCING...') : (lang === 'bn' ? 'এআই দিয়ে সিঙ্ক করুন' : 'TRIGGER AI SYNC')}</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    whileHover={{ scale: 1.05, backgroundColor: 'rgba(239, 68, 68, 0.2)' }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleReset}
+                    disabled={isSyncing}
+                    className="flex items-center space-x-4 text-[12px] font-black uppercase tracking-[0.25em] bg-white/5 text-red-300 px-10 py-6 rounded-[2rem] border-2 border-red-500/30 transition-all disabled:opacity-50 shadow-lg"
+                  >
+                    <Database className="w-5 h-5" />
+                    <span>{lang === 'bn' ? 'রিসেট করুন' : 'HARD RESET'}</span>
+                  </motion.button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 border-t border-white/10 pt-10">
+                {[
+                  { label: 'Active Catalogs', value: allSchemes.length, icon: Globe, color: 'text-blue-400' },
+                  { label: 'Search Index', value: 'Google Cloud', icon: Search, color: 'text-emerald-400' },
+                  { label: 'Security Level', value: 'Level 5', icon: ShieldCheck, color: 'text-orange-400' },
+                  { label: 'Last System Sync', value: 'Synced', icon: Clock, color: 'text-purple-400' }
+                ].map((stat, i) => (
+                  <motion.div 
+                    key={i} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="bg-white/5 p-5 rounded-[2rem] border border-white/10"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 bg-white/5 rounded-xl ${stat.color}`}>
+                        <stat.icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">{stat.label}</p>
+                        <p className="text-lg font-black text-white tracking-tight">{stat.value}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.div>
         )}
 
-        <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-gray-100 gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="bg-blue-600 text-white font-black px-5 py-2 rounded-2xl text-lg shadow-lg shadow-blue-500/20">
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-8 rounded-[3rem] border border-gray-100 gap-8 shadow-sm">
+          <div className="flex items-center space-x-6">
+            <div className="bg-blue-600 text-white font-black px-6 py-3 rounded-2xl text-2xl shadow-xl shadow-blue-500/20">
               {filteredSchemes.length}
             </div>
             <div>
               <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm">
-                {lang === 'bn' ? 'উপলব্ধ প্রকল্পসমূহ' : 'Available Schemes'}
+                {lang === 'bn' ? 'উপলব্ধ প্রকল্পসমূহ' : 'Available Systems'}
               </h3>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                {selectedTag === 'All' ? (lang === 'bn' ? 'সব বিভাগ' : 'ALL CATEGORIES') : selectedTag.toUpperCase()}
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                {selectedTag === 'All' ? (lang === 'bn' ? 'সব বিভাগ' : 'GLOBAL ACCESS') : `${selectedTag.toUpperCase()} ONLY`}
               </p>
             </div>
           </div>
-        </div>
 
-        {/* Tag Filter */}
-        <div className="flex flex-wrap items-center gap-3 px-2">
-          {uniqueTags.map((tag) => (
-            <motion.button
-              key={tag}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedTag(tag)}
-              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border ${
-                selectedTag === tag 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30' 
-                  : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
-              }`}
-            >
-              {tag}
-            </motion.button>
-          ))}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {uniqueTags.map((tag) => (
+              <motion.button
+                key={tag}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedTag(tag)}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                  selectedTag === tag 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30' 
+                    : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
+                }`}
+              >
+                {tag}
+              </motion.button>
+            ))}
+          </div>
         </div>
       </div>
 
