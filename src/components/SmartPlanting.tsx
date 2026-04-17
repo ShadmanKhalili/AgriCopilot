@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Info, Navigation, Cloud, Satellite, Wallet, History } from 'lucide-react';
+import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Info, Navigation, Cloud, Satellite, Wallet, History, Sparkles } from 'lucide-react';
 import { getPlantingRecommendations } from '../services/ai';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
@@ -20,8 +20,9 @@ interface SmartPlantingProps {
 
 export default function SmartPlanting({ lang, globalLocation, setGlobalLocation }: SmartPlantingProps) {
   const t = translations[lang];
-  const { incrementUsage, limit, currentUsage, tier } = useUsageTracking();
+  const { canUse, canUsePremium, incrementUsage, incrementPremiumUsage, currentUsage, limit, tier, currentPremiumUsage, premiumLimit } = useUsageTracking('smart-planting');
   const { user } = useAuth();
+  const [usePremium, setUsePremium] = useState(false);
 
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
         console.warn("Failed to fetch satellite data", e);
       }
 
-      const isPremium = tier === 'premium';
+      const isPremiumAnalysis = usePremium || tier === 'premium';
       const data = await getPlantingRecommendations(
         activeLocation,
         landType,
@@ -117,10 +118,11 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
         weatherData,
         satelliteData,
         lang,
-        isPremium
+        isPremiumAnalysis
       );
       
       setResults(data);
+      if (usePremium && tier !== 'premium') incrementPremiumUsage();
       incrementUsage();
 
       // Save Intent to Database
@@ -395,6 +397,26 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
           <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-2xl border border-red-100 flex items-center space-x-3">
             <AlertTriangle className="w-5 h-5 flex-shrink-0" />
             <p className="font-medium">{error}</p>
+          </div>
+        )}
+
+        {tier !== 'premium' && canUsePremium() && (
+          <div className="mb-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-100 rounded-2xl">
+            <div className="flex items-center space-x-3">
+              <div className="bg-orange-100 p-2 rounded-xl">
+                <Sparkles className="w-5 h-5 text-orange-600" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gray-900">Premium Analysis (Gemini 3.1 Flash)</h4>
+                <p className="text-xs text-gray-500">Use your 1 free daily premium run for this tab.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setUsePremium(!usePremium)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${usePremium ? 'bg-orange-500' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${usePremium ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
           </div>
         )}
 

@@ -36,8 +36,6 @@ interface Props {
   setPersistedInsights?: (insights: any | null) => void;
   persistedProduce?: string;
   setPersistedProduce?: (produce: string) => void;
-  persistedQuantity?: string;
-  setPersistedQuantity?: (quantity: string) => void;
 }
 
 export default function MarketConnect({ 
@@ -45,12 +43,9 @@ export default function MarketConnect({
   persistedInsights,
   setPersistedInsights,
   persistedProduce,
-  setPersistedProduce,
-  persistedQuantity,
-  setPersistedQuantity
+  setPersistedProduce
 }: Props) {
   const [produce, setProduce] = useState(persistedProduce || PRODUCE_TYPES[0]);
-  const [quantity, setQuantity] = useState(persistedQuantity || '100');
   const [isLoading, setIsLoading] = useState(false);
   const [insights, setInsights] = useState<any | null>(persistedInsights || null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -58,7 +53,8 @@ export default function MarketConnect({
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const { user } = useAuth();
-  const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
+  const { canUse, canUsePremium, incrementUsage, incrementPremiumUsage, tier, currentUsage, limit } = useUsageTracking('market-connect');
+  const [usePremium, setUsePremium] = useState(false);
   const t = translations[lang];
 
   // Sync with persisted state
@@ -69,10 +65,6 @@ export default function MarketConnect({
   React.useEffect(() => {
     if (setPersistedProduce) setPersistedProduce(produce);
   }, [produce, setPersistedProduce]);
-
-  React.useEffect(() => {
-    if (setPersistedQuantity) setPersistedQuantity(quantity);
-  }, [quantity, setPersistedQuantity]);
 
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
@@ -102,7 +94,8 @@ export default function MarketConnect({
     try {
       const produceName = translations.en.crops[produce as keyof typeof translations.en.crops] || produce;
       
-      result = await getMarketInsights(produceName, quantity, lang, isAdvanced, coords || undefined);
+      const isPremiumAnalysis = usePremium || tier === 'premium';
+      result = await getMarketInsights(produceName, lang, isPremiumAnalysis, coords || undefined);
       setInsights(result);
       setLastUpdated(new Date().toLocaleString());
 
@@ -112,9 +105,8 @@ export default function MarketConnect({
           await addDoc(collection(db, 'market_queries'), {
             userId: user.uid,
             produce,
-            quantity,
             insights: result.insights,
-            isAdvanced,
+            isAdvanced: isPremiumAnalysis,
             createdAt: new Date().toISOString()
           });
         } catch (saveError) {
@@ -129,6 +121,7 @@ export default function MarketConnect({
     }
 
     try {
+      if (usePremium && tier !== 'premium') incrementPremiumUsage();
       await incrementUsage();
     } catch (error) {
       console.error("Usage increment failed:", error);
@@ -189,26 +182,6 @@ export default function MarketConnect({
                 </div>
               </div>
 
-              {/* Quantity */}
-              <div className="space-y-3">
-                <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
-                  <Scale className="w-4 h-4 mr-2 text-blue-500" />
-                  {t.quantity}
-                </label>
-                <div className="relative">
-                  <input 
-                    type="number"
-                    value={quantity} 
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="e.g. 100"
-                    className="w-full rounded-2xl border border-gray-200 shadow-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-gray-50 p-4 pr-16 text-base font-bold text-gray-900 transition-all outline-none"
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 p-1 px-2 bg-blue-100 text-blue-700 font-bold text-xs rounded-lg">
-                    KG
-                  </div>
-                </div>
-              </div>
-
               {/* Location */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -244,29 +217,48 @@ export default function MarketConnect({
                 )}
               </div>
 
-              {/* Advanced Toggle */}
-              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-2xl border border-amber-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      id="advancedMarket" 
-                      checked={isAdvanced}
-                      onChange={(e) => setIsAdvanced(e.target.checked)}
-                      disabled={tier !== 'premium'}
-                      className="absolute w-6 h-6 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full appearance-none cursor-pointer checked:translate-x-4 checked:border-amber-500 focus:outline-none disabled:opacity-50"
-                    />
-                    <label htmlFor="advancedMarket" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-amber-400' : ''}`}></label>
+              {/* Advanced / Premium Toggle */}
+              {tier === 'premium' ? (
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-2xl border border-amber-100 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        id="advancedMarket" 
+                        checked={isAdvanced}
+                        onChange={(e) => setIsAdvanced(e.target.checked)}
+                        className="absolute w-6 h-6 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full appearance-none cursor-pointer checked:translate-x-4 checked:border-amber-500 focus:outline-none"
+                      />
+                      <label htmlFor="advancedMarket" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-amber-400' : ''}`}></label>
+                    </div>
+                    <label htmlFor="advancedMarket" className={`text-sm font-black uppercase tracking-widest flex items-center text-gray-800`}>
+                      <Sparkles className="w-4 h-4 mr-1.5 text-amber-500" />
+                      {t.advancedAnalysis}
+                    </label>
                   </div>
-                  <label htmlFor="advancedMarket" className={`text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-800' : 'text-gray-400'}`}>
-                    <Sparkles className="w-4 h-4 mr-1.5 text-amber-500" />
-                    {t.advancedAnalysis}
-                  </label>
+                  <Tooltip content={t.tooltips.advanced}>
+                    <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
+                  </Tooltip>
                 </div>
-                <Tooltip content={t.tooltips.advanced}>
-                  <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
-                </Tooltip>
-              </div>
+              ) : canUsePremium() && (
+                 <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-orange-100 p-2 rounded-xl">
+                      <Sparkles className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900">Premium Analysis</h4>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">1 free daily run</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setUsePremium(!usePremium)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${usePremium ? 'bg-orange-500' : 'bg-gray-200'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${usePremium ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              )}
 
               {/* Usage Bar */}
               <div className="py-2">
@@ -402,7 +394,7 @@ export default function MarketConnect({
                 </div>
                 <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Market Intelligence</h3>
                 <p className="text-sm font-medium text-gray-500 max-w-sm leading-relaxed">
-                  Enter your produce, quantity, and location to fetch real-time market insights and nearby wholesale pricing.
+                  Enter your produce and location to fetch real-time market insights and nearby wholesale pricing.
                 </p>
               </motion.div>
             )}

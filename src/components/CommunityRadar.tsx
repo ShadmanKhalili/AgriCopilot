@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Radar, AlertTriangle, MapPin, Calendar, Loader2, ShieldAlert } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { translations, Language } from '../utils/translations';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 interface Props {
   lang: Language;
@@ -24,21 +25,20 @@ export default function CommunityRadar({ lang }: Props) {
   const t = translations[lang];
 
   useEffect(() => {
-    const fetchAlerts = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch recent high-severity diagnoses
-        const q = query(
-          collection(db, 'diagnoses'),
-          where('severity', '>=', 50),
-          orderBy('severity', 'desc'),
-          limit(10)
-        );
-        
-        const snapshot = await getDocs(q);
-        const fetchedAlerts: Alert[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
+    setIsLoading(true);
+    // Fetch recent diagnoses and filter high-severity locally to avoid composite index requirement
+    const q = query(
+      collection(db, 'diagnoses'),
+      orderBy('createdAt', 'desc'),
+      limit(30)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedAlerts: Alert[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        // Client-side filter for severity
+        if (data.severity && data.severity >= 30) {
           fetchedAlerts.push({
             id: doc.id,
             crop: data.crop,
@@ -47,17 +47,18 @@ export default function CommunityRadar({ lang }: Props) {
             createdAt: data.createdAt,
             diagnosisText: data.diagnosisText
           });
-        });
-        
-        setAlerts(fetchedAlerts);
-      } catch (error) {
-        console.error("Error fetching community alerts:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        }
+      });
+      
+      // Take top 10 recent severe ones
+      setAlerts(fetchedAlerts.slice(0, 10));
+      setIsLoading(false);
+    }, (error) => {
+      setIsLoading(false);
+      handleFirestoreError(error, OperationType.GET, 'diagnoses');
+    });
 
-    fetchAlerts();
+    return () => unsubscribe();
   }, []);
 
   return (
@@ -150,7 +151,15 @@ export default function CommunityRadar({ lang }: Props) {
                 </div>
                 <div className="flex items-center text-gray-400 text-xs font-bold">
                   <Calendar className="w-3.5 h-3.5 mr-1" />
-                  <span>{new Date(alert.createdAt).toLocaleDateString()}</span>
+                  <span>
+                    {(() => {
+                      const diffInfo = Math.floor((new Date().getTime() - new Date(alert.createdAt).getTime()) / 60000);
+                      if (diffInfo < 60) return `${diffInfo} ${lang === 'bn' ? 'মিনিট আগে' : 'minutes ago'}`;
+                      const diffHours = Math.floor(diffInfo / 60);
+                      if (diffHours < 24) return `${diffHours} ${lang === 'bn' ? 'ঘন্টা আগে' : 'hours ago'}`;
+                      return new Date(alert.createdAt).toLocaleDateString();
+                    })()}
+                  </span>
                 </div>
               </div>
             </motion.div>

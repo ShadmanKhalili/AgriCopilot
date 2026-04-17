@@ -198,7 +198,7 @@ export default function UserGuide({ lang }: Props) {
         </motion.div>
       </div>
 
-      {/* Pricing & Usage Guide */}
+        {/* Pricing & Usage Guide */}
       <motion.div variants={itemVariants} className="mt-16 bg-white p-10 md:p-12 rounded-[48px] border border-gray-100 shadow-2xl shadow-gray-200/50 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-green-50 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-50 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/3 opacity-50 pointer-events-none"></div>
@@ -210,7 +210,7 @@ export default function UserGuide({ lang }: Props) {
           <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase italic">{t.guidePricing}</h3>
         </div>
         <p className="text-gray-500 leading-relaxed text-xl max-w-3xl font-medium relative z-10">
-          {t.guidePricingDesc}
+          Access different performance levels and limits based on your account type.
         </p>
         
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 relative z-10">
@@ -223,8 +223,8 @@ export default function UserGuide({ lang }: Props) {
                 <CheckCircle2 className="w-6 h-6 text-gray-400" />
               </div>
               <div>
-                <p className="font-black text-gray-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'অজ্ঞাত' : 'Anonymous'}</p>
-                <p className="text-lg font-black text-gray-400 tracking-tighter">{lang === 'bn' ? '৫টি ব্যবহার' : '5 uses total'}</p>
+                <p className="font-black text-gray-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'গেস্ট' : 'Guest'}</p>
+                <p className="text-sm font-black text-gray-400 tracking-tight">{lang === 'bn' ? '১০ বার প্রতি ট্যাব/দিন' : '10 uses / tab / day'}</p>
               </div>
             </motion.div>
           </Tooltip>
@@ -237,22 +237,22 @@ export default function UserGuide({ lang }: Props) {
                 <CheckCircle2 className="w-6 h-6 text-green-500" />
               </div>
               <div>
-                <p className="font-black text-green-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'ফ্রি' : 'Free Account'}</p>
-                <p className="text-lg font-black text-green-600 tracking-tighter">{lang === 'bn' ? '১০টি ব্যবহার' : '10 uses total'}</p>
+                <p className="font-black text-green-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'ফ্রি' : 'Standard'}</p>
+                <p className="text-sm font-black text-green-600 tracking-tight">{lang === 'bn' ? '১০০ বার/দিন + ১ প্রিমিয়াম/ট্যাব' : '100 queries/day + 1 Premium/tab'}</p>
               </div>
             </motion.div>
           </Tooltip>
-          <Tooltip content={lang === 'bn' ? 'সর্বোচ্চ সুবিধা এবং এআই শক্তি' : 'Maximum benefits and AI power'}>
+          <Tooltip content={lang === 'bn' ? 'যোগাযোগ করুন কাস্টমাইজড প্ল্যানের জন্য - Shadman Khalili, +880 141-045-6453' : 'Contact for custom plans - Shadman Khalili, +880 141-045-6453'}>
             <motion.div 
               whileHover={{ scale: 1.05 }}
-              className="bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-[32px] border border-yellow-200 flex items-center space-x-4 shadow-xl shadow-orange-200/50 w-full"
+              className="bg-gradient-to-br from-yellow-400 to-orange-500 p-6 rounded-[32px] border border-yellow-200 flex items-center space-x-4 shadow-xl shadow-orange-200/50 w-full cursor-pointer"
             >
               <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
                 <Crown className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="font-black text-white uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'প্রিমিয়াম' : 'Premium'}</p>
-                <p className="text-lg font-black text-white tracking-tighter">{lang === 'bn' ? '৫০টি ব্যবহার' : '50 uses total'}</p>
+                <p className="font-black text-white uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'প্রো ও এন্টারপ্রাইজ' : 'Pro & Enterprise'}</p>
+                <p className="text-sm font-black text-white tracking-tight">{lang === 'bn' ? 'আনলিমিটেড প্রিমিয়াম' : 'Unlimited Premium'}</p>
               </div>
             </motion.div>
           </Tooltip>

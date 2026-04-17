@@ -40,7 +40,6 @@ export default function Layout() {
   // MarketConnect State Persistence
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
-  const [marketQuantity, setMarketQuantity] = useState<string>('100');
 
   // Global Location State
   const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -329,8 +328,6 @@ export default function Layout() {
               setPersistedInsights={setMarketInsights}
               persistedProduce={marketProduce}
               setPersistedProduce={setMarketProduce}
-              persistedQuantity={marketQuantity}
-              setPersistedQuantity={setMarketQuantity}
             />
           </div>
           <div className={activeTab === 'macro-trends' ? 'block flex-1' : 'hidden'}>

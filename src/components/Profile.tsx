@@ -30,7 +30,6 @@ interface CertificateRecord {
 interface MarketQueryRecord {
   id: string;
   produce: string;
-  location: string;
   createdAt: string;
   isAdvanced: boolean;
 }
@@ -306,7 +305,7 @@ export default function Profile({ lang }: Props) {
                       </div>
                       <div>
                         <p className="text-lg font-black text-gray-900 tracking-tight">{mq.produce}</p>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{mq.location} • {new Date(mq.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{new Date(mq.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="text-right">

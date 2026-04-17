@@ -335,7 +335,6 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
 
 export const getMarketInsights = async (
   produce: string, 
-  quantity: string, 
   lang: string, 
   isAdvanced?: boolean,
   coords?: { latitude: number; longitude: number }
@@ -350,7 +349,6 @@ export const getMarketInsights = async (
 
       const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in Bangladesh for TODAY (${today}). 
       ${locationContext}
-      The user wants to sell a quantity of ${quantity} kg.
       Search for official market reports, news articles, or agricultural bulletins from ${currentYear}.
       If ${currentYear} data is absolutely unavailable, use data from ${currentYear - 1}.
       
