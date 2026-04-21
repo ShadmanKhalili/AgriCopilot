@@ -7,6 +7,7 @@ import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
@@ -33,6 +34,7 @@ export default function SmartGrade({ lang }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<GradeResult | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
+  const isOnline = useNetworkStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
@@ -56,6 +58,11 @@ export default function SmartGrade({ lang }: Props) {
   const handleGrade = async () => {
     if (!image) return;
     
+    if (!isOnline) {
+      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      return;
+    }
+
     if (!canUse()) {
       alert(t.limitReached);
       return;
@@ -216,7 +223,7 @@ export default function SmartGrade({ lang }: Props) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleGrade}
-              disabled={!image || isLoading}
+              disabled={!image || isLoading || !isOnline}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
             >
               {isLoading ? (

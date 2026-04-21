@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Info, Navigation, Cloud, Satellite, Wallet, History, Sparkles } from 'lucide-react';
 import { getPlantingRecommendations } from '../services/ai';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { addDoc, collection } from 'firebase/firestore';
@@ -23,6 +24,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
   const { canUse, canUsePremium, incrementUsage, incrementPremiumUsage, currentUsage, limit, tier, currentPremiumUsage, premiumLimit } = useUsageTracking('smart-planting');
   const { user } = useAuth();
   const [usePremium, setUsePremium] = useState(false);
+  const isOnline = useNetworkStatus();
 
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -65,6 +67,11 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
   };
 
   const handleAnalyze = async () => {
+    if (!isOnline) {
+      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      return;
+    }
+
     const activeLocation = isManualLocation && activeUpazila
       ? { latitude: activeUpazila.lat, longitude: activeUpazila.lng }
       : globalLocation;

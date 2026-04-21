@@ -81,9 +81,12 @@ export const diagnoseCrop = async (
       
       If multiple images are provided, synthesize the information from all of them to provide a more accurate diagnosis.
       
-      CRITICAL: Pay special attention to Nutrient Levels. Farmers rely on this for soil management. 
-      Provide specific percentages for Nitrogen (N), Phosphorus (P), and Potassium (K) based on visual symptoms like leaf yellowing (N), purple tints (P), or burnt edges (K).
-      Also, provide the ideal percentage range for these nutrients for this specific crop.
+      CRITICAL ANALYSIS GUIDELINES:
+      - DISEASE: Look for fungal patterns (powdery/downy mildews), bacterial rots, or viral mosaic patterns.
+      - PESTS: Look for direct insect sightings or characteristic damage (mining, chewing, webbing, piercing/sucking symptoms).
+      - ABIOTIC STRESS: Identify visual signs of heat stress, waterlogging, drought, or sunscald.
+      - VISUAL SYMPTOMS: Describe specific leaf discolorations (chlorosis, necrosis), wilting types, and fruit/stem abnormalities.
+      - DO NOT provide specific chemical/nutrient percentages (e.g., N/P/K %) as these cannot be reliably diagnosed from images alone. Instead, suggest general nutritional health based on vigor and color.
       
       Return the response in the following JSON format:
       {

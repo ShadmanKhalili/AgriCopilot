@@ -17,6 +17,8 @@ import { useAuth } from './AuthProvider';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import GoogleAd from './GoogleAd';
+import OfflineBanner from './OfflineBanner';
+import LegalModal from './LegalModal';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile';
 
@@ -25,6 +27,7 @@ export default function Layout() {
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['agri-copilot']));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [lang, setLang] = useState<Language>('bn');
 
   useEffect(() => {
@@ -75,7 +78,9 @@ export default function Layout() {
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-gray-50 flex flex-col md:flex-row font-sans overflow-hidden">
+    <>
+      <OfflineBanner lang={lang} />
+      <div className="h-[100dvh] w-full bg-gray-50 flex flex-col md:flex-row font-sans overflow-hidden">
       {/* Mobile Header */}
       <div className="md:hidden bg-green-700 text-white p-4 flex justify-between items-center shadow-md z-30 shrink-0">
         <div className="flex items-center space-x-2">
@@ -226,6 +231,14 @@ export default function Layout() {
               <span>{t.signIn}</span>
             </motion.button>
           )}
+          <div className="text-center pt-2">
+            <button 
+              onClick={() => setIsLegalOpen(true)}
+              className="text-[10px] text-green-300/60 hover:text-green-300 underline underline-offset-2 uppercase tracking-wider transition-colors"
+            >
+              {lang === 'bn' ? 'গোপনীয়তা নীতি ও শর্তাবলী' : 'Privacy Policy & Terms'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -330,6 +343,14 @@ export default function Layout() {
         onClose={() => setIsPricingOpen(false)} 
         lang={lang} 
       />
+
+      {/* Legal Modal */}
+      <LegalModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        lang={lang}
+      />
     </div>
+    </>
   );
 }

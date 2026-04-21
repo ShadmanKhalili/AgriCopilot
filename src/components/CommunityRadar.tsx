@@ -14,7 +14,7 @@ interface Alert {
   id: string;
   crop: string;
   analysisType: string;
-  severity: number;
+  severity: number | string;
   createdAt: string;
   diagnosisText: string;
 }
@@ -37,13 +37,24 @@ export default function CommunityRadar({ lang }: Props) {
       const fetchedAlerts: Alert[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        // Client-side filter for severity
-        if (data.severity && data.severity >= 30) {
+        // Client-side filter for severity (support both legacy numeric and new qualitative severity)
+        let isSevere = false;
+        let displaySeverity: number | string = 0;
+
+        if (typeof data.severity === 'number' && data.severity >= 30) {
+          isSevere = true;
+          displaySeverity = data.severity;
+        } else if (data.qualitativeSeverity && (data.qualitativeSeverity === 'High' || data.qualitativeSeverity === 'Medium')) {
+          isSevere = true;
+          displaySeverity = data.qualitativeSeverity;
+        }
+
+        if (isSevere) {
           fetchedAlerts.push({
             id: doc.id,
             crop: data.crop,
             analysisType: data.analysisType,
-            severity: data.severity,
+            severity: displaySeverity,
             createdAt: data.createdAt,
             diagnosisText: data.diagnosisText
           });
@@ -126,12 +137,17 @@ export default function CommunityRadar({ lang }: Props) {
                       {t.crops[alert.crop as keyof typeof t.crops] || alert.crop}
                     </h3>
                     <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">
-                      {alert.analysisType === 'disease' ? t.disease : alert.analysisType === 'pest' ? t.pest : t.nutrient}
+                      {alert.analysisType === 'disease' ? t.disease : alert.analysisType === 'pest' ? t.pest : t.abiotic}
                     </span>
                   </div>
                 </div>
                 <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold border border-red-100">
-                  {alert.severity}% Severe
+                  {typeof alert.severity === 'number' 
+                    ? `${alert.severity}% Severe` 
+                    : lang === 'bn' 
+                      ? (alert.severity === 'High' ? 'উচ্চ ঝুঁকি' : 'মাঝারি ঝুঁকি')
+                      : `${alert.severity} Severity`
+                  }
                 </div>
               </div>
 

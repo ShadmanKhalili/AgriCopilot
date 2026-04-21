@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
@@ -74,6 +75,7 @@ export default function AgriCopilot({
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isManualLocation, setIsManualLocation] = useState(false);
+  const isOnline = useNetworkStatus();
   const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
   const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
@@ -125,7 +127,7 @@ export default function AgriCopilot({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const remainingSlots = 3 - images.length;
+      const remainingSlots = 5 - images.length;
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
       try {
@@ -296,6 +298,11 @@ export default function AgriCopilot({
   const handleDiagnose = async () => {
     if (images.length === 0) return;
     
+    if (!isOnline) {
+      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      return;
+    }
+
     if (!canUse()) {
       alert(t.limitReached);
       return;
@@ -303,7 +310,7 @@ export default function AgriCopilot({
 
     setIsLoading(true);
     try {
-      const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.nutrient;
+      const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
       // Use English values for the AI prompt to ensure consistency, but we can pass the translated ones too
       const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
       const stageName = translations.en.stages[cropStage as keyof typeof translations.en.stages];
@@ -402,12 +409,12 @@ export default function AgriCopilot({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.captureImage}</label>
-                <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 uppercase tracking-widest">{images.length}/3 {t.photoLimit}</span>
+                <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 uppercase tracking-widest">{images.length}/5 {t.photoLimit}</span>
               </div>
               
               {images.length > 0 && (
                 <div className="space-y-4 mb-4">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-5 gap-3">
                     {images.map((img, idx) => (
                       <motion.div 
                         key={idx} 
@@ -433,7 +440,7 @@ export default function AgriCopilot({
                       </motion.div>
                     ))}
                   </div>
-                  {images.length < 3 && (
+                  {images.length < 5 && (
                     <motion.label 
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
@@ -596,7 +603,7 @@ export default function AgriCopilot({
               >
                 <option value="disease">{t.disease}</option>
                 <option value="pest">{t.pest}</option>
-                <option value="nutrient">{t.nutrient}</option>
+                <option value="abiotic">{t.abiotic}</option>
               </select>
             </div>
 
@@ -646,7 +653,7 @@ export default function AgriCopilot({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleDiagnose}
-              disabled={images.length === 0 || isLoading}
+              disabled={images.length === 0 || isLoading || !isOnline}
               className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
             >
               {isLoading ? (
