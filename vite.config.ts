@@ -7,9 +7,6 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
@@ -23,6 +20,7 @@ export default defineConfig(({mode}) => {
             'vendor-motion': ['motion/react'],
             'vendor-charts': ['recharts'],
             'vendor-icons': ['lucide-react'],
+            'vendor-markdown': ['react-markdown'],
             'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore']
           }
         }

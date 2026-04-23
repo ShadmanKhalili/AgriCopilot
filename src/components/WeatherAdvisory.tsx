@@ -244,7 +244,16 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
       try {
         const climateRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
+        
+        if (!climateRes.ok) {
+          throw new Error(`Historical API returned ${climateRes.status}`);
+        }
+
         const climateData = await climateRes.json();
+        
+        if (!climateData.daily || !climateData.daily.temperature_2m_mean || !climateData.daily.time) {
+          throw new Error("Incomplete daily historical temperature data");
+        }
         
         const temps = climateData.daily.temperature_2m_mean;
         const times = climateData.daily.time;
@@ -266,6 +275,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
       try {
         const lastYearRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
+        
+        if (!lastYearRes.ok) {
+          throw new Error(`Last year API returned ${lastYearRes.status}`);
+        }
+
         const lastYearData = await lastYearRes.json();
         
         if (lastYearData.daily && lastYearData.daily.temperature_2m_max.length > 0) {

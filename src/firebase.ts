@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -32,6 +32,27 @@ export const signInWithGoogle = async () => {
     throw error;
   } finally {
     isSigningIn = false;
+  }
+};
+
+export const signUpWithEmail = async (email: string, password: string, name: string) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: name });
+    return userCredential.user;
+  } catch (error) {
+    console.error("Error signing up with email", error);
+    throw error;
+  }
+};
+
+export const loginWithEmail = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
+  } catch (error) {
+    console.error("Error logging in with email", error);
+    throw error;
   }
 };
 

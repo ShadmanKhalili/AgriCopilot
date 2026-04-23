@@ -5,6 +5,9 @@ import { fileURLToPath } from "url";
 import axios from "axios";
 import dotenv from "dotenv";
 import https from "https";
+import helmet from "helmet";
+import { rateLimit } from 'express-rate-limit';
+import compression from "compression";
 
 dotenv.config();
 
@@ -14,6 +17,82 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // 0. Enable Gzip Compression
+  app.use(compression());
+
+  // 0.1 Serve Static Assets with Cache-Control
+  if (process.env.NODE_ENV === "production") {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath, {
+      maxAge: '1d',
+      etag: true,
+      lastModified: true
+    }));
+  }
+
+  // 0.2 Trust Proxy (Required for rate limiting behind Cloud Run/Nginx)
+  app.set('trust proxy', 1);
+
+  // 1. Rate Limiting
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 500, // Increased limit for smoother dashboard experience
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later." }
+  });
+
+  // Apply rate limiter to all /api routes
+  app.use("/api", limiter);
+
+  // 1.5 AI Service Setup (Server-Side)
+  // AI is now handled strictly on the frontend as per platform standards.
+
+
+  // 1. Security Headers with Helmet
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://pagead2.googlesyndication.com", "https://www.googletagmanager.com", "https://apis.google.com"],
+        "img-src": ["'self'", "data:", "https:", "https://pagead2.googlesyndication.com"],
+        "connect-src": [
+          "'self'", 
+          "https://api.open-meteo.com", 
+          "https://archive-api.open-meteo.com", 
+          "https://rest.isric.org", 
+          "https://api.worldbank.org", 
+          "https://api.bigdatacloud.net", 
+          "https://get.geojs.io", 
+          "https://identity.dataspace.copernicus.eu", 
+          "https://sh.dataspace.copernicus.eu", 
+          "https://services.sentinel-hub.com", 
+          "https://*.googleapis.com",
+          "https://*.firebaseapp.com",
+          "https://*.google.com"
+        ],
+        "frame-src": [
+          "'self'", 
+          "https://googleads.g.doubleclick.net", 
+          "https://www.google.com", 
+          "https://content-cloudrun-static-files-pa.googleapis.com",
+          "https://*.firebaseapp.com"
+        ],
+        "frame-ancestors": ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.web.app", "https://*.firebaseapp.com"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    frameguard: false,
+  }));
+
+  // 2. Extra Security Headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Removed X-Frame-Options: SAMEORIGIN to allow AI Studio preview iframe
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
 
   app.use(express.json());
 
@@ -356,7 +435,10 @@ async function startServer() {
     }
   });
 
-  // Link Preview Helper
+  // AI PROXY ROUTES REMOVED (AI moved to frontend)
+
+
+  // Link Preview Helper (Hardened against SSRF)
   app.get("/api/link-preview", async (req, res) => {
     const { url } = req.query;
     if (!url || typeof url !== 'string') {
@@ -368,6 +450,12 @@ async function startServer() {
       urlObj = new URL(url);
     } catch {
       return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    // SSRF Prevention: Block internal/local hostnames
+    const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254'];
+    if (blockedHosts.includes(urlObj.hostname) || urlObj.hostname.startsWith('192.168.') || urlObj.hostname.startsWith('10.')) {
+      return res.status(403).json({ error: "Access to internal resources is prohibited" });
     }
 
     try {
@@ -392,7 +480,9 @@ async function startServer() {
           'Referer': urlObj.origin + '/'
         },
         httpsAgent: new https.Agent({
-          rejectUnauthorized: false
+          // NOTE: Some local portals might have SSL certificate issues.
+          // In a high-security environment, this should be set to true.
+          rejectUnauthorized: process.env.NODE_ENV === 'production'
         }),
         timeout: 10000,
         maxRedirects: 10,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock } from 'lucide-react';
 
 interface LinkMetadata {
@@ -153,6 +153,7 @@ const DISTRICTS = [
 
 export default function GovSchemes({ lang, globalLocation }: Props) {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string>('');
   const [allSchemes, setAllSchemes] = useState<GovScheme[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const { userProfile } = useAuth();
@@ -184,13 +185,26 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
 
   const handleSync = async () => {
     if (!window.confirm(lang === 'bn' ? "গুগল সার্চের মাধ্যমে প্রকল্পগুলো আপডেট করবেন? এটি এআই ব্যবহার করে এবং কিছুটা সময় নিতে পারে।" : "Sync curated schemes with Google Search? This uses AI and takes a few moments.")) return;
+    
     setIsSyncing(true);
+    setSyncStatus(lang === 'bn' ? 'এআই ইঞ্জিন চালু হচ্ছে...' : 'Initializing AI Engine...');
+    
     try {
+      // Simulate phases for user transparency
+      setTimeout(() => setSyncStatus(lang === 'bn' ? 'গুগল সার্চে অনুসন্ধান করা হচ্ছে...' : 'Searching Google for latest schemes...'), 2000);
+      setTimeout(() => setSyncStatus(lang === 'bn' ? 'ডেটা প্রসেস করা হচ্ছে...' : 'Analyzing and structuring data...'), 5000);
+      
       const count = await syncCuratedSchemes();
-      alert(lang === 'bn' ? `সফলভাবে ${count}টি প্রকল্প আপডেট করা হয়েছে!` : `Successfully synced ${count} schemes from the latest search!`);
+      
+      setSyncStatus(lang === 'bn' ? 'ডেটাবেস আপডেট করা হচ্ছে...' : 'Finalizing Database Update...');
+      setTimeout(() => {
+        alert(lang === 'bn' ? `সফলভাবে ${count}টি প্রকল্প আপডেট করা হয়েছে!` : `Successfully synced ${count} schemes from the latest search!`);
+        setSyncStatus('');
+      }, 1000);
     } catch (error) {
       console.error("Sync failed:", error);
       alert(lang === 'bn' ? "আপডেট করতে ব্যর্থ হয়েছে। কনসোল দেখুন।" : "Failed to sync schemes. check console.");
+      setSyncStatus('');
     } finally {
       setIsSyncing(false);
     }
@@ -257,16 +271,41 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
-                  <motion.button
-                    whileHover={{ scale: 1.05, backgroundColor: 'rgba(59, 130, 246, 0.4)' }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSync}
-                    disabled={isSyncing}
-                    className="flex items-center space-x-4 text-[12px] font-black uppercase tracking-[0.25em] bg-blue-500/30 text-white px-10 py-6 rounded-[2rem] border-2 border-blue-400/50 transition-all disabled:opacity-50 shadow-xl shadow-blue-500/20"
-                  >
-                    {isSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCcw className="w-5 h-5" />}
-                    <span>{isSyncing ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'AI SYNCING...') : (lang === 'bn' ? 'এআই দিয়ে সিঙ্ক করুন' : 'TRIGGER AI SYNC')}</span>
-                  </motion.button>
+                  <div className="relative group">
+                    <AnimatePresence>
+                      {isSyncing && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1.1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          className="absolute -inset-2 bg-blue-500/20 rounded-[2.5rem] blur-xl animate-pulse -z-10"
+                        />
+                      )}
+                    </AnimatePresence>
+                    <motion.button
+                      whileHover={{ scale: 1.05, backgroundColor: 'rgba(59, 130, 246, 0.4)' }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleSync}
+                      disabled={isSyncing}
+                      className="flex items-center space-x-4 text-[12px] font-black uppercase tracking-[0.25em] bg-blue-500/30 text-white px-10 py-6 rounded-[2rem] border-2 border-blue-400/50 transition-all disabled:opacity-50 shadow-xl shadow-blue-500/20 relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-3">
+                        {isSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCcw className="w-5 h-5" />}
+                        <div className="flex flex-col items-start">
+                          <span>{isSyncing ? (lang === 'bn' ? 'এআই সিঙ্কিং শুরু...' : 'INITIALIZING SYNC...') : (lang === 'bn' ? 'এআই দিয়ে সিঙ্ক করুন' : 'TRIGGER AI SYNC')}</span>
+                          {isSyncing && (
+                            <motion.span 
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-[8px] opacity-70 mt-1 lowercase font-mono translate-y-[-2px]"
+                            >
+                              {syncStatus}
+                            </motion.span>
+                          )}
+                        </div>
+                      </div>
+                    </motion.button>
+                  </div>
                   
                   <motion.button
                     whileHover={{ scale: 1.05, backgroundColor: 'rgba(239, 68, 68, 0.2)' }}

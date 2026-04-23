@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { diagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
+import toast from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -383,14 +384,26 @@ export default function AgriCopilot({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-green-900/5 border border-green-100 mb-6 md:mb-8">
-        <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-green-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <Leaf className="w-6 h-6 md:w-8 h-8 text-green-600" />
+      {/* Ultra-Compact Main Header */}
+      <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-gray-100 mb-4 md:mb-6 relative overflow-hidden group">
+        <div className="flex items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center space-x-3 md:space-x-5">
+            <div className="bg-green-600 p-2 md:p-3 rounded-xl shadow-lg shadow-green-100 flex-shrink-0">
+              <Radar className="w-5 h-5 md:w-7 h-7 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-1.5 mb-0.5">
+                <span className="text-[8px] md:text-[9px] font-display font-black text-green-700 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 uppercase tracking-widest">Live Engine</span>
+              </div>
+              <h1 className="text-lg md:text-2xl font-display font-black text-gray-900 tracking-tight leading-none uppercase">
+                {t.agriCopilot}
+              </h1>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.agriCopilot}</h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium">{t.agriCopilotDesc}</p>
+          
+          <div className="hidden sm:flex flex-col items-end opacity-40">
+            <div className="font-mono text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">{t.agriCopilotDesc}</div>
+            <div className="font-mono text-[8px] font-bold text-gray-300 uppercase">System: v3.1.2_Stable</div>
           </div>
         </div>
       </div>
@@ -408,12 +421,16 @@ export default function AgriCopilot({
           <div className="relative z-10 space-y-6">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.captureImage}</label>
-                <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100 uppercase tracking-widest">{images.length}/5 {t.photoLimit}</span>
+                <label className="block font-display font-black text-gray-500 uppercase tracking-[0.2em] text-[10px] sm:text-xs">{t.captureImage}</label>
+                <span className="text-[10px] font-mono font-bold text-green-700 bg-green-100/50 px-2.5 py-1 rounded-full border border-green-200/50 uppercase tracking-widest">{images.length}/5 Photo Payload</span>
               </div>
               
               {images.length > 0 && (
-                <div className="space-y-4 mb-4">
+                <div 
+                  className="space-y-4 mb-4" 
+                  role="region" 
+                  aria-label={lang === 'bn' ? 'আপলোড করা ছবিগুলো' : 'Uploaded photos'}
+                >
                   <div className="grid grid-cols-5 gap-3">
                     {images.map((img, idx) => (
                       <motion.div 
@@ -424,18 +441,20 @@ export default function AgriCopilot({
                       >
                         <img 
                           src={`data:${img.mimeType};base64,${img.base64}`} 
-                          alt={`Upload ${idx + 1}`} 
+                          alt={lang === 'bn' ? `ফসলের ছবি ${idx + 1}` : `Crop photo ${idx + 1}`} 
                           className="w-full h-full object-cover transition-transform group-hover:scale-110"
                           referrerPolicy="no-referrer"
                         />
                         <button 
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             removeImage(idx);
                           }}
-                          className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white p-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600"
+                          aria-label={lang === 'bn' ? 'ছবিটি মুছুন' : 'Remove image'}
+                          className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white p-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 focus:opacity-100 focus:ring-2 focus:ring-red-400 outline-none"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </motion.div>
                     ))}
@@ -444,24 +463,33 @@ export default function AgriCopilot({
                     <motion.label 
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
-                      className="w-full py-3 rounded-2xl border-2 border-dashed border-green-200 flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all bg-green-50/30"
+                      className="w-full py-3 rounded-2xl border-2 border-dashed border-green-200 flex items-center justify-center cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all bg-green-50/30 focus-within:ring-2 focus-within:ring-green-500 outline-none"
                     >
-                      <Plus className="w-5 h-5 text-green-500 mr-2" />
+                      <Plus className="w-5 h-5 text-green-500 mr-2" aria-hidden="true" />
                       <span className="text-xs font-black text-green-600 uppercase tracking-widest">{t.addPhoto}</span>
-                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" multiple={images.length === 0} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload} 
+                        className="sr-only" 
+                        multiple={images.length === 0} 
+                        aria-label={t.addPhoto}
+                      />
                     </motion.label>
                   )}
                 </div>
               )}
 
               {images.length === 0 && (
-                <motion.div 
+                <motion.button
+                  type="button"
                   whileHover={{ y: -2 }}
-                  className="bg-gradient-to-br from-green-50 to-white rounded-3xl p-10 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner" 
+                  className="w-full bg-gradient-to-br from-green-50 to-white rounded-3xl p-10 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner focus:ring-2 focus:ring-green-500 outline-none" 
                   onClick={() => fileInputRef.current?.click()}
+                  aria-label={t.captureImage}
                 >
                   <div className="bg-white p-5 rounded-[24px] shadow-md mb-4 group-hover:scale-110 transition-transform text-green-600">
-                    <Camera className="w-12 h-12" />
+                    <Camera className="w-12 h-12" aria-hidden="true" />
                   </div>
                   <p className="text-lg font-black text-green-900 mb-1 tracking-tight">{t.captureImage}</p>
                   <p className="text-sm text-green-600/70 font-medium">{lang === 'bn' ? 'পাতা বা ফলের ছবি দিন' : 'Upload leaf or fruit photo'}</p>
@@ -470,10 +498,11 @@ export default function AgriCopilot({
                     ref={fileInputRef}
                     accept="image/*" 
                     onChange={handleImageUpload} 
-                    className="hidden" 
+                    className="sr-only" 
                     multiple
+                    aria-hidden="true"
                   />
-                </motion.div>
+                </motion.button>
               )}
             </div>
 
@@ -511,36 +540,40 @@ export default function AgriCopilot({
             <div className="bg-white p-5 rounded-3xl border border-green-100 shadow-sm flex flex-col space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
+                  <h4 id="location-label" className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
                   <p className="text-xs text-gray-500 font-medium">{globalLocation ? t.tooltips.locationDetected : t.tooltips.locationDesc}</p>
                 </div>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setIsManualLocation(!isManualLocation)}
-                    className={`p-2 rounded-xl transition-colors border ${
+                    className={`p-2 rounded-xl transition-colors border focus:ring-2 focus:ring-amber-400 outline-none ${
                       isManualLocation 
                         ? 'bg-amber-50 border-amber-200 text-amber-700' 
                         : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
-                    title={isManualLocation ? "Use GPS" : "Set Manually"}
+                    aria-label={isManualLocation ? (lang === 'bn' ? 'জিপিএস ব্যবহার করুন' : 'Use GPS') : (lang === 'bn' ? 'ম্যানুয়ালি সেট করুন' : 'Set Manually')}
+                    aria-pressed={isManualLocation}
                   >
-                    <Navigation className="w-4 h-4" />
+                    <Navigation className="w-4 h-4" aria-hidden="true" />
                   </button>
                   <button 
+                    type="button"
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
-                    className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm ${
+                    className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm focus:ring-2 focus:ring-green-500 outline-none ${
                       globalLocation 
                         ? 'bg-green-50 text-green-700 hover:bg-green-100' 
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
+                    } disabled:opacity-50`}
+                    aria-label={t.tooltips.detectLocation}
                   >
                     {isDetectingLocation ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                     ) : globalLocation ? (
-                      <Navigation className="w-4 h-4" />
+                      <Navigation className="w-4 h-4" aria-hidden="true" />
                     ) : (
-                      <MapPin className="w-4 h-4" />
+                      <MapPin className="w-4 h-4" aria-hidden="true" />
                     )}
                     <span className="text-xs">{isDetectingLocation ? t.tooltips.detecting : globalLocation ? 'Update' : t.tooltips.detectLocation}</span>
                   </button>
@@ -548,7 +581,11 @@ export default function AgriCopilot({
               </div>
 
               {isManualLocation && (
-                <div className="pt-2 border-t border-green-50 flex flex-col gap-2">
+                <div 
+                  className="pt-2 border-t border-green-50 flex flex-col gap-2"
+                  role="group"
+                  aria-labelledby="location-label"
+                >
                   <select
                     value={selectedDistrict}
                     onChange={(e) => {
@@ -561,6 +598,7 @@ export default function AgriCopilot({
                       }
                     }}
                     className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                    aria-label={lang === 'bn' ? 'জেলা নির্বাচন করুন' : 'Select District'}
                   >
                     {geoData.map(d => (
                       <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
@@ -571,6 +609,7 @@ export default function AgriCopilot({
                     onChange={(e) => handleManualLocationChange(e.target.value)}
                     className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
                     disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+                    aria-label={lang === 'bn' ? 'উপজেলা নির্বাচন করুন' : 'Select Upazila'}
                   >
                     {activeDistrict?.upazilas.map(u => (
                       <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
@@ -591,15 +630,18 @@ export default function AgriCopilot({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.analysisType}</label>
+                <label id="analysis-type-label" className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.analysisType}</label>
                 <Tooltip content={t.tooltips[analysisType as keyof typeof t.tooltips]}>
-                  <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
+                  <button type="button" aria-label={t.tooltips[analysisType as keyof typeof t.tooltips]} className="focus:outline-none">
+                    <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" aria-hidden="true" />
+                  </button>
                 </Tooltip>
               </div>
               <select 
                 value={analysisType} 
                 onChange={(e) => setAnalysisType(e.target.value)}
-                className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
+                aria-labelledby="analysis-type-label"
+                className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all outline-none"
               >
                 <option value="disease">{t.disease}</option>
                 <option value="pest">{t.pest}</option>
@@ -609,38 +651,57 @@ export default function AgriCopilot({
 
             <div className="flex items-center justify-between bg-gradient-to-r from-green-50 to-white p-4 rounded-2xl border border-green-100 shadow-inner">
               <div className="flex items-center space-x-3">
-                <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    id="advanced" 
-                    checked={isAdvanced}
-                    onChange={(e) => setIsAdvanced(e.target.checked)}
-                    disabled={tier !== 'premium'}
-                    className="absolute w-6 h-6 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full appearance-none cursor-pointer checked:translate-x-4 checked:border-green-500 focus:outline-none disabled:opacity-50"
-                  />
-                  <label htmlFor="advanced" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-green-400' : ''}`}></label>
-                </div>
-                <label htmlFor="advanced" className={`text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
-                  <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" />
+                <button
+                  type="button"
+                  role="switch"
+                  id="advanced-toggle"
+                  aria-checked={isAdvanced}
+                  aria-label={t.advancedAnalysis}
+                  disabled={tier !== 'premium'}
+                  onClick={() => tier === 'premium' && setIsAdvanced(!isAdvanced)}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ' || e.key === 'Enter') {
+                      e.preventDefault();
+                      tier === 'premium' && setIsAdvanced(!isAdvanced);
+                    }
+                  }}
+                  className={`relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer focus:ring-2 focus:ring-green-500 outline-none ${tier !== 'premium' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className={`block h-6 overflow-hidden bg-gray-200 rounded-full transition-colors ${isAdvanced ? 'bg-green-400' : ''}`}></div>
+                  <div className={`absolute left-0.5 top-0.5 w-5 h-5 transition duration-200 ease-in-out transform bg-white border-2 border-gray-300 rounded-full ${isAdvanced ? 'translate-x-4 border-green-500' : ''}`}></div>
+                </button>
+                <label htmlFor="advanced-toggle" className={`text-sm font-black uppercase tracking-widest flex items-center cursor-pointer ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
+                  <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" aria-hidden="true" />
                   {t.advancedAnalysis}
                 </label>
               </div>
               <Tooltip content={t.tooltips.advanced}>
-                <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
+                <button type="button" aria-label={t.tooltips.advanced} className="focus:outline-none">
+                  <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" aria-hidden="true" />
+                </button>
               </Tooltip>
             </div>
 
             <div className="pt-2">
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center space-x-1">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
+                  <span id="usage-label" className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
                   <Tooltip content={t.tooltips.usage}>
-                    <HelpCircle className="w-3 h-3 text-gray-300" />
+                    <button type="button" aria-label={t.tooltips.usage} className="focus:outline-none">
+                      <HelpCircle className="w-3 h-3 text-gray-300" aria-hidden="true" />
+                    </button>
                   </Tooltip>
                 </div>
                 <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
               </div>
-              <div className="w-full bg-green-100/50 rounded-full h-2 overflow-hidden shadow-inner">
+              <div 
+                className="w-full bg-green-100/50 rounded-full h-2 overflow-hidden shadow-inner"
+                role="progressbar"
+                aria-labelledby="usage-label"
+                aria-valuenow={currentUsage}
+                aria-valuemin={0}
+                aria-valuemax={limit}
+              >
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${(currentUsage / limit) * 100}%` }}
@@ -650,20 +711,22 @@ export default function AgriCopilot({
             </div>
 
             <motion.button
+              type="button"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleDiagnose}
               disabled={images.length === 0 || isLoading || !isOnline}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
+              aria-busy={isLoading}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-7 h-7 animate-spin" />
+                  <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
                   <span>{t.analyzing}</span>
                 </>
               ) : (
                 <>
-                  <Leaf className="w-7 h-7" />
+                  <Leaf className="w-7 h-7" aria-hidden="true" />
                   <span>{t.diagnoseDisease}</span>
                 </>
               )}
@@ -710,7 +773,12 @@ export default function AgriCopilot({
                 </div>
               )}
 
-              <div className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative">
+              <div 
+                className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative"
+                role="log"
+                aria-live="polite"
+                aria-label={lang === 'bn' ? 'চ্যাট ইতিহাস' : 'Chat history'}
+              >
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {chatMessages.length === 0 && !chatSummary && (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
@@ -718,6 +786,7 @@ export default function AgriCopilot({
                         animate={{ y: [0, -5, 0] }}
                         transition={{ duration: 3, repeat: Infinity }}
                         className="bg-white p-4 rounded-[24px] shadow-sm mb-4"
+                        aria-hidden="true"
                       >
                         <Bot className="w-8 h-8 opacity-40" />
                       </motion.div>
@@ -730,9 +799,11 @@ export default function AgriCopilot({
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       className="bg-green-50 border border-green-100 p-6 rounded-[32px] mb-4 shadow-sm"
+                      role="article"
+                      aria-label={t.tooltips.chatSummaryTitle}
                     >
                       <div className="flex items-center space-x-2 text-green-700 mb-3">
-                        <Sparkles className="w-4 h-4" />
+                        <Sparkles className="w-4 h-4" aria-hidden="true" />
                         <h4 className="text-xs font-black uppercase tracking-widest leading-none">{t.tooltips.chatSummaryTitle}</h4>
                       </div>
                       <div className="markdown-body prose-sm prose-green leading-relaxed text-green-900 text-xs">
@@ -754,7 +825,7 @@ export default function AgriCopilot({
                           : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
                       }`}>
                         <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
-                          {msg.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
+                          {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
                           <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
                         </div>
                         <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
@@ -768,6 +839,7 @@ export default function AgriCopilot({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       className="flex justify-start"
+                      aria-label={t.tooltips.aiThinking}
                     >
                       <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
                         <div className="flex space-x-1">
@@ -785,18 +857,19 @@ export default function AgriCopilot({
                 <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-2">
                   {chatMessages.length >= 2 && !chatSummary && (
                     <button
+                      type="button"
                       onClick={handleSummarizeAndSave}
                       disabled={isSummarizing || isChatLoading}
-                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1"
+                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
                     >
                       {isSummarizing ? (
                         <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
                           <span>{t.tooltips.summarizing}</span>
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3 h-3" />
+                          <Sparkles className="w-3 h-3" aria-hidden="true" />
                           <span>{t.tooltips.saveSummary}</span>
                         </>
                       )}
@@ -804,7 +877,9 @@ export default function AgriCopilot({
                   )}
                   
                   <div className="relative flex items-center">
+                    <label htmlFor="chat-input" className="sr-only">{lang === 'bn' ? 'আপনার প্রশ্ন' : 'Your question'}</label>
                     <input
+                      id="chat-input"
                       type="text"
                       value={currentChatMessage}
                       onChange={(e) => setCurrentChatMessage(e.target.value)}
@@ -819,11 +894,13 @@ export default function AgriCopilot({
                       className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
                     />
                     <button
+                      type="button"
                       onClick={handleSendMessage}
                       disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
-                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm"
+                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
+                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -868,14 +945,15 @@ export default function AgriCopilot({
                   <div className="relative z-10 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-8">
                       <div className="flex items-center space-x-4">
-                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-2xl shadow-lg shadow-green-100">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-2xl shadow-lg shadow-green-100" aria-hidden="true">
                           <Leaf className="w-6 h-6 text-white" />
                         </div>
                         <div>
                           <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.diagnosisResult}</h3>
                           <div className="flex items-center mt-0.5">
-                            <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" />
+                            <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
                               {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
@@ -883,26 +961,33 @@ export default function AgriCopilot({
                       </div>
                       <div className="flex items-center space-x-2">
                         <button 
+                          type="button"
                           onClick={handleTranslate}
                           disabled={isTranslating}
-                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all"
+                          aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
+                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none"
                         >
-                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Globe className="w-3 h-3" />}
+                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
                           <span>{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
                         </button>
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
                         <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-widest">AI Verified</span>
                       </div>
                     </div>
                     
-                    <div className="flex-1 space-y-8">
+                    <div 
+                      className="flex-1 space-y-8"
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
                       {diagnosis.status === 'Invalid' ? (
                         <motion.div 
                           initial={{ scale: 0.9, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
                           className="bg-red-50 border border-red-100 rounded-3xl p-8 flex items-start space-x-5 shadow-inner"
                         >
-                          <div className="bg-white p-3 rounded-2xl shadow-sm">
+                          <div className="bg-white p-3 rounded-2xl shadow-sm" aria-hidden="true">
                             <AlertTriangle className="w-8 h-8 text-red-500" />
                           </div>
                           <p className="text-red-900 font-bold text-lg leading-relaxed">{diagnosis.diagnosis}</p>
@@ -913,11 +998,63 @@ export default function AgriCopilot({
                           <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="bg-white rounded-[32px] p-8 md:p-10 border border-gray-100 text-gray-800 shadow-sm relative overflow-hidden"
+                            className="bg-white rounded-[32px] p-8 md:p-12 border border-green-100/60 text-gray-800 shadow-sm relative overflow-hidden"
+                            role="article"
+                            aria-labelledby="diagnosis-heading"
                           >
-                            <div className="absolute top-0 left-0 w-1 h-full bg-green-500 opacity-20"></div>
-                            <div className="markdown-body text-base md:text-lg leading-relaxed prose prose-green max-w-none">
-                              <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
+                            <h4 id="diagnosis-heading" className="sr-only">{t.diagnosisResult}</h4>
+                            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '16px 16px' }}></div>
+                            
+                            <div className="relative z-10">
+                              <div className="flex items-center justify-between mb-8 border-b border-green-50 pb-4">
+                                <span className="font-display font-black text-xs uppercase tracking-[0.2em] text-green-700">Digital Diagnosis Core</span>
+                                <span className="font-mono text-[10px] text-gray-300 font-bold">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
+                              </div>
+                              <div className="markdown-body text-base md:text-xl leading-relaxed prose prose-green max-w-none">
+                                <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
+                              </div>
+
+                              {/* Helpfulness Rating Section */}
+                              <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
+                                  <p className="text-xs font-bold text-gray-500">{lang === 'en' ? 'Was this diagnosis helpful?' : 'এই পরামর্শটি কি আপনার উপকারে এসেছে?'}</p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <button 
+                                    onClick={async () => {
+                                      if (lastDiagnosisId) {
+                                        try {
+                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: true });
+                                          toast.success(lang === 'en' ? 'Thank you for your feedback!' : 'মতামতের জন্য ধন্যবাদ!');
+                                        } catch (e) {
+                                          console.error(e);
+                                        }
+                                      }
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-all border border-green-100 group"
+                                  >
+                                    <ThumbsUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{lang === 'en' ? 'Helpful' : 'উপকারী'}</span>
+                                  </button>
+                                  <button 
+                                    onClick={async () => {
+                                      if (lastDiagnosisId) {
+                                        try {
+                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: false });
+                                          toast.success(lang === 'en' ? 'Feedback recorded.' : 'মতামত গ্রহণ করা হয়েছে।');
+                                        } catch (e) {
+                                          console.error(e);
+                                        }
+                                      }
+                                    }}
+                                    className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl transition-all border border-red-100 group"
+                                  >
+                                    <ThumbsDown className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">{lang === 'en' ? 'Not Helpful' : 'উপকারী নয়'}</span>
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                             
                             {/* TTS Audio Player */}
@@ -926,21 +1063,29 @@ export default function AgriCopilot({
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className="mt-10 bg-gradient-to-r from-emerald-100 to-green-100 rounded-[2rem] p-6 md:p-8 border-2 border-green-200/50 shadow-xl shadow-green-900/5 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 relative overflow-hidden"
+                                role="region"
+                                aria-label={lang === 'bn' ? 'এআই অডিও বিশ্লেষণ' : 'AI audio analysis'}
                               >
                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
                                 <motion.div 
                                   animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
                                   transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                                   className="bg-white p-5 rounded-2xl text-green-600 shadow-md relative z-10 border border-green-50"
+                                  aria-hidden="true"
                                 >
                                   <Volume2 className="w-10 h-10" />
                                 </motion.div>
                                 <div className="flex-1 w-full text-center md:text-left relative z-10">
-                                  <p className="text-sm font-black text-green-900 uppercase tracking-widest mb-3 drop-shadow-sm">
+                                  <p id="audio-analysis-label" className="text-sm font-black text-green-900 uppercase tracking-widest mb-3 drop-shadow-sm">
                                     {lang === 'bn' ? 'এআই অডিও শুনুন' : 'Listen to AI Analysis'}
                                   </p>
                                   <div className="bg-white/60 p-2 rounded-2xl shadow-inner border border-green-100/50">
-                                    <audio controls src={audioUrl} className="w-full h-12 rounded-xl" />
+                                    <audio 
+                                      controls 
+                                      src={audioUrl} 
+                                      className="w-full h-12 rounded-xl"
+                                      aria-labelledby="audio-analysis-label"
+                                    />
                                   </div>
                                 </div>
                               </motion.div>

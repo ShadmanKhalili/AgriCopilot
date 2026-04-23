@@ -1,43 +1,29 @@
-import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { Type, GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../firebase';
-import { collection, doc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 
+// Singleton AI instance using platform-injected key
+let aiInstance: GoogleGenAI | null = null;
 export const getAi = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("GEMINI_API_KEY is not defined in the environment.");
-    // Fallback to a common error that the UI can catch
-    throw new Error("AI Service Configuration Error: API Key missing.");
+  if (!aiInstance) {
+    const apiKey = (process.env.GEMINI_API_KEY as string) || '';
+    aiInstance = new GoogleGenAI({ apiKey });
   }
-  return new GoogleGenAI({ apiKey });
+  return aiInstance;
 };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
+export { Type };
+
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
 const BACKUP_MODEL = 'gemini-3.1-pro-preview';
-const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
-const SEARCH_BACKUP_MODEL = 'gemini-3.1-pro-preview';
-const LIVE_MODEL = 'gemini-3.1-flash-live-preview';
+const SEARCH_MODEL = 'gemini-3-flash-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
-      // If it's a model not found error or similar, we might want to skip retry and go to fallback if we had one
-      // but here we just retry the same function.
-      
       if (i === retries - 1) throw error;
-      
-      const isTransient = error.message?.includes("fetch") || 
-                          error.message?.includes("network") || 
-                          error.message?.includes("503") || 
-                          error.message?.includes("500") ||
-                          error.message?.includes("deadline") ||
-                          error.message?.includes("quota") ||
-                          error.message?.includes("overloaded");
-      
-      if (!isTransient) throw error;
-      
       console.warn(`AI call failed, retrying (${i + 1}/${retries})...`, error);
       await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
     }
@@ -45,13 +31,12 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000
 };
 
 const callAiWithFallback = async (params: any, primaryModel: string) => {
+  const ai = getAi();
   try {
-    const ai = getAi();
-    return await ai.models.generateContent({ ...params, model: primaryModel });
+    return await ai.models.generateContent({ ...params, model: primaryModel } as any);
   } catch (error) {
     console.warn(`Primary model ${primaryModel} failed, falling back to ${BACKUP_MODEL}:`, error);
-    const ai = getAi();
-    return await ai.models.generateContent({ ...params, model: BACKUP_MODEL });
+    return await ai.models.generateContent({ ...params, model: BACKUP_MODEL } as any);
   }
 };
 
@@ -118,8 +103,8 @@ export const diagnoseCrop = async (
         }
       };
       
-      const contents: any[] = images.map(img => ({ inlineData: { data: img.base64, mimeType: img.mimeType } }));
-      contents.push(prompt);
+      const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
+      contents.push({ parts: [{ text: prompt }] });
 
       const response = await callAiWithFallback({
         contents,
@@ -147,7 +132,7 @@ Text to translate:
 ${text}`;
 
       const response = await callAiWithFallback({
-        contents: prompt
+        contents: [{ parts: [{ text: prompt }] }]
       }, BACKUP_MODEL);
       
       return response.text || '';
@@ -214,8 +199,8 @@ export const generateWeatherAdvisory = async (
       Use markdown for formatting. Be direct and practical.`;
 
       const response = await callAiWithFallback({
-        contents: prompt
-      }, SEARCH_MODEL); // Use SEARCH_MODEL (gemini-3-flash-preview)
+        contents: [{ parts: [{ text: prompt }] }]
+      }, SEARCH_MODEL);
       
       return response.text || '';
     } catch (error) {
@@ -228,7 +213,9 @@ export const generateWeatherAdvisory = async (
 export const generateSpeech = async (text: string) => {
   return await callAiWithRetry(async () => {
     try {
-      const response = await callAiWithFallback({
+      const ai = getAi();
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text }] }],
         config: {
           responseModalities: [Modality.AUDIO],
@@ -238,13 +225,12 @@ export const generateSpeech = async (text: string) => {
             },
           },
         },
-      }, 'gemini-3.1-flash-tts-preview');
+      });
       
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (!base64Audio) return null;
 
       // Gemini TTS returns raw 16-bit PCM at 24000Hz. 
-      // We add a WAV header so the browser can play it easily.
       const binary = atob(base64Audio);
       const pcmData = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
@@ -276,7 +262,6 @@ export const generateSpeech = async (text: string) => {
       view.setUint32(40, pcmData.length, true);
       new Uint8Array(buffer, 44).set(pcmData);
 
-      // Convert back to base64
       const wavBase64 = btoa(
         new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
       );
@@ -293,7 +278,6 @@ export const summarizeConversation = async (messages: { role: string; text: stri
     try {
       const chatStr = messages.map(m => `${m.role === 'user' ? 'Farmer' : 'Expert'}: ${m.text}`).join('\n');
       const prompt = `Summarize the following agricultural consultation conversation into a few key bullet points and a short summary paragraph. 
-      Focus on the diagnosis discussed and the specific advice given. 
       Maintain a helpful and professional tone.
       Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
       
@@ -301,7 +285,7 @@ export const summarizeConversation = async (messages: { role: string; text: stri
       ${chatStr}`;
 
       const response = await callAiWithFallback({
-        contents: prompt
+        contents: [{ parts: [{ text: prompt }] }]
       }, BACKUP_MODEL);
       
       return response.text || '';
@@ -331,8 +315,8 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
       
       const response = await callAiWithFallback({
         contents: [
-          { inlineData: { data: imageBase64, mimeType } },
-          prompt
+          { parts: [{ inlineData: { data: imageBase64, mimeType } }] },
+          { parts: [{ text: prompt }] }
         ],
         config: {
           responseMimeType: 'application/json',
@@ -413,37 +397,22 @@ export const getMarketInsights = async (
           },
           required: ['insights', 'priceDrivers']
         },
-        tools: [{ googleSearch: {} }],
-        toolConfig: {
-          includeServerSideToolInvocations: true
-        }
+        tools: [{ googleSearch: {} }]
       };
 
       try {
-        // Try primary search model (Gemini 3)
-        try {
-          const response = await callAiWithFallback({
-            contents: prompt,
-            config
-          }, SEARCH_MODEL);
-          return JSON.parse(response.text || '{}');
-        } catch (primarySearchError) {
-          console.warn(`Primary search model ${SEARCH_MODEL} failed, trying ${SEARCH_BACKUP_MODEL}:`, primarySearchError);
-          // Try backup search model (Gemini 2.5)
-          const response = await callAiWithFallback({
-            contents: prompt,
-            config
-          }, SEARCH_BACKUP_MODEL);
-          return JSON.parse(response.text || '{}');
-        }
+        const ai = getAi();
+        const response = await ai.models.generateContent({
+          contents: [{ parts: [{ text: prompt }] }],
+          config,
+          toolConfig: { includeServerSideToolInvocations: true },
+          model: SEARCH_MODEL
+        } as any);
+        return JSON.parse(response.text || '{}');
       } catch (searchError) {
-        console.warn("Both Google Search models failed, falling back to standard generation:", searchError);
-        // Fallback without googleSearch
+        console.warn("Google Search model failed, falling back to standard generation:", searchError);
         const fallbackResponse = await callAiWithFallback({
-          contents: `Provide a short estimated market insight for ${produce} in ${location}, Bangladesh for the period around ${today}. 
-          Return JSON with 'insights' (string) and 'priceDrivers' (array of strings). 
-          CRITICAL: All prices must be in BDT and per KG.
-          Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
+          contents: [{ parts: [{ text: `Provide estimated market insight for ${produce} for the period around ${today}. Return JSON with 'insights' and 'priceDrivers'. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
           config: {
             responseMimeType: 'application/json',
             responseSchema: config.responseSchema
@@ -500,22 +469,22 @@ export const findGovernmentSchemes = async (
           },
           required: ['schemes']
         },
-        tools: [{ googleSearch: {} }],
-        toolConfig: {
-          includeServerSideToolInvocations: true
-        }
+        tools: [{ googleSearch: {} }]
       };
 
       try {
-        const response = await callAiWithFallback({
-          contents: prompt,
-          config
-        }, SEARCH_MODEL);
+        const ai = getAi();
+        const response = await ai.models.generateContent({
+          contents: [{ parts: [{ text: prompt }] }],
+          config,
+          toolConfig: { includeServerSideToolInvocations: true },
+          model: SEARCH_MODEL
+        } as any);
         return JSON.parse(response.text || '{}');
       } catch (searchError) {
         console.warn("Search model failed for schemes, falling back:", searchError);
         const fallbackResponse = await callAiWithFallback({
-          contents: `Provide general information about common agricultural subsidies and schemes in Bangladesh for ${crop} farmers. Return JSON with 'schemes' array. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.`,
+          contents: [{ parts: [{ text: `Provide general information about common agricultural subsidies in Bangladesh for ${crop} farmers. Return JSON with 'schemes' array. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
           config: {
             responseMimeType: 'application/json',
             responseSchema: config.responseSchema
@@ -560,32 +529,22 @@ export const getPlantingRecommendations = async (
       const prompt = `You are an expert agricultural recommendation engine for Bangladesh.
       Apply a 5-layer scoring system to recommend what crops a farmer should plant next.
       
-      TODAY's DATE: ${today}
-      
       FARMER PROFILE:
       - Location: GPS (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})
-      - Land Type: ${landType} (e.g., High, Medium High, Medium Low, Low, Very Low)
+      - Land Type: ${landType}
       - Land Size: ${landSize} decimals
-      - Irrigation System: ${irrigation}
-      - Previous Crop: ${previousCrop} (Consider crop rotation benefits)
+      - Previous Crop: ${previousCrop}
       - Investment Budget: ${budget}
-      - Target Planting Time: ${targetTime} (Calculate the exact season based on today's date and this target time)
+      - Target Planting Time: ${targetTime}
 
       ENVIRONMENTAL DATA:
       ${weatherContext}
       ${satelliteContext}
 
-      LOGIC LAYERS:
-      Layer 1 (Eligibility): Filter crops suitable for this specific GPS location (AEZ), land type, and the calculated season.
-      Layer 2 (Supply Saturation): Consider the risk of oversupply if everyone plants the same thing. Suggest crops that are less likely to be over-planted.
-      Layer 3 (Profitability): Estimate net margin per decimal in BDT. Consider expected yield, expected harvest-month price, and input costs based on the budget.
-      Layer 4 (Demand Intelligence): Consider import substitution, export opportunities, or domestic policy priorities.
-      Layer 5 (Risk): Assess basic risks (price volatility, major weather risks like flood/drought for that specific region/season based on weather/satellite data).
-
       OUTPUT REQUIREMENTS:
-      - Recommend the Top 3 crops (green).
-      - Suggest 1-2 crops to AVOID (red) due to high risk or oversupply.
-      - Suggest 1 diversification crop (moderate margin, low risk).
+      - Recommend the Top 3 crops.
+      - Suggest 1-2 crops to AVOID.
+      - Suggest 1 diversification crop.
       - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
 
       RESPONSE FORMAT (JSON):
@@ -593,25 +552,21 @@ export const getPlantingRecommendations = async (
         "recommended": [
           {
             "crop": "Crop Name",
-            "expectedMargin": "Estimated net margin per decimal in BDT (e.g., '1500 BDT')",
-            "reasons": ["Reason 1", "Reason 2"],
-            "detailedAnalysis": "A detailed 2-3 sentence analysis explaining WHY this crop was chosen based on the 5 layers (Eligibility, Supply, Profit, Demand, Risk).",
+            "expectedMargin": "Estimated net margin",
+            "reasons": ["Reason 1"],
+            "detailedAnalysis": "...",
             "riskLevel": "Low" | "Medium" | "High",
-            "riskReason": "One sentence reason for risk",
-            "macroWarning": "Optional warning about macro factors"
+            "riskReason": "..."
           }
         ],
         "avoid": [
-          {
-            "crop": "Crop Name",
-            "evidence": "Detailed explanation of why to avoid, referencing specific risks or market trends."
-          }
+          { "crop": "Crop Name", "evidence": "..." }
         ],
         "diversification": {
           "crop": "Crop Name",
-          "reasons": ["Reason 1"],
-          "detailedAnalysis": "Analysis of why this is a good diversification option.",
-          "riskLevel": "Low" | "Medium" | "High",
+          "reasons": ["..."],
+          "detailedAnalysis": "...",
+          "riskLevel": "...",
           "riskReason": "..."
         }
       }`;
@@ -631,8 +586,7 @@ export const getPlantingRecommendations = async (
                   reasons: { type: Type.ARRAY, items: { type: Type.STRING } },
                   detailedAnalysis: { type: Type.STRING },
                   riskLevel: { type: Type.STRING },
-                  riskReason: { type: Type.STRING },
-                  macroWarning: { type: Type.STRING }
+                  riskReason: { type: Type.STRING }
                 },
                 required: ['crop', 'expectedMargin', 'reasons', 'detailedAnalysis', 'riskLevel', 'riskReason']
               }
@@ -665,7 +619,7 @@ export const getPlantingRecommendations = async (
       };
 
       const response = await callAiWithFallback({
-        contents: prompt,
+        contents: [{ parts: [{ text: prompt }] }],
         config
       }, getModelName(isAdvanced));
       
@@ -678,60 +632,44 @@ export const getPlantingRecommendations = async (
 };
 
 export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
-  const ai = getAi();
-  return ai.chats.create({
-    model: 'gemini-3-flash-preview',
-    config: {
-      systemInstruction: `You are a helpful agricultural expert in Bangladesh. 
-      CONTEXT: The user has just received a diagnosis for their crop: "${context}".
-      TASK: Answer follow-up questions from the user about this diagnosis. 
-      - Provide practical, chemical-free, or climate-smart advice.
-      - Use local context for ${locationContext}.
-      - Respond in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - CRITICAL: Be extremely concise. Keep answers short, sweet, and to the point. 
-      - Use markdown for formatting to make it readable.`,
-    },
-  });
+  const history: { role: string; text: string }[] = [];
+  return {
+    sendMessage: async (req: { message: string }) => {
+      const prompt = history.length === 0 
+        ? `You are a helpful agricultural expert in Bangladesh. 
+           CONTEXT: The user has just received a diagnosis for their crop: "${context}".
+           TASK: Handle the user's first follow-up question: "${req.message}".
+           Respond in ${lang === 'bn' ? 'Bangla' : 'English'}. Concise markdown.`
+        : req.message;
+
+      const contents = history.map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.text }]
+      }));
+      contents.push({ role: 'user', parts: [{ text: prompt }] });
+
+      const ai = getAi();
+      const response = await ai.models.generateContent({
+        contents,
+        model: 'gemini-3-flash-preview'
+      });
+      
+      const responseText = response.text || '';
+      history.push({ role: 'user', text: req.message });
+      history.push({ role: 'model', text: responseText });
+      
+      return { text: responseText };
+    }
+  };
 };
 
 export const syncCuratedSchemes = async () => {
   return await callAiWithRetry(async () => {
     try {
-      const currentYear = new Date().getFullYear();
       const today = new Date().toISOString();
-      const prompt = `Use Google Search to find the LATEST and most DETAILED agricultural subsidies, government schemes, or financial relief programs for farmers in Bangladesh as of ${currentYear}.
-
-      CRITICAL INSTRUCTIONS FOR CONTENT QUALITY & TONE:
-      - LANGUAGE: Use conversational, friendly, and extremely simple language that a farmer with basic education would understand.
-      - ELIGIBILITY: Instead of saying "Criteria: Land owner", say something like "If you have a farmer card and own even a little land, you are eligible."
-      - APPLY MODE: Be very specific about LOCAL CONTACTS. Use phrases like: "Contact your local Upazila Agriculture Officer (Krishi Office)", "Talk to your Union Parishad Chairman or Member", "Go to the nearest government bank (Sonali/Krishi Bank) with your NID card".
-      - BENEFITS: Clearly state how much money or discount they get in simple terms.
-      
-      Look for:
-      - Farmers' Card updates (MoA + Sonali Bank)
-      - Machinery subsidies from DAE (50-70%)
-      - Irrigation scheme benefits (MoA)
-      - Paddy/Rice procurement windows (Directorate of Food)
-      - Loan waivers or relief packages
-      - Krishi Call Centre (16123) info
-      - BRAC or NGO agricultural support programs
-      - Crop insurance (Green Delta, etc.)
-      
-      For each scheme, provide:
-      1. TITLE and DESCRIPTION.
-      2. ELIGIBILITY and APPLY MODE (Use the "farmer-friendly local contact" tone).
-      3. KEY BENEFITS (e.g., specific subsidy amounts, loan interest rates).
-      4. DEADLINE or validity period if available.
-      5. CONTACT INFO (official helplines or office names).
-      6. CATEGORY TAGS (e.g., "Seed Help", "Money Support", "Insurance").
-      
-      Look for official news from the Ministry of Agriculture, Daily Star, Prothom Alo, or BADC.
-      
-      RESPONSE FORMAT:
-      - Respond in JSON format.
-      - 'schemes': array of objects.
-      - Each object should have: 'id' (short unique slug), 'title' {en, bn}, 'description' {en, bn}, 'provider', 'status', 'eligibility' {en, bn}, 'howToApply' {en, bn}, 'benefits' {en, bn}, 'deadline' {en, bn}, 'contactInfo' {en, bn}, 'tags' (array of strings), 'crops' (array of slugs), 'districts' (array of slugs), 'sourceLinks' (array of URLs).
-      - Include robust translations for all fields.`;
+      const prompt = `Use Google Search to find LATEST agricultural subsidies, government schemes, or financial aid programs in Bangladesh for ${new Date().getFullYear()}. 
+      Return a list of schemes. Each scheme must follow the provided schema.
+      Language: Ensure both 'en' and 'bn' fields are populated.`;
       
       const config: any = {
         responseMimeType: 'application/json',
@@ -749,30 +687,32 @@ export const syncCuratedSchemes = async () => {
                     properties: {
                       en: { type: Type.STRING },
                       bn: { type: Type.STRING }
-                    }
+                    },
+                    required: ['en', 'bn']
                   },
                   description: {
                     type: Type.OBJECT,
                     properties: {
                       en: { type: Type.STRING },
                       bn: { type: Type.STRING }
-                    }
+                    },
+                    required: ['en', 'bn']
                   },
-                  provider: { type: Type.STRING },
-                  status: { type: Type.STRING },
                   eligibility: {
                     type: Type.OBJECT,
                     properties: {
                       en: { type: Type.STRING },
                       bn: { type: Type.STRING }
-                    }
+                    },
+                    required: ['en', 'bn']
                   },
                   howToApply: {
                     type: Type.OBJECT,
                     properties: {
                       en: { type: Type.STRING },
                       bn: { type: Type.STRING }
-                    }
+                    },
+                    required: ['en', 'bn']
                   },
                   benefits: {
                     type: Type.OBJECT,
@@ -781,54 +721,34 @@ export const syncCuratedSchemes = async () => {
                       bn: { type: Type.STRING }
                     }
                   },
-                  deadline: {
-                    type: Type.OBJECT,
-                    properties: {
-                      en: { type: Type.STRING },
-                      bn: { type: Type.STRING }
-                    }
-                  },
-                  contactInfo: {
-                    type: Type.OBJECT,
-                    properties: {
-                      en: { type: Type.STRING },
-                      bn: { type: Type.STRING }
-                    }
-                  },
                   tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  crops: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  districts: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  provider: { type: Type.STRING },
                   sourceLinks: { type: Type.ARRAY, items: { type: Type.STRING } }
                 },
-                required: ['id', 'title', 'description', 'eligibility', 'howToApply', 'crops', 'districts']
+                required: ['title', 'description', 'eligibility', 'howToApply']
               }
             }
           },
           required: ['schemes']
         },
-        tools: [{ googleSearch: {} }],
-        toolConfig: { includeServerSideToolInvocations: true }
+        tools: [{ googleSearch: {} }]
       };
 
       const response = await callAiWithFallback({
-        contents: prompt,
-        config
+        contents: [{ parts: [{ text: prompt }] }],
+        config,
+        toolConfig: { includeServerSideToolInvocations: true }
       }, SEARCH_MODEL);
 
       const parsed = JSON.parse(response.text || '{}');
       if (parsed.schemes && Array.isArray(parsed.schemes)) {
         const batch = writeBatch(db);
         const colRef = collection(db, 'gov_schemes');
-        
         parsed.schemes.forEach((scheme: any) => {
-          const { id, ...data } = scheme;
+          const id = scheme.id || Math.random().toString(36).substr(2, 9);
           const docRef = doc(colRef, id);
-          batch.set(docRef, {
-            ...data,
-            lastUpdated: today
-          });
+          batch.set(docRef, { ...scheme, lastUpdated: today });
         });
-        
         await batch.commit();
         return parsed.schemes.length;
       }
@@ -838,4 +758,8 @@ export const syncCuratedSchemes = async () => {
       throw error;
     }
   });
+};
+
+export const getMarketInsightsByLocation = async (produce: string, location: string, lang: string) => {
+  return await getMarketInsights(produce, lang, false);
 };

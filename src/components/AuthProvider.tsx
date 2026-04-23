@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { auth, db, signInWithGoogle, logout } from '../firebase';
+import { auth, db, signInWithGoogle, logout, signUpWithEmail, loginWithEmail } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 export interface UserProfile {
@@ -21,6 +21,8 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   isAuthReady: boolean;
   signIn: () => Promise<void>;
+  signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   upgradeToPremium: () => Promise<void>;
 }
@@ -31,6 +33,8 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   isAuthReady: false,
   signIn: async () => {},
+  signUpWithEmail: async () => {},
+  loginWithEmail: async () => {},
   signOut: async () => {},
   upgradeToPremium: async () => {},
 });
@@ -94,6 +98,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               createdAt: new Date().toISOString()
             };
             await setDoc(userDocRef, newProfile);
+          } else if (userDoc && userDoc.exists()) {
+            // Force administrative privileges for the owner email if not already set
+            const data = userDoc.data() as UserProfile;
+            if (currentUser.email === 'sadmankhalili@gmail.com' && data.role !== 'admin') {
+              console.log("Promoting established user to admin...");
+              await updateDoc(userDocRef, { role: 'admin', tier: 'premium' });
+            }
           }
           
           // Listen for profile updates
@@ -134,6 +145,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const handleSignUp = async (email: string, password: string, name: string) => {
+    try {
+      await signUpWithEmail(email, password, name);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      await loginWithEmail(email, password);
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const upgradeToPremium = async () => {
     if (user) {
       try {
@@ -146,7 +173,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, userRole, userProfile, isAuthReady, signIn: signInWithGoogle, signOut: logout, upgradeToPremium }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      userRole, 
+      userProfile, 
+      isAuthReady, 
+      signIn: signInWithGoogle, 
+      signUpWithEmail: handleSignUp,
+      loginWithEmail: handleLogin,
+      signOut: logout, 
+      upgradeToPremium 
+    }}>
       {children}
     </AuthContext.Provider>
   );

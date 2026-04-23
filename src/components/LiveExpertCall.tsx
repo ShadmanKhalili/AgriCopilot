@@ -54,6 +54,15 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const startCall = async () => {
     setIsCalling(true);
     try {
+      const apiKey = (process.env as any).GEMINI_API_KEY;
+      if (!apiKey) {
+        alert(lang === 'bn' 
+          ? "নিরাপত্তার কারণে ভয়েস কল বর্তমানে নিষ্ক্রিয় রয়েছে। অনুগ্রহ করে টাইপ করে পরামর্শ নিন।" 
+          : "Voice Chat is currently restricted for security reasons. Please use the text chat instead.");
+        setIsCalling(false);
+        return;
+      }
+      
       const ai = getAi();
       
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ 
@@ -260,16 +269,18 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   };
 
   return (
-    <div className="w-full mt-6 mb-4">
+    <div className="w-full mt-6 mb-4" role="region" aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞ কল সার্ভিস' : 'AI Expert Call Service'}>
       {!isConnected && !isCalling ? (
         <motion.button
+          type="button"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={startCall}
-          className="w-full flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-600 to-emerald-800 text-white p-6 rounded-3xl shadow-xl shadow-green-900/20 border border-green-500/30 transition-all cursor-pointer relative overflow-hidden group"
+          aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Expert'}
+          className="w-full flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-600 to-emerald-800 text-white p-6 rounded-3xl shadow-xl shadow-green-900/20 border border-green-500/30 transition-all cursor-pointer relative overflow-hidden group focus:ring-4 focus:ring-green-400 outline-none"
         >
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner">
+          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner" aria-hidden="true">
             <Phone className="w-8 h-8 text-white" />
           </div>
           <span className="font-black uppercase tracking-widest text-lg lg:text-xl drop-shadow-sm">
@@ -284,23 +295,29 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           className="bg-gray-900 rounded-[32px] p-8 w-full shadow-2xl border border-gray-800 relative overflow-hidden"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="expert-call-title"
         >
           <div className="absolute inset-0 bg-gradient-to-b from-green-900/30 to-transparent pointer-events-none"></div>
           
           <div className="flex flex-col items-center space-y-8 relative z-10">
             <div className="text-center">
-              <h4 className="text-white font-black text-2xl tracking-tight mb-2">
+              <h4 id="expert-call-title" className="text-white font-black text-2xl tracking-tight mb-2">
                 {lang === 'bn' ? 'কৃষি বিশেষজ্ঞ' : 'Agri Expert'}
               </h4>
-              <div className="flex items-center justify-center space-x-2">
-                {isCalling && <Loader2 className="w-4 h-4 text-green-400 animate-spin" />}
+              <div className="flex items-center justify-center space-x-2" role="status" aria-live="polite">
+                {isCalling && <Loader2 className="w-4 h-4 text-green-400 animate-spin" aria-hidden="true" />}
                 <p className={`text-xs uppercase tracking-widest font-black ${isCalling ? 'text-green-400 animate-pulse' : 'text-green-500'}`}>
                   {isCalling ? (lang === 'bn' ? 'সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...' : 'Establishing Connection, Please Wait...') : (lang === 'bn' ? 'সংযুক্ত - কথা বলুন' : 'Connected - Speak Now')}
                 </p>
+                <span className="sr-only">
+                  {isSpeaking ? (lang === 'bn' ? 'বিশেষজ্ঞ কথা বলছেন' : 'Expert is speaking') : (lang === 'bn' ? 'শান্ত' : 'Silent')}
+                </span>
               </div>
             </div>
 
-            <div className="relative flex items-center justify-center w-full h-32">
+            <div className="relative flex items-center justify-center w-full h-32" aria-hidden="true">
               <div className="absolute inset-0 flex items-center justify-center gap-1.5">
                 {audioLevel.map((level, i) => (
                   <motion.div
@@ -326,29 +343,34 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
             <div className="flex items-center justify-center space-x-8 w-full pt-4">
               <div className="flex flex-col items-center space-y-2">
                 <button
+                  type="button"
                   onClick={toggleMute}
                   disabled={isCalling}
-                  className={`p-6 rounded-full transition-all ${
+                  aria-pressed={isMuted}
+                  aria-label={isMuted ? (lang === 'bn' ? 'আনমিউট করুন' : 'Unmute microphone') : (lang === 'bn' ? 'মিউট করুন' : 'Mute microphone')}
+                  className={`p-6 rounded-full transition-all focus:ring-4 focus:ring-gray-600 outline-none ${
                     isMuted 
                       ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50' 
                       : 'bg-gray-800 text-white hover:bg-gray-700 border border-gray-700'
                   } disabled:opacity-50`}
                 >
-                  {isMuted ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+                  {isMuted ? <MicOff className="w-8 h-8" aria-hidden="true" /> : <Mic className="w-8 h-8" aria-hidden="true" />}
                 </button>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400" aria-hidden="true">
                   {isMuted ? (lang === 'bn' ? 'আনমিউট' : 'Unmute') : (lang === 'bn' ? 'মিউট' : 'Mute')}
                 </span>
               </div>
               
               <div className="flex flex-col items-center space-y-2">
                 <button
+                  type="button"
                   onClick={endCall}
-                  className="p-6 rounded-full bg-red-600 text-white hover:bg-red-500 transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:shadow-[0_0_30px_rgba(239,68,68,0.6)]"
+                  aria-label={lang === 'bn' ? 'কল শেষ করুন' : 'End conversation'}
+                  className="p-6 rounded-full bg-red-600 text-white hover:bg-red-500 transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:shadow-[0_0_30px_rgba(239,68,68,0.6)] focus:ring-4 focus:ring-red-400 outline-none"
                 >
-                  <PhoneOff className="w-8 h-8" />
+                  <PhoneOff className="w-8 h-8" aria-hidden="true" />
                 </button>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400" aria-hidden="true">
                   {lang === 'bn' ? 'কল কাটুন' : 'End Call'}
                 </span>
               </div>
