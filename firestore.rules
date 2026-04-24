@@ -1,278 +1,210 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Global Safety Net - Default Deny
+    // 0. Global Safety Net
     match /{document=**} {
       allow read, write: if false;
     }
 
     // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Document ID: {userId}
-    // Fields:
-    //   - uid: string (required, immutable)
-    //   - email: string (required, immutable)
-    //   - name: string (optional)
-    //   - role: string (required, enum: ['agri-preneur', 'hub-manager', 'admin'])
-    //   - tier: string (required, enum: ['free', 'premium'])
-    //   - usageCount: number (required)
-    //   - lastUsedDate: string (optional, YYYY-MM-DD)
-    //   - createdAt: string (required, immutable)
-    //
-    // Collection: diagnoses
-    // Document ID: {diagnosisId}
-    // Fields:
-    //   - userId: string (required, immutable)
-    //   - crop: string (required)
-    //   - upazila: string (required)
-    //   - analysisType: string (required)
-    //   - diagnosisText: string (required)
-    //   - severity: number (required, 0-100)
-    //   - confidence: number (required, 0-100)
-    //   - verificationAdvice: string (required)
-    //   - createdAt: string (required, immutable)
-    //
-    // Collection: certificates
-    // Document ID: {certificateId}
-    // Fields:
-    //   - userId: string (required, immutable)
-    //   - produce: string (required)
-    //   - grade: string (required)
-    //   - justification: string (required)
-    //   - estimatedPriceBdt: number (required)
-    //   - createdAt: string (required, immutable)
-    //
-    // Collection: alerts
-    // Document ID: {alertId}
-    // Fields:
-    //   - userId: string (required, immutable)
-    //   - scenario: string (required)
-    //   - message: string (required)
-    //   - createdAt: string (required, immutable)
-    //
-    // Collection: market_queries
-    // Document ID: {queryId}
-    // Fields:
-    //   - userId: string (required, immutable)
-    //   - produce: string (required)
-    //   - insights: string (required)
-    //   - isAdvanced: boolean (required)
-    //   - createdAt: string (required, immutable)
-    //
-    // ===============================================================
-    // Helper Functions
+    // Shared Primitives
     // ===============================================================
     
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
     
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
     
     function isAdmin() {
-      return isAuthenticated() && 
+      return isSignedIn() && 
         (request.auth.token.email == "sadmankhalili@gmail.com" && request.auth.token.email_verified == true);
     }
 
     function isDatabaseAdmin() {
-      return isAdmin() || (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      // Identity isolation: We don't want users to spoof admin role in their profile
+      // so we use a hardcoded email for the bootstrapper admin
+      return isAdmin();
     }
-    
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
-    
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
+
+    function incoming() {
+      return request.resource.data;
     }
-    
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+
+    function existing() {
+      return resource.data;
     }
-    
-    function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+
+    // Pillars: Standard type checks with size bounds
+    function isStr(val, min, max) {
+      return val is string && val.size() >= min && val.size() <= max;
+    }
+
+    function isTimestamp(val) {
+      // Perceived as ISO string by the app
+      return val is string && val.size() >= 19;
     }
 
     // ===============================================================
-    // Domain Validators
+    // Entity Validators (Pillar 2)
     // ===============================================================
-    
+
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'name', 'role', 'tier', 'usageCount', 'lastUsedDate', 'createdAt']) &&
-             hasRequiredFields(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
-             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
-             data.email is string && isValidEmail(data.email) && data.email.size() < 100 &&
-             (!('name' in data) || (data.name is string && data.name.size() < 100)) &&
-             data.role in ['agri-preneur', 'hub-manager', 'admin'] &&
-             data.tier in ['free', 'premium'] &&
-             data.usageCount is number && data.usageCount >= 0 &&
-             (!('lastUsedDate' in data) || (data.lastUsedDate is string && data.lastUsedDate.matches("^\\d{4}-\\d{2}-\\d{2}$"))) &&
-             isValidDateString(data.createdAt);
+      // uid, email, name, role, tier, usageCount, lastUsedDate, createdAt
+      return data.keys().hasAll(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
+             isStr(data.uid, 1, 128) &&
+             isStr(data.email, 3, 128) &&
+             data.usageCount is number &&
+             isTimestamp(data.createdAt);
     }
-    
+
     function isValidDiagnosis(data) {
-      return hasOnlyAllowedFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
-             hasRequiredFields(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
-             data.crop is string && data.crop.size() > 0 && data.crop.size() < 100 &&
-             data.cropStage is string && data.cropStage.size() > 0 && data.cropStage.size() < 100 &&
-             data.analysisType is string && data.analysisType.size() > 0 && data.analysisType.size() < 100 &&
-             data.diagnosisText is string && data.diagnosisText.size() > 0 && data.diagnosisText.size() < 5000 &&
-             data.qualitativeSeverity is string && data.qualitativeSeverity in ['Low', 'Medium', 'High'] &&
-             data.symptomsBreakdown is list && data.symptomsBreakdown.size() >= 0 && data.symptomsBreakdown.size() < 20 &&
-             data.verificationAdvice is string && data.verificationAdvice.size() > 0 && data.verificationAdvice.size() < 2000 &&
-             isValidDateString(data.createdAt);
+      // userId, crop, cropStage, analysisType, diagnosisText, qualitativeSeverity, symptomsBreakdown, verificationAdvice, createdAt
+      return data.keys().hasAll(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
+             isStr(data.userId, 1, 128) &&
+             isStr(data.diagnosisText, 1, 30000) &&
+             isTimestamp(data.createdAt);
     }
-    
+
     function isValidCertificate(data) {
-      return hasOnlyAllowedFields(['userId', 'produce', 'grade', 'justification', 'estimatedPriceBdt', 'createdAt']) &&
-             hasRequiredFields(['userId', 'produce', 'grade', 'justification', 'estimatedPriceBdt', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
-             data.produce is string && data.produce.size() > 0 && data.produce.size() < 100 &&
-             data.grade is string && data.grade.size() > 0 && data.grade.size() < 50 &&
-             data.justification is string && data.justification.size() > 0 && data.justification.size() < 2000 &&
-             data.estimatedPriceBdt is number && data.estimatedPriceBdt >= 0 &&
-             isValidDateString(data.createdAt);
+      let requiredFields = ['userId', 'produce', 'grade', 'justification', 'estimatedPriceBdt', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
+             isStr(data.produce, 1, 128) &&
+             isStr(data.grade, 1, 64) &&
+             isStr(data.justification, 1, 5000) &&
+             data.estimatedPriceBdt is number &&
+             isTimestamp(data.createdAt);
     }
-    
+
     function isValidAlert(data) {
-      return hasOnlyAllowedFields(['userId', 'scenario', 'message', 'createdAt']) &&
-             hasRequiredFields(['userId', 'scenario', 'message', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
-             data.scenario is string && data.scenario.size() > 0 && data.scenario.size() < 200 &&
-             data.message is string && data.message.size() > 0 && data.message.size() < 2000 &&
-             isValidDateString(data.createdAt);
+      let requiredFields = ['userId', 'scenario', 'message', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
+             isStr(data.scenario, 1, 256) &&
+             isStr(data.message, 1, 5000) &&
+             isTimestamp(data.createdAt);
     }
 
     function isValidMarketQuery(data) {
-      return hasOnlyAllowedFields(['userId', 'produce', 'insights', 'isAdvanced', 'createdAt']) &&
-             hasRequiredFields(['userId', 'produce', 'insights', 'isAdvanced', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
-             data.produce is string && data.produce.size() > 0 && data.produce.size() < 100 &&
-             data.insights is string && data.insights.size() > 0 && data.insights.size() < 5000 &&
+      let requiredFields = ['userId', 'produce', 'insights', 'isAdvanced', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
+             isStr(data.produce, 1, 128) &&
+             isStr(data.insights, 1, 10000) &&
              data.isAdvanced is bool &&
-             isValidDateString(data.createdAt);
+             isTimestamp(data.createdAt);
     }
 
-    // ===============================================================
-    // Rules
-    // ===============================================================
-    
-    function isValidGovScheme(data) {
-      return hasRequiredFields(['title', 'description', 'eligibility', 'howToApply', 'crops', 'districts', 'lastUpdated']);
-    }
-    
     function isValidPlantingIntent(data) {
-      return hasOnlyAllowedFields(['userId', 'latitude', 'longitude', 'landType', 'landSize', 'irrigation', 'previousCrop', 'budget', 'targetTime', 'recommendedCrop', 'createdAt']) &&
-             hasRequiredFields(['userId', 'latitude', 'longitude', 'landType', 'landSize', 'irrigation', 'previousCrop', 'budget', 'targetTime', 'recommendedCrop', 'createdAt']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+      let requiredFields = ['userId', 'latitude', 'longitude', 'landType', 'landSize', 'irrigation', 'previousCrop', 'budget', 'targetTime', 'recommendedCrop', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
              data.latitude is number &&
              data.longitude is number &&
-             data.landType is string && data.landType.size() > 0 && data.landType.size() < 100 &&
-             data.landSize is string && data.landSize.size() > 0 && data.landSize.size() < 100 &&
-             data.irrigation is string && data.irrigation.size() > 0 && data.irrigation.size() < 100 &&
-             data.previousCrop is string && data.previousCrop.size() > 0 && data.previousCrop.size() < 100 &&
-             data.budget is string && data.budget.size() > 0 && data.budget.size() < 100 &&
-             data.targetTime is string && data.targetTime.size() > 0 && data.targetTime.size() < 100 &&
-             data.recommendedCrop is string && data.recommendedCrop.size() > 0 && data.recommendedCrop.size() < 100 &&
-             isValidDateString(data.createdAt);
+             isStr(data.landType, 1, 128) &&
+             isStr(data.landSize, 1, 128) &&
+             isStr(data.irrigation, 1, 128) &&
+             isStr(data.previousCrop, 1, 128) &&
+             isStr(data.budget, 1, 128) &&
+             isStr(data.targetTime, 1, 128) &&
+             isStr(data.recommendedCrop, 1, 128) &&
+             isTimestamp(data.createdAt);
     }
 
-    match /gov_schemes/{schemeId} {
-      allow get, list: if true;
-      allow write: if isDatabaseAdmin() && isValidGovScheme(request.resource.data);
-    }
+    // ===============================================================
+    // Rules Enforcement
+    // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    request.resource.data.uid == request.auth.uid &&
-                    ((isOwner(userId) && request.resource.data.role == 'agri-preneur') || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
-                    request.resource.data.uid == resource.data.uid &&
-                    request.resource.data.email == resource.data.email &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
+      allow create: if isSignedIn() && isValidUser(incoming()) && 
+                    incoming().uid == request.auth.uid &&
+                    userId == request.auth.uid;
+      allow update: if isSignedIn() && isValidUser(incoming()) &&
+                    isOwner(userId) &&
+                    incoming().uid == existing().uid &&
+                    incoming().email == existing().email &&
+                    incoming().createdAt == existing().createdAt &&
                     (
                       isAdmin() || 
-                      (isOwner(userId) && 
-                       request.resource.data.role == resource.data.get('role', 'agri-preneur') &&
-                       (
-                         // Tier upgrade
-                         (request.resource.data.tier != resource.data.get('tier', 'free') && 
-                          request.resource.data.usageCount == resource.data.get('usageCount', 0)) ||
-                         // Normal increment (same day)
-                         (request.resource.data.tier == resource.data.get('tier', 'free') &&
-                          request.resource.data.lastUsedDate == resource.data.get('lastUsedDate', '') &&
-                          request.resource.data.usageCount == resource.data.get('usageCount', 0) + 1) ||
-                         // Daily reset (new day)
-                         (request.resource.data.tier == resource.data.get('tier', 'free') &&
-                          request.resource.data.lastUsedDate != resource.data.get('lastUsedDate', '') &&
-                          request.resource.data.usageCount == 1)
-                       )
+                      (
+                        // Tier upgrade or Usage Count sync
+                        incoming().diff(existing()).affectedKeys().hasAny(['tier', 'usageCount', 'lastUsedDate', 'name']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name'])
                       )
                     );
       allow delete: if isAdmin();
     }
-    
+
     match /diagnoses/{diagnosisId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && isValidDiagnosis(request.resource.data) &&
-                    request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidDiagnosis(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    (request.auth.uid == resource.data.userId || isAdmin());
+      // Secure List Query (Pillar 8)
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && isValidDiagnosis(incoming()) &&
+                    incoming().userId == request.auth.uid;
+      
+      allow update: if isSignedIn() && isValidDiagnosis(incoming()) &&
+                    existing().userId == request.auth.uid &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt &&
+                    (
+                      isAdmin() ||
+                      (
+                        // Action based update
+                        incoming().diff(existing()).affectedKeys().hasAny(['deepDiagnosis', 'deepDiagnosedAt', 'helpful', 'chatSummary']) &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['deepDiagnosis', 'deepDiagnosedAt', 'helpful', 'chatSummary', 'updatedAt'])
+                      )
+                    );
       allow delete: if isAdmin();
     }
-    
+
     match /certificates/{certificateId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isDatabaseAdmin());
-      allow create: if isAuthenticated() && isValidCertificate(request.resource.data) &&
-                    request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidCertificate(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    (request.auth.uid == resource.data.userId || isDatabaseAdmin());
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidCertificate(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    isValidId(certificateId);
       allow delete: if isAdmin();
     }
-    
+
     match /alerts/{alertId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isDatabaseAdmin());
-      allow create: if isAuthenticated() && isValidAlert(request.resource.data) &&
-                    request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidAlert(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    (request.auth.uid == resource.data.userId || isDatabaseAdmin());
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidAlert(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    isValidId(alertId);
       allow delete: if isAdmin();
     }
 
     match /market_queries/{queryId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isDatabaseAdmin());
-      allow create: if isAuthenticated() && isValidMarketQuery(request.resource.data) &&
-                    request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidMarketQuery(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    (request.auth.uid == resource.data.userId || isDatabaseAdmin());
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidMarketQuery(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    isValidId(queryId);
       allow delete: if isAdmin();
     }
 
     match /planting_intents/{intentId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isDatabaseAdmin());
-      allow create: if isAuthenticated() && isValidPlantingIntent(request.resource.data) &&
-                    request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidPlantingIntent(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    (request.auth.uid == resource.data.userId || isDatabaseAdmin());
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidPlantingIntent(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    isValidId(intentId);
       allow delete: if isAdmin();
+    }
+    
+    match /gov_schemes/{schemeId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

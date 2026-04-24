@@ -56,27 +56,33 @@ export const diagnoseCrop = async (
         : `Location: Unknown (Please advise based on general best practices).`;
 
       const prompt = `You are a world-class agricultural expert specializing in crops from Bangladesh.
-      Analyze the provided image(s) of a ${crop} plant at the ${cropStage} stage.
+      Analyze the provided image(s) of a ${crop || 'plant (please identify the crop)'} plant at the ${cropStage || 'unknown'} stage.
       ${locationContext}
       
-      The user is specifically interested in ${analysisType}.
+      The user is specifically interested in ${analysisType || 'its general health and any visible issues'}.
       
       Provide a comprehensive diagnosis in ${lang === 'bn' ? 'Bangla' : 'English'}.
       Your response must be approximately 100 words, detailed, and not generalized.
       
+      CRITICAL: You MUST translate ALL field values (visibleSymptoms, possibleDiseases, differentialDiagnosis, diagnosis, symptomsBreakdown, verificationAdvice) into ${lang === 'bn' ? 'Bangla' : 'English'} accurately. Even technical crop disease names should be translated or transliterated if they are commonly known in the local language. ALL text in the JSON values must be in ${lang === 'bn' ? 'Bangla' : 'English'}.
+      
       If multiple images are provided, synthesize the information from all of them to provide a more accurate diagnosis.
       
-      CRITICAL ANALYSIS GUIDELINES:
-      - DISEASE: Look for fungal patterns (powdery/downy mildews), bacterial rots, or viral mosaic patterns.
-      - PESTS: Look for direct insect sightings or characteristic damage (mining, chewing, webbing, piercing/sucking symptoms).
-      - ABIOTIC STRESS: Identify visual signs of heat stress, waterlogging, drought, or sunscald.
-      - VISUAL SYMPTOMS: Describe specific leaf discolorations (chlorosis, necrosis), wilting types, and fruit/stem abnormalities.
+      CRITICAL ANALYSIS GUIDELINES & CHAIN OF THOUGHT:
+      To ensure high accuracy, you MUST follow a deductive reasoning pattern. Do not jump to conclusions. Your JSON must include:
+      - 'visibleSymptoms': A detailed list of all symptoms visible in the image.
+      - 'possibleDiseases': A list of at least 3 possible conditions that match the symptoms and the crop.
+      - 'differentialDiagnosis': An explanation of why it is the final disease and NOT the others.
       - DO NOT provide specific chemical/nutrient percentages (e.g., N/P/K %) as these cannot be reliably diagnosed from images alone. Instead, suggest general nutritional health based on vigor and color.
+      - SAFETY FIRST: Be exceptionally cautious when recommending any synthetic pesticides or chemicals. Prioritize food safety and explicitly advise on farmer safety (e.g., wearing mandatory protective gear, safe handling, and withholding periods before harvest).
       
       Return the response in the following JSON format:
       {
         "status": "Valid" | "Invalid",
-        "diagnosis": "Detailed markdown diagnosis and treatment plan (approx 100 words)",
+        "visibleSymptoms": "Detailed description of visible symptoms",
+        "possibleDiseases": ["Condition 1", "Condition 2", "Condition 3"],
+        "differentialDiagnosis": "Reasoning for choosing the final diagnosis",
+        "diagnosis": "Detailed markdown final diagnosis and treatment plan (approx 100 words)",
         "qualitativeSeverity": "Low" | "Medium" | "High",
         "symptomsBreakdown": ["Symptom 1", "Symptom 2", "Symptom 3"],
         "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers)."
@@ -90,6 +96,9 @@ export const diagnoseCrop = async (
           type: Type.OBJECT,
           properties: {
             status: { type: Type.STRING, description: 'Valid or Invalid' },
+            visibleSymptoms: { type: Type.STRING },
+            possibleDiseases: { type: Type.ARRAY, items: { type: Type.STRING } },
+            differentialDiagnosis: { type: Type.STRING },
             diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
             qualitativeSeverity: { type: Type.STRING, description: 'Low, Medium, or High' },
             symptomsBreakdown: { 
@@ -99,7 +108,7 @@ export const diagnoseCrop = async (
             },
             verificationAdvice: { type: Type.STRING, description: 'Advice for further verification' }
           },
-          required: ['status', 'diagnosis', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice']
+          required: ['status', 'visibleSymptoms', 'possibleDiseases', 'differentialDiagnosis', 'diagnosis', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice']
         }
       };
       
@@ -118,6 +127,99 @@ export const diagnoseCrop = async (
       return JSON.parse(response.text);
     } catch (error) {
       console.error("AI Service Error (Diagnose Crop):", error);
+      throw error;
+    }
+  });
+};
+
+export const deepDiagnoseCrop = async (
+  images: { base64: string; mimeType: string }[], 
+  crop: string, 
+  cropStage: string, 
+  analysisType: string, 
+  lang: string, 
+  basicDiagnosis: any,
+  coords?: { latitude: number; longitude: number }
+) => {
+  return await callAiWithRetry(async () => {
+    try {
+      const locationContext = coords 
+        ? `Location: ${coords.latitude}, ${coords.longitude} (Bangladesh).` 
+        : `Location: Bangladesh.`;
+
+      const prompt = `You are a world-class agricultural expert.
+      A user uploaded an image of a ${crop || 'plant (please identify the crop)'} plant at the ${cropStage || 'unknown'} stage.
+      They are looking for a deep analysis regarding ${analysisType || 'its general health and any visible issues'}.
+      
+      ${locationContext}
+
+      Initial analysis identified:
+      Status: ${basicDiagnosis.status}
+      Severity: ${basicDiagnosis.qualitativeSeverity}
+      Symptoms: ${basicDiagnosis.symptomsBreakdown?.join(', ')}
+      Initial Diagnosis: ${basicDiagnosis.diagnosis}
+      
+      Your tasks:
+      1. OPTION 4 (Grounding): Before diagnosing, USE GOOGLE SEARCH to look up recent agricultural news for ${crop} diseases or pests currently spreading near this location in Bangladesh, or general recent outbreaks in the country.
+      2. OPTION 2 (Chain-of-Thought): To ensure high accuracy, you MUST follow a deductive reasoning pattern. Your JSON must include:
+         - 'visibleSymptoms': A detailed list of all symptoms visible in the image.
+         - 'possibleDiseases': A list of at least 3 possible conditions that match the symptoms and the crop.
+         - 'differentialDiagnosis': An explanation of why it is the final disease and NOT the others.
+      3. Provide a DEEP ANALYSIS based on your deductive reasoning and search findings. Provide highly specific, advanced treatment protocols (e.g., specific chemical names available in Bangladesh, precise dosage). BE EXTRA CAREFUL when suggesting pesticides and chemicals. Emphasize food safety, environmental impact, and farmers' safety (e.g., mandatory protective gear, safe handling, and withholding periods before harvest).
+      
+      CRITICAL: You MUST translate ALL field values in the JSON (visibleSymptoms, possibleDiseases, differentialDiagnosis, detailedDiagnosis, advancedTreatment, environmentalContext) into ${lang === 'bn' ? 'Bangla' : 'English'} accurately. All explanations, reasoning, and lists must be entirely in the target language.
+      
+      Respond in ${lang === 'bn' ? 'Bangla' : 'English'} in the following JSON format:
+      {
+        "visibleSymptoms": "Detailed description of visible symptoms",
+        "possibleDiseases": ["Disease 1", "Disease 2", "Disease 3"],
+        "differentialDiagnosis": "Reasoning for choosing the final diagnosis over others",
+        "detailedDiagnosis": "In-depth explanation and final conclusion about this issue (markdown)",
+        "advancedTreatment": "Specific chemical or biological treatments with dosages (markdown)",
+        "environmentalContext": "How recent weather or local conditions/outbreaks found via search might be contributing to this (markdown)",
+        "sources": ["List of relevant URLs or search findings used"]
+      }`;
+      
+      const config: any = {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            visibleSymptoms: { type: Type.STRING },
+            possibleDiseases: { type: Type.ARRAY, items: { type: Type.STRING } },
+            differentialDiagnosis: { type: Type.STRING },
+            detailedDiagnosis: { type: Type.STRING, description: 'In-depth explanation' },
+            advancedTreatment: { type: Type.STRING, description: 'Specific advanced treatment protocols' },
+            environmentalContext: { type: Type.STRING, description: 'Environmental and weather context based on search' },
+            sources: { 
+              type: Type.ARRAY, 
+              items: { type: Type.STRING },
+              description: 'Sources or references found via Search'
+            }
+          },
+          required: ['visibleSymptoms', 'possibleDiseases', 'differentialDiagnosis', 'detailedDiagnosis', 'advancedTreatment', 'environmentalContext', 'sources']
+        },
+        tools: [{ googleSearch: {} }]
+      };
+      
+      const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
+      contents.push({ parts: [{ text: prompt }] });
+
+      // Always use SEARCH_MODEL (flash-preview) for search grounding
+      const ai = getAi();
+      const response = await ai.models.generateContent({
+        contents,
+        config,
+        model: SEARCH_MODEL
+      } as any);
+      
+      if (!response.text) {
+        throw new Error("AI returned an empty response.");
+      }
+      
+      return JSON.parse(response.text);
+    } catch (error) {
+      console.error("AI Service Error (Deep Diagnose Crop):", error);
       throw error;
     }
   });
@@ -227,8 +329,12 @@ export const generateSpeech = async (text: string) => {
         },
       });
       
+      console.log("TTS Response received", !!response.candidates?.[0]);
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!base64Audio) return null;
+      if (!base64Audio) {
+        console.warn("No audio data in response content parts", JSON.stringify(response.candidates?.[0]?.content?.parts));
+        return null;
+      }
 
       // Gemini TTS returns raw 16-bit PCM at 24000Hz. 
       const binary = atob(base64Audio);

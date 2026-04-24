@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
-import { diagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
+import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -29,6 +29,8 @@ interface Props {
   setPersistedImages?: (images: { base64: string; mimeType: string }[]) => void;
   persistedDiagnosis?: any | null;
   setPersistedDiagnosis?: (diagnosis: any | null) => void;
+  persistedDeepDiagnosis?: any | null;
+  setPersistedDeepDiagnosis?: (diagnosis: any | null) => void;
   persistedChatMessages?: { role: 'user' | 'model'; text: string }[];
   setPersistedChatMessages?: (messages: { role: 'user' | 'model'; text: string }[]) => void;
   persistedChatSession?: any | null;
@@ -51,6 +53,8 @@ export default function AgriCopilot({
   setPersistedImages,
   persistedDiagnosis,
   setPersistedDiagnosis,
+  persistedDeepDiagnosis,
+  setPersistedDeepDiagnosis,
   persistedChatMessages,
   setPersistedChatMessages,
   persistedChatSession,
@@ -65,20 +69,22 @@ export default function AgriCopilot({
   setPersistedAnalysisType
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
-  const [cropStage, setCropStage] = useState(persistedCropStage || 'vegetative');
-  const [crop, setCrop] = useState(persistedCrop || CROPS[0]);
-  const [analysisType, setAnalysisType] = useState(persistedAnalysisType || 'disease');
+  const [cropStage, setCropStage] = useState(persistedCropStage || '');
+  const [crop, setCrop] = useState(persistedCrop || '');
+  const [analysisType, setAnalysisType] = useState(persistedAnalysisType || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isFindingExpert, setIsFindingExpert] = useState(false);
   const [diagnosis, setDiagnosis] = useState<any | null>(persistedDiagnosis || null);
+  const [deepDiagnosis, setDeepDiagnosis] = useState<any | null>(persistedDeepDiagnosis || null);
+  const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(persistedAudioUrl || null);
   const [isAdvanced, setIsAdvanced] = useState(false);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isManualLocation, setIsManualLocation] = useState(false);
   const isOnline = useNetworkStatus();
-  const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
-  const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedUpazila, setSelectedUpazila] = useState('');
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -100,6 +106,10 @@ export default function AgriCopilot({
   useEffect(() => {
     if (setPersistedDiagnosis) setPersistedDiagnosis(diagnosis);
   }, [diagnosis, setPersistedDiagnosis]);
+
+  useEffect(() => {
+    if (setPersistedDeepDiagnosis) setPersistedDeepDiagnosis(deepDiagnosis);
+  }, [deepDiagnosis, setPersistedDeepDiagnosis]);
 
   useEffect(() => {
     if (setPersistedChatMessages) setPersistedChatMessages(chatMessages);
@@ -142,6 +152,7 @@ export default function AgriCopilot({
         
         setImages(prev => [...prev, ...processedImages]);
         setDiagnosis(null);
+        setDeepDiagnosis(null);
         setAudioUrl(null);
       } catch (error) {
         console.error("Error optimizing images:", error);
@@ -207,6 +218,7 @@ export default function AgriCopilot({
   };
 
   const [isTranslating, setIsTranslating] = useState(false);
+  const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null);
 
   const handleTranslate = async () => {
     if (!diagnosis) return;
@@ -342,14 +354,14 @@ export default function AgriCopilot({
           const severity = allowedSeverities.includes(result.qualitativeSeverity) ? result.qualitativeSeverity : 'Medium';
 
           const diagDoc = await addDoc(collection(db, 'diagnoses'), {
-            userId: user.uid,
-            crop,
-            cropStage,
-            analysisType,
-            diagnosisText: result.diagnosis || 'No diagnosis provided',
-            qualitativeSeverity: severity,
+            userId: String(user.uid),
+            crop: String(crop || ''),
+            cropStage: String(cropStage || ''),
+            analysisType: String(analysisType || ''),
+            diagnosisText: String(result.diagnosis || 'No diagnosis provided'),
+            qualitativeSeverity: String(severity),
             symptomsBreakdown: Array.isArray(result.symptomsBreakdown) ? result.symptomsBreakdown : [],
-            verificationAdvice: result.verificationAdvice || 'Consult an expert.',
+            verificationAdvice: String(result.verificationAdvice || 'Consult an expert.'),
             createdAt: new Date().toISOString()
           });
           setLastDiagnosisId(diagDoc.id);
@@ -375,6 +387,57 @@ export default function AgriCopilot({
       setDiagnosis(error.message || "Error connecting to AI service. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeepDiagnose = async () => {
+    if (!diagnosis || images.length === 0) return;
+    
+    if (!isOnline) {
+      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      return;
+    }
+
+    if (!canUse()) {
+      alert(t.limitReached);
+      return;
+    }
+
+    setIsDeepAnalyzing(true);
+    try {
+      const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
+      const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
+      const stageName = translations.en.stages[cropStage as keyof typeof translations.en.stages];
+      
+      const result = await deepDiagnoseCrop(
+        images, 
+        cropName, 
+        stageName, 
+        analysisTypeStr, 
+        lang, 
+        diagnosis,
+        globalLocation || undefined
+      );
+      
+      setDeepDiagnosis(result);
+      await incrementUsage();
+
+      // Save deep diagnosis to Firestore
+      if (user && lastDiagnosisId) {
+        try {
+          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), {
+            deepDiagnosis: result,
+            deepDiagnosedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error("Failed to update diagnosis with deep analysis:", error);
+        }
+      }
+    } catch (error: any) {
+      console.error("Deep Diagnosis failed:", error);
+      alert(lang === 'bn' ? 'গভীর বিশ্লেষণে সমস্যা হয়েছে।' : 'Error performing deep analysis. Please try again.');
+    } finally {
+      setIsDeepAnalyzing(false);
     }
   };
 
@@ -408,13 +471,13 @@ export default function AgriCopilot({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="flex flex-col space-y-10 max-w-4xl mx-auto">
         {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-5 space-y-6 bg-white p-8 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 relative overflow-hidden"
+          className="space-y-6 bg-white p-8 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
           
@@ -506,7 +569,645 @@ export default function AgriCopilot({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleDiagnose}
+              disabled={images.length === 0 || isLoading || !isOnline}
+              aria-busy={isLoading}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
+                  <span>{t.analyzing}</span>
+                </>
+              ) : (
+                <>
+                  <Leaf className="w-7 h-7" aria-hidden="true" />
+                  <span>{t.diagnoseDisease}</span>
+                </>
+              )}
+            </motion.button>
+
+          </div>
+        </motion.div>
+
+        {/* Results Section */}
+        <div className="space-y-6 w-full">
+          <AnimatePresence mode="wait">
+            {diagnosis ? (
+              <motion.div 
+                key="result"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 p-1 rounded-[40px] shadow-2xl shadow-green-200 h-full"
+              >
+                <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
+                  
+                  {/* Translation Loading Overlay */}
+                  <AnimatePresence>
+                    {isTranslating && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4"
+                      >
+                        <div className="relative">
+                          <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+                          <Globe className="w-6 h-6 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                        </div>
+                        <p className="text-blue-600 font-black uppercase tracking-widest text-xs animate-pulse">
+                          {lang === 'bn' ? 'অনুবাদ করা হচ্ছে...' : 'Translating...'}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  <div className="relative z-10 flex flex-col h-full">
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center space-x-4">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-2xl shadow-lg shadow-green-100" aria-hidden="true">
+                          <Leaf className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.diagnosisResult}</h3>
+                          <div className="flex items-center mt-0.5">
+                            <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                              <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
+                              {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          type="button"
+                          onClick={handleTranslate}
+                          disabled={isTranslating}
+                          aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
+                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none"
+                        >
+                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
+                          <span>{lang === 'en' ? 'বাংলায় দেখুন' : 'View in English'}</span>
+                        </button>
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
+                        <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-widest">AI Verified</span>
+                      </div>
+                    </div>
+                    
+                    <div 
+                      className="flex-1 space-y-8"
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      {diagnosis.status === 'Invalid' ? (
+                        <motion.div 
+                          initial={{ scale: 0.9, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          className="bg-red-50 border border-red-100 rounded-3xl p-8 flex items-start space-x-5 shadow-inner"
+                        >
+                          <div className="bg-white p-3 rounded-2xl shadow-sm" aria-hidden="true">
+                            <AlertTriangle className="w-8 h-8 text-red-500" />
+                          </div>
+                          <p className="text-red-900 font-bold text-lg leading-relaxed">{diagnosis.diagnosis}</p>
+                        </motion.div>
+                      ) : (
+                        <>
+                          {/* 1. AI Suggestion (Diagnosis Text) */}
+                          <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="bg-white rounded-[32px] p-8 md:p-12 border border-green-100/60 text-gray-800 shadow-sm relative overflow-hidden"
+                            role="article"
+                            aria-labelledby="diagnosis-heading"
+                          >
+                            <h4 id="diagnosis-heading" className="sr-only">{t.diagnosisResult}</h4>
+                            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '16px 16px' }}></div>
+                            
+                            <div className="relative z-10">
+                              <div className="flex items-center justify-between mb-8 border-b border-green-50 pb-4">
+                                <span className="font-display font-black text-xs uppercase tracking-[0.2em] text-green-700">Digital Diagnosis Core</span>
+                                <span className="font-mono text-[10px] text-gray-300 font-bold">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
+                              </div>
+                              <div className="markdown-body text-base md:text-xl leading-relaxed prose prose-green max-w-none">
+                                <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
+                              </div>
+
+                              {/* Helpfulness Rating Section */}
+                              <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
+                                  <p className="text-xs font-bold text-gray-500">{lang === 'en' ? 'Was this diagnosis helpful?' : 'এই পরামর্শটি কি আপনার উপকারে এসেছে?'}</p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <button 
+                                    disabled={feedbackGiven !== null}
+                                    onClick={async () => {
+                                      setFeedbackGiven('up');
+                                      if (lastDiagnosisId) {
+                                        try {
+                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: true });
+                                          toast.success(lang === 'en' ? 'Thanks for your feedback!' : 'আপনার মতামতের জন্য ধন্যবাদ!');
+                                        } catch (e) {
+                                          console.error(e);
+                                        }
+                                      }
+                                    }}
+                                    className={`p-3 rounded-xl border flex items-center space-x-2 transition-all ${feedbackGiven === 'up' ? 'bg-green-100 border-green-500 text-green-700' : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-500 hover:text-green-600 disabled:opacity-50'}`}
+                                  >
+                                    <ThumbsUp className={`w-4 h-4 ${feedbackGiven === 'up' ? 'fill-current' : ''}`} />
+                                    {feedbackGiven === 'up' && <span className="text-xs font-bold pr-1">{lang === 'bn' ? 'উপকারী' : 'Helpful'}</span>}
+                                  </button>
+                                  <button 
+                                    disabled={feedbackGiven !== null}
+                                    onClick={async () => {
+                                      setFeedbackGiven('down');
+                                      if (lastDiagnosisId) {
+                                        try {
+                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: false });
+                                          toast.success(lang === 'en' ? 'Thanks for your feedback!' : 'আপনার মতামতের জন্য ধন্যবাদ!');
+                                        } catch (e) {
+                                          console.error(e);
+                                        }
+                                      }
+                                    }}
+                                    className={`p-3 rounded-xl border flex items-center space-x-2 transition-all ${feedbackGiven === 'down' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-500 hover:text-red-600 disabled:opacity-50'}`}
+                                  >
+                                    <ThumbsDown className={`w-4 h-4 ${feedbackGiven === 'down' ? 'fill-current' : ''}`} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* TTS Audio Player */}
+                            {audioUrl && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mt-10 bg-gradient-to-r from-emerald-100 to-green-100 rounded-[2rem] p-6 md:p-8 border-2 border-green-200/50 shadow-xl shadow-green-900/5 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 relative overflow-hidden"
+                                role="region"
+                                aria-label={lang === 'bn' ? 'এআই অডিও বিশ্লেষণ' : 'AI audio analysis'}
+                              >
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+                                <motion.div 
+                                  animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                  className="bg-white p-5 rounded-2xl text-green-600 shadow-md relative z-10 border border-green-50"
+                                  aria-hidden="true"
+                                >
+                                  <Volume2 className="w-10 h-10" />
+                                </motion.div>
+                                <div className="flex-1 w-full text-center md:text-left relative z-10">
+                                  <p id="audio-analysis-label" className="text-sm font-black text-green-900 uppercase tracking-widest mb-3 drop-shadow-sm">
+                                    {lang === 'bn' ? 'এআই অডিও শুনুন' : 'Listen to AI Analysis'}
+                                  </p>
+                                  <div className="bg-white/60 p-2 rounded-2xl shadow-inner border border-green-100/50">
+                                    <audio 
+                                      controls 
+                                      src={audioUrl} 
+                                      className="w-full h-12 rounded-xl"
+                                      aria-labelledby="audio-analysis-label"
+                                    />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </motion.div>
+
+                          {/* 2. Verification Advice */}
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[32px] p-8 shadow-inner">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="bg-white p-2 rounded-xl shadow-sm">
+                                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
+                            </div>
+                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-6 prose-sm prose-blue leading-relaxed">
+                              <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
+                            </div>
+                            
+                            {diagnosis.confidence < 70 && (
+                              <div className="flex items-center space-x-2 text-amber-600 bg-amber-100/50 px-4 py-2 rounded-xl border border-amber-200 w-fit">
+                                <AlertTriangle className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{t.lowConfidenceWarning}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 3. Symptoms and Severity */}
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                            {/* Severity */}
+                            <motion.div 
+                              whileHover={{ y: -4, scale: 1.01 }}
+                              className="bg-white/80 backdrop-blur-md rounded-3xl p-6 border border-gray-100 shadow-lg shadow-gray-200/50 flex flex-col justify-center relative overflow-hidden"
+                            >
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-gray-100 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 opacity-50"></div>
+                              <div className="flex items-center space-x-3 mb-4">
+                                <div className="p-2.5 bg-gray-50 rounded-2xl">
+                                  <AlertTriangle className="w-5 h-5 text-gray-500" />
+                                </div>
+                                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'সংক্রমণের মাত্রা' : 'Severity Level'}</p>
+                              </div>
+                              
+                              <div className="flex items-center space-x-4">
+                                <div className={`flex-1 h-3 rounded-full overflow-hidden bg-gray-100`}>
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: diagnosis.qualitativeSeverity === 'High' ? '100%' : diagnosis.qualitativeSeverity === 'Medium' ? '60%' : '30%' }}
+                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                    className={`h-full ${
+                                      diagnosis.qualitativeSeverity === 'High' ? 'bg-red-500' : 
+                                      diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-500' : 
+                                      'bg-green-500'
+                                    }`}
+                                  />
+                                </div>
+                                <div className={`px-5 py-2 rounded-xl font-black text-lg shadow-sm ${
+                                  diagnosis.qualitativeSeverity === 'High' ? 'bg-red-50 text-red-600 border border-red-100' : 
+                                  diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 
+                                  'bg-green-50 text-green-600 border border-green-100'
+                                }`}>
+                                  {diagnosis.qualitativeSeverity === 'High' && lang === 'bn' ? 'উচ্চ' : 
+                                   diagnosis.qualitativeSeverity === 'Medium' && lang === 'bn' ? 'মাঝারি' : 
+                                   diagnosis.qualitativeSeverity === 'Low' && lang === 'bn' ? 'নিম্ন' : 
+                                   diagnosis.qualitativeSeverity || 'Unknown'}
+                                </div>
+                              </div>
+                            </motion.div>
+
+                            {/* Symptoms Breakdown */}
+                            <motion.div 
+                              whileHover={{ y: -4, scale: 1.01 }}
+                              className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-3xl p-6 border border-indigo-100/50 shadow-lg shadow-indigo-100/50 relative overflow-hidden flex flex-col"
+                            >
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-white/40 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
+                              <div className="flex items-center space-x-3 mb-4">
+                                <div className="p-2.5 bg-white rounded-2xl shadow-sm">
+                                  <Bug className="w-5 h-5 text-indigo-500" />
+                                </div>
+                                <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">{lang === 'bn' ? 'শনাক্তকৃত লক্ষণ' : 'Visible Symptoms'}</p>
+                              </div>
+                              <ul className="space-y-2.5 flex-1 font-medium">
+                                {diagnosis.symptomsBreakdown?.slice(0, 4).map((symptom: string, idx: number) => (
+                                  <motion.li 
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: idx * 0.1 }}
+                                    key={idx} 
+                                    className="flex items-start text-sm text-indigo-900/80"
+                                  >
+                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0 mr-2.5"></div>
+                                    <span className="leading-snug">{symptom}</span>
+                                  </motion.li>
+                                ))}
+                              </ul>
+                            </motion.div>
+                          </div>
+
+                          {/* Differential Diagnosis (Chain of Thought Output) */}
+                          {(diagnosis.possibleDiseases?.length > 0 || diagnosis.differentialDiagnosis) && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm relative z-10"
+                            >
+                              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
+                                <Activity className="w-4 h-4 mr-2" />
+                                {lang === 'bn' ? 'সম্ভাব্য রোগ ও পার্থক্য' : 'Differential Diagnosis'}
+                              </h4>
+                              
+                              {diagnosis.possibleDiseases && diagnosis.possibleDiseases.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                  {diagnosis.possibleDiseases.map((disease: string, idx: number) => (
+                                    <span key={idx} className="bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold">
+                                      {disease}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {diagnosis.differentialDiagnosis && (
+                                <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100">
+                                  <p className="text-sm font-medium text-gray-700 leading-relaxed">
+                                    <span className="font-bold text-orange-600 mr-2">Why this diagnosis?</span>
+                                    {diagnosis.differentialDiagnosis}
+                                  </p>
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+
+                                                    {/* Deep Analysis Result or Button */}
+                          <div className="mt-8">
+  {/* Chatbot Section (Moved to Left Column) */}
+                            <div className="mt-8 pt-8 border-t border-gray-100">
+                              <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-3">
+                                  <div className="bg-green-100 p-2.5 rounded-xl shadow-inner">
+                                    <MessageSquare className="w-5 h-5 text-green-600" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
+                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                  <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
+                                </div>
+                              </div>
+
+                              {diagnosis && (
+                                <div className="mb-6">
+                                  <LiveExpertCall 
+                                    diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
+                                    lang={lang} 
+                                    locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
+                                  />
+                                </div>
+                              )}
+
+                              <div 
+                                className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative"
+                                role="log"
+                                aria-live="polite"
+                                aria-label={lang === 'bn' ? 'চ্যাট ইতিহাস' : 'Chat history'}
+                              >
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                  {chatMessages.length === 0 && !chatSummary && (
+                                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
+                                      <motion.div 
+                                        animate={{ y: [0, -5, 0] }}
+                                        transition={{ duration: 3, repeat: Infinity }}
+                                        className="bg-white p-4 rounded-[24px] shadow-sm mb-4"
+                                        aria-hidden="true"
+                                      >
+                                        <Bot className="w-8 h-8 opacity-40" />
+                                      </motion.div>
+                                      <p className="text-xs font-bold max-w-[200px] leading-relaxed">{lang === 'bn' ? 'আপনার প্রশ্ন জিজ্ঞাসা করুন...' : 'Ask your follow-up questions here......'}</p>
+                                    </div>
+                                  )}
+
+                                  {chatSummary && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      className="bg-green-50 border border-green-100 p-6 rounded-[32px] mb-4 shadow-sm"
+                                      role="article"
+                                      aria-label={t.tooltips.chatSummaryTitle}
+                                    >
+                                      <div className="flex items-center space-x-2 text-green-700 mb-3">
+                                        <Sparkles className="w-4 h-4" aria-hidden="true" />
+                                        <h4 className="text-xs font-black uppercase tracking-widest leading-none">{t.tooltips.chatSummaryTitle}</h4>
+                                      </div>
+                                      <div className="markdown-body prose-sm prose-green leading-relaxed text-green-900 text-xs">
+                                        <ReactMarkdown>{chatSummary}</ReactMarkdown>
+                                      </div>
+                                    </motion.div>
+                                  )}
+
+                                  {!chatSummary && chatMessages.map((msg, idx) => (
+                                    <motion.div 
+                                      key={idx} 
+                                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    >
+                                      <div className={`max-w-[85%] p-4 rounded-[20px] text-xs shadow-md relative ${
+                                        msg.role === 'user' 
+                                          ? 'bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-tr-none' 
+                                          : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
+                                      }`}>
+                                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
+                                          {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
+                                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
+                                        </div>
+                                        <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
+                                          <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                  {isChatLoading && (
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="flex justify-start"
+                                      aria-label={t.tooltips.aiThinking}
+                                    >
+                                      <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
+                                        <div className="flex space-x-1">
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                        </div>
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                  <div ref={chatEndRef} />
+                                </div>
+                                
+                                <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-2">
+                                  {chatMessages.length >= 2 && !chatSummary && (
+                                    <button
+                                      type="button"
+                                      onClick={handleSummarizeAndSave}
+                                      disabled={isSummarizing || isChatLoading}
+                                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
+                                    >
+                                      {isSummarizing ? (
+                                        <>
+                                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                                          <span>{t.tooltips.summarizing}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                          <span>{t.tooltips.saveSummary}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  
+                                  <div className="relative flex items-center">
+                                    <label htmlFor="chat-input" className="sr-only">{lang === 'bn' ? 'আপনার প্রশ্ন' : 'Your question'}</label>
+                                    <input
+                                      id="chat-input"
+                                      type="text"
+                                      value={currentChatMessage}
+                                      onChange={(e) => setCurrentChatMessage(e.target.value)}
+                                      onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleSendMessage(e as any);
+                                        }
+                                      }}
+                                      placeholder={lang === 'bn' ? 'আপনার প্রশ্ন লিখুন...' : 'Type your question...'}
+                                      disabled={!diagnosis || isChatLoading || !!chatSummary}
+                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={handleSendMessage}
+                                      disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
+                                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
+                                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                    >
+                                      <Send className="w-4 h-4" aria-hidden="true" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {deepDiagnosis ? (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="mt-8 bg-white border border-blue-100 rounded-[32px] p-8 shadow-md relative overflow-hidden"
+                            >
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-80 pointer-events-none"></div>
+                              <div className="relative z-10 space-y-6">
+                                <div className="flex items-center space-x-3 mb-6">
+                                  <div className="bg-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-200">
+                                    <Globe className="w-6 h-6 text-white" />
+                                  </div>
+                                  <div>
+                                    <h3 className="font-display font-black text-blue-900 tracking-tight uppercase text-lg leading-none">{lang === 'bn' ? 'গভীর বিশ্লেষণ' : 'Deep Analysis'}</h3>
+                                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Grounding Search Active</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                  <div>
+                                    <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3">{lang === 'bn' ? 'বিস্তারিত নির্ণয়' : 'Detailed Diagnosis'}</h4>
+                                    <div className="markdown-body text-sm text-gray-800 flex flex-col gap-3">
+                                      <ReactMarkdown>{deepDiagnosis.detailedDiagnosis}</ReactMarkdown>
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
+                                    <h4 className="flex items-center text-[10px] font-black text-blue-800 uppercase tracking-[0.2em] mb-3">
+                                      <AlertTriangle className="w-3 h-3 mr-2" />
+                                      {lang === 'bn' ? 'সংশ্লিষ্ট পরিবেশের প্রভাব' : 'Environmental Context'}
+                                    </h4>
+                                    <div className="text-sm text-blue-900/80 font-medium leading-relaxed">
+                                      <ReactMarkdown>{deepDiagnosis.environmentalContext}</ReactMarkdown>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <h4 className="flex items-center text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-3">
+                                      <Search className="w-3 h-3 mr-2" />
+                                      {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা' : 'Advanced Treatment'}
+                                    </h4>
+                                    <div className="markdown-body text-sm text-gray-800">
+                                      <ReactMarkdown>{deepDiagnosis.advancedTreatment}</ReactMarkdown>
+                                    </div>
+                                  </div>
+                                  
+                                  {deepDiagnosis.sources && deepDiagnosis.sources.length > 0 && (
+                                    <div className="pt-4 border-t border-gray-100">
+                                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{lang === 'bn' ? 'তথ্যসূত্রগুলি' : 'Verified Sources'}</h4>
+                                      <ul className="space-y-1">
+                                        {deepDiagnosis.sources.map((source: string, idx: number) => (
+                                          <li key={idx} className="flex items-center space-x-2 text-xs">
+                                            <div className="w-1 h-1 rounded-full bg-gray-300"></div>
+                                            <span className="text-gray-500 line-clamp-1">{source.replace(/https?:\/\/(www\.)?/, '')}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          ) : (
+                            <div className="mt-8 flex justify-center">
+                              <motion.button 
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleDeepDiagnose}
+                                disabled={isDeepAnalyzing}
+                                className="group relative inline-flex items-center justify-center space-x-3 bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-black py-4 px-8 rounded-2xl hover:shadow-xl hover:shadow-blue-200 disabled:opacity-50 transition-all focus:ring-4 focus:ring-blue-400 outline-none w-full sm:w-auto"
+                              >
+                                {isDeepAnalyzing ? (
+                                  <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <span className="uppercase tracking-widest">{lang === 'bn' ? 'বিশ্লেষণ করা হচ্ছে...' : 'Performing Deep Analysis...'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <Globe className="w-5 h-5 relative z-10" />
+                                    <span className="uppercase tracking-widest relative z-10">
+                                      {lang === 'bn' ? 'যাচাই ও গভীর বিশ্লেষণ করুন' : 'Verify & Deep Analysis'}
+                                    </span>
+                                  </>
+                                )}
+                              </motion.button>
+                            </div>
+                          )}
+
+                          {/* 4. Chat with Expert (Search DAE) - Indicative */}
+                          <div className="flex justify-center pt-2 pb-4">
+                            <motion.button 
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={handleVerifyWithExpert}
+                              disabled={isFindingExpert}
+                              className="text-gray-500 hover:text-blue-600 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 transition-all border border-transparent hover:border-blue-100 hover:bg-blue-50"
+                            >
+                              {isFindingExpert ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Search className="w-4 h-4" />
+                              )}
+                              <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert} (Indicative)</span>
+                            </motion.button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-white rounded-[40px] p-16 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gray-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
+                <div className="bg-gray-50 p-10 rounded-[32px] mb-8 shadow-inner relative z-10">
+                  <Leaf className="w-20 h-20 text-gray-200" />
+                </div>
+                <p className="text-2xl font-black text-gray-300 max-w-sm leading-tight relative z-10 tracking-tight">Upload an image and click Diagnose to see results here.</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Settings and Info Section */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-8 space-y-6 bg-white/50 backdrop-blur-sm p-6 sm:p-8 rounded-[32px] border border-gray-100 shadow-sm"
+        >
+          <div className="flex items-center space-x-2 mb-2">
+            <h3 className="font-black text-gray-700 uppercase tracking-widest text-sm">Additional Configuration & Details</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
                 <select 
@@ -514,6 +1215,7 @@ export default function AgriCopilot({
                   onChange={(e) => setCrop(e.target.value)}
                   className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
                 >
+                  <option value="">{lang === 'bn' ? 'স্বয়ংক্রিয় সনাক্তকরণ' : 'Auto detect'}</option>
                   {CROPS.map(c => (
                     <option key={c} value={c}>
                       {t.crops[c as keyof typeof t.crops]}
@@ -528,6 +1230,7 @@ export default function AgriCopilot({
                   onChange={(e) => setCropStage(e.target.value)}
                   className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
                 >
+                  <option value="">{lang === 'bn' ? 'স্বয়ংক্রিয় সনাক্তকরণ' : 'Auto detect'}</option>
                   {Object.keys(translations.en.stages).map(s => (
                     <option key={s} value={s}>
                       {t.stages[s as keyof typeof t.stages]}
@@ -600,6 +1303,7 @@ export default function AgriCopilot({
                     className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
                     aria-label={lang === 'bn' ? 'জেলা নির্বাচন করুন' : 'Select District'}
                   >
+                    <option value="">{lang === 'bn' ? 'জেলা নির্বাচন করুন (ঐচ্ছিক)' : 'Select District (Optional)'}</option>
                     {geoData.map(d => (
                       <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
                     ))}
@@ -611,6 +1315,7 @@ export default function AgriCopilot({
                     disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
                     aria-label={lang === 'bn' ? 'উপজেলা নির্বাচন করুন' : 'Select Upazila'}
                   >
+                    <option value="">{lang === 'bn' ? 'উপজেলা নির্বাচন করুন (ঐচ্ছিক)' : 'Select Upazila (Optional)'}</option>
                     {activeDistrict?.upazilas.map(u => (
                       <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
                     ))}
@@ -710,27 +1415,7 @@ export default function AgriCopilot({
               </div>
             </div>
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleDiagnose}
-              disabled={images.length === 0 || isLoading || !isOnline}
-              aria-busy={isLoading}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
-                  <span>{t.analyzing}</span>
-                </>
-              ) : (
-                <>
-                  <Leaf className="w-7 h-7" aria-hidden="true" />
-                  <span>{t.diagnoseDisease}</span>
-                </>
-              )}
-            </motion.button>
+            
 
             {/* Safety Disclaimer */}
             <div className="mt-6 bg-amber-50/50 backdrop-blur-sm border border-amber-100 rounded-2xl p-5 shadow-inner">
@@ -745,446 +1430,9 @@ export default function AgriCopilot({
               </p>
             </div>
 
-            {/* Chatbot Section (Moved to Left Column) */}
-            <div className="mt-8 pt-8 border-t border-gray-100">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-green-100 p-2.5 rounded-xl shadow-inner">
-                    <MessageSquare className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
-                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                  <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
-                </div>
-              </div>
-
-              {diagnosis && (
-                <div className="mb-6">
-                  <LiveExpertCall 
-                    diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
-                    lang={lang} 
-                    locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
-                  />
-                </div>
-              )}
-
-              <div 
-                className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative"
-                role="log"
-                aria-live="polite"
-                aria-label={lang === 'bn' ? 'চ্যাট ইতিহাস' : 'Chat history'}
-              >
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {chatMessages.length === 0 && !chatSummary && (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
-                      <motion.div 
-                        animate={{ y: [0, -5, 0] }}
-                        transition={{ duration: 3, repeat: Infinity }}
-                        className="bg-white p-4 rounded-[24px] shadow-sm mb-4"
-                        aria-hidden="true"
-                      >
-                        <Bot className="w-8 h-8 opacity-40" />
-                      </motion.div>
-                      <p className="text-xs font-bold max-w-[200px] leading-relaxed">{lang === 'bn' ? 'আপনার প্রশ্ন জিজ্ঞাসা করুন...' : 'Ask your follow-up questions here......'}</p>
-                    </div>
-                  )}
-
-                  {chatSummary && (
-                    <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-green-50 border border-green-100 p-6 rounded-[32px] mb-4 shadow-sm"
-                      role="article"
-                      aria-label={t.tooltips.chatSummaryTitle}
-                    >
-                      <div className="flex items-center space-x-2 text-green-700 mb-3">
-                        <Sparkles className="w-4 h-4" aria-hidden="true" />
-                        <h4 className="text-xs font-black uppercase tracking-widest leading-none">{t.tooltips.chatSummaryTitle}</h4>
-                      </div>
-                      <div className="markdown-body prose-sm prose-green leading-relaxed text-green-900 text-xs">
-                        <ReactMarkdown>{chatSummary}</ReactMarkdown>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {!chatSummary && chatMessages.map((msg, idx) => (
-                    <motion.div 
-                      key={idx} 
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`max-w-[85%] p-4 rounded-[20px] text-xs shadow-md relative ${
-                        msg.role === 'user' 
-                          ? 'bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-tr-none' 
-                          : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
-                      }`}>
-                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
-                          {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
-                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
-                        </div>
-                        <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
-                          <ReactMarkdown>{msg.text}</ReactMarkdown>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                  {isChatLoading && (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex justify-start"
-                      aria-label={t.tooltips.aiThinking}
-                    >
-                      <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
-                        <div className="flex space-x-1">
-                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                        </div>
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
-                      </div>
-                    </motion.div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-                
-                <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-2">
-                  {chatMessages.length >= 2 && !chatSummary && (
-                    <button
-                      type="button"
-                      onClick={handleSummarizeAndSave}
-                      disabled={isSummarizing || isChatLoading}
-                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
-                    >
-                      {isSummarizing ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
-                          <span>{t.tooltips.summarizing}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-3 h-3" aria-hidden="true" />
-                          <span>{t.tooltips.saveSummary}</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                  
-                  <div className="relative flex items-center">
-                    <label htmlFor="chat-input" className="sr-only">{lang === 'bn' ? 'আপনার প্রশ্ন' : 'Your question'}</label>
-                    <input
-                      id="chat-input"
-                      type="text"
-                      value={currentChatMessage}
-                      onChange={(e) => setCurrentChatMessage(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSendMessage(e as any);
-                        }
-                      }}
-                      placeholder={lang === 'bn' ? 'আপনার প্রশ্ন লিখুন...' : 'Type your question...'}
-                      disabled={!diagnosis || isChatLoading || !!chatSummary}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSendMessage}
-                      disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
-                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
-                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
-                    >
-                      <Send className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            
         </motion.div>
 
-        {/* Results Section */}
-        <div className="lg:col-span-7 space-y-6">
-          <AnimatePresence mode="wait">
-            {diagnosis ? (
-              <motion.div 
-                key="result"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 p-1 rounded-[40px] shadow-2xl shadow-green-200 h-full"
-              >
-                <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
-                  
-                  {/* Translation Loading Overlay */}
-                  <AnimatePresence>
-                    {isTranslating && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4"
-                      >
-                        <div className="relative">
-                          <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-                          <Globe className="w-6 h-6 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                        </div>
-                        <p className="text-blue-600 font-black uppercase tracking-widest text-xs animate-pulse">
-                          {lang === 'bn' ? 'অনুবাদ করা হচ্ছে...' : 'Translating...'}
-                        </p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-8">
-                      <div className="flex items-center space-x-4">
-                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-2xl shadow-lg shadow-green-100" aria-hidden="true">
-                          <Leaf className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.diagnosisResult}</h3>
-                          <div className="flex items-center mt-0.5">
-                            <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                              <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
-                              {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button 
-                          type="button"
-                          onClick={handleTranslate}
-                          disabled={isTranslating}
-                          aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
-                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none"
-                        >
-                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
-                          <span>{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
-                        </button>
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
-                        <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-widest">AI Verified</span>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      className="flex-1 space-y-8"
-                      role="status"
-                      aria-live="polite"
-                      aria-atomic="true"
-                    >
-                      {diagnosis.status === 'Invalid' ? (
-                        <motion.div 
-                          initial={{ scale: 0.9, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          className="bg-red-50 border border-red-100 rounded-3xl p-8 flex items-start space-x-5 shadow-inner"
-                        >
-                          <div className="bg-white p-3 rounded-2xl shadow-sm" aria-hidden="true">
-                            <AlertTriangle className="w-8 h-8 text-red-500" />
-                          </div>
-                          <p className="text-red-900 font-bold text-lg leading-relaxed">{diagnosis.diagnosis}</p>
-                        </motion.div>
-                      ) : (
-                        <>
-                          {/* 1. AI Suggestion (Diagnosis Text) */}
-                          <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="bg-white rounded-[32px] p-8 md:p-12 border border-green-100/60 text-gray-800 shadow-sm relative overflow-hidden"
-                            role="article"
-                            aria-labelledby="diagnosis-heading"
-                          >
-                            <h4 id="diagnosis-heading" className="sr-only">{t.diagnosisResult}</h4>
-                            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '16px 16px' }}></div>
-                            
-                            <div className="relative z-10">
-                              <div className="flex items-center justify-between mb-8 border-b border-green-50 pb-4">
-                                <span className="font-display font-black text-xs uppercase tracking-[0.2em] text-green-700">Digital Diagnosis Core</span>
-                                <span className="font-mono text-[10px] text-gray-300 font-bold">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
-                              </div>
-                              <div className="markdown-body text-base md:text-xl leading-relaxed prose prose-green max-w-none">
-                                <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
-                              </div>
-
-                              {/* Helpfulness Rating Section */}
-                              <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
-                                  <p className="text-xs font-bold text-gray-500">{lang === 'en' ? 'Was this diagnosis helpful?' : 'এই পরামর্শটি কি আপনার উপকারে এসেছে?'}</p>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <button 
-                                    onClick={async () => {
-                                      if (lastDiagnosisId) {
-                                        try {
-                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: true });
-                                          toast.success(lang === 'en' ? 'Thank you for your feedback!' : 'মতামতের জন্য ধন্যবাদ!');
-                                        } catch (e) {
-                                          console.error(e);
-                                        }
-                                      }
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl transition-all border border-green-100 group"
-                                  >
-                                    <ThumbsUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{lang === 'en' ? 'Helpful' : 'উপকারী'}</span>
-                                  </button>
-                                  <button 
-                                    onClick={async () => {
-                                      if (lastDiagnosisId) {
-                                        try {
-                                          await updateDoc(doc(db, 'diagnoses', lastDiagnosisId), { helpful: false });
-                                          toast.success(lang === 'en' ? 'Feedback recorded.' : 'মতামত গ্রহণ করা হয়েছে।');
-                                        } catch (e) {
-                                          console.error(e);
-                                        }
-                                      }
-                                    }}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl transition-all border border-red-100 group"
-                                  >
-                                    <ThumbsDown className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{lang === 'en' ? 'Not Helpful' : 'উপকারী নয়'}</span>
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* TTS Audio Player */}
-                            {audioUrl && (
-                              <motion.div 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mt-10 bg-gradient-to-r from-emerald-100 to-green-100 rounded-[2rem] p-6 md:p-8 border-2 border-green-200/50 shadow-xl shadow-green-900/5 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 relative overflow-hidden"
-                                role="region"
-                                aria-label={lang === 'bn' ? 'এআই অডিও বিশ্লেষণ' : 'AI audio analysis'}
-                              >
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-                                <motion.div 
-                                  animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                                  className="bg-white p-5 rounded-2xl text-green-600 shadow-md relative z-10 border border-green-50"
-                                  aria-hidden="true"
-                                >
-                                  <Volume2 className="w-10 h-10" />
-                                </motion.div>
-                                <div className="flex-1 w-full text-center md:text-left relative z-10">
-                                  <p id="audio-analysis-label" className="text-sm font-black text-green-900 uppercase tracking-widest mb-3 drop-shadow-sm">
-                                    {lang === 'bn' ? 'এআই অডিও শুনুন' : 'Listen to AI Analysis'}
-                                  </p>
-                                  <div className="bg-white/60 p-2 rounded-2xl shadow-inner border border-green-100/50">
-                                    <audio 
-                                      controls 
-                                      src={audioUrl} 
-                                      className="w-full h-12 rounded-xl"
-                                      aria-labelledby="audio-analysis-label"
-                                    />
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </motion.div>
-
-                          {/* 2. Verification Advice */}
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[32px] p-8 shadow-inner">
-                            <div className="flex items-center space-x-3 mb-4">
-                              <div className="bg-white p-2 rounded-xl shadow-sm">
-                                <ShieldAlert className="w-5 h-5 text-blue-500" />
-                              </div>
-                              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
-                            </div>
-                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-6 prose-sm prose-blue leading-relaxed">
-                              <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
-                            </div>
-                            
-                            {diagnosis.confidence < 70 && (
-                              <div className="flex items-center space-x-2 text-amber-600 bg-amber-100/50 px-4 py-2 rounded-xl border border-amber-200 w-fit">
-                                <AlertTriangle className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{t.lowConfidenceWarning}</span>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* 3. Symptoms and Severity */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {/* Severity */}
-                            <motion.div 
-                              whileHover={{ y: -5 }}
-                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col items-center justify-center relative overflow-hidden"
-                            >
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'তীব্রতা' : 'Severity'}</p>
-                              <div className={`px-6 py-3 rounded-2xl font-black text-xl ${
-                                diagnosis.qualitativeSeverity === 'High' ? 'bg-red-100 text-red-600' : 
-                                diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-100 text-amber-600' : 
-                                'bg-green-100 text-green-600'
-                              }`}>
-                                {diagnosis.qualitativeSeverity || 'Unknown'}
-                              </div>
-                            </motion.div>
-
-                            {/* Symptoms Breakdown */}
-                            <motion.div 
-                              whileHover={{ y: -5 }}
-                              className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm flex flex-col justify-center relative overflow-hidden"
-                            >
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">{lang === 'bn' ? 'লক্ষণসমূহ' : 'Visible Symptoms'}</p>
-                              <ul className="space-y-2">
-                                {diagnosis.symptomsBreakdown?.map((symptom: string, idx: number) => (
-                                  <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700 font-medium">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 shrink-0"></div>
-                                    <span>{symptom}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </motion.div>
-                          </div>
-
-                          {/* 4. Chat with Expert (Search DAE) - Indicative */}
-                          <div className="flex justify-center pt-2 pb-4">
-                            <motion.button 
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={handleVerifyWithExpert}
-                              disabled={isFindingExpert}
-                              className="text-gray-500 hover:text-blue-600 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 transition-all border border-transparent hover:border-blue-100 hover:bg-blue-50"
-                            >
-                              {isFindingExpert ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Search className="w-4 h-4" />
-                              )}
-                              <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert} (Indicative)</span>
-                            </motion.button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-white rounded-[40px] p-16 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gray-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
-                <div className="bg-gray-50 p-10 rounded-[32px] mb-8 shadow-inner relative z-10">
-                  <Leaf className="w-20 h-20 text-gray-200" />
-                </div>
-                <p className="text-2xl font-black text-gray-300 max-w-sm leading-tight relative z-10 tracking-tight">Upload an image and click Diagnose to see results here.</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </div>
     </motion.div>
   );

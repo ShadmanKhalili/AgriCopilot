@@ -54,7 +54,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const startCall = async () => {
     setIsCalling(true);
     try {
-      const apiKey = (process.env as any).GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || '';
       if (!apiKey) {
         alert(lang === 'bn' 
           ? "নিরাপত্তার কারণে ভয়েস কল বর্তমানে নিষ্ক্রিয় রয়েছে। অনুগ্রহ করে টাইপ করে পরামর্শ নিন।" 
@@ -173,6 +173,9 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           },
           onerror: (err: any) => {
             console.error("Live API Error:", err);
+            if (err?.message === 'Network error' || err instanceof Event) {
+               alert(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+            }
             endCall();
           }
         }

@@ -46,8 +46,8 @@ export default function Layout() {
   const [agriChatMessages, setAgriChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [agriChatSession, setAgriChatSession] = useState<any | null>(null);
   const [agriAudioUrl, setAgriAudioUrl] = useState<string | null>(null);
-  const [agriCropStage, setAgriCropStage] = useState<string>('vegetative');
-  const [agriCrop, setAgriCrop] = useState<string>('tomato');
+  const [agriCropStage, setAgriCropStage] = useState<string>('');
+  const [agriCrop, setAgriCrop] = useState<string>('');
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
 
   // MarketConnect State Persistence
