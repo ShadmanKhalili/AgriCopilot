@@ -4,16 +4,29 @@ import { collection, doc, writeBatch } from 'firebase/firestore';
 
 // Helper to call AI via Netlify proxy
 const callAiProxy = async (params: any) => {
-  const response = await fetch('/.netlify/functions/ai-proxy', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params)
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'AI Proxy request failed');
+  try {
+    const response = await fetch('/api/ai-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    
+    if (!response.ok) {
+      let errorMessage = `AI Proxy Failed (Status: ${response.status})`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        // Not JSON
+      }
+      throw new Error(errorMessage);
+    }
+    
+    return await response.json();
+  } catch (err: any) {
+    console.error("Critical AI Proxy Error:", err);
+    throw err;
   }
-  return await response.json();
 };
 
 // Singleton AI instance using platform-injected key
@@ -39,17 +52,28 @@ const generateContent = async (params: any) => {
   
   const { model, contents, config, tools, toolConfig, responseModalities, speechConfig } = params;
 
-  const requestConfig: any = { ...config };
-  if (tools) requestConfig.tools = tools;
-  if (toolConfig) requestConfig.toolConfig = toolConfig;
-  if (responseModalities) requestConfig.responseModalities = responseModalities;
-  if (speechConfig) requestConfig.speechConfig = speechConfig;
-
-  return await ai.models.generateContent({
-    model,
-    contents,
-    config: requestConfig
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents,
+      config: {
+        ...config,
+        tools,
+        toolConfig,
+        responseModalities,
+        speechConfig
+      }
+    });
+    
+    return {
+      text: response.text,
+      candidates: response.candidates,
+      promptFeedback: response.promptFeedback
+    };
+  } catch (error: any) {
+    console.error("Direct AI Call Failed:", error);
+    throw error;
+  }
 };
 
 export { Type };

@@ -22,24 +22,28 @@ const handler: Handler = async (event, context) => {
       return { statusCode: 400, body: "Missing model or contents" };
     }
 
-    const genAI = new GoogleGenAI({ apiKey });
+    const client = new GoogleGenAI({ apiKey });
     
-    const requestConfig: any = { ...config };
-    if (tools) requestConfig.tools = tools;
-    if (toolConfig) requestConfig.toolConfig = toolConfig;
-    if (responseModalities) requestConfig.responseModalities = responseModalities;
-    if (speechConfig) requestConfig.speechConfig = speechConfig;
-
-    const response = await genAI.models.generateContent({
+    const response = await client.models.generateContent({
       model,
       contents,
-      config: requestConfig
+      config: {
+        ...config,
+        tools,
+        toolConfig,
+        responseModalities,
+        speechConfig
+      }
     });
 
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(response)
+      body: JSON.stringify({
+        text: response.text,
+        candidates: response.candidates,
+        promptFeedback: response.promptFeedback
+      })
     };
   } catch (error: any) {
     console.error("AI Proxy Error:", error);
