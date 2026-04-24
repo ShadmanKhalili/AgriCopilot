@@ -14,9 +14,9 @@ export const getAi = () => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
 const BACKUP_MODEL = 'gemini-3.1-pro-preview';
-const SEARCH_MODEL = 'gemini-3-flash-preview';
+const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
   for (let i = 0; i < retries; i++) {
@@ -757,7 +757,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
       const ai = getAi();
       const response = await ai.models.generateContent({
         contents,
-        model: 'gemini-3-flash-preview'
+        model: 'gemini-3.1-flash-lite-preview'
       });
       
       const responseText = response.text || '';
