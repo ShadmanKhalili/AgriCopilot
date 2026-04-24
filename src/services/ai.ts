@@ -211,37 +211,49 @@ export const deepDiagnoseCrop = async (
         ? `Location: ${coords.latitude}, ${coords.longitude} (Bangladesh).` 
         : `Location: Bangladesh.`;
 
-      const prompt = `You are a world-class agricultural expert.
-      A user uploaded an image of a ${crop || 'plant (please identify the crop)'} plant at the ${cropStage || 'unknown'} stage.
-      They are looking for a deep analysis regarding ${analysisType || 'its general health and any visible issues'}.
+      const prompt = `You are a SENIOR AGRICULTURAL PATHOLOGIST and INDEPENDENT DIAGNOSTIC AUDITOR.
       
-      ${locationContext}
+      A user has uploaded images of a ${crop || 'plant'} plant at the ${cropStage || 'unknown'} stage in ${locationContext}.
+      
+      WORKING HYPOTHESIS (For audit only):
+      - Preliminary Claim: ${basicDiagnosis.diagnosis}
+      - Symptoms Noted: ${basicDiagnosis.symptomsBreakdown?.join(', ')}
+      
+      YOUR MISSION:
+      Reach the GROUND TRUTH using forensic visual evidence. Do not blindly confirm the preliminary claim, but do not contradict it without definitive proof.
+      
+      STEP 0: INDEPENDENT VISUAL AUDIT
+      Ignore the preliminary claim for a moment. Examine the images and list every visual abnormality (edges, spots, curling, texture, spores, pests).
+      
+      STEP 1: DIFFERENTIAL AUDIT
+      - Compare the preliminary claim against 2-3 most likely alternatives (e.g., Disease vs Nutrient vs Pest).
+      - If the preliminary claim ("${basicDiagnosis.diagnosis}") is correct, identify the "Technical Signature" (the specific visual mark) that confirms it beyond doubt.
+      - If it is incorrect, provide the logical proof for the correction.
+      
+      STEP 2: GROUNDING & CONTEXT
+      - Use GOOGLE SEARCH to cross-reference these symptoms with current climate and disease outbreaks in Bangladesh for ${crop}.
+      - Check if the humidity and temperature in ${locationContext} currently support the suspected pathogen.
+      
+      STEP 3: FINAL EXPERT VERDICT
+      - Provide a final diagnosis with high physiological certainty.
+      - Give EXACT dosages for local brands (ACI, Syngenta, etc.).
+      - Provide a specific PHI (Pre-Harvest Interval).
 
-      Initial analysis identified:
-      Status: ${basicDiagnosis.status}
-      Severity: ${basicDiagnosis.qualitativeSeverity}
-      Symptoms: ${basicDiagnosis.symptomsBreakdown?.join(', ')}
-      Initial Diagnosis: ${basicDiagnosis.diagnosis}
-      
-      Your tasks:
-      1. OPTION 4 (Grounding): Before diagnosing, USE GOOGLE SEARCH to look up recent agricultural news for ${crop} diseases or pests currently spreading near this location in Bangladesh, or general recent outbreaks in the country.
-      2. OPTION 2 (Chain-of-Thought): To ensure high accuracy, you MUST follow a deductive reasoning pattern. Your JSON must include:
-         - 'visibleSymptoms': A detailed list of all symptoms visible in the image.
-         - 'possibleDiseases': A list of at least 3 possible conditions that match the symptoms and the crop.
-         - 'differentialDiagnosis': An explanation of why it is the final disease and NOT the others.
-      3. Provide a DEEP ANALYSIS based on your deductive reasoning and search findings. Provide highly specific, advanced treatment protocols (e.g., specific chemical names available in Bangladesh, precise dosage). BE EXTRA CAREFUL when suggesting pesticides and chemicals. Emphasize food safety, environmental impact, and farmers' safety (e.g., mandatory protective gear, safe handling, and withholding periods before harvest).
-      
-      CRITICAL: You MUST translate ALL field values in the JSON (visibleSymptoms, possibleDiseases, differentialDiagnosis, detailedDiagnosis, advancedTreatment, environmentalContext) into ${lang === 'bn' ? 'Bangla' : 'English'} accurately. All explanations, reasoning, and lists must be entirely in the target language.
+      CRITICAL: Translate all fields to ${lang === 'bn' ? 'Bangla' : 'English'}.
       
       Respond in ${lang === 'bn' ? 'Bangla' : 'English'} in the following JSON format:
       {
-        "visibleSymptoms": "Detailed description of visible symptoms",
-        "possibleDiseases": ["Disease 1", "Disease 2", "Disease 3"],
-        "differentialDiagnosis": "Reasoning for choosing the final diagnosis over others",
-        "detailedDiagnosis": "In-depth explanation and final conclusion about this issue (markdown)",
-        "advancedTreatment": "Specific chemical or biological treatments with dosages (markdown)",
-        "environmentalContext": "How recent weather or local conditions/outbreaks found via search might be contributing to this (markdown)",
-        "sources": ["List of relevant URLs or search findings used"]
+        "visibleSymptoms": "Hyper-detailed forensic breakdown of visual evidence.",
+        "severityScore": 1-10,
+        "hypothesesEvaluation": "Objective audit of the initial hypothesis vs your findings. Confirm if correct, or explain the correction (markdown).",
+        "possibleAlternatives": ["Alternative 1", "Alternative 2"],
+        "differentialReasoning": "The definitive evidence that proves your final conclusion and rules out alternatives (markdown).",
+        "detailedDiagnosis": "Final expert conclusion with physiological context (markdown).",
+        "recoveryTimeline": "Actionable timeline: Day 1, Week 1, Month 1 (markdown).",
+        "advancedTreatment": "CHEMICAL and ORGANIC protocols with EXACT dosages and safety rules (markdown).",
+        "environmentalContext": "Search-grounded local context and outbreak data (markdown).",
+        "biologicalCause": "Technical Pathogen details (provide this last).",
+        "sources": ["URLs used"]
       }`;
       
       const config: any = {
@@ -250,18 +262,22 @@ export const deepDiagnoseCrop = async (
           type: Type.OBJECT,
           properties: {
             visibleSymptoms: { type: Type.STRING },
-            possibleDiseases: { type: Type.ARRAY, items: { type: Type.STRING } },
-            differentialDiagnosis: { type: Type.STRING },
-            detailedDiagnosis: { type: Type.STRING, description: 'In-depth explanation' },
-            advancedTreatment: { type: Type.STRING, description: 'Specific advanced treatment protocols' },
-            environmentalContext: { type: Type.STRING, description: 'Environmental and weather context based on search' },
-            sources: { 
-              type: Type.ARRAY, 
-              items: { type: Type.STRING },
-              description: 'Sources or references found via Search'
-            }
+            severityScore: { type: Type.NUMBER },
+            hypothesesEvaluation: { type: Type.STRING },
+            possibleAlternatives: { type: Type.ARRAY, items: { type: Type.STRING } },
+            differentialReasoning: { type: Type.STRING },
+            detailedDiagnosis: { type: Type.STRING },
+            recoveryTimeline: { type: Type.STRING },
+            advancedTreatment: { type: Type.STRING },
+            environmentalContext: { type: Type.STRING },
+            biologicalCause: { type: Type.STRING },
+            sources: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ['visibleSymptoms', 'possibleDiseases', 'differentialDiagnosis', 'detailedDiagnosis', 'advancedTreatment', 'environmentalContext', 'sources']
+          required: [
+            'visibleSymptoms', 'severityScore', 'hypothesesEvaluation', 'possibleAlternatives', 
+            'differentialReasoning', 'detailedDiagnosis', 'recoveryTimeline', 
+            'advancedTreatment', 'environmentalContext', 'biologicalCause', 'sources'
+          ]
         },
         tools: [{ googleSearch: {} }]
       };
