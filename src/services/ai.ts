@@ -21,7 +21,7 @@ let aiInstance: GoogleGenAI | null = null;
 export const getAi = () => {
   // If we are in the browser and don't have a key, we'll use the proxy instead
   // of initializing the SDK here.
-  const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  const apiKey = (process.env.GEMINI_API_KEY as string) || '';
   
   if (apiKey && !aiInstance) {
     aiInstance = new GoogleGenAI({ apiKey });
@@ -37,20 +37,19 @@ const generateContent = async (params: any) => {
     return await callAiProxy(params);
   }
   
-  const model = ai.getGenerativeModel({ 
-    model: params.model,
-    ...(params.config || {})
+  const { model, contents, config, tools, toolConfig, responseModalities, speechConfig } = params;
+
+  const requestConfig: any = { ...config };
+  if (tools) requestConfig.tools = tools;
+  if (toolConfig) requestConfig.toolConfig = toolConfig;
+  if (responseModalities) requestConfig.responseModalities = responseModalities;
+  if (speechConfig) requestConfig.speechConfig = speechConfig;
+
+  return await ai.models.generateContent({
+    model,
+    contents,
+    config: requestConfig
   });
-  
-  const result = await model.generateContent({
-    contents: params.contents,
-    tools: params.tools,
-    toolConfig: params.toolConfig,
-    responseModalities: params.responseModalities,
-    speechConfig: params.speechConfig
-  });
-  
-  return await result.response;
 };
 
 export { Type };
@@ -72,12 +71,11 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000
 };
 
 const callAiWithFallback = async (params: any, primaryModel: string) => {
-  const ai = getAi();
   try {
-    return await ai.models.generateContent({ ...params, model: primaryModel } as any);
+    return await generateContent({ ...params, model: primaryModel });
   } catch (error) {
     console.warn(`Primary model ${primaryModel} failed, falling back to ${BACKUP_MODEL}:`, error);
-    return await ai.models.generateContent({ ...params, model: BACKUP_MODEL } as any);
+    return await generateContent({ ...params, model: BACKUP_MODEL });
   }
 };
 
@@ -360,12 +358,10 @@ export const generateSpeech = async (text: string) => {
       const response = await generateContent({
         model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
       });
@@ -467,7 +463,17 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
         ],
         config: {
           responseMimeType: 'application/json',
-          responseSchema: config.responseSchema // Using the schema defined below in the original file
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              grade: { type: Type.STRING, description: 'Grade A, Grade B, Reject, or Invalid' },
+              justification: { type: Type.STRING, description: `Short justification for the grade in ${lang === 'bn' ? 'Bangla' : 'English'}` },
+              estimatedPriceBdt: { type: Type.NUMBER, description: 'Estimated price per kg in BDT' },
+              shelfLife: { type: Type.STRING, description: 'Estimated shelf life (e.g., 3-5 days)' },
+              bestMarket: { type: Type.STRING, description: 'Recommended market type (e.g., Local Bazaar, Supermarket, Export)' }
+            },
+            required: ['grade', 'justification', 'estimatedPriceBdt', 'shelfLife', 'bestMarket']
+          }
         },
         model: getModelName(isAdvanced)
       });

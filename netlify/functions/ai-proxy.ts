@@ -22,22 +22,19 @@ const handler: Handler = async (event, context) => {
       return { statusCode: 400, body: "Missing model or contents" };
     }
 
-    const genAI = new GoogleGenAI(apiKey);
-    const aiModel = genAI.getGenerativeModel({ model, ...config });
-
-    const result = await aiModel.generateContent({
-      contents,
-      tools,
-      toolConfig,
-      responseModalities,
-      speechConfig
-    });
-
-    const response = await result.response;
+    const genAI = new GoogleGenAI({ apiKey });
     
-    // Check if it's an audio response (TTS)
-    const candidate = response.candidates?.[0];
-    const isAudio = candidate?.content?.parts?.[0]?.inlineData?.data;
+    const requestConfig: any = { ...config };
+    if (tools) requestConfig.tools = tools;
+    if (toolConfig) requestConfig.toolConfig = toolConfig;
+    if (responseModalities) requestConfig.responseModalities = responseModalities;
+    if (speechConfig) requestConfig.speechConfig = speechConfig;
+
+    const response = await genAI.models.generateContent({
+      model,
+      contents,
+      config: requestConfig
+    });
 
     return {
       statusCode: 200,
