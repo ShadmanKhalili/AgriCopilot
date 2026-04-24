@@ -54,11 +54,11 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const startCall = async () => {
     setIsCalling(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       if (!apiKey) {
         alert(lang === 'bn' 
-          ? "নিরাপত্তার কারণে ভয়েস কল বর্তমানে নিষ্ক্রিয় রয়েছে। অনুগ্রহ করে টাইপ করে পরামর্শ নিন।" 
-          : "Voice Chat is currently restricted for security reasons. Please use the text chat instead.");
+          ? "ভয়েস কল ফিচারের জন্য Netlify-তে VITE_GEMINI_API_KEY যুক্ত করতে হবে। আপাতত চ্যাট ব্যবহার করুন।" 
+          : "Voice calls require VITE_GEMINI_API_KEY to be set in your Netlify environment. Please use text chat for now.");
         setIsCalling(false);
         return;
       }

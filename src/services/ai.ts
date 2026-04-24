@@ -2,14 +2,55 @@ import { Type, GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../firebase';
 import { collection, doc, writeBatch } from 'firebase/firestore';
 
+// Helper to call AI via Netlify proxy
+const callAiProxy = async (params: any) => {
+  const response = await fetch('/.netlify/functions/ai-proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'AI Proxy request failed');
+  }
+  return await response.json();
+};
+
 // Singleton AI instance using platform-injected key
 let aiInstance: GoogleGenAI | null = null;
 export const getAi = () => {
-  if (!aiInstance) {
-    const apiKey = (process.env.GEMINI_API_KEY as string) || '';
+  // If we are in the browser and don't have a key, we'll use the proxy instead
+  // of initializing the SDK here.
+  const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  
+  if (apiKey && !aiInstance) {
     aiInstance = new GoogleGenAI({ apiKey });
   }
   return aiInstance;
+};
+
+// Generic wrapper for AI calls that handles Proxy vs Direct SDK
+const generateContent = async (params: any) => {
+  const ai = getAi();
+  if (!ai) {
+    // If no API key is set in browser, use Netlify proxy
+    return await callAiProxy(params);
+  }
+  
+  const model = ai.getGenerativeModel({ 
+    model: params.model,
+    ...(params.config || {})
+  });
+  
+  const result = await model.generateContent({
+    contents: params.contents,
+    tools: params.tools,
+    toolConfig: params.toolConfig,
+    responseModalities: params.responseModalities,
+    speechConfig: params.speechConfig
+  });
+  
+  return await result.response;
 };
 
 export { Type };
@@ -115,10 +156,11 @@ export const diagnoseCrop = async (
       const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
       contents.push({ parts: [{ text: prompt }] });
 
-      const response = await callAiWithFallback({
+      const response = await generateContent({
         contents,
-        config
-      }, getModelName(isAdvanced));
+        config,
+        model: getModelName(isAdvanced)
+      });
       
       if (!response.text) {
         throw new Error("AI returned an empty response.");
@@ -206,12 +248,11 @@ export const deepDiagnoseCrop = async (
       contents.push({ parts: [{ text: prompt }] });
 
       // Always use SEARCH_MODEL (flash-preview) for search grounding
-      const ai = getAi();
-      const response = await ai.models.generateContent({
+      const response = await generateContent({
         contents,
         config,
         model: SEARCH_MODEL
-      } as any);
+      });
       
       if (!response.text) {
         throw new Error("AI returned an empty response.");
@@ -300,9 +341,10 @@ export const generateWeatherAdvisory = async (
       
       Use markdown for formatting. Be direct and practical.`;
 
-      const response = await callAiWithFallback({
-        contents: [{ parts: [{ text: prompt }] }]
-      }, SEARCH_MODEL);
+      const response = await generateContent({
+        contents: [{ parts: [{ text: prompt }] }],
+        model: SEARCH_MODEL
+      });
       
       return response.text || '';
     } catch (error) {
@@ -315,8 +357,7 @@ export const generateWeatherAdvisory = async (
 export const generateSpeech = async (text: string) => {
   return await callAiWithRetry(async () => {
     try {
-      const ai = getAi();
-      const response = await ai.models.generateContent({
+      const response = await generateContent({
         model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text }] }],
         config: {
@@ -419,26 +460,17 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
       - Use markdown in the justification for better readability.
       - CRITICAL: Keep the justification very short, sweet, and to the point.`;
       
-      const response = await callAiWithFallback({
+      const response = await generateContent({
         contents: [
           { parts: [{ inlineData: { data: imageBase64, mimeType } }] },
           { parts: [{ text: prompt }] }
         ],
         config: {
           responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              grade: { type: Type.STRING, description: 'Grade A, Grade B, Reject, or Invalid' },
-              justification: { type: Type.STRING, description: `Short justification for the grade in ${lang === 'bn' ? 'Bangla' : 'English'}` },
-              estimatedPriceBdt: { type: Type.NUMBER, description: 'Estimated price per kg in BDT' },
-              shelfLife: { type: Type.STRING, description: 'Estimated shelf life (e.g., 3-5 days)' },
-              bestMarket: { type: Type.STRING, description: 'Recommended market type (e.g., Local Bazaar, Supermarket, Export)' }
-            },
-            required: ['grade', 'justification', 'estimatedPriceBdt', 'shelfLife', 'bestMarket']
-          }
-        }
-      }, getModelName(isAdvanced));
+          responseSchema: config.responseSchema // Using the schema defined below in the original file
+        },
+        model: getModelName(isAdvanced)
+      });
       
       if (!response.text) {
         throw new Error("AI returned an empty response.");
@@ -507,23 +539,23 @@ export const getMarketInsights = async (
       };
 
       try {
-        const ai = getAi();
-        const response = await ai.models.generateContent({
+        const response = await generateContent({
           contents: [{ parts: [{ text: prompt }] }],
           config,
           toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
-        } as any);
+        });
         return JSON.parse(response.text || '{}');
       } catch (searchError) {
         console.warn("Google Search model failed, falling back to standard generation:", searchError);
-        const fallbackResponse = await callAiWithFallback({
+        const fallbackResponse = await generateContent({
           contents: [{ parts: [{ text: `Provide estimated market insight for ${produce} for the period around ${today}. Return JSON with 'insights' and 'priceDrivers'. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
           config: {
             responseMimeType: 'application/json',
             responseSchema: config.responseSchema
-          }
-        }, BACKUP_MODEL);
+          },
+          model: BACKUP_MODEL
+        });
         return JSON.parse(fallbackResponse.text || '{}');
       }
     } catch (error) {
@@ -579,23 +611,23 @@ export const findGovernmentSchemes = async (
       };
 
       try {
-        const ai = getAi();
-        const response = await ai.models.generateContent({
+        const response = await generateContent({
           contents: [{ parts: [{ text: prompt }] }],
           config,
           toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
-        } as any);
+        });
         return JSON.parse(response.text || '{}');
       } catch (searchError) {
         console.warn("Search model failed for schemes, falling back:", searchError);
-        const fallbackResponse = await callAiWithFallback({
+        const fallbackResponse = await generateContent({
           contents: [{ parts: [{ text: `Provide general information about common agricultural subsidies in Bangladesh for ${crop} farmers. Return JSON with 'schemes' array. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
           config: {
             responseMimeType: 'application/json',
             responseSchema: config.responseSchema
-          }
-        }, BACKUP_MODEL);
+          },
+          model: BACKUP_MODEL
+        });
         return JSON.parse(fallbackResponse.text || '{}');
       }
     } catch (error) {
@@ -724,10 +756,11 @@ export const getPlantingRecommendations = async (
         }
       };
 
-      const response = await callAiWithFallback({
+      const response = await generateContent({
         contents: [{ parts: [{ text: prompt }] }],
-        config
-      }, getModelName(isAdvanced));
+        config,
+        model: getModelName(isAdvanced)
+      });
       
       return JSON.parse(response.text || '{}');
     } catch (error) {
@@ -754,8 +787,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
       }));
       contents.push({ role: 'user', parts: [{ text: prompt }] });
 
-      const ai = getAi();
-      const response = await ai.models.generateContent({
+      const response = await generateContent({
         contents,
         model: 'gemini-3.1-flash-lite-preview'
       });
@@ -840,11 +872,12 @@ export const syncCuratedSchemes = async () => {
         tools: [{ googleSearch: {} }]
       };
 
-      const response = await callAiWithFallback({
+      const response = await generateContent({
         contents: [{ parts: [{ text: prompt }] }],
         config,
-        toolConfig: { includeServerSideToolInvocations: true }
-      }, SEARCH_MODEL);
+        toolConfig: { includeServerSideToolInvocations: true },
+        model: SEARCH_MODEL
+      });
 
       const parsed = JSON.parse(response.text || '{}');
       if (parsed.schemes && Array.isArray(parsed.schemes)) {
