@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from 'f
 import { db } from '../firebase';
 import { translations, Language } from '../utils/translations';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { useAuth } from './AuthProvider';
 
 interface Props {
   lang: Language;
@@ -23,12 +24,16 @@ export default function CommunityRadar({ lang }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const t = translations[lang];
+  const { user } = useAuth();
 
   useEffect(() => {
+    if (!user) return;
+    
     setIsLoading(true);
-    // Fetch recent diagnoses and filter high-severity locally to avoid composite index requirement
+    // Fetch recent diagnoses for the current user to evaluate severe risks locally
     const q = query(
       collection(db, 'diagnoses'),
+      where('userId', '==', user.uid),
       orderBy('createdAt', 'desc'),
       limit(30)
     );
@@ -70,7 +75,7 @@ export default function CommunityRadar({ lang }: Props) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   return (
     <motion.div 

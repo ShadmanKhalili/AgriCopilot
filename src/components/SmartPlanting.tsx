@@ -155,7 +155,11 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
 
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to generate recommendations.');
+      const isQuotaError = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED');
+      const errorMsg = isQuotaError 
+        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
+        : (err.message || 'Failed to generate recommendations.');
+      setError(errorMsg);
     } finally {
       setIsAnalyzing(false);
     }

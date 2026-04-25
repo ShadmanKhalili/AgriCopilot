@@ -159,13 +159,31 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
   const { userProfile } = useAuth();
   const t = translations[lang];
 
-  // Derive unique tags
+  // Sync status and UI-level deduplication
   const rawSchemes = allSchemes.length > 0 ? allSchemes : (CURRENT_PDF_SCHEMES as GovScheme[]);
-  const uniqueTags = ['All', ...Array.from(new Set(rawSchemes.flatMap(s => s.tags || [])))];
+  
+  // Ensure UI-level uniqueness by ID and Title
+  const deduplicatedSchemes = React.useMemo(() => {
+    const seen = new Set();
+    return rawSchemes.filter(scheme => {
+      const titleKey = scheme.title?.en?.toLowerCase().trim();
+      if (seen.has(scheme.id) || (titleKey && seen.has(titleKey))) return false;
+      seen.add(scheme.id);
+      if (titleKey) seen.add(titleKey);
+      return true;
+    });
+  }, [rawSchemes]);
 
-  const filteredSchemes = selectedTag === 'All' 
-    ? rawSchemes 
-    : rawSchemes.filter(s => s.tags?.includes(selectedTag));
+  const uniqueTags = React.useMemo(() => [
+    'All', 
+    ...Array.from(new Set(deduplicatedSchemes.flatMap(s => s.tags || [])))
+  ], [deduplicatedSchemes]);
+
+  const filteredSchemes = React.useMemo(() => {
+    return selectedTag === 'All' 
+      ? deduplicatedSchemes 
+      : deduplicatedSchemes.filter(s => s.tags?.includes(selectedTag));
+  }, [deduplicatedSchemes, selectedTag]);
 
   // Real-time listener for schemes
   useEffect(() => {

@@ -208,9 +208,18 @@ export const CURRENT_PDF_SCHEMES = [
 ];
 
 export async function seedGovSchemes() {
-  const batch = writeBatch(db);
   const colRef = collection(db, 'gov_schemes');
   
+  // 1. Clear existing documents to remove any duplicates with random IDs
+  const snapshot = await getDocs(colRef);
+  if (!snapshot.empty) {
+    const deleteBatch = writeBatch(db);
+    snapshot.forEach((d) => deleteBatch.delete(d.ref));
+    await deleteBatch.commit();
+  }
+
+  // 2. Seed with deterministic IDs from CURRENT_PDF_SCHEMES
+  const batch = writeBatch(db);
   CURRENT_PDF_SCHEMES.forEach((scheme) => {
     const docRef = doc(colRef, scheme.id);
     const { id, ...data } = scheme;

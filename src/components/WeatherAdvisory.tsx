@@ -352,13 +352,21 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       try {
         const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
         setAdvisory(advisoryText);
-      } catch (aiError) {
+      } catch (aiError: any) {
         console.error("Advisory generation failed", aiError);
-        setAdvisory("Weather data loaded, but we couldn't generate a personalized AI advisory at this moment. Please check the stats below.");
+        const isQuotaError = aiError.message?.includes('429') || aiError.message?.includes('RESOURCE_EXHAUSTED');
+        const fallbackMsg = isQuotaError 
+          ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Weather data loaded, but personalized advisory is delayed. Please check the stats below.')
+          : (lang === 'bn' ? 'পরামর্শ তৈরিতে সমস্যা হয়েছে। ' : "Weather data loaded, but we couldn't generate a personalized AI advisory at this moment. Please check the stats below.");
+        setAdvisory(fallbackMsg);
       }
     } catch (error: any) {
       console.error("Weather/Advisory error:", error);
-      setAdvisory(`Failed to load weather data. Please try again later. (Debug: ${error.message || 'Network error or server timeout. Check your connection.'})`);
+      const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
+      const errorMsg = isQuotaError
+        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
+        : `Failed to load weather data. Please try again later. (Debug: ${error.message || 'Network error or server timeout. Check your connection.'})`;
+      setAdvisory(errorMsg);
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,6 @@
 import { Type, GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 
 // Helper to call AI via Netlify proxy
 const callAiProxy = async (params: any) => {
@@ -78,29 +78,63 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3.1-flash-lite-preview';
-const BACKUP_MODEL = 'gemini-3.1-pro-preview';
-const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'models/gemini-3.1-pro-preview' : 'models/gemini-3-flash-preview';
+const BACKUP_MODEL = 'models/gemini-3.1-flash-lite-preview';
+const SEARCH_MODEL = 'models/gemini-3-flash-preview';
+const TTS_PRIMARY_MODEL = 'models/gemini-2.5-flash';
+const TTS_BACKUP_MODEL = 'models/gemini-3.1-flash-preview';
+const LIVE_API_MODEL = 'models/gemini-3-flash-preview';
 
-const callAiWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000) => {
+const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
-      if (i === retries - 1) throw error;
-      console.warn(`AI call failed, retrying (${i + 1}/${retries})...`, error);
-      await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
+      const errorStr = JSON.stringify(error).toLowerCase();
+      const isQuotaError = error.message?.includes('429') || 
+                          error.message?.includes('RESOURCE_EXHAUSTED') || 
+                          errorStr.includes('quota') || 
+                          errorStr.includes('429');
+      
+      const isNotFoundError = error.message?.includes('404') || 
+                              errorStr.includes('not_found');
+      
+      if (i === retries - 1 && !isNotFoundError) throw error;
+      if (isNotFoundError && i === retries - 1) throw error;
+      
+      // Exponential backoff with jitter
+      const backoffFactor = isQuotaError ? 3 : 2;
+      const currentDelay = (delay * Math.pow(backoffFactor, i)) + (Math.random() * 1000);
+      
+      console.warn(`AI call failed (${isQuotaError ? 'Quota Exceeded' : (isNotFoundError ? 'Not Found' : 'Error')}), retrying in ${Math.round(currentDelay)}ms (${i + 1}/${retries})...`);
+      
+      await new Promise(res => setTimeout(res, currentDelay));
     }
   }
 };
 
-const callAiWithFallback = async (params: any, primaryModel: string) => {
-  try {
-    return await generateContent({ ...params, model: primaryModel });
-  } catch (error) {
-    console.warn(`Primary model ${primaryModel} failed, falling back to ${BACKUP_MODEL}:`, error);
-    return await generateContent({ ...params, model: BACKUP_MODEL });
+const callAiWithFallback = async (params: any, primaryModel: string, customBackupModel?: string) => {
+  const fallbacks = [
+    primaryModel,
+    customBackupModel || BACKUP_MODEL,
+    'models/gemini-3-flash-preview',
+    'models/gemini-3.1-flash-lite-preview',
+    'models/gemini-2.5-flash'
+  ];
+  
+  // Try models in sequence until one works
+  let lastError = null;
+  for (const model of new Set(fallbacks)) {
+    if (!model) continue;
+    try {
+      return await generateContent({ ...params, model });
+    } catch (error: any) {
+      console.warn(`Model ${model} failed:`, error.message);
+      lastError = error;
+      // If it's not a quota error or internal error, perhaps still retry next model
+    }
   }
+  throw lastError;
 };
 
 export const diagnoseCrop = async (
@@ -395,8 +429,7 @@ export const generateWeatherAdvisory = async (
 export const generateSpeech = async (text: string) => {
   return await callAiWithRetry(async () => {
     try {
-      const response = await generateContent({
-        model: "gemini-3.1-flash-tts-preview",
+      const response = await callAiWithFallback({
         contents: [{ parts: [{ text }] }],
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -404,7 +437,7 @@ export const generateSpeech = async (text: string) => {
             prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
-      });
+      }, TTS_PRIMARY_MODEL, TTS_BACKUP_MODEL);
       
       console.log("TTS Response received", !!response.candidates?.[0]);
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -835,7 +868,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
 
       const response = await generateContent({
         contents,
-        model: 'gemini-3.1-flash-lite-preview'
+        model: LIVE_API_MODEL
       });
       
       const responseText = response.text || '';
@@ -852,8 +885,10 @@ export const syncCuratedSchemes = async () => {
     try {
       const today = new Date().toISOString();
       const prompt = `Use Google Search to find LATEST agricultural subsidies, government schemes, or financial aid programs in Bangladesh for ${new Date().getFullYear()}. 
-      Return a list of schemes. Each scheme must follow the provided schema.
-      Language: Ensure both 'en' and 'bn' fields are populated.`;
+      Return a list of unique schemes. Ensure each scheme is distinct with no duplicates. 
+      For each scheme, ensure the 'benefits' field is a concise, point-wise summary of unique benefits.
+      Each scheme must follow the provided schema.
+      Language: Ensure both 'en' and 'bn' fields are populated for all text fields.`;
       
       const config: any = {
         responseMimeType: 'application/json',
@@ -929,10 +964,30 @@ export const syncCuratedSchemes = async () => {
       if (parsed.schemes && Array.isArray(parsed.schemes)) {
         const batch = writeBatch(db);
         const colRef = collection(db, 'gov_schemes');
+        const slugify = (text: string) => text.toLowerCase().replace(/[^\w ]+/g, '').replace(/ +/g, '-');
+
+        // Fetch existing schemes to identify and remove potential duplicates with old random IDs
+        const existingSnapshot = await getDocs(colRef);
+        const existingDocs = existingSnapshot.docs.map(d => ({ id: d.id, titleEn: d.data().title?.en }));
+
         parsed.schemes.forEach((scheme: any) => {
-          const id = scheme.id || Math.random().toString(36).substr(2, 9);
-          const docRef = doc(colRef, id);
-          batch.set(docRef, { ...scheme, lastUpdated: today });
+          // Generate a deterministic ID based on the English title to prevent future duplicates
+          const titleEn = scheme.title?.en || '';
+          const deterministicId = titleEn ? slugify(titleEn) : Math.random().toString(36).substr(2, 9);
+          
+          // Cleanup existing duplicates that match by title but have different IDs (old random IDs)
+          existingDocs.forEach(oldDoc => {
+            if (oldDoc.titleEn && titleEn && oldDoc.titleEn.trim().toLowerCase() === titleEn.trim().toLowerCase() && oldDoc.id !== deterministicId) {
+              batch.delete(doc(colRef, oldDoc.id));
+            }
+          });
+
+          const docRef = doc(colRef, deterministicId);
+          batch.set(docRef, { 
+            ...scheme, 
+            id: deterministicId, // Ensure the field ID matches doc ID
+            lastUpdated: today 
+          });
         });
         await batch.commit();
         return parsed.schemes.length;

@@ -145,7 +145,7 @@ service cloud.firestore {
 
     match /diagnoses/{diagnosisId} {
       // Secure List Query (Pillar 8)
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       
       allow create: if isSignedIn() && isValidDiagnosis(incoming()) &&
@@ -167,7 +167,7 @@ service cloud.firestore {
     }
 
     match /certificates/{certificateId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidCertificate(incoming()) &&
                     incoming().userId == request.auth.uid &&
@@ -176,7 +176,7 @@ service cloud.firestore {
     }
 
     match /alerts/{alertId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidAlert(incoming()) &&
                     incoming().userId == request.auth.uid &&
@@ -185,7 +185,7 @@ service cloud.firestore {
     }
 
     match /market_queries/{queryId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidMarketQuery(incoming()) &&
                     incoming().userId == request.auth.uid &&
@@ -194,7 +194,7 @@ service cloud.firestore {
     }
 
     match /planting_intents/{intentId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && isValidPlantingIntent(incoming()) &&
                     incoming().userId == request.auth.uid &&

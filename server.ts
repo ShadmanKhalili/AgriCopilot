@@ -432,13 +432,24 @@ async function startServer() {
       
       res.json(response.data);
     } catch (error: any) {
-      console.error("World Bank Proxy Error:", error.message);
-      if (error.response) {
-        console.error("World Bank API Response Error:", error.response.status, error.response.data);
+      const errorStatus = error.response?.status || 500;
+      let errorDetails = error.response?.data;
+      
+      console.error(`World Bank Proxy Error at /api/wb-indicators for ${ind}:`, error.message);
+      
+      if (errorDetails) {
+        // If it's an HTML error page, don't flood logs or send huge HTML to frontend
+        if (typeof errorDetails === 'string' && errorDetails.trim().startsWith('<')) {
+          console.error(`World Bank API Response Error: ${errorStatus} (HTML error page omitted)`);
+          errorDetails = "Upstream server returned an HTML error page";
+        } else {
+          console.error("World Bank API Response Error:", errorStatus, errorDetails);
+        }
       }
-      res.status(error.response?.status || 500).json({ 
-        error: error.message,
-        details: error.response?.data 
+      
+      res.status(errorStatus).json({ 
+        error: error.message || "Failed to fetch from World Bank API",
+        details: errorDetails
       });
     }
   });

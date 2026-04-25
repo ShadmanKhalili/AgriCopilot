@@ -115,7 +115,12 @@ export default function MarketConnect({
       }
     } catch (error: any) {
       console.error("Market insights failed:", error);
-      setInsights(error.message || "Error fetching market insights from AI. Please try again.");
+      const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
+      const errorMsg = isQuotaError 
+        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
+        : (error.message || "Error fetching market insights from AI. Please try again.");
+      
+      setInsights({ insights: errorMsg });
       setIsLoading(false);
       return;
     }

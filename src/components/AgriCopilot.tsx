@@ -93,6 +93,7 @@ export default function AgriCopilot({
   const [chatSummary, setChatSummary] = useState<string | null>(null);
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
+  const [isAudioGenerating, setIsAudioGenerating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -309,6 +310,29 @@ export default function AgriCopilot({
     }
   };
 
+  const handleGenerateAudio = async () => {
+    if (!diagnosis || isAudioGenerating) return;
+    setIsAudioGenerating(true);
+    try {
+      const audioBase64 = await generateSpeech(diagnosis.diagnosis);
+      if (audioBase64) {
+        const binary = atob(audioBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: 'audio/wav' });
+        setAudioUrl(URL.createObjectURL(blob));
+      }
+    } catch (error) {
+      console.error("Audio generation failed:", error);
+      toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+    } finally {
+      setIsAudioGenerating(false);
+    }
+  };
+
   const handleDiagnose = async () => {
     if (images.length === 0) return;
     
@@ -323,6 +347,7 @@ export default function AgriCopilot({
     }
 
     setIsLoading(true);
+    setAudioUrl(null); // Reset audio for new diagnosis
     try {
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
       // Use English values for the AI prompt to ensure consistency, but we can pass the translated ones too
@@ -370,22 +395,15 @@ export default function AgriCopilot({
           handleFirestoreError(error, OperationType.CREATE, 'diagnoses');
         }
       }
-
-      // Generate audio
-      const audioBase64 = await generateSpeech(result.diagnosis);
-      if (audioBase64) {
-        const binary = atob(audioBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        
-        const blob = new Blob([bytes], { type: 'audio/wav' });
-        setAudioUrl(URL.createObjectURL(blob));
-      }
     } catch (error: any) {
       console.error("Diagnosis failed:", error);
-      setDiagnosis(error.message || "Error connecting to AI service. Please try again.");
+      const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
+      const errorMsg = isQuotaError 
+        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
+        : (error.message || "Error connecting to AI service. Please try again.");
+      
+      setDiagnosis(null);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -734,40 +752,42 @@ export default function AgriCopilot({
                   </AnimatePresence>
                   
                   <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-8">
-                      <div className="flex items-center space-x-4">
-                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-2xl shadow-lg shadow-green-100" aria-hidden="true">
-                          <Leaf className="w-6 h-6 text-white" />
+                    <div className="flex items-center justify-between mb-10">
+                      <div className="flex items-center space-x-5">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-4 rounded-2xl shadow-xl shadow-green-100" aria-hidden="true">
+                          <Leaf className="w-7 h-7 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.diagnosisResult}</h3>
-                          <div className="flex items-center mt-0.5">
+                          <h3 className="text-3xl font-black text-gray-900 tracking-tight leading-none mb-1">{t.diagnosisResult}</h3>
+                          <div className="flex items-center">
                             <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
                               <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
                               {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-3">
                         <button 
                           type="button"
                           onClick={handleTranslate}
                           disabled={isTranslating}
                           aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
-                          className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none"
+                          className="flex items-center space-x-2 text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-5 py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-sm"
                         >
-                          {isTranslating ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
+                          {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Globe className="w-3.5 h-3.5" aria-hidden="true" />}
                           <span>{lang === 'en' ? 'বাংলায় দেখুন' : 'View in English'}</span>
                         </button>
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
-                        <span className="text-[10px] font-black text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-100 uppercase tracking-widest">AI Verified</span>
+                        <div className="flex items-center space-x-2 bg-green-50 px-4 py-2.5 rounded-2xl border border-green-100 shadow-sm transition-all hover:bg-green-100/50">
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
+                          <span className="text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
+                        </div>
                       </div>
                     </div>
                     
                     <div 
-                      className="flex-1 space-y-8"
+                      className="flex-1 space-y-10"
                       role="status"
                       aria-live="polite"
                       aria-atomic="true"
@@ -776,12 +796,12 @@ export default function AgriCopilot({
                         <motion.div 
                           initial={{ scale: 0.9, opacity: 0 }}
                           animate={{ scale: 1, opacity: 1 }}
-                          className="bg-red-50 border border-red-100 rounded-3xl p-8 flex items-start space-x-5 shadow-inner"
+                          className="bg-red-50 border border-red-100 rounded-[2.5rem] p-10 flex items-start space-x-6 shadow-inner"
                         >
-                          <div className="bg-white p-3 rounded-2xl shadow-sm" aria-hidden="true">
-                            <AlertTriangle className="w-8 h-8 text-red-500" />
+                          <div className="bg-white p-4 rounded-2xl shadow-sm text-red-500" aria-hidden="true">
+                            <AlertTriangle className="w-10 h-10" />
                           </div>
-                          <p className="text-red-900 font-bold text-lg leading-relaxed">{diagnosis.diagnosis}</p>
+                          <p className="text-red-900 font-bold text-xl leading-relaxed">{diagnosis.diagnosis}</p>
                         </motion.div>
                       ) : (
                         <>
@@ -789,19 +809,19 @@ export default function AgriCopilot({
                           <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="bg-white rounded-[32px] p-8 md:p-12 border border-green-100/60 text-gray-800 shadow-sm relative overflow-hidden"
+                            className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-green-100/60 text-gray-800 shadow-sm relative overflow-hidden"
                             role="article"
                             aria-labelledby="diagnosis-heading"
                           >
                             <h4 id="diagnosis-heading" className="sr-only">{t.diagnosisResult}</h4>
-                            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '16px 16px' }}></div>
+                            <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}></div>
                             
                             <div className="relative z-10">
-                              <div className="flex items-center justify-between mb-8 border-b border-green-50 pb-4">
-                                <span className="font-display font-black text-xs uppercase tracking-[0.2em] text-green-700">Digital Diagnosis Core</span>
-                                <span className="font-mono text-[10px] text-gray-300 font-bold">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
+                              <div className="flex items-center justify-between mb-10 border-b border-green-50 pb-6">
+                                <span className="font-display font-black text-sm uppercase tracking-[0.3em] text-green-700">Digital Diagnosis Core</span>
+                                <span className="font-mono text-[11px] text-gray-300 font-bold bg-gray-50 px-3 py-1 rounded-full border border-gray-100">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
                               </div>
-                              <div className="markdown-body text-base md:text-xl leading-relaxed prose prose-green max-w-none">
+                              <div className="markdown-body text-[1.25rem] md:text-[1.5rem] leading-[1.4] font-medium prose prose-green max-w-none text-gray-900 tracking-tight">
                                 <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
                               </div>
 
@@ -851,8 +871,30 @@ export default function AgriCopilot({
                               </div>
                             </div>
                             
-                            {/* TTS Audio Player */}
-                            {audioUrl && (
+                            {/* TTS Audio Player or Generator */}
+                            {!audioUrl ? (
+                              <div className="mt-8 flex justify-center">
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={handleGenerateAudio}
+                                  disabled={isAudioGenerating}
+                                  className="flex items-center space-x-3 bg-green-50 text-green-700 font-black py-4 px-8 rounded-2xl border border-green-200 hover:bg-green-100 transition-all uppercase tracking-widest text-xs disabled:opacity-50"
+                                >
+                                  {isAudioGenerating ? (
+                                    <>
+                                      <Loader2 className="w-5 h-5 animate-spin" />
+                                      <span>{lang === 'bn' ? 'অডিও তৈরি হচ্ছে...' : 'Generating Audio...'}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Volume2 className="w-5 h-5" />
+                                      <span>{lang === 'bn' ? 'অডিও অডভাইজরি তৈরি করুন' : 'Generate Audio Advisory'}</span>
+                                    </>
+                                  )}
+                                </motion.button>
+                              </div>
+                            ) : (
                               <motion.div 
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1010,171 +1052,7 @@ export default function AgriCopilot({
                             </motion.div>
                           )}
 
-                                                    {/* Deep Analysis Result or Button */}
-                          <div className="mt-8">
-  {/* Chatbot Section (Moved to Left Column) */}
-                            <div className="mt-8 pt-8 border-t border-gray-100">
-                              <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center space-x-3">
-                                  <div className="bg-green-100 p-2.5 rounded-xl shadow-inner">
-                                    <MessageSquare className="w-5 h-5 text-green-600" />
-                                  </div>
-                                  <div>
-                                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
-                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center space-x-1.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                  <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
-                                </div>
-                              </div>
-
-                              {diagnosis && (
-                                <div className="mb-6">
-                                  <LiveExpertCall 
-                                    diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
-                                    lang={lang} 
-                                    locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
-                                  />
-                                </div>
-                              )}
-
-                              <div 
-                                className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative"
-                                role="log"
-                                aria-live="polite"
-                                aria-label={lang === 'bn' ? 'চ্যাট ইতিহাস' : 'Chat history'}
-                              >
-                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                  {chatMessages.length === 0 && !chatSummary && (
-                                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
-                                      <motion.div 
-                                        animate={{ y: [0, -5, 0] }}
-                                        transition={{ duration: 3, repeat: Infinity }}
-                                        className="bg-white p-4 rounded-[24px] shadow-sm mb-4"
-                                        aria-hidden="true"
-                                      >
-                                        <Bot className="w-8 h-8 opacity-40" />
-                                      </motion.div>
-                                      <p className="text-xs font-bold max-w-[200px] leading-relaxed">{lang === 'bn' ? 'আপনার প্রশ্ন জিজ্ঞাসা করুন...' : 'Ask your follow-up questions here......'}</p>
-                                    </div>
-                                  )}
-
-                                  {chatSummary && (
-                                    <motion.div 
-                                      initial={{ opacity: 0, scale: 0.95 }}
-                                      animate={{ opacity: 1, scale: 1 }}
-                                      className="bg-green-50 border border-green-100 p-6 rounded-[32px] mb-4 shadow-sm"
-                                      role="article"
-                                      aria-label={t.tooltips.chatSummaryTitle}
-                                    >
-                                      <div className="flex items-center space-x-2 text-green-700 mb-3">
-                                        <Sparkles className="w-4 h-4" aria-hidden="true" />
-                                        <h4 className="text-xs font-black uppercase tracking-widest leading-none">{t.tooltips.chatSummaryTitle}</h4>
-                                      </div>
-                                      <div className="markdown-body prose-sm prose-green leading-relaxed text-green-900 text-xs">
-                                        <ReactMarkdown>{chatSummary}</ReactMarkdown>
-                                      </div>
-                                    </motion.div>
-                                  )}
-
-                                  {!chatSummary && chatMessages.map((msg, idx) => (
-                                    <motion.div 
-                                      key={idx} 
-                                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                      <div className={`max-w-[85%] p-4 rounded-[20px] text-xs shadow-md relative ${
-                                        msg.role === 'user' 
-                                          ? 'bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-tr-none' 
-                                          : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
-                                      }`}>
-                                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
-                                          {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
-                                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
-                                        </div>
-                                        <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
-                                          <ReactMarkdown>{msg.text}</ReactMarkdown>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  ))}
-                                  {isChatLoading && (
-                                    <motion.div 
-                                      initial={{ opacity: 0 }}
-                                      animate={{ opacity: 1 }}
-                                      className="flex justify-start"
-                                      aria-label={t.tooltips.aiThinking}
-                                    >
-                                      <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
-                                        <div className="flex space-x-1">
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                                        </div>
-                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                  <div ref={chatEndRef} />
-                                </div>
-                                
-                                <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-2">
-                                  {chatMessages.length >= 2 && !chatSummary && (
-                                    <button
-                                      type="button"
-                                      onClick={handleSummarizeAndSave}
-                                      disabled={isSummarizing || isChatLoading}
-                                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
-                                    >
-                                      {isSummarizing ? (
-                                        <>
-                                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
-                                          <span>{t.tooltips.summarizing}</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="w-3 h-3" aria-hidden="true" />
-                                          <span>{t.tooltips.saveSummary}</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  )}
-                                  
-                                  <div className="relative flex items-center">
-                                    <label htmlFor="chat-input" className="sr-only">{lang === 'bn' ? 'আপনার প্রশ্ন' : 'Your question'}</label>
-                                    <input
-                                      id="chat-input"
-                                      type="text"
-                                      value={currentChatMessage}
-                                      onChange={(e) => setCurrentChatMessage(e.target.value)}
-                                      onKeyPress={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleSendMessage(e as any);
-                                        }
-                                      }}
-                                      placeholder={lang === 'bn' ? 'আপনার প্রশ্ন লিখুন...' : 'Type your question...'}
-                                      disabled={!diagnosis || isChatLoading || !!chatSummary}
-                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={handleSendMessage}
-                                      disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
-                                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
-                                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
-                                    >
-                                      <Send className="w-4 h-4" aria-hidden="true" />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
+                          {/* Deep Analysis Result or Button */}
                           {deepDiagnosis ? (
                             <motion.div 
                               initial={{ opacity: 0, y: 20 }}
@@ -1364,6 +1242,170 @@ export default function AgriCopilot({
                               </motion.button>
                             </div>
                           )}
+
+                          {/* Chatbot Section (Moved after Deep Analysis) */}
+                          <div className="mt-8">
+                            <div className="mt-8 pt-8 border-t border-gray-100">
+                              <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-3">
+                                  <div className="bg-green-100 p-2.5 rounded-xl shadow-inner">
+                                    <MessageSquare className="w-5 h-5 text-green-600" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
+                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                  <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
+                                </div>
+                              </div>
+
+                              {diagnosis && (
+                                <div className="mb-6">
+                                  <LiveExpertCall 
+                                    diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
+                                    lang={lang} 
+                                    locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
+                                  />
+                                </div>
+                              )}
+
+                              <div 
+                                className="bg-gray-50/50 backdrop-blur-sm rounded-[24px] border border-gray-100 overflow-hidden flex flex-col h-[400px] shadow-inner relative"
+                                role="log"
+                                aria-live="polite"
+                                aria-label={lang === 'bn' ? 'চ্যাট ইতিহাস' : 'Chat history'}
+                              >
+                                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                                  {chatMessages.length === 0 && !chatSummary && (
+                                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
+                                      <motion.div 
+                                        animate={{ y: [0, -5, 0] }}
+                                        transition={{ duration: 3, repeat: Infinity }}
+                                        className="bg-white p-4 rounded-[24px] shadow-sm mb-4"
+                                        aria-hidden="true"
+                                      >
+                                        <Bot className="w-8 h-8 opacity-40" />
+                                      </motion.div>
+                                      <p className="text-xs font-bold max-w-[200px] leading-relaxed">{lang === 'bn' ? 'আপনার প্রশ্ন জিজ্ঞাসা করুন...' : 'Ask your follow-up questions here......'}</p>
+                                    </div>
+                                  )}
+
+                                  {chatSummary && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      className="bg-green-50 border border-green-100 p-6 rounded-[32px] mb-4 shadow-sm"
+                                      role="article"
+                                      aria-label={t.tooltips.chatSummaryTitle}
+                                    >
+                                      <div className="flex items-center space-x-2 text-green-700 mb-3">
+                                        <Sparkles className="w-4 h-4" aria-hidden="true" />
+                                        <h4 className="text-xs font-black uppercase tracking-widest leading-none">{t.tooltips.chatSummaryTitle}</h4>
+                                      </div>
+                                      <div className="markdown-body prose-sm prose-green leading-relaxed text-green-900 text-xs">
+                                        <ReactMarkdown>{chatSummary}</ReactMarkdown>
+                                      </div>
+                                    </motion.div>
+                                  )}
+
+                                  {!chatSummary && chatMessages.map((msg, idx) => (
+                                    <motion.div 
+                                      key={idx} 
+                                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    >
+                                      <div className={`max-w-[85%] p-4 rounded-[20px] text-xs shadow-md relative ${
+                                        msg.role === 'user' 
+                                          ? 'bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-tr-none' 
+                                          : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
+                                      }`}>
+                                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
+                                          {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
+                                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
+                                        </div>
+                                        <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
+                                          <ReactMarkdown>{msg.text}</ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                  {isChatLoading && (
+                                    <motion.div 
+                                      initial={{ opacity: 0 }}
+                                      animate={{ opacity: 1 }}
+                                      className="flex justify-start"
+                                      aria-label={t.tooltips.aiThinking}
+                                    >
+                                      <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
+                                        <div className="flex space-x-1">
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                        </div>
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                  <div ref={chatEndRef} />
+                                </div>
+                                
+                                <div className="p-3 bg-white border-t border-gray-100 flex flex-col space-y-2">
+                                  {chatMessages.length >= 2 && !chatSummary && (
+                                    <button
+                                      type="button"
+                                      onClick={handleSummarizeAndSave}
+                                      disabled={isSummarizing || isChatLoading}
+                                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
+                                    >
+                                      {isSummarizing ? (
+                                        <>
+                                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                                          <span>{t.tooltips.summarizing}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                          <span>{t.tooltips.saveSummary}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
+                                  
+                                  <div className="relative flex items-center">
+                                    <label htmlFor="chat-input" className="sr-only">{lang === 'bn' ? 'আপনার প্রশ্ন' : 'Your question'}</label>
+                                    <input
+                                      id="chat-input"
+                                      type="text"
+                                      value={currentChatMessage}
+                                      onChange={(e) => setCurrentChatMessage(e.target.value)}
+                                      onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleSendMessage(e as any);
+                                        }
+                                      }}
+                                      placeholder={lang === 'bn' ? 'আপনার প্রশ্ন লিখুন...' : 'Type your question...'}
+                                      disabled={!diagnosis || isChatLoading || !!chatSummary}
+                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={handleSendMessage}
+                                      disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
+                                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
+                                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                    >
+                                      <Send className="w-4 h-4" aria-hidden="true" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
 
                           {/* 4. Chat with Expert (Search DAE) - Indicative */}
                           <div className="flex justify-center pt-2 pb-4">
