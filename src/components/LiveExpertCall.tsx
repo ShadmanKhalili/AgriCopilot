@@ -92,7 +92,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       - Strike a balance: be thorough and insightful, but keep individual spoken responses concise enough for a comfortable phone conversation. Speak like an experienced, highly educated professor of agronomy.`;
 
       const sessionPromise = ai.live.connect({
-        model: "models/gemini-3-flash-preview",
+        model: "gemini-3.1-flash-live-preview",
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {

@@ -78,12 +78,12 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'models/gemini-3.1-pro-preview' : 'models/gemini-3-flash-preview';
-const BACKUP_MODEL = 'models/gemini-3.1-flash-lite-preview';
-const SEARCH_MODEL = 'models/gemini-3-flash-preview';
-const TTS_PRIMARY_MODEL = 'models/gemini-2.5-flash';
-const TTS_BACKUP_MODEL = 'models/gemini-3.1-flash-preview';
-const LIVE_API_MODEL = 'models/gemini-3-flash-preview';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
+const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
+const SEARCH_MODEL = 'gemini-3-flash-preview';
+const TTS_PRIMARY_MODEL = 'gemini-2.5-flash';
+const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; // Also update this model to tts preview
+const LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
   for (let i = 0; i < retries; i++) {
@@ -117,9 +117,9 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   const fallbacks = [
     primaryModel,
     customBackupModel || BACKUP_MODEL,
-    'models/gemini-3-flash-preview',
-    'models/gemini-3.1-flash-lite-preview',
-    'models/gemini-2.5-flash'
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-2.5-flash'
   ];
   
   // Try models in sequence until one works
@@ -144,7 +144,8 @@ export const diagnoseCrop = async (
   analysisType: string, 
   lang: string, 
   isAdvanced?: boolean,
-  coords?: { latitude: number; longitude: number }
+  coords?: { latitude: number; longitude: number },
+  description?: string
 ) => {
   return await callAiWithRetry(async () => {
     try {
@@ -152,9 +153,11 @@ export const diagnoseCrop = async (
         ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
         : `Location: Unknown (Please advise based on general best practices).`;
 
+      const userNoteContext = description ? `\nThe user has also provided this additional note/description regarding the plant: "${description}"\n` : '';
+
       const prompt = `You are a world-class agricultural expert specializing in crops from Bangladesh.
       Analyze the provided image(s) of a ${crop || 'plant (please identify the crop)'} plant at the ${cropStage || 'unknown'} stage.
-      ${locationContext}
+      ${locationContext}${userNoteContext}
       
       The user is specifically interested in ${analysisType || 'its general health and any visible issues'}.
       
@@ -237,7 +240,8 @@ export const deepDiagnoseCrop = async (
   analysisType: string, 
   lang: string, 
   basicDiagnosis: any,
-  coords?: { latitude: number; longitude: number }
+  coords?: { latitude: number; longitude: number },
+  description?: string
 ) => {
   return await callAiWithRetry(async () => {
     try {
@@ -245,10 +249,12 @@ export const deepDiagnoseCrop = async (
         ? `Location: ${coords.latitude}, ${coords.longitude} (Bangladesh).` 
         : `Location: Bangladesh.`;
 
+      const userNoteContext = description ? `\nUSER'S ADDITIONAL NOTES/DESCRIPTION: "${description}"\n` : '';
+
       const prompt = `You are a SENIOR AGRICULTURAL PATHOLOGIST and INDEPENDENT DIAGNOSTIC AUDITOR.
       
       A user has uploaded images of a ${crop || 'plant'} plant at the ${cropStage || 'unknown'} stage in ${locationContext}.
-      
+      ${userNoteContext}
       WORKING HYPOTHESIS (For audit only):
       - Preliminary Claim: ${basicDiagnosis.diagnosis}
       - Symptoms Noted: ${basicDiagnosis.symptomsBreakdown?.join(', ')}

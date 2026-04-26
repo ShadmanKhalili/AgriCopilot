@@ -230,7 +230,14 @@ export const translations = {
       potato: "Potato",
       onion: "Onion",
       cucumber: "Cucumber",
-      betelLeaf: "Betel Leaf"
+      betelLeaf: "Betel Leaf",
+      wheat: "Wheat",
+      maize: "Maize",
+      jute: "Jute",
+      sugarcane: "Sugarcane",
+      tea: "Tea",
+      pulse: "Pulse",
+      mustard: "Mustard"
     },
     upazilas: {
       sadar: "Cox's Bazar Sadar",
@@ -499,7 +506,14 @@ export const translations = {
       potato: "আলু",
       onion: "পেঁয়াজ",
       cucumber: "শসা",
-      betelLeaf: "পান পাতা"
+      betelLeaf: "পান পাতা",
+      wheat: "গম",
+      maize: "ভুট্টা",
+      jute: "পাট",
+      sugarcane: "আখ",
+      tea: "চা",
+      pulse: "ডাল",
+      mustard: "সরিষা"
     },
     upazilas: {
       sadar: "কক্সবাজার সদর",

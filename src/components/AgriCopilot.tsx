@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -20,7 +20,7 @@ import { LiveExpertCall } from './LiveExpertCall';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 
-const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf'];
+const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
 
 interface Props {
   lang: Language;
@@ -44,6 +44,8 @@ interface Props {
   setPersistedCrop?: (crop: string) => void;
   persistedAnalysisType?: string;
   setPersistedAnalysisType?: (type: string) => void;
+  persistedDescription?: string;
+  setPersistedDescription?: (desc: string) => void;
 }
 
 export default function AgriCopilot({ 
@@ -67,12 +69,15 @@ export default function AgriCopilot({
   persistedCrop,
   setPersistedCrop,
   persistedAnalysisType,
-  setPersistedAnalysisType
+  setPersistedAnalysisType,
+  persistedDescription,
+  setPersistedDescription
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
   const [cropStage, setCropStage] = useState(persistedCropStage || '');
   const [crop, setCrop] = useState(persistedCrop || '');
   const [analysisType, setAnalysisType] = useState(persistedAnalysisType || '');
+  const [description, setDescription] = useState(persistedDescription || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isFindingExpert, setIsFindingExpert] = useState(false);
   const [diagnosis, setDiagnosis] = useState<any | null>(persistedDiagnosis || null);
@@ -136,6 +141,25 @@ export default function AgriCopilot({
   useEffect(() => {
     if (setPersistedAnalysisType) setPersistedAnalysisType(analysisType);
   }, [analysisType, setPersistedAnalysisType]);
+
+  useEffect(() => {
+    if (setPersistedDescription) setPersistedDescription(description);
+  }, [description, setPersistedDescription]);
+
+  const handleClearAll = () => {
+    setImages([]);
+    setCropStage('');
+    setCrop('');
+    setAnalysisType('');
+    setDescription('');
+    setDiagnosis(null);
+    setDeepDiagnosis(null);
+    setChatMessages([]);
+    setChatSession(null);
+    setAudioUrl(null);
+    setChatSummary(null);
+    setLastDiagnosisId(null);
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -361,7 +385,8 @@ export default function AgriCopilot({
         analysisTypeStr, 
         lang, 
         isAdvanced,
-        globalLocation || undefined
+        globalLocation || undefined,
+        description.trim() || undefined
       );
       setDiagnosis(result);
       
@@ -540,7 +565,8 @@ export default function AgriCopilot({
         analysisTypeStr, 
         lang, 
         diagnosis,
-        globalLocation || undefined
+        globalLocation || undefined,
+        description.trim() || undefined
       );
       
       setDeepDiagnosis(result);
@@ -607,9 +633,21 @@ export default function AgriCopilot({
           
           <div className="relative z-10 space-y-6">
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-wrap items-center justify-between gap-y-2 mb-4">
                 <label className="block font-display font-black text-gray-500 uppercase tracking-[0.2em] text-[10px] sm:text-xs">{t.captureImage}</label>
-                <span className="text-[10px] font-mono font-bold text-green-700 bg-green-100/50 px-2.5 py-1 rounded-full border border-green-200/50 uppercase tracking-widest">{images.length}/5 Photo Payload</span>
+                <div className="flex gap-2">
+                  <span className="text-[10px] font-mono font-bold text-green-700 bg-green-100/50 px-2.5 py-1 rounded-full border border-green-200/50 uppercase tracking-widest">{images.length}/5 Photo Payload</span>
+                  {(images.length > 0 || crop || cropStage || analysisType || description || diagnosis) && (
+                    <button
+                      onClick={handleClearAll}
+                      type="button"
+                      className="text-[10px] font-mono font-bold text-red-700 bg-red-100/50 px-2.5 py-1 rounded-full border border-red-200/50 uppercase tracking-widest hover:bg-red-200/50 transition-all cursor-pointer"
+                      aria-label="Clear all inputs"
+                    >
+                      {lang === 'bn' ? 'সব মুছুন' : 'Clear All'}
+                    </button>
+                  )}
+                </div>
               </div>
               
               {images.length > 0 && (
@@ -819,7 +857,20 @@ export default function AgriCopilot({
                             <div className="relative z-10">
                               <div className="flex items-center justify-between mb-10 border-b border-green-50 pb-6">
                                 <span className="font-display font-black text-sm uppercase tracking-[0.3em] text-green-700">Digital Diagnosis Core</span>
-                                <span className="font-mono text-[11px] text-gray-300 font-bold bg-gray-50 px-3 py-1 rounded-full border border-gray-100">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
+                                <div className="flex items-center gap-3">
+                                  <span className="font-mono text-[11px] text-gray-300 font-bold bg-gray-50 px-3 py-1 rounded-full border border-gray-100 hidden sm:inline-block">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(diagnosis.diagnosis);
+                                      toast.success(lang === 'bn' ? 'কপি সফল হয়েছে' : 'Copied to clipboard');
+                                    }}
+                                    className="flex items-center justify-center bg-gray-50 text-gray-500 hover:text-green-600 hover:bg-green-50 p-2 rounded-full transition-all border border-gray-100 outline-none focus:ring-2 focus:ring-green-100"
+                                    aria-label="Copy Diagnosis"
+                                    title="Copy Diagnosis"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
                               <div className="markdown-body text-[1.25rem] md:text-[1.5rem] leading-[1.4] font-medium prose prose-green max-w-none text-gray-900 tracking-tight">
                                 <ReactMarkdown>{diagnosis.diagnosis}</ReactMarkdown>
@@ -1457,22 +1508,37 @@ export default function AgriCopilot({
             <h3 className="font-black text-gray-700 uppercase tracking-widest text-sm">Additional Configuration & Details</h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-3 col-span-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
-                <select 
-                  value={crop} 
-                  onChange={(e) => setCrop(e.target.value)}
-                  className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
-                >
-                  <option value="">{lang === 'bn' ? 'স্বয়ংক্রিয় সনাক্তকরণ' : 'Auto detect'}</option>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCrop('')}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200 ${
+                      crop === '' 
+                        ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' 
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-green-50 hover:border-green-200'
+                    }`}
+                  >
+                    {lang === 'bn' ? 'স্বয়ংক্রিয়' : 'Auto detect'}
+                  </button>
                   {CROPS.map(c => (
-                    <option key={c} value={c}>
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCrop(c)}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200 ${
+                        crop === c 
+                          ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' 
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-green-50 hover:border-green-200'
+                      }`}
+                    >
                       {t.crops[c as keyof typeof t.crops]}
-                    </option>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropStage}</label>
                 <select 
                   value={cropStage} 
@@ -1601,6 +1667,19 @@ export default function AgriCopilot({
                 <option value="pest">{t.pest}</option>
                 <option value="abiotic">{t.abiotic}</option>
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label id="description-label" className="block text-xs font-black text-gray-400 uppercase tracking-widest">{lang === 'bn' ? 'অতিরিক্ত তথ্য ও বিবরণ' : 'Description & Notes'}</label>
+              </div>
+              <textarea 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)}
+                aria-labelledby="description-label"
+                placeholder={lang === 'bn' ? 'ফসলের সমস্যা সম্পর্কে আরও কোনো তথ্য বা লক্ষণ লিখতে পারেন...' : 'Any extra details on when it started, fertilizers applied, or other symptoms...'}
+                className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-sm font-medium text-gray-900 transition-all outline-none resize-none h-24"
+              />
             </div>
 
             <div className="flex items-center justify-between bg-gradient-to-r from-green-50 to-white p-4 rounded-2xl border border-green-100 shadow-inner">

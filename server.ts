@@ -435,7 +435,7 @@ async function startServer() {
       const errorStatus = error.response?.status || 500;
       let errorDetails = error.response?.data;
       
-      console.error(`World Bank Proxy Error at /api/wb-indicators for ${ind}:`, error.message);
+      console.error(`World Bank Proxy Error at /api/wb-indicators for ${req.query.ind}:`, error.message);
       
       if (errorDetails) {
         // If it's an HTML error page, don't flood logs or send huge HTML to frontend
