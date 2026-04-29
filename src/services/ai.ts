@@ -34,7 +34,7 @@ let aiInstance: GoogleGenAI | null = null;
 export const getAi = () => {
   // If we are in the browser and don't have a key, we'll use the proxy instead
   // of initializing the SDK here.
-  const apiKey = (process.env.GEMINI_API_KEY as string) || '';
+  const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   
   if (apiKey && !aiInstance) {
     aiInstance = new GoogleGenAI({ apiKey });

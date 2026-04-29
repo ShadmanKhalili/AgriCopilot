@@ -54,7 +54,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const startCall = async () => {
     setIsCalling(true);
     try {
-      const apiKey = (process.env.GEMINI_API_KEY as string) || '';
+      const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       if (!apiKey) {
         alert(lang === 'bn' 
           ? "ভয়েস কল ফিচারের জন্য Netlify-তে VITE_GEMINI_API_KEY যুক্ত করতে হবে। আপাতত চ্যাট ব্যবহার করুন।" 
