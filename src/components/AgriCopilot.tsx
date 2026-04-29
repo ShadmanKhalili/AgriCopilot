@@ -595,10 +595,10 @@ export default function AgriCopilot({
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 md:space-y-6"
+      className="space-y-4 md:space-y-6 w-full"
     >
       {/* Ultra-Compact Main Header */}
-      <div className="bg-white rounded-[24px] p-3 md:p-5 shadow-sm border border-gray-100 mb-4 relative overflow-hidden group w-full max-w-5xl xl:max-w-6xl">
+      <div className="bg-white rounded-[24px] p-3 md:p-5 shadow-sm border border-gray-100 mb-4 relative overflow-hidden group w-full">
         <div className="flex items-center justify-between gap-4 relative z-10">
           <div className="flex items-center space-x-3 md:space-x-5">
             <div className="bg-green-600 p-2 md:p-3 rounded-xl shadow-lg shadow-green-100 flex-shrink-0">
@@ -621,7 +621,7 @@ export default function AgriCopilot({
         </div>
       </div>
 
-      <div className="flex flex-col space-y-4 md:space-y-6 w-full max-w-5xl xl:max-w-6xl">
+      <div className="flex flex-col space-y-4 md:space-y-6 w-full">
         {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}

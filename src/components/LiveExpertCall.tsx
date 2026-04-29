@@ -15,38 +15,85 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [callStatus, setCallStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [audioLevel, setAudioLevel] = useState<number[]>(new Array(16).fill(0));
   
+  const isMutedRef = useRef(false);
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const userAnalyserRef = useRef<AnalyserNode | null>(null);
+  const silenceStartRef = useRef<number>(Date.now());
   const animationFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
   const sourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
 
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
   const updateVisualizer = () => {
-    if (!analyserRef.current) return;
-    
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-    
-    // Get 16 bars of data
-    const newLevels = [];
-    const step = Math.floor(dataArray.length / 16);
-    for (let i = 0; i < 16; i++) {
-      let sum = 0;
-      for (let j = 0; j < step; j++) {
-        sum += dataArray[i * step + j];
+    let aiAvg = 0;
+    let aiLevels: number[] = new Array(16).fill(0);
+    if (analyserRef.current) {
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(dataArray);
+      
+      const newLevels = [];
+      const step = Math.floor(dataArray.length / 16);
+      for (let i = 0; i < 16; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          sum += dataArray[i * step + j];
+        }
+        newLevels.push(sum / step / 255);
       }
-      newLevels.push(sum / step / 255); // Normalize to 0-1
+      aiLevels = newLevels;
+      aiAvg = newLevels.reduce((a, b) => a + b, 0) / newLevels.length;
     }
-    setAudioLevel(newLevels);
     
-    // Update isSpeaking based on volume
-    const average = newLevels.reduce((a, b) => a + b, 0) / newLevels.length;
-    setIsSpeaking(average > 0.05);
+    let userAvg = 0;
+    let userLevels: number[] = new Array(16).fill(0);
+    if (userAnalyserRef.current && !isMutedRef.current) {
+      const userDataArray = new Uint8Array(userAnalyserRef.current.frequencyBinCount);
+      userAnalyserRef.current.getByteFrequencyData(userDataArray);
+
+      const newLevels = [];
+      const step = Math.floor(userDataArray.length / 16);
+      for (let i = 0; i < 16; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          sum += userDataArray[i * step + j];
+        }
+        newLevels.push(sum / step / 255);
+      }
+      userLevels = newLevels;
+      userAvg = newLevels.reduce((a, b) => a + b, 0) / newLevels.length;
+    }
+
+    const aiSpeaking = aiAvg > 0.02;
+    const userSpeaking = userAvg > 0.01;
+
+    setIsSpeaking(aiSpeaking);
+
+    setCallStatus(prev => {
+      if (aiSpeaking) return 'speaking';
+      if (userSpeaking) {
+        silenceStartRef.current = Date.now();
+        return 'listening';
+      }
+      if (prev === 'listening' && Date.now() - silenceStartRef.current > 1000) {
+        return 'thinking';
+      }
+      if (prev === 'thinking' && Date.now() - silenceStartRef.current > 15000) {
+        return 'listening';
+      }
+      return prev === 'idle' ? 'listening' : prev;
+    });
+
+    setAudioLevel(aiSpeaking ? aiLevels : (userSpeaking ? userLevels : new Array(16).fill(0)));
 
     animationFrameRef.current = requestAnimationFrame(updateVisualizer);
   };
@@ -117,7 +164,13 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
               streamRef.current = stream;
               
               const source = audioCtx.createMediaStreamSource(stream);
-              const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+              
+              const userAnalyser = audioCtx.createAnalyser();
+              userAnalyser.fftSize = 64;
+              userAnalyserRef.current = userAnalyser;
+              source.connect(userAnalyser);
+
+              const processor = audioCtx.createScriptProcessor(512, 1, 1);
               processorRef.current = processor;
 
               processor.onaudioprocess = (e) => {
@@ -311,11 +364,19 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
               </h4>
               <div className="flex items-center justify-center space-x-2" role="status" aria-live="polite">
                 {isCalling && <Loader2 className="w-4 h-4 text-green-400 animate-spin" aria-hidden="true" />}
-                <p className={`text-xs uppercase tracking-widest font-black ${isCalling ? 'text-green-400 animate-pulse' : 'text-green-500'}`}>
-                  {isCalling ? (lang === 'bn' ? 'সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...' : 'Establishing Connection, Please Wait...') : (lang === 'bn' ? 'সংযুক্ত - কথা বলুন' : 'Connected - Speak Now')}
+                <p className={`text-xs uppercase tracking-widest font-black ${isCalling || callStatus === 'thinking' ? 'text-green-400 animate-pulse' : 'text-green-500'}`}>
+                  {isCalling 
+                    ? (lang === 'bn' ? 'সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...' : 'Establishing Connection, Please Wait...') 
+                    : callStatus === 'thinking' 
+                      ? (lang === 'bn' ? 'বিশেষজ্ঞ ভাবছেন...' : 'Thinking...') 
+                      : callStatus === 'speaking' 
+                        ? (lang === 'bn' ? 'কৃষি বিশেষজ্ঞ কথা বলছেন' : 'AI Speaking...') 
+                        : callStatus === 'listening' 
+                          ? (lang === 'bn' ? 'আপনার কথা শোনা হচ্ছে...' : 'Listening...') 
+                          : (lang === 'bn' ? 'সংযুক্ত - কথা বলুন' : 'Connected - Speak Now')}
                 </p>
                 <span className="sr-only">
-                  {isSpeaking ? (lang === 'bn' ? 'বিশেষজ্ঞ কথা বলছেন' : 'Expert is speaking') : (lang === 'bn' ? 'শান্ত' : 'Silent')}
+                  {callStatus === 'speaking' ? (lang === 'bn' ? 'বিশেষজ্ঞ কথা বলছেন' : 'Expert is speaking') : (lang === 'bn' ? 'শান্ত' : 'Silent')}
                 </span>
               </div>
             </div>
@@ -326,19 +387,21 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
                   <motion.div
                     key={i}
                     animate={{ 
-                      height: isSpeaking ? Math.max(4, level * 80) : 4,
-                      opacity: isSpeaking ? 1 : 0.3
+                      height: Math.max(4, level * 80),
+                      opacity: level > 0 ? 1 : 0.3
                     }}
-                    className="w-2 bg-gradient-to-t from-green-600 to-green-400 rounded-full"
+                    className={`w-2 rounded-full ${callStatus === 'speaking' ? 'bg-gradient-to-t from-green-600 to-green-400' : 'bg-gradient-to-t from-indigo-600 to-blue-400'}`}
                   />
                 ))}
               </div>
               
-              <div className={`w-28 h-28 rounded-full flex items-center justify-center z-10 shadow-inner transition-all duration-500 ${isCalling ? 'bg-gray-800 border-2 border-gray-700' : 'bg-green-900/40 border-2 border-green-500/50 shadow-[0_0_30px_rgba(34,197,94,0.3)]'}`}>
-                {isCalling ? (
-                  <Loader2 className="w-10 h-10 text-green-500 animate-spin" />
+              <div className={`w-28 h-28 rounded-full flex items-center justify-center z-10 shadow-inner transition-all duration-500 ${isCalling || callStatus === 'thinking' ? 'bg-gray-800 border-2 border-gray-700' : callStatus === 'speaking' ? 'bg-green-900/40 border-2 border-green-500/50 shadow-[0_0_30px_rgba(34,197,94,0.3)]' : 'bg-indigo-900/40 border-2 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.3)]'}`}>
+                {isCalling || callStatus === 'thinking' ? (
+                  <Loader2 className={`w-10 h-10 animate-spin ${callStatus === 'thinking' ? 'text-indigo-400' : 'text-green-500'}`} />
+                ) : callStatus === 'speaking' ? (
+                  <Volume2 className="w-12 h-12 transition-colors duration-300 text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
                 ) : (
-                  <Volume2 className={`w-12 h-12 transition-colors duration-300 ${isSpeaking ? 'text-green-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]' : 'text-green-700'}`} />
+                  <Mic className="w-10 h-10 transition-colors duration-300 text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
                 )}
               </div>
             </div>

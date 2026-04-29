@@ -295,7 +295,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 md:space-y-6 max-w-6xl mx-auto px-4"
+      className="space-y-4 md:space-y-6 w-full px-4"
     >
       <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-blue-900/5 border border-blue-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">

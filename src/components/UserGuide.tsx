@@ -30,7 +30,7 @@ export default function UserGuide({ lang }: Props) {
 
   return (
     <motion.div 
-      className="space-y-10 max-w-5xl mx-auto"
+      className="space-y-10 w-full"
       initial="hidden"
       animate="visible"
       variants={containerVariants}

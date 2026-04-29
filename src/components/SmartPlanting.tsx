@@ -175,7 +175,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-green-900/5 border border-green-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
           <div className="bg-green-100 p-2 md:p-3 rounded-xl flex-shrink-0">

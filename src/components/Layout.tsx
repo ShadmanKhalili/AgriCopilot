@@ -280,13 +280,13 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-2 sm:p-3 md:p-4 lg:p-6 overflow-y-auto custom-scrollbar w-full max-w-7xl relative bg-[#F7F7F5]">
+      <main className="flex-1 p-2 sm:p-3 md:p-4 lg:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F7F5]">
         {/* Background Decorative Elements */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#141414 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>
         </div>
 
-        <div className="relative z-10 min-h-full flex flex-col">
+        <div className="relative z-10 min-h-full flex flex-col w-full">
           <Suspense fallback={
             <div className="flex-1 flex flex-col items-center justify-center p-20 text-green-700/40">
               <Loader2 className="w-12 h-12 animate-spin mb-4" />
