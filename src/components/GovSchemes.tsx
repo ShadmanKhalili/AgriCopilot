@@ -295,16 +295,16 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-12 max-w-6xl mx-auto px-4"
+      className="space-y-4 md:space-y-6 max-w-6xl mx-auto px-4"
     >
-      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-blue-900/5 border border-blue-100 mb-6 md:mb-8">
+      <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-blue-900/5 border border-blue-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-blue-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <Landmark className="w-6 h-6 md:w-8 h-8 text-blue-600" />
+          <div className="bg-blue-50 p-2 md:p-3 rounded-xl flex-shrink-0">
+            <Landmark className="w-6 h-6 md:w-7 h-7 text-blue-600" />
           </div>
           <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.govSchemes}</h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium">{t.govSchemesDesc}</p>
+            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.govSchemes}</h2>
+            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.govSchemesDesc}</p>
           </div>
         </div>
       </div>

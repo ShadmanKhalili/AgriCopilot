@@ -81,16 +81,16 @@ export default function CommunityRadar({ lang }: Props) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8 max-w-5xl mx-auto"
+      className="space-y-4 md:space-y-6 max-w-5xl mx-auto"
     >
-      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-red-900/5 border border-red-100 mb-6 md:mb-8">
+      <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-red-900/5 border border-red-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-red-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <Radar className="w-6 h-6 md:w-8 h-8 text-red-600" />
+          <div className="bg-red-50 p-2 md:p-3 rounded-xl flex-shrink-0">
+            <Radar className="w-6 h-6 md:w-7 h-7 text-red-600" />
           </div>
           <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.communityRadar}</h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium">{t.communityRadarDesc}</p>
+            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.communityRadar}</h2>
+            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.communityRadarDesc}</p>
           </div>
         </div>
       </div>

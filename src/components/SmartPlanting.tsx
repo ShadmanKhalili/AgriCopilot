@@ -175,17 +175,17 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-green-900/5 border border-green-100 mb-6 md:mb-8">
+    <div className="max-w-5xl mx-auto space-y-4 md:space-y-6">
+      <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-green-900/5 border border-green-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-green-100 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <Sprout className="w-6 h-6 md:w-8 h-8 text-green-600" />
+          <div className="bg-green-100 p-2 md:p-3 rounded-xl flex-shrink-0">
+            <Sprout className="w-6 h-6 md:w-7 h-7 text-green-600" />
           </div>
           <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">
+            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">
               {lang === 'bn' ? 'স্মার্ট প্ল্যানার' : 'Smart Planner'}
             </h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium">
+            <p className="text-gray-500 text-[10px] md:text-sm font-medium">
               {lang === 'bn' ? 'পরবর্তী মৌসুমে কী চাষ করবেন তার এআই ভিত্তিক পরামর্শ' : 'AI-driven recommendations for your next crop cycle'}
             </p>
           </div>
@@ -193,7 +193,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
       </div>
 
         {/* Location Section */}
-        <div className="mb-8 p-6 bg-gray-50 rounded-2xl border border-gray-200">
+        <div className="mb-4 md:mb-6 p-4 md:p-5 bg-gray-50 rounded-2xl border border-gray-200">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex-grow">
               <h3 className="font-bold text-gray-900 flex items-center space-x-2">
@@ -288,7 +288,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {/* Target Time */}
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
@@ -457,12 +457,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation 
           className="space-y-6"
         >
           {/* AI Voice Call Section */}
-          <div className="bg-gradient-to-br from-green-900 to-emerald-900 rounded-[32px] p-6 shadow-xl border border-green-800 text-white">
-            <div className="mb-4">
-              <h3 className="text-xl font-black mb-1">{lang === 'bn' ? 'মাস্টার এগ্রোনমিস্টের সাথে কথা বলুন' : 'Discuss Your Plan with AI'}</h3>
-              <p className="text-green-200 text-sm">{lang === 'bn' ? 'আপনার প্ল্যান সম্পর্কে এআই এর সাথে সরাসরি কথা বলুন' : 'Have a live conversation with our AI expert about these crop recommendations.'}</p>
+          <div className="bg-gradient-to-br from-green-900 to-emerald-900 rounded-[28px] p-4 md:p-6 shadow-xl border border-green-800 text-white">
+            <div className="mb-3">
+              <h3 className="text-lg font-black mb-1">{lang === 'bn' ? 'মাস্টার এগ্রোনমিস্টের সাথে কথা বলুন' : 'Discuss Your Plan with AI'}</h3>
+              <p className="text-green-200 text-xs">{lang === 'bn' ? 'আপনার প্ল্যান সম্পর্কে এআই এর সাথে সরাসরি কথা বলুন' : 'Have a live conversation with our AI expert about these crop recommendations.'}</p>
             </div>
-            <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/10">
+            <div className="bg-white/10 rounded-2xl p-3 backdrop-blur-sm border border-white/10">
               <LiveExpertCall 
                 diagnosisContext={`User Profile: ${landSize} decimal ${landType} land, ${irrigation} irrigation, budget: ${budget}. 
 Top Recommendations:
@@ -480,12 +480,12 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
           </div>
 
           {/* Recommended Crops */}
-          <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-xl shadow-green-900/5 border border-green-100">
-            <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center space-x-2">
-              <CheckCircle2 className="w-6 h-6 text-green-500" />
+          <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-xl shadow-green-900/5 border border-green-100">
+            <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center space-x-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
               <span>{lang === 'bn' ? 'শীর্ষ সুপারিশকৃত ফসল' : 'Top Recommended Crops'}</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {results.recommended?.map((rec: any, idx: number) => (
                 <div key={idx} className="bg-gray-50 rounded-2xl p-5 border border-gray-100 hover:border-green-300 transition-colors flex flex-col">
                   <div className="flex justify-between items-start mb-4">
@@ -536,21 +536,21 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Avoid Crops */}
-            <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-xl shadow-red-900/5 border border-red-100">
-              <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center space-x-2">
-                <XCircle className="w-6 h-6 text-red-500" />
+            <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-xl shadow-red-900/5 border border-red-100">
+              <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center space-x-2">
+                <XCircle className="w-5 h-5 text-red-500" />
                 <span>{lang === 'bn' ? 'যেসব ফসল এড়িয়ে চলবেন' : 'Crops to Avoid'}</span>
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {results.avoid?.map((avoid: any, idx: number) => (
-                  <div key={idx} className="bg-red-50 rounded-2xl p-5 border border-red-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="w-5 h-5 text-red-600" />
-                      <h4 className="text-lg font-bold text-red-900">{avoid.crop}</h4>
+                  <div key={idx} className="bg-red-50 rounded-2xl p-4 border border-red-100">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                      <h4 className="text-base font-bold text-red-900">{avoid.crop}</h4>
                     </div>
-                    <p className="text-sm text-red-700 leading-relaxed">{avoid.evidence}</p>
+                    <p className="text-xs text-red-700 leading-relaxed">{avoid.evidence}</p>
                   </div>
                 ))}
               </div>
@@ -558,37 +558,37 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
 
             {/* Diversification */}
             {results.diversification && (
-              <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-xl shadow-blue-900/5 border border-blue-100">
-                <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center space-x-2">
-                  <Info className="w-6 h-6 text-blue-500" />
+              <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-xl shadow-blue-900/5 border border-blue-100">
+                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center space-x-2">
+                  <Info className="w-5 h-5 text-blue-500" />
                   <span>{lang === 'bn' ? 'ঝুঁকি কমাতে বিকল্প ফসল' : 'Diversification Option'}</span>
                 </h3>
-                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="text-lg font-bold text-blue-900">{results.diversification.crop}</h4>
-                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${getRiskColor(results.diversification.riskLevel)}`}>
+                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="text-base font-bold text-blue-900">{results.diversification.crop}</h4>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${getRiskColor(results.diversification.riskLevel)}`}>
                       Risk: {results.diversification.riskLevel}
                     </span>
                   </div>
-                  <div className="space-y-2 mb-4">
+                  <div className="space-y-1.5 mb-3">
                     {results.diversification.reasons?.map((reason: string, rIdx: number) => (
-                      <div key={rIdx} className="flex items-start space-x-2 text-sm text-blue-800">
-                        <ChevronRight className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div key={rIdx} className="flex items-start space-x-2 text-xs text-blue-800">
+                        <ChevronRight className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
                         <span>{reason}</span>
                       </div>
                     ))}
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-blue-200">
-                    <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <h5 className="text-[10px] font-bold text-blue-900 uppercase tracking-wider mb-1.5">
                       {lang === 'bn' ? 'বিকল্প হিসেবে কেন?' : 'Why as an alternative?'}
                     </h5>
-                    <p className="text-xs text-blue-800 leading-relaxed italic">
+                    <p className="text-[10px] text-blue-800 leading-relaxed italic">
                       {results.diversification.detailedAnalysis}
                     </p>
                   </div>
 
-                  <div className="mt-4 bg-white/60 p-3 rounded-xl border border-blue-200 text-xs text-blue-900">
+                  <div className="mt-3 bg-white/60 p-2.5 rounded-xl border border-blue-200 text-[10px] text-blue-900">
                     <span className="font-bold">{lang === 'bn' ? 'ঝুঁকির কারণ:' : 'Risk Reason:'}</span> {results.diversification.riskReason}
                   </div>
                 </div>

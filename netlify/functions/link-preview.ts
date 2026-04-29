@@ -56,7 +56,7 @@ export const handler: Handler = async (event) => {
       return matchName ? matchName[1] : null;
     };
 
-    const title = getMeta('og:title') || getMeta('title') || html.match(/<title>([^<]*)<\\/title>/i)?.[1];
+    const title = getMeta('og:title') || getMeta('title') || html.match(/<title>([^<]*)<\/title>/i)?.[1];
     const description = getMeta('og:description') || getMeta('description');
     const image = getMeta('og:image') || getMeta('twitter:image');
     const siteName = getMeta('og:site_name');

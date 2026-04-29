@@ -137,7 +137,7 @@ export default function Layout() {
         role="navigation"
         aria-label={lang === 'bn' ? 'প্রধান নেভিগেশন' : 'Main navigation'}
       >
-        <div className="p-8 flex items-center justify-between border-b border-white/5">
+        <div className="p-6 pb-4 flex items-center justify-between border-b border-white/5">
           <div className="flex items-center space-x-4">
             <motion.div 
               whileHover={{ rotate: 15 }}
@@ -179,7 +179,7 @@ export default function Layout() {
         </div>
         
         <nav 
-          className="flex-1 px-4 py-8 space-y-3 overflow-y-auto custom-scrollbar"
+          className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scrollbar"
           role="tablist"
           aria-orientation="vertical"
         >
@@ -200,7 +200,7 @@ export default function Layout() {
                   setActiveTab(tab.id);
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center space-x-4 px-5 py-3.5 mt-1 rounded-[24px] transition-all duration-200 text-left relative overflow-hidden group focus:ring-2 focus:ring-white/50 outline-none ${
+                className={`w-full flex items-center space-x-4 px-4 py-2.5 mt-0.5 rounded-[20px] transition-all duration-200 text-left relative overflow-hidden group focus:ring-2 focus:ring-white/50 outline-none ${
                   isActive 
                     ? 'bg-white text-green-900 shadow-xl shadow-green-950/20' 
                     : 'text-green-100 hover:bg-white/10'
@@ -280,7 +280,7 @@ export default function Layout() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto custom-scrollbar w-full max-w-7xl mx-auto relative bg-[#F7F7F5]">
+      <main className="flex-1 p-2 sm:p-3 md:p-4 lg:p-6 overflow-y-auto custom-scrollbar w-full max-w-7xl relative bg-[#F7F7F5]">
         {/* Background Decorative Elements */}
         <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#141414 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>

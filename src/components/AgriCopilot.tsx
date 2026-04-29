@@ -595,10 +595,10 @@ export default function AgriCopilot({
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="space-y-4 md:space-y-6"
     >
       {/* Ultra-Compact Main Header */}
-      <div className="bg-white rounded-3xl p-3 md:p-5 shadow-sm border border-gray-100 mb-4 md:mb-6 relative overflow-hidden group">
+      <div className="bg-white rounded-[24px] p-3 md:p-5 shadow-sm border border-gray-100 mb-4 relative overflow-hidden group w-full max-w-5xl xl:max-w-6xl">
         <div className="flex items-center justify-between gap-4 relative z-10">
           <div className="flex items-center space-x-3 md:space-x-5">
             <div className="bg-green-600 p-2 md:p-3 rounded-xl shadow-lg shadow-green-100 flex-shrink-0">
@@ -621,13 +621,13 @@ export default function AgriCopilot({
         </div>
       </div>
 
-      <div className="flex flex-col space-y-10 max-w-4xl mx-auto">
+      <div className="flex flex-col space-y-4 md:space-y-6 w-full max-w-5xl xl:max-w-6xl">
         {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="space-y-6 bg-white p-8 rounded-[40px] border border-green-100 shadow-xl shadow-green-50/50 relative overflow-hidden"
+          className="space-y-4 bg-white p-4 md:p-6 rounded-[24px] md:rounded-[28px] border border-green-100 shadow-xl shadow-green-50/50 relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
           
@@ -766,7 +766,7 @@ export default function AgriCopilot({
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 p-1 rounded-[40px] shadow-2xl shadow-green-200 h-full"
               >
-                <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
+                <div className="bg-white/95 backdrop-blur-xl rounded-[36px] p-5 md:p-8 h-full flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
                   
                   {/* Translation Loading Overlay */}
@@ -1481,20 +1481,7 @@ export default function AgriCopilot({
                   </div>
                 </div>
               </motion.div>
-            ) : (
-              <motion.div 
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="bg-white rounded-[40px] p-16 border border-dashed border-gray-200 h-full flex flex-col items-center justify-center text-gray-400 text-center relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gray-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
-                <div className="bg-gray-50 p-10 rounded-[32px] mb-8 shadow-inner relative z-10">
-                  <Leaf className="w-20 h-20 text-gray-200" />
-                </div>
-                <p className="text-2xl font-black text-gray-300 max-w-sm leading-tight relative z-10 tracking-tight">Upload an image and click Diagnose to see results here.</p>
-              </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 

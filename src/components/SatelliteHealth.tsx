@@ -129,25 +129,25 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-8"
+      className="space-y-4 md:space-y-6"
     >
-      <motion.div variants={itemVariants} className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-6 md:mb-8">
+      <motion.div variants={itemVariants} className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-indigo-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <Satellite className="w-6 h-6 md:w-8 h-8 text-indigo-600" />
+          <div className="bg-indigo-50 p-2 md:p-3 rounded-xl flex-shrink-0">
+            <Satellite className="w-6 h-6 md:w-7 h-7 text-indigo-600" />
           </div>
           <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium leading-relaxed">{t.cropHealthDesc}</p>
+            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
+            <p className="text-gray-500 text-[10px] md:text-sm font-medium leading-relaxed">{t.cropHealthDesc}</p>
           </div>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Location Card */}
         <motion.div 
           variants={itemVariants}
-          className="bg-white border border-indigo-100 shadow-xl shadow-indigo-50/50 rounded-[40px] p-8 lg:col-span-1 h-fit relative overflow-hidden group"
+          className="bg-white border border-indigo-100 shadow-xl shadow-indigo-50/50 rounded-[28px] md:rounded-[32px] p-5 md:p-6 lg:col-span-1 h-fit relative overflow-hidden group"
         >
           <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
           
@@ -405,32 +405,32 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-            className="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 rounded-[40px] p-8 lg:p-12 relative overflow-hidden shadow-2xl shadow-indigo-200"
+            className="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 rounded-[28px] md:rounded-[32px] p-6 md:p-8 lg:p-10 relative overflow-hidden shadow-2xl shadow-indigo-200"
           >
             <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
             
-            <h3 className="text-3xl font-black text-white mb-10 flex items-center gap-4 relative z-10 tracking-tight">
-              <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
-                <Leaf className="w-8 h-8 text-green-300" />
+            <h3 className="text-xl md:text-2xl font-black text-white mb-6 md:mb-8 flex items-center gap-4 relative z-10 tracking-tight">
+              <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-md">
+                <Leaf className="w-6 h-6 md:w-8 h-8 text-green-300" />
               </div>
               {t.actionableInsights}
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-              <div className="bg-white/10 backdrop-blur-xl rounded-[32px] p-8 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
-                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-sm flex items-center gap-3 mb-4">
-                  <CheckCircle2 className="w-5 h-5 text-green-300" /> 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 relative z-10">
+              <div className="bg-white/10 backdrop-blur-xl rounded-[24px] p-5 md:p-6 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
+                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-4 h-4 text-green-300" /> 
                   {t.cropHealthTitle || "Crop Health (NDVI)"}
                 </h4>
-                <p className="text-white leading-relaxed text-xl font-medium">
+                <p className="text-white leading-relaxed text-base md:text-lg font-medium">
                   {getHealthStatus(ndvi).insight}
                 </p>
               </div>
-              <div className="bg-white/10 backdrop-blur-xl rounded-[32px] p-8 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
-                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-sm flex items-center gap-3 mb-4">
-                  <Cloud className="w-5 h-5 text-blue-300" /> 
+              <div className="bg-white/10 backdrop-blur-xl rounded-[24px] p-5 md:p-6 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
+                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mb-3">
+                  <Cloud className="w-4 h-4 text-blue-300" /> 
                   {t.moistureTitle || "Soil & Canopy Moisture (NDMI)"}
                 </h4>
-                <p className="text-white leading-relaxed text-xl font-medium">
+                <p className="text-white leading-relaxed text-base md:text-lg font-medium">
                   {getMoistureStatus(ndmi).insight}
                 </p>
               </div>
