@@ -16,7 +16,7 @@ const handler: Handler = async (event, context) => {
       };
     }
 
-    const { model, contents, config, tools, toolConfig, responseModalities, speechConfig } = JSON.parse(event.body || "{}");
+    const { model, contents, config, tools, toolConfig, responseModalities, speechConfig, generationConfig } = JSON.parse(event.body || "{}");
     
     if (!model || !contents) {
       return { statusCode: 400, body: "Missing model or contents" };
@@ -28,11 +28,12 @@ const handler: Handler = async (event, context) => {
       model,
       contents,
       config: {
-        ...config,
+        ...(config || {}),
         tools,
         toolConfig,
         responseModalities,
-        speechConfig
+        speechConfig,
+        generationConfig
       }
     });
 
