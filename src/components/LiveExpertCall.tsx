@@ -57,8 +57,8 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       if (!apiKey) {
         alert(lang === 'bn' 
-          ? "ভয়েস কল ফিচারের জন্য Netlify-তে VITE_GEMINI_API_KEY যুক্ত করতে হবে। আপাতত চ্যাট ব্যবহার করুন।" 
-          : "Voice calls require VITE_GEMINI_API_KEY to be set in your Netlify environment. Please use text chat for now.");
+          ? "ভয়েস কল ফিচারের জন্য GEMINI_API_KEY যুক্ত করতে হবে। আপাতত চ্যাট ব্যবহার করুন।" 
+          : "Voice calls require GEMINI_API_KEY to be set in your environment. Please use text chat for now.");
         setIsCalling(false);
         return;
       }

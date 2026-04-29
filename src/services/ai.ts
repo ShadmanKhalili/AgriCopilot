@@ -79,13 +79,13 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-flash-lite-preview';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
-const SEARCH_MODEL = 'gemini-3-flash-preview';
+const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
 const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
 export const LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
-const CHAT_MODEL = 'gemini-3-flash-preview';
+const CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
   for (let i = 0; i < retries; i++) {
@@ -119,7 +119,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   const fallbacks = [
     primaryModel,
     customBackupModel || BACKUP_MODEL,
-    'gemini-3.1-flash-preview',
+    'gemini-3.1-flash-lite-preview',
     'gemini-3-flash-preview'
   ];
   
