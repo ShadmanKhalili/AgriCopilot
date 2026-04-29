@@ -81,9 +81,10 @@ export { Type };
 const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-pro-preview' : 'gemini-3-flash-preview';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
 const SEARCH_MODEL = 'gemini-3-flash-preview';
-const TTS_PRIMARY_MODEL = 'gemini-2.5-flash';
-const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; // Also update this model to tts preview
+const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
+const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
 const LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
+const CHAT_MODEL = 'gemini-3-flash-preview';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
   for (let i = 0; i < retries; i++) {
@@ -118,8 +119,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
     primaryModel,
     customBackupModel || BACKUP_MODEL,
     'gemini-3-flash-preview',
-    'gemini-3.1-flash-lite-preview',
-    'gemini-2.5-flash'
+    'gemini-3.1-flash-lite-preview'
   ];
   
   // Try models in sequence until one works
@@ -874,7 +874,51 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
 
       const response = await generateContent({
         contents,
-        model: LIVE_API_MODEL
+        model: CHAT_MODEL
+      });
+      
+      const responseText = response.text || '';
+      history.push({ role: 'user', text: req.message });
+      history.push({ role: 'model', text: responseText });
+      
+      return { text: responseText };
+    }
+  };
+};
+
+export const startSchemeChat = (scheme: any, lang: string) => {
+  const history: { role: string; text: string }[] = [];
+  const schemeContext = `
+    Title: ${scheme.title[lang]}
+    Description: ${scheme.description[lang]}
+    Eligibility: ${scheme.eligibility[lang]}
+    How to Apply: ${scheme.howToApply[lang]}
+    Benefits: ${scheme.benefits?.[lang] || 'N/A'}
+    Provider: ${scheme.provider || 'N/A'}
+  `;
+
+  return {
+    sendMessage: async (req: { message: string }) => {
+      const prompt = history.length === 0 
+        ? `You are an expert agricultural advisor specializing in government schemes in Bangladesh. 
+           The user is asking about the following scheme:
+           ${schemeContext}
+           
+           Help them understand how they can avail these benefits, what documents they might need, or clarify any parts of the eligibility.
+           USER'S FIRST QUESTION: "${req.message}"
+           
+           Respond in ${lang === 'bn' ? 'Bangla' : 'English'}. Be encouraging, practical, and clear. Use markdown.`
+        : req.message;
+
+      const contents = history.map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.text }]
+      }));
+      contents.push({ role: 'user', parts: [{ text: prompt }] });
+
+      const response = await generateContent({
+        contents,
+        model: CHAT_MODEL
       });
       
       const responseText = response.text || '';

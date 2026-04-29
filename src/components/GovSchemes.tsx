@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock } from 'lucide-react';
+import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock, Bot, X, Send } from 'lucide-react';
 
 interface LinkMetadata {
   title?: string;
@@ -120,9 +120,10 @@ import { translations, Language } from '../utils/translations';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
-import { syncCuratedSchemes } from '../services/ai';
+import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
+import ReactMarkdown from 'react-markdown';
 
 interface Props {
   lang: Language;
@@ -151,13 +152,61 @@ const DISTRICTS = [
   'all', 'dhaka', 'rajshahi', 'khulna', 'barisal', 'sylhet', 'chittagong', 'comilla', 'bogra', 'narsingdi'
 ];
 
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
 export default function GovSchemes({ lang, globalLocation }: Props) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [allSchemes, setAllSchemes] = useState<GovScheme[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('All');
+  const [chatScheme, setChatScheme] = useState<GovScheme | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [chatSession, setChatSession] = useState<any>(null);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
+  
   const { userProfile } = useAuth();
   const t = translations[lang];
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const handleStartChat = (scheme: GovScheme) => {
+    setChatScheme(scheme);
+    setChatMessages([{
+      role: 'model',
+      text: lang === 'bn' 
+        ? `স্বাগতম! আমি আপনাকে "${scheme.title[lang]}" সম্পর্কে সাহায্য করতে পারি। আপনি কীভাবে সুবিধা পেতে পারেন বা আপনার কোনো প্রশ্ন থাকলে তা আমাকে জিজ্ঞাসা করুন।` 
+        : `Welcome! I can help you with "${scheme.title[lang]}". Feel free to ask how you can avail this benefit or any other questions you may have.`
+    }]);
+    setChatSession(startSchemeChat(scheme, lang));
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isChatLoading || !chatSession) return;
+
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsChatLoading(true);
+
+    try {
+      const response = await chatSession.sendMessage({ message: userMsg });
+      setChatMessages(prev => [...prev, { role: 'model', text: response.text }]);
+    } catch (err) {
+      console.error("Chat error:", err);
+      setChatMessages(prev => [...prev, { role: 'model', text: lang === 'bn' ? "দুঃখিত, আমি বর্তমানে উত্তর দিতে পারছি না।" : "Sorry, I'm unable to respond correctly at the moment." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   // Sync status and UI-level deduplication
   const rawSchemes = allSchemes.length > 0 ? allSchemes : (CURRENT_PDF_SCHEMES as GovScheme[]);
@@ -472,8 +521,23 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                 {scheme.benefits && (
                   <div className="p-8 bg-blue-600 text-white rounded-[2.5rem] shadow-xl shadow-blue-500/20 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-70">{lang === 'bn' ? 'মূল সুবিধাগুলো' : 'Key Benefits'}</h4>
-                    <p className="text-xl font-black italic tracking-tight">{scheme.benefits[lang]}</p>
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-70">{lang === 'bn' ? 'মূল সুবিধাগুলো' : 'Key Benefits'}</h4>
+                        <p className="text-xl font-black italic tracking-tight">{scheme.benefits[lang]}</p>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleStartChat(scheme)}
+                        className="bg-white text-blue-600 p-3 rounded-2xl shadow-xl flex items-center gap-2 group/chat cursor-pointer"
+                      >
+                        <Bot className="w-5 h-5 group-hover/chat:animate-bounce" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">
+                          {lang === 'bn' ? 'পরামর্শ' : 'ADVISOR'}
+                        </span>
+                      </motion.button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -489,6 +553,20 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                           <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'প্রদানকারী' : 'Provider'}</p>
                           <p className="text-sm font-black text-white">{scheme.provider}</p>
                         </div>
+                      )}
+                      
+                      {!scheme.benefits && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleStartChat(scheme)}
+                          className="w-full bg-blue-600 text-white p-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 group/chat cursor-pointer mb-6"
+                        >
+                          <Bot className="w-5 h-5 group-hover/chat:animate-bounce" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">
+                            {lang === 'bn' ? 'এআই পরামর্শদাতার সাথে কথা বলুন' : 'CHAT WITH AI ADVISOR'}
+                          </span>
+                        </motion.button>
                       )}
                       
                       {scheme.deadline && (
@@ -525,6 +603,96 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
           </motion.div>
         ))}
       </div>
+
+      {/* Chat Overlay */}
+      <AnimatePresence>
+        {chatScheme && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 sm:p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-2xl h-[80vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden border border-white/20"
+            >
+              {/* Header */}
+              <div className="p-6 sm:p-8 bg-blue-600 text-white flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/20 p-3 rounded-2xl">
+                    <Bot className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg leading-tight uppercase tracking-tight">{lang === 'bn' ? 'স্কিম গাইড' : 'Scheme Advisor'}</h3>
+                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{chatScheme.title[lang]}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setChatScheme(null)}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 scrollbar-hide">
+                {chatMessages.map((msg, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-medium shadow-sm leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-tr-none' 
+                        : 'bg-blue-50 text-gray-900 rounded-tl-none border border-blue-100'
+                    }`}>
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                  </motion.div>
+                ))}
+                {isChatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-blue-50 p-5 rounded-[2rem] rounded-tl-none border border-blue-100 flex items-center gap-3">
+                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                      <span className="text-xs font-black text-blue-600 uppercase tracking-widest">
+                        {lang === 'bn' ? 'পরামর্শদাতা লিখছেন...' : 'Advisor is typing...'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <form onSubmit={handleSendMessage} className="p-6 sm:p-8 bg-gray-50 border-t border-gray-100">
+                <div className="relative group">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder={lang === 'bn' ? 'কিভাবে আবেদন করব?' : 'How do I apply? Ask anything...'}
+                    className="w-full bg-white border border-gray-200 p-5 pr-16 rounded-[2rem] text-sm font-medium focus:ring-4 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all shadow-inner"
+                    disabled={isChatLoading}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || isChatLoading}
+                    className="absolute right-2 top-2 bottom-2 aspect-square bg-blue-600 text-white rounded-2xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors cursor-pointer"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
