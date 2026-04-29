@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2 } from 'lucide-react';
-import { getAi } from '../services/ai';
+import { getAi, LIVE_API_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality } from '@google/genai';
 import { motion } from 'motion/react';
 
@@ -92,7 +92,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       - Strike a balance: be thorough and insightful, but keep individual spoken responses concise enough for a comfortable phone conversation. Speak like an experienced, highly educated professor of agronomy.`;
 
       const sessionPromise = ai.live.connect({
-        model: "models/gemini-3.1-flash-live-preview",
+        model: LIVE_API_MODEL,
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
