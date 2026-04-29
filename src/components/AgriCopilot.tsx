@@ -323,12 +323,18 @@ export default function AgriCopilot({
           await updateDoc(diagRef, {
             chatSummary: summary
           });
+          toast.success(t.tooltips.summarySaved);
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, 'diagnoses');
         }
+      } else if (!user) {
+        toast.success(lang === 'bn' ? 'সারাংশ তৈরি হয়েছে! সেভ করতে লগ-ইন করুন।' : 'Summary generated! Sign in to save permanently.');
+      } else {
+        toast.success(t.tooltips.summarySaved);
       }
     } catch (error) {
       console.error("Summarization Error:", error);
+      toast.error(lang === 'bn' ? 'সারাংশ তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate summary.');
     } finally {
       setIsSummarizing(false);
     }
@@ -1386,18 +1392,33 @@ export default function AgriCopilot({
                                   ))}
                                   {isChatLoading && (
                                     <motion.div 
-                                      initial={{ opacity: 0 }}
-                                      animate={{ opacity: 1 }}
-                                      className="flex justify-start"
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      className="flex justify-start items-end space-x-2"
                                       aria-label={t.tooltips.aiThinking}
                                     >
-                                      <div className="bg-white border border-gray-50 p-4 rounded-[20px] rounded-tl-none shadow-md flex items-center space-x-2">
-                                        <div className="flex space-x-1">
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
-                                          <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1 h-1 bg-green-500 rounded-full"></motion.div>
+                                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center border border-green-200">
+                                        <Bot className="w-4 h-4 text-green-600" />
+                                      </div>
+                                      <div className="bg-white border border-gray-100 p-4 rounded-[20px] rounded-bl-none shadow-md flex flex-col space-y-2">
+                                        <div className="flex space-x-1.5 ml-1">
+                                          <motion.div 
+                                            animate={{ y: [0, -5, 0], opacity: [0.3, 1, 0.3] }} 
+                                            transition={{ repeat: Infinity, duration: 1 }} 
+                                            className="w-1.5 h-1.5 bg-green-500 rounded-full"
+                                          ></motion.div>
+                                          <motion.div 
+                                            animate={{ y: [0, -5, 0], opacity: [0.3, 1, 0.3] }} 
+                                            transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} 
+                                            className="w-1.5 h-1.5 bg-green-500 rounded-full"
+                                          ></motion.div>
+                                          <motion.div 
+                                            animate={{ y: [0, -5, 0], opacity: [0.3, 1, 0.3] }} 
+                                            transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} 
+                                            className="w-1.5 h-1.5 bg-green-500 rounded-full"
+                                          ></motion.div>
                                         </div>
-                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
                                       </div>
                                     </motion.div>
                                   )}
@@ -1410,16 +1431,18 @@ export default function AgriCopilot({
                                       type="button"
                                       onClick={handleSummarizeAndSave}
                                       disabled={isSummarizing || isChatLoading}
-                                      className="w-full flex items-center justify-center space-x-2 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl border border-indigo-100 transition-all text-[10px] font-black uppercase tracking-widest disabled:opacity-50 mb-1 focus:ring-2 focus:ring-indigo-400 outline-none"
+                                      className="w-full flex items-center justify-center space-x-3 py-3 bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 text-indigo-700 rounded-xl border border-indigo-200/50 shadow-sm transition-all text-[11px] font-black uppercase tracking-widest disabled:opacity-50 mb-2 focus:ring-2 focus:ring-indigo-400 outline-none group"
                                     >
                                       {isSummarizing ? (
                                         <>
-                                          <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                                          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                                           <span>{t.tooltips.summarizing}</span>
                                         </>
                                       ) : (
                                         <>
-                                          <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                          <div className="bg-indigo-600 p-1.5 rounded-lg group-hover:scale-110 transition-transform">
+                                            <Sparkles className="w-3.5 h-3.5 text-white" aria-hidden="true" />
+                                          </div>
                                           <span>{t.tooltips.saveSummary}</span>
                                         </>
                                       )}
