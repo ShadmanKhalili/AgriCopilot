@@ -8,6 +8,7 @@ import Markdown from 'react-markdown';
 import { translateText, generateWeatherAdvisory, generateSpeech } from '../services/ai';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import CropLifecycleCalendar from './CropLifecycleCalendar';
 
 interface Props {
   lang: Language;
@@ -866,6 +867,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 )}
               </div>
             </motion.div>
+          </div>
+
+          {/* Integrated Proactive Spray Schedule & Calendar */}
+          <div className="mt-8">
+            <CropLifecycleCalendar 
+              lang={lang} 
+              weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
+            />
           </div>
         </div>
       )}

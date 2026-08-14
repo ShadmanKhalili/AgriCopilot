@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Navigation, Package, Scale, DollarSign, Activity, AlertCircle, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Navigation, Package, Scale, DollarSign, Activity, AlertCircle, ArrowUpRight, ArrowDownRight, Calculator, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 import { collection, addDoc } from 'firebase/firestore';
@@ -36,6 +36,7 @@ interface Props {
   setPersistedInsights?: (insights: any | null) => void;
   persistedProduce?: string;
   setPersistedProduce?: (produce: string) => void;
+  onNavigateTab?: (tab: any, payload?: any) => void;
 }
 
 export default function MarketConnect({ 
@@ -43,7 +44,8 @@ export default function MarketConnect({
   persistedInsights,
   setPersistedInsights,
   persistedProduce,
-  setPersistedProduce
+  setPersistedProduce,
+  onNavigateTab
 }: Props) {
   const [produce, setProduce] = useState(persistedProduce || PRODUCE_TYPES[0]);
   const [isLoading, setIsLoading] = useState(false);
@@ -314,6 +316,42 @@ export default function MarketConnect({
                 animate={{ opacity: 1, x: 0 }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full"
               >
+                {/* Cross-Module Linked Action Bar */}
+                {onNavigateTab && (
+                  <div className="md:col-span-2 bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 p-5 md:p-6 rounded-[2rem] text-white flex flex-col sm:flex-row items-center justify-between gap-4 border border-emerald-800 shadow-md">
+                    <div className="flex items-center space-x-3.5 text-left">
+                      <div className="p-3 bg-emerald-500/20 text-emerald-300 rounded-2xl shrink-0 border border-emerald-400/30">
+                        <Calculator className="w-5 h-5 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm text-white leading-tight">
+                          {lang === 'bn' ? 'এই ফসলের প্রকৃত লাভ ও ব্রেক-ইভেন ব্যয় হিসাব করুন' : 'Calculate Profit Margin & Net Production Cost'}
+                        </h4>
+                        <p className="text-xs text-emerald-300 font-medium mt-0.5">
+                          {lang === 'bn' ? 'পাইকার ও ফরিয়াদের কাছে বিক্রির আগে আপনার আসল খরচ জেনে নিন' : 'Know your true baseline cost before trading with intermediaries'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('krishi-profit', { crop: produce })}
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-400 hover:bg-emerald-300 active:scale-95 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md min-h-[44px] cursor-pointer"
+                      >
+                        <span>{lang === 'bn' ? 'মুনাফা হিসাব' : 'Profit Calculator'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('agri-copilot', { crop: produce })}
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-3 px-4 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs rounded-xl border border-white/20 transition-all min-h-[44px] cursor-pointer"
+                      >
+                        <span>{lang === 'bn' ? 'এআই ডাক্তার' : 'AI Doctor'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Main Executive Summary */}
                 <div className="md:col-span-2 bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
                   <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">

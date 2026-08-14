@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Info, Navigation, Cloud, Satellite, Wallet, History, Sparkles } from 'lucide-react';
+import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Info, Navigation, Cloud, Satellite, Wallet, History, Sparkles, Calculator, TrendingUp, Waves, ArrowRight } from 'lucide-react';
 import { getPlantingRecommendations } from '../services/ai';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
@@ -12,14 +12,16 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import { LiveExpertCall } from './LiveExpertCall';
+import CropLifecycleCalendar from './CropLifecycleCalendar';
 
 interface SmartPlantingProps {
   lang: Language;
   globalLocation: { latitude: number; longitude: number } | null;
   setGlobalLocation: (loc: { latitude: number; longitude: number }) => void;
+  onNavigateTab?: (tab: any, payload?: any) => void;
 }
 
-export default function SmartPlanting({ lang, globalLocation, setGlobalLocation }: SmartPlantingProps) {
+export default function SmartPlanting({ lang, globalLocation, setGlobalLocation, onNavigateTab }: SmartPlantingProps) {
   const t = translations[lang];
   const { canUse, canUsePremium, incrementUsage, incrementPremiumUsage, currentUsage, limit, tier, currentPremiumUsage, premiumLimit } = useUsageTracking('smart-planting');
   const { user } = useAuth();
@@ -531,6 +533,28 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                       <span>{rec.macroWarning}</span>
                     </div>
                   )}
+
+                  {/* Cross-Module Quick Actions */}
+                  {onNavigateTab && (
+                    <div className="mt-4 pt-3 border-t border-gray-200/80 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('krishi-profit', { crop: rec.crop })}
+                        className="flex items-center justify-center space-x-1.5 py-2.5 px-2 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-900 text-xs font-black rounded-xl border border-emerald-200/80 transition-all min-h-[44px] cursor-pointer shadow-2xs"
+                      >
+                        <Calculator className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="truncate">{lang === 'bn' ? 'ব্যয় ও লাভ' : 'Cost & Profit'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('market-connect', { produce: rec.crop })}
+                        className="flex items-center justify-center space-x-1.5 py-2.5 px-2 bg-amber-50 hover:bg-amber-100 active:scale-95 text-amber-900 text-xs font-black rounded-xl border border-amber-200/80 transition-all min-h-[44px] cursor-pointer shadow-2xs"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5 text-amber-700" />
+                        <span className="truncate">{lang === 'bn' ? 'বাজারদর' : 'Mandi Price'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -550,7 +574,17 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                       <AlertTriangle className="w-4 h-4 text-red-600" />
                       <h4 className="text-base font-bold text-red-900">{avoid.crop}</h4>
                     </div>
-                    <p className="text-xs text-red-700 leading-relaxed">{avoid.evidence}</p>
+                    <p className="text-xs text-red-700 leading-relaxed mb-2.5">{avoid.evidence}</p>
+                    {onNavigateTab && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigateTab('climate-resilience')}
+                        className="w-full flex items-center justify-center space-x-2 py-2 px-3 bg-white hover:bg-red-100/60 active:scale-95 text-red-800 text-xs font-black rounded-xl border border-red-200 transition-all min-h-[40px] shadow-2xs cursor-pointer"
+                      >
+                        <Waves className="w-3.5 h-3.5 text-red-600" />
+                        <span>{lang === 'bn' ? 'সহনশীল বিকল্প জাত খুঁজুন ➔' : 'Find Resilient Seeds ➔'}</span>
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -595,7 +629,36 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
               </div>
             )}
           </div>
+
+          {/* Integrated Crop Lifecycle & Spray Schedule */}
+          <div className="mt-6">
+            <CropLifecycleCalendar 
+              lang={lang} 
+              selectedCropKey={
+                results.recommended?.[0]?.crop?.toLowerCase().includes('rice') || results.recommended?.[0]?.crop?.toLowerCase().includes('paddy') || results.recommended?.[0]?.crop?.includes('ধান') ? 'paddy' :
+                results.recommended?.[0]?.crop?.toLowerCase().includes('potato') || results.recommended?.[0]?.crop?.includes('আলু') ? 'potato' :
+                results.recommended?.[0]?.crop?.toLowerCase().includes('tomato') || results.recommended?.[0]?.crop?.includes('টমেটো') ? 'tomato' :
+                results.recommended?.[0]?.crop?.toLowerCase().includes('onion') || results.recommended?.[0]?.crop?.includes('পেঁয়াজ') ? 'onion' :
+                'paddy'
+              }
+            />
+          </div>
         </motion.div>
+      )}
+
+      {/* Standalone Crop Lifecycle Calendar when results haven't run yet */}
+      {!results && (
+        <div className="mt-8 pt-8 border-t border-gray-200/80">
+          <div className="mb-4">
+            <h3 className="text-lg font-black text-gray-900">
+              {lang === 'bn' ? 'বাস্তবসম্মত ফসলের জীবনচক্র ও স্প্রে শিডিউল' : 'Interactive Crop Lifecycle & Spray Calendar'}
+            </h3>
+            <p className="text-xs text-gray-500">
+              {lang === 'bn' ? 'চারা রোপণের তারিখ অনুযায়ী প্রতিটি পর্যায়ের পানি, সার ও কীটনাশক স্প্রে ট্র্যাকিং।' : 'Track critical milestones, irrigation checkpoints, and spray schedules based on planting date.'}
+            </p>
+          </div>
+          <CropLifecycleCalendar lang={lang} />
+        </div>
       )}
     </div>
   );

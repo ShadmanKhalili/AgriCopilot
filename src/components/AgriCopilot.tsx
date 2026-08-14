@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { LiveExpertCall } from './LiveExpertCall';
+import DosageCalculator from './DosageCalculator';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 
@@ -46,6 +47,7 @@ interface Props {
   setPersistedAnalysisType?: (type: string) => void;
   persistedDescription?: string;
   setPersistedDescription?: (desc: string) => void;
+  onNavigateTab?: (tab: any, payload?: any) => void;
 }
 
 export default function AgriCopilot({ 
@@ -71,7 +73,8 @@ export default function AgriCopilot({
   persistedAnalysisType,
   setPersistedAnalysisType,
   persistedDescription,
-  setPersistedDescription
+  setPersistedDescription,
+  onNavigateTab
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
   const [cropStage, setCropStage] = useState(persistedCropStage || '');
@@ -872,6 +875,116 @@ export default function AgriCopilot({
                         </motion.div>
                       ) : (
                         <>
+                          {/* Cross-Module Deep-Links & Next Best Actions */}
+                          {onNavigateTab && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-green-950 rounded-[2.2rem] p-5 sm:p-6 text-white shadow-xl border border-emerald-800/80 mb-6 relative overflow-hidden"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center space-x-2.5">
+                                  <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
+                                    <Sparkles className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-display font-black text-xs uppercase tracking-widest text-white leading-tight">
+                                      {lang === 'bn' ? 'পরবর্তী প্রয়োজনীয় পদক্ষেপ ও সেবা' : 'Connected Agri-Tools & Next Steps'}
+                                    </h4>
+                                    <p className="text-[11px] text-emerald-300 font-medium">
+                                      {lang === 'bn' ? 'এই ফসলের জন্য সমন্বিত ডিজিটাল কৃষি সেবা' : 'Linked farmer tools for this crop diagnosis'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] bg-emerald-500 text-emerald-950 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm shrink-0">
+                                  {crop ? (t.crops[crop as keyof typeof t.crops] || crop) : (lang === 'bn' ? 'স্মার্ট সেবা' : 'Smart Action')}
+                                </span>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                {/* 1. Krishi Profit */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('krishi-profit', { crop: crop || 'potato' })}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-emerald-400 text-emerald-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Calculator className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'উৎপাদন ব্যয় ও লাভ' : 'Cost & Profit'}</span>
+                                      <ArrowRight className="w-3 h-3 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-emerald-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'ব্রেক-ইভেন ও খরচের হিসাব' : 'Estimate profit margin'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 2. Market Connect */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('market-connect', { produce: crop || 'tomato' })}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-amber-400 text-amber-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'পাইকারি বাজারদর' : 'Mandi Rates'}</span>
+                                      <ArrowRight className="w-3 h-3 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-amber-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'আড়তের লাইভ দর ও ট্রেন্ড' : 'Wholesale price trends'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 3. Climate Resilience */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('climate-resilience')}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-sky-400 text-sky-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Waves className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'সহনশীল জাত গাইড' : 'Resilient Seeds'}</span>
+                                      <ArrowRight className="w-3 h-3 text-sky-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-sky-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'বন্যা/খরা/লবণাক্ততা' : 'Flood/saline varieties'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 4. Satellite Health */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('crop-health')}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-teal-400 text-teal-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Satellite className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'স্যাটেলাইট স্ক্যান' : 'Satellite Scan'}</span>
+                                      <ArrowRight className="w-3 h-3 text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-teal-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'জমির NDVI স্বাস্থ্য সূচক' : 'Field vegetation index'}
+                                    </div>
+                                  </div>
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+
                           {/* 1. AI Suggestion (Diagnosis Text) */}
                           <motion.div 
                             initial={{ opacity: 0 }}
@@ -950,7 +1063,7 @@ export default function AgriCopilot({
                                 </div>
                               </div>
                             </div>
-                            
+
                             {/* TTS Audio Player or Generator */}
                             {!audioUrl ? (
                               <div className="mt-8 flex justify-center">
@@ -1235,16 +1348,25 @@ export default function AgriCopilot({
                                     </div>
                                   </div>
 
-                                  {/* Step 4: Advanced Treatment (Exact Dosages) */}
-                                  <div className="bg-emerald-600/95 backdrop-blur-md p-8 md:p-10 rounded-[3.5rem] shadow-2xl shadow-emerald-200/50 text-white relative overflow-hidden group">
-                                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                                    <h4 className="flex items-center text-[10px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
-                                      <ShieldAlert className="w-5 h-5 mr-3 text-white" />
-                                      {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা এবং সঠিক মাত্রা' : 'Advanced Treatment & Exact Dosages'}
-                                    </h4>
-                                    <div className="markdown-body text-white/95 text-[15px] font-medium leading-relaxed space-y-4">
-                                      <ReactMarkdown>{deepDiagnosis.advancedTreatment}</ReactMarkdown>
+                                  {/* Step 4: Advanced Treatment (Exact Dosages) & Precision Spray Engine */}
+                                  <div className="space-y-6">
+                                    <div className="bg-emerald-600/95 backdrop-blur-md p-8 md:p-10 rounded-[3.5rem] shadow-2xl shadow-emerald-200/50 text-white relative overflow-hidden group">
+                                      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                      <h4 className="flex items-center text-[10px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
+                                        <ShieldAlert className="w-5 h-5 mr-3 text-white" />
+                                        {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা এবং সঠিক মাত্রা' : 'Advanced Treatment & Exact Dosages'}
+                                      </h4>
+                                      <div className="markdown-body text-white/95 text-[15px] font-medium leading-relaxed space-y-4">
+                                        <ReactMarkdown>{deepDiagnosis.advancedTreatment}</ReactMarkdown>
+                                      </div>
                                     </div>
+
+                                    {/* Integrated Precision Spray & Knapsack Dosage Engine */}
+                                    <DosageCalculator 
+                                      lang={lang}
+                                      cropName={crop ? t.crops[crop as keyof typeof t.crops] || crop : 'Crop'}
+                                      treatmentText={deepDiagnosis.advancedTreatment || deepDiagnosis.detailedDiagnosis || diagnosis.diagnosis}
+                                    />
                                   </div>
 
                                   {/* Step 5: Timeline & Context */}

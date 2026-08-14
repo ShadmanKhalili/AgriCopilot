@@ -68,7 +68,7 @@ export const CURRENT_PDF_SCHEMES = [
     },
     crops: ["all"],
     districts: ["all"],
-    sourceLinks: ["http://service.moa.gov.bd/"]
+    sourceLinks: ["https://moa.gov.bd/"]
   },
   {
     id: "irrigation-scheme",
@@ -102,7 +102,7 @@ export const CURRENT_PDF_SCHEMES = [
     },
     crops: ["all"],
     districts: ["all"],
-    sourceLinks: ["http://service.moa.gov.bd/"]
+    sourceLinks: ["https://badc.gov.bd/"]
   },
   {
     id: "gov-paddy-procurement",

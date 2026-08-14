@@ -1,5 +1,9 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, ShieldCheck, Loader2 } from 'lucide-react';
+import { 
+  Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
+  UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
+  ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // Lazy load components
@@ -7,9 +11,10 @@ const AgriCopilot = lazy(() => import('./AgriCopilot'));
 const SmartGrade = lazy(() => import('./SmartGrade'));
 const SmartPlanting = lazy(() => import('./SmartPlanting'));
 const MarketConnect = lazy(() => import('./MarketConnect'));
+const KrishiProfitCalculator = lazy(() => import('./KrishiProfitCalculator'));
+const ClimateResilienceGuide = lazy(() => import('./ClimateResilienceGuide'));
 const WeatherAdvisory = lazy(() => import('./WeatherAdvisory'));
 const SatelliteHealth = lazy(() => import('./SatelliteHealth'));
-const MacroTrends = lazy(() => import('./MacroTrends'));
 const CommunityRadar = lazy(() => import('./CommunityRadar'));
 const GovSchemes = lazy(() => import('./GovSchemes'));
 const UserGuide = lazy(() => import('./UserGuide'));
@@ -24,8 +29,22 @@ import GoogleAd from './GoogleAd';
 import OfflineBanner from './OfflineBanner';
 import LegalModal from './LegalModal';
 import AuthModal from './AuthModal';
+import RegionModal from './RegionModal';
+import MobileBottomNav from './MobileBottomNav';
+import { useLocationName } from '../hooks/useLocationName';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'macro-trends' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile' | 'admin-dashboard';
+type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile' | 'admin-dashboard';
+
+type PillarKey = 'all' | 'health' | 'planning' | 'economics';
+
+interface TabItem {
+  id: Tab;
+  name: string;
+  icon: any;
+  description: string;
+  pillar: 'health' | 'planning' | 'economics' | 'account';
+  badge?: string;
+}
 
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
@@ -34,6 +53,8 @@ export default function Layout() {
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
+  const [selectedPillarFilter, setSelectedPillarFilter] = useState<PillarKey>('all');
   const [lang, setLang] = useState<Language>('bn');
 
   useEffect(() => {
@@ -50,374 +71,594 @@ export default function Layout() {
   const [agriCrop, setAgriCrop] = useState<string>('');
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
 
+  // Profit Calculator State Persistence & Cross-Navigation
+  const [profitCrop, setProfitCrop] = useState<string>('paddy_boro');
+
   // MarketConnect State Persistence
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
 
-  // Global Location State
-  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Global Location State (Default: Bogura Sadar, Rajshahi Division)
+  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>({
+    latitude: 24.8465,
+    longitude: 89.3777
+  });
 
-  const { user, userRole, isAuthReady, signIn, signOut } = useAuth();
+  const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
+    if (payload?.crop) {
+      const cropMap: Record<string, string> = {
+        'potato': 'potato',
+        'tomato': 'tomato',
+        'onion': 'onion',
+        'brinjal': 'brinjal',
+        'chili': 'chili',
+        'paddy': 'paddy_boro',
+        'rice': 'paddy_boro',
+        'paddy_boro': 'paddy_boro',
+        'paddy_aman': 'paddy_aman',
+        'maize': 'maize',
+        'wheat': 'wheat',
+        'mustard': 'mustard',
+        'jute': 'jute',
+      };
+      const targetCrop = cropMap[payload.crop.toLowerCase()] || payload.crop;
+      setProfitCrop(targetCrop);
+    }
+    if (payload?.produce) {
+      setMarketProduce(payload.produce.toLowerCase());
+    }
+    setActiveTab(tab);
+  };
 
+  const { locationName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
+  const { user, userRole, isAuthReady, signOut } = useAuth();
   const t = translations[lang];
 
-  const tabs: { id: Tab; name: string; icon: any; description: string }[] = [
-    { id: 'agri-copilot', name: t.agriCopilot, icon: Leaf, description: t.agriCopilotDesc },
-    { id: 'smart-planting', name: t.smartPlanting, icon: Sprout, description: t.smartPlantingDesc },
-    { id: 'weather-advisory', name: t.weatherAdvisory, icon: Cloud, description: t.weatherAdvisoryDesc },
-    { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc },
-    { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc },
-    { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc },
-    { id: 'community-radar', name: t.communityRadar, icon: Radar, description: t.communityRadarDesc },
-    { id: 'gov-schemes', name: t.govSchemes, icon: Landmark, description: t.govSchemesDesc },
-    { id: 'macro-trends', name: lang === 'bn' ? 'জাতীয় প্রবণতা' : 'National Trends', icon: BarChart3, description: lang === 'bn' ? 'বিশ্বব্যাংকের সামষ্টিক অর্থনৈতিক তথ্য' : 'World Bank Macro-Economic Data' },
-    { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc },
-    { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc },
-    ...( (userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') ? [{ id: 'admin-dashboard' as const, name: 'Admin Hub', icon: BarChart3, description: 'Protocol & Analytics' }] : []),
+  const tabs: TabItem[] = [
+    // Pillar 1: Crop Health & Doctor
+    { id: 'agri-copilot', name: t.agriCopilot, icon: Leaf, description: t.agriCopilotDesc, pillar: 'health', badge: 'AI' },
+    { id: 'weather-advisory', name: t.weatherAdvisory, icon: Cloud, description: t.weatherAdvisoryDesc, pillar: 'health' },
+    { id: 'crop-health', name: t.cropHealth, icon: Satellite, description: t.cropHealthDesc, pillar: 'health' },
+    { id: 'community-radar', name: t.communityRadar, icon: Radar, description: t.communityRadarDesc, pillar: 'health' },
+
+    // Pillar 2: Planning & Resilience
+    { id: 'smart-planting', name: t.smartPlanting, icon: Sprout, description: t.smartPlantingDesc, pillar: 'planning' },
+    { id: 'climate-resilience', name: t.climateResilience, icon: Waves, description: t.climateResilienceDesc, pillar: 'planning', badge: lang === 'bn' ? 'জাত' : 'Guide' },
+
+    // Pillar 3: Economics & Markets
+    { id: 'krishi-profit', name: t.krishiProfit, icon: Calculator, description: t.krishiProfitDesc, pillar: 'economics', badge: lang === 'bn' ? 'নতুন' : 'New' },
+    { id: 'market-connect', name: t.marketConnect, icon: TrendingUp, description: t.marketConnectDesc, pillar: 'economics' },
+    { id: 'smart-grade', name: t.smartGrade, icon: Award, description: t.smartGradeDesc, pillar: 'economics' },
+    { id: 'gov-schemes', name: t.govSchemes, icon: Landmark, description: t.govSchemesDesc, pillar: 'economics' },
+
+    // Account & Help
+    { id: 'user-guide', name: t.userGuide, icon: BookOpen, description: t.userGuideDesc, pillar: 'account' },
+    { id: 'profile', name: t.profile, icon: UserCircle, description: t.profileDesc, pillar: 'account' },
+    ...( (userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') ? [{ id: 'admin-dashboard' as const, name: 'Admin Hub', icon: BarChart3, description: 'Protocol & Analytics', pillar: 'account' as const }] : []),
   ];
 
+  const pillarCategories = [
+    { key: 'all' as PillarKey, label: lang === 'bn' ? 'সকল' : 'All' },
+    { key: 'health' as PillarKey, label: lang === 'bn' ? 'স্বাস্থ্য' : 'Health' },
+    { key: 'planning' as PillarKey, label: lang === 'bn' ? 'পরিকল্পনা' : 'Plan' },
+    { key: 'economics' as PillarKey, label: lang === 'bn' ? 'বাজার/লাভ' : 'Market' },
+  ];
+
+  const filteredTabs = selectedPillarFilter === 'all' 
+    ? tabs 
+    : tabs.filter(t => t.pillar === selectedPillarFilter || t.pillar === 'account');
+
   if (!isAuthReady) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-emerald-800">
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mb-3" />
+        <span className="text-xs font-black uppercase tracking-widest text-emerald-950">
+          {lang === 'bn' ? 'স্মার্ট কৃষি সেবা লোড হচ্ছে...' : 'Loading Smart Agri-Tools...'}
+        </span>
+      </div>
+    );
   }
 
   const toggleLanguage = () => {
     setLang(prev => prev === 'en' ? 'bn' : 'en');
   };
 
+  const activeTabDetails = tabs.find(tab => tab.id === activeTab);
+
   return (
     <>
       <OfflineBanner lang={lang} />
-      <div className="h-[100dvh] w-full bg-gray-50 flex flex-col md:flex-row font-sans overflow-hidden">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-green-700/90 backdrop-blur-md text-white p-4 flex justify-between items-center shadow-lg z-30 shrink-0 sticky top-0 border-b border-white/10">
-        <div className="flex items-center space-x-2">
-          <Leaf className="w-6 h-6 text-green-300" />
-          <span className="font-display font-black text-lg tracking-tighter uppercase">{t.agriCopilot}</span>
-        </div>
-        <div className="flex items-center space-x-3">
-          <button 
-            type="button"
-            onClick={toggleLanguage} 
-            className="flex items-center space-x-1 font-black text-[10px] bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/10 shadow-sm transition-all active:scale-95"
-          >
-            <Globe className="w-3.5 h-3.5 opacity-60" aria-hidden="true" />
-            <span>{lang === 'en' ? 'BN' : 'EN'}</span>
-          </button>
-          <button 
-            type="button"
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="p-1.5 bg-white/10 rounded-xl hover:bg-white/20 transition-all active:scale-95"
-          >
-            <Menu className="w-6 h-6" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
-      {/* Sidebar / Mobile Drawer */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <div 
-        id="sidebar-nav"
-        className={`
-          fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
-          w-80 bg-gradient-to-b from-green-900 via-green-800 to-emerald-900 text-white flex flex-col shadow-2xl z-50 h-full shrink-0
-        `}
-        role="navigation"
-        aria-label={lang === 'bn' ? 'প্রধান নেভিগেশন' : 'Main navigation'}
-      >
-        <div className="p-6 pb-4 flex items-center justify-between border-b border-white/5">
-          <div className="flex items-center space-x-4">
+      
+      <div className="h-[100dvh] w-full bg-[#F4F6F4] flex flex-col md:flex-row font-sans overflow-hidden">
+        
+        {/* ======================= SIDEBAR (DESKTOP & MOBILE DRAWER) ======================= */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
             <motion.div 
-              whileHover={{ rotate: 15 }}
-              className="bg-white/10 p-2.5 rounded-2xl backdrop-blur-md border border-white/20 shadow-lg"
-              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <div 
+          id="sidebar-nav"
+          className={`
+            fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+            md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
+            w-80 bg-gradient-to-b from-emerald-950 via-emerald-900 to-green-950 text-white flex flex-col shadow-2xl z-50 h-full shrink-0 border-r border-emerald-800/40
+          `}
+          role="navigation"
+          aria-label={lang === 'bn' ? 'প্রধান নেভিগেশন' : 'Main navigation'}
+        >
+          {/* Brand Header */}
+          <div className="p-5 pb-4 flex items-center justify-between border-b border-white/10 bg-black/10">
+            <div className="flex items-center space-x-3">
+              <motion.div 
+                whileHover={{ rotate: 12, scale: 1.05 }}
+                className="bg-gradient-to-tr from-emerald-400 to-green-500 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/20 text-emerald-950"
+                aria-hidden="true"
+              >
+                <Leaf className="w-6 h-6 stroke-[2.5]" />
+              </motion.div>
+              <div className="flex flex-col">
+                <span className="font-display font-black text-xl tracking-tight leading-none text-white">
+                  {lang === 'bn' ? 'স্মার্ট কৃষি-সেবা' : 'Smart Agri-Tools'}
+                </span>
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className="text-[9px] font-mono font-bold text-emerald-300 tracking-[0.1em] opacity-70 uppercase">
+                    AI-Studio Krishi
+                  </span>
+                  {(userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
+                    <span className="text-[8px] bg-yellow-400 text-gray-900 font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                      Admin
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              type="button"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden p-2 bg-white/10 rounded-xl hover:bg-white/20 text-white/80 focus:outline-none"
             >
-              <Leaf className="w-8 h-8 text-green-400" />
-            </motion.div>
-            <div className="flex flex-col">
-              <span className="font-display font-black text-2xl tracking-tighter uppercase italic leading-none">{t.agriCopilot}</span>
-              <div className="flex items-center space-x-2 mt-1">
-                <span className="text-[10px] font-mono font-bold text-green-300 tracking-[0.1em] opacity-40 uppercase">v3.0-Live</span>
-                {(userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
-                  <div className="inline-flex items-center space-x-1.5 bg-yellow-400 text-gray-900 px-2 py-0.5 mt-0.5 rounded-full border border-yellow-300 shadow-lg shadow-yellow-400/20">
-                    <div className="w-1.5 h-1.5 bg-gray-900 rounded-full animate-pulse"></div>
-                    <span className="text-[8px] font-black uppercase tracking-widest">Admin Active</span>
+              <X className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Pillar Category Filter Tabs (Quick Filter) */}
+          <div className="px-3 pt-3 pb-1">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-emerald-950/80 rounded-2xl border border-emerald-800/40">
+              {pillarCategories.map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => setSelectedPillarFilter(cat.key)}
+                  className={`py-1.5 px-1 text-[10px] font-black rounded-xl transition-all truncate text-center ${
+                    selectedPillarFilter === cat.key
+                      ? 'bg-emerald-500 text-emerald-950 shadow-sm'
+                      : 'text-emerald-300/80 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Tabs Navigation List */}
+          <nav 
+            className="flex-1 px-3 py-2 space-y-1.5 overflow-y-auto custom-scrollbar"
+            role="tablist"
+            aria-orientation="vertical"
+          >
+            {filteredTabs.map((tab, index) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <motion.button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.02, duration: 0.2 }}
+                  aria-selected={isActive}
+                  aria-controls={`panel-${tab.id}`}
+                  id={`tab-${tab.id}`}
+                  whileHover={{ x: 3 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all duration-150 text-left relative overflow-hidden group outline-none ${
+                    isActive 
+                      ? 'bg-white text-emerald-950 shadow-xl shadow-emerald-950/30' 
+                      : 'text-emerald-100 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div 
+                      layoutId="activeSidebarTabBg"
+                      className="absolute inset-0 bg-white"
+                      transition={{ type: "spring", bounce: 0, duration: 0.2 }}
+                    />
+                  )}
+                  
+                  <div className="relative z-10 flex items-center space-x-3 min-w-0">
+                    <div className={`p-2 rounded-xl transition-colors shrink-0 ${
+                      isActive 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : 'bg-emerald-900/60 text-emerald-300 group-hover:bg-white/15'
+                    }`}>
+                      <Icon className="w-4 h-4" aria-hidden="true" />
+                    </div>
+                    <div className="truncate">
+                      <div className="font-black text-xs uppercase tracking-wider truncate">{tab.name}</div>
+                      <div className={`text-[10px] font-bold uppercase tracking-wider truncate opacity-70 ${isActive ? 'text-emerald-800' : 'text-emerald-300'}`}>
+                        {tab.description}
+                      </div>
+                    </div>
+                  </div>
+
+                  {tab.badge && (
+                    <span className={`relative z-10 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ml-1 ${
+                      isActive 
+                        ? 'bg-emerald-800 text-white' 
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </nav>
+          
+          {/* Sidebar Footer: DAE Hotline & Auth */}
+          <div className="p-3.5 border-t border-white/10 bg-black/15 space-y-2.5 shrink-0">
+            {/* Quick DAE Toll-Free Call Box */}
+            <a 
+              href="tel:16123"
+              className="flex items-center justify-between p-2.5 bg-emerald-900/50 hover:bg-emerald-900/80 rounded-2xl border border-emerald-700/40 text-emerald-200 text-xs transition-colors group"
+            >
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1.5 bg-emerald-500 text-emerald-950 rounded-xl group-hover:scale-105 transition-transform">
+                  <PhoneCall className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <div className="font-black text-[11px] text-white leading-tight">
+                    {lang === 'bn' ? 'কৃষি কল সেন্টার' : 'Krishi Call Center'}
+                  </div>
+                  <div className="text-[10px] text-emerald-300 font-mono font-bold">16123 (বিনামূল্যে)</div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </a>
+
+            {/* Auth Button */}
+            {user ? (
+              <div className="flex items-center justify-between bg-white/5 p-2 rounded-2xl border border-white/10">
+                <button 
+                  onClick={() => {
+                    setActiveTab('profile');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center space-x-2.5 text-left flex-1 hover:bg-white/5 p-1 rounded-xl transition-all"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center font-black text-white text-xs shadow-md">
+                    {user.displayName?.charAt(0) || 'U'}
+                  </div>
+                  <div className="text-xs truncate">
+                    <div className="font-black tracking-tight truncate max-w-[90px] text-white">
+                      {user.displayName}
+                    </div>
+                    <div className="text-emerald-400 text-[9px] font-bold uppercase tracking-wider">{userRole}</div>
+                  </div>
+                </button>
+                <button 
+                  onClick={signOut} 
+                  className="p-2 hover:bg-red-500/20 rounded-xl text-emerald-300 hover:text-red-400 transition-all" 
+                  title={t.signOut}
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="w-full flex items-center justify-center space-x-2 bg-white text-emerald-950 font-black py-2.5 px-4 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all shadow-md text-xs uppercase tracking-wider"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>{t.signIn}</span>
+              </button>
+            )}
+
+            <div className="text-center pt-0.5">
+              <button 
+                onClick={() => setIsLegalOpen(true)}
+                className="text-[9px] text-emerald-300/60 hover:text-emerald-300 underline underline-offset-2 uppercase tracking-wider transition-colors"
+              >
+                {lang === 'bn' ? 'গোপনীয়তা ও শর্তাবলী' : 'Privacy & Terms'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================= MAIN CONTENT AREA ======================= */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
+          
+          {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
+          <header className="bg-white border-b border-gray-200/80 px-3 sm:px-4 md:px-6 py-2.5 flex items-center justify-between z-20 shrink-0 shadow-xs">
+            {/* Left: Mobile Menu Toggle & Active Module Info */}
+            <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+              <button 
+                type="button"
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl transition-all active:scale-95 shrink-0"
+                aria-label="Open Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center space-x-2 truncate">
+                {activeTabDetails && (
+                  <div className="flex items-center space-x-2">
+                    <div className="hidden sm:flex p-1.5 bg-emerald-50 text-emerald-700 rounded-xl">
+                      <activeTabDetails.icon className="w-4 h-4" />
+                    </div>
+                    <span className="font-black text-sm sm:text-base text-gray-900 tracking-tight truncate">
+                      {activeTabDetails.name}
+                    </span>
                   </div>
                 )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button 
-              type="button"
-              onClick={toggleLanguage} 
-              className="md:flex hidden text-green-200/60 hover:text-white transition-all p-2 hover:bg-white/10 rounded-xl focus:outline-none"
-              title="Toggle Language"
-            >
-              <Globe className="w-5 h-5" aria-hidden="true" />
-            </button>
-            <button 
-              type="button"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden p-2 bg-white/5 rounded-xl hover:bg-white/10 focus:outline-none"
-            >
-              <X className="w-6 h-6" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        
-        <nav 
-          className="flex-1 px-3 py-4 space-y-2 overflow-y-auto custom-scrollbar"
-          role="tablist"
-          aria-orientation="vertical"
-        >
-          {tabs.map((tab, index) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <motion.button
-                key={tab.id}
-                type="button"
-                role="tab"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05, duration: 0.3 }}
-                aria-selected={isActive}
-                aria-controls={`panel-${tab.id}`}
-                id={`tab-${tab.id}`}
-                whileHover={{ x: 5 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`w-full flex items-center space-x-4 px-4 py-2.5 mt-0.5 rounded-[20px] transition-all duration-200 text-left relative overflow-hidden group focus:ring-2 focus:ring-white/50 outline-none ${
-                  isActive 
-                    ? 'bg-white text-green-900 shadow-xl shadow-green-950/20' 
-                    : 'text-green-100 hover:bg-white/10'
-                }`}
-              >
-                {isActive && (
-                  <motion.div 
-                    layoutId="activeTabBg"
-                    className="absolute inset-0 bg-white"
-                    transition={{ type: "spring", bounce: 0, duration: 0.2 }}
-                  />
-                )}
-                <div className="relative z-10 flex items-center space-x-4">
-                  <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-green-100 text-green-700' : 'bg-white/5 text-green-300 group-hover:bg-white/10'}`}>
-                    <Icon className="w-5 h-5" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <div className="font-black text-sm uppercase tracking-wider">{tab.name}</div>
-                    <div className={`text-[10px] font-bold uppercase tracking-widest opacity-60 mt-0.5 ${isActive ? 'text-green-800' : 'text-green-200'}`}>
-                      {tab.description}
-                    </div>
-                  </div>
-                </div>
-              </motion.button>
-            );
-          })}
-        </nav>
-        
-        <div className="p-6 border-t border-white/10 space-y-6 pb-10 md:pb-8">
-          {/* Auth Section */}
-          {user ? (
-            <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/10">
+
+            {/* Right: Universal Location Chip, Language Toggle & Actions */}
+            <div className="flex items-center space-x-1.5 sm:space-x-2.5">
+              
+              {/* Universal Location Chip with 1-Click Switcher */}
+              <Tooltip content={lang === 'bn' ? 'উপজেলা বা জেলা পরিবর্তন করুন' : 'Click to change District / Upazila'}>
+                <button
+                  type="button"
+                  onClick={() => setIsRegionModalOpen(true)}
+                  className="flex items-center space-x-1.5 bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-900 border border-emerald-200/60 px-2.5 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs group"
+                >
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                  </span>
+                  <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span className="text-xs font-black truncate max-w-[100px] sm:max-w-[160px]">
+                    {isLocNameLoading ? (
+                      <span className="opacity-60">{lang === 'bn' ? 'খোঁজা হচ্ছে...' : 'Locating...'}</span>
+                    ) : (
+                      locationName || (lang === 'bn' ? 'বগুড়া সদর' : 'Bogura Sadar')
+                    )}
+                  </span>
+                </button>
+              </Tooltip>
+
+              {/* Language Switcher Pill */}
               <button 
-                onClick={() => setActiveTab('profile')}
-                className="flex items-center space-x-3 text-left flex-1 hover:bg-white/5 p-1 rounded-xl transition-all group"
+                type="button"
+                onClick={toggleLanguage} 
+                className="flex items-center space-x-1 font-black text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 py-1.5 rounded-xl border border-gray-200 transition-all active:scale-95"
+                title="Toggle Language"
               >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center font-black text-white shadow-lg border border-white/20 group-hover:scale-105 transition-transform">
-                  {user.displayName?.charAt(0) || 'U'}
-                </div>
-                <div className="text-sm">
-                  <div className="font-black tracking-tight truncate max-w-[100px] flex items-center gap-1.5">
-                    {user.displayName}
-                    {userRole === 'admin' && <ShieldCheck className="w-3 h-3 text-blue-400" />}
-                  </div>
-                  <div className="text-green-400 text-[10px] font-bold uppercase tracking-widest">{userRole}</div>
-                </div>
+                <Globe className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
+                <span>{lang === 'en' ? 'বাংলা' : 'EN'}</span>
               </button>
-              <motion.button 
-                whileHover={{ rotate: 90 }}
-                onClick={signOut} 
-                className="p-2.5 hover:bg-red-500/20 rounded-xl text-green-300 hover:text-red-400 transition-all border border-transparent hover:border-red-500/30" 
-                title={t.signOut}
-              >
-                <LogOut className="w-5 h-5" />
-              </motion.button>
+
+              {/* Profile or Sign-in Quick Pill */}
+              {user ? (
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all"
+                  title="Profile"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center">
+                    {user.displayName?.charAt(0) || 'U'}
+                  </div>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="hidden sm:inline-flex items-center space-x-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl transition-all shadow-xs"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>{t.signIn}</span>
+                </button>
+              )}
             </div>
-          ) : (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setIsAuthModalOpen(true)}
-              className="w-full flex items-center justify-center space-x-3 bg-white text-green-900 font-black py-4 px-6 rounded-2xl hover:bg-green-50 transition-all shadow-xl shadow-green-950/20 text-sm uppercase tracking-widest"
-            >
-              <LogIn className="w-5 h-5" />
-              <span>{t.signIn}</span>
-            </motion.button>
-          )}
-          <div className="text-center pt-2">
-            <button 
-              onClick={() => setIsLegalOpen(true)}
-              className="text-[10px] text-green-300/60 hover:text-green-300 underline underline-offset-2 uppercase tracking-wider transition-colors"
-            >
-              {lang === 'bn' ? 'গোপনীয়তা নীতি ও শর্তাবলী' : 'Privacy Policy & Terms'}
-            </button>
-          </div>
+          </header>
+
+          {/* ================= SCROLLABLE MAIN CONTENT ================= */}
+          <main className="flex-1 p-2.5 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] pb-24 md:pb-6">
+            
+            {/* Background Texture Grid */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+              <div 
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.025] pointer-events-none" 
+                style={{ backgroundImage: 'radial-gradient(#064e3b 0.6px, transparent 0.6px)', backgroundSize: '24px 24px' }}
+              />
+            </div>
+
+            <div className="relative z-10 min-h-full flex flex-col w-full max-w-7xl mx-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  className="flex-1 flex flex-col"
+                >
+                  <Suspense fallback={
+                    <div className="flex-1 flex flex-col items-center justify-center p-20 text-emerald-700/60">
+                      <Loader2 className="w-10 h-10 animate-spin mb-3 text-emerald-600" />
+                      <div className="font-display font-black text-xs uppercase tracking-widest text-emerald-950">
+                        {lang === 'bn' ? 'টুল প্রস্তুত করা হচ্ছে...' : 'Loading Tool Module...'}
+                      </div>
+                    </div>
+                  }>
+                    <div className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('agri-copilot') && (
+                        <AgriCopilot 
+                          lang={lang} 
+                          globalLocation={globalLocation}
+                          setGlobalLocation={setGlobalLocation}
+                          persistedImages={agriImages}
+                          setPersistedImages={setAgriImages}
+                          persistedDiagnosis={agriDiagnosis}
+                          setPersistedDiagnosis={setAgriDiagnosis}
+                          persistedChatMessages={agriChatMessages}
+                          setPersistedChatMessages={setAgriChatMessages}
+                          persistedChatSession={agriChatSession}
+                          setPersistedChatSession={setAgriChatSession}
+                          persistedAudioUrl={agriAudioUrl}
+                          setPersistedAudioUrl={setAgriAudioUrl}
+                          persistedCropStage={agriCropStage}
+                          setPersistedCropStage={setAgriCropStage}
+                          persistedCrop={agriCrop}
+                          setPersistedCrop={setAgriCrop}
+                          persistedAnalysisType={agriAnalysisType}
+                          setPersistedAnalysisType={setAgriAnalysisType}
+                          onNavigateTab={handleNavigateTab}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('weather-advisory') && (
+                        <WeatherAdvisory 
+                          lang={lang} 
+                          globalLocation={globalLocation}
+                          setGlobalLocation={setGlobalLocation}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'krishi-profit' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('krishi-profit') && (
+                        <KrishiProfitCalculator 
+                          lang={lang} 
+                          initialCrop={profitCrop}
+                          onCropSelect={setProfitCrop}
+                          onNavigateTab={handleNavigateTab}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'climate-resilience' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('climate-resilience') && (
+                        <ClimateResilienceGuide 
+                          lang={lang} 
+                          onNavigateTab={handleNavigateTab}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('crop-health') && (
+                        <SatelliteHealth 
+                          lang={lang} 
+                          globalLocation={globalLocation}
+                          setGlobalLocation={setGlobalLocation}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
+                    </div>
+                    <div className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('smart-planting') && (
+                        <SmartPlanting 
+                          lang={lang} 
+                          globalLocation={globalLocation}
+                          setGlobalLocation={setGlobalLocation}
+                          onNavigateTab={handleNavigateTab}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('market-connect') && (
+                        <MarketConnect 
+                          lang={lang} 
+                          persistedInsights={marketInsights}
+                          setPersistedInsights={setMarketInsights}
+                          persistedProduce={marketProduce}
+                          setPersistedProduce={setMarketProduce}
+                          onNavigateTab={handleNavigateTab}
+                        />
+                      )}
+                    </div>
+                    <div className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
+                    </div>
+                    <div className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
+                    </div>
+                    <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
+                    </div>
+                    <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
+                    </div>
+                    <div className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('admin-dashboard') && <AdminDashboard lang={lang} />}
+                    </div>
+                  </Suspense>
+                </motion.div>
+              </AnimatePresence>
+
+              <GoogleAd lang={lang} className="mt-10 mb-2" />
+            </div>
+          </main>
+
+          {/* ================= SLEEK MOBILE BOTTOM ACTION BAR ================= */}
+          <MobileBottomNav 
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            lang={lang}
+            onOpenAllTools={() => setIsMobileMenuOpen(true)}
+          />
         </div>
+
+        {/* ================= MODALS ================= */}
+        {/* Universal Region / District Selector */}
+        <RegionModal
+          isOpen={isRegionModalOpen}
+          onClose={() => setIsRegionModalOpen(false)}
+          lang={lang}
+          globalLocation={globalLocation}
+          setGlobalLocation={setGlobalLocation}
+          currentLocationName={locationName}
+        />
+
+        {/* Pricing Modal */}
+        <PricingModal 
+          isOpen={isPricingOpen} 
+          onClose={() => setIsPricingOpen(false)} 
+          lang={lang} 
+        />
+
+        {/* Legal Modal */}
+        <LegalModal
+          isOpen={isLegalOpen}
+          onClose={() => setIsLegalOpen(false)}
+          lang={lang}
+        />
+
+        {/* Auth Modal */}
+        <AuthModal 
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          lang={lang}
+        />
       </div>
-
-      {/* Main Content */}
-      <main className="flex-1 p-2 sm:p-3 md:p-4 lg:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F7F5]">
-        {/* Background Decorative Elements */}
-        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#141414 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}></div>
-        </div>
-
-        <div className="relative z-10 min-h-full flex flex-col w-full">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="flex-1 flex flex-col"
-            >
-              <Suspense fallback={
-                <div className="flex-1 flex flex-col items-center justify-center p-20 text-green-700/40">
-                  <Loader2 className="w-12 h-12 animate-spin mb-4" />
-                  <div className="font-display font-black text-xs uppercase tracking-widest leading-none">Initializing Module...</div>
-                </div>
-              }>
-                <div className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('agri-copilot') && (
-                    <AgriCopilot 
-                      lang={lang} 
-                      globalLocation={globalLocation}
-                      setGlobalLocation={setGlobalLocation}
-                      persistedImages={agriImages}
-                      setPersistedImages={setAgriImages}
-                      persistedDiagnosis={agriDiagnosis}
-                      setPersistedDiagnosis={setAgriDiagnosis}
-                      persistedChatMessages={agriChatMessages}
-                      setPersistedChatMessages={setAgriChatMessages}
-                      persistedChatSession={agriChatSession}
-                      setPersistedChatSession={setAgriChatSession}
-                      persistedAudioUrl={agriAudioUrl}
-                      setPersistedAudioUrl={setAgriAudioUrl}
-                      persistedCropStage={agriCropStage}
-                      setPersistedCropStage={setAgriCropStage}
-                      persistedCrop={agriCrop}
-                      setPersistedCrop={setAgriCrop}
-                      persistedAnalysisType={agriAnalysisType}
-                      setPersistedAnalysisType={setAgriAnalysisType}
-                    />
-                  )}
-                </div>
-                <div className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('weather-advisory') && (
-                    <WeatherAdvisory 
-                      lang={lang} 
-                      globalLocation={globalLocation}
-                      setGlobalLocation={setGlobalLocation}
-                    />
-                  )}
-                </div>
-                <div className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('crop-health') && (
-                    <SatelliteHealth 
-                      lang={lang} 
-                      globalLocation={globalLocation}
-                      setGlobalLocation={setGlobalLocation}
-                    />
-                  )}
-                </div>
-                <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
-                </div>
-                <div className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('smart-planting') && (
-                    <SmartPlanting 
-                      lang={lang} 
-                      globalLocation={globalLocation}
-                      setGlobalLocation={setGlobalLocation}
-                    />
-                  )}
-                </div>
-                <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
-                  {visitedTabs.has('market-connect') && (
-                    <MarketConnect 
-                      lang={lang} 
-                      persistedInsights={marketInsights}
-                      setPersistedInsights={setMarketInsights}
-                      persistedProduce={marketProduce}
-                      setPersistedProduce={setMarketProduce}
-                    />
-                  )}
-                </div>
-                <div className={activeTab === 'macro-trends' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('macro-trends') && <MacroTrends lang={lang} />}
-                </div>
-                <div className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
-                </div>
-                <div className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
-                </div>
-                <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
-                </div>
-                <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
-                </div>
-                <div className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
-                   {visitedTabs.has('admin-dashboard') && <AdminDashboard lang={lang} />}
-                </div>
-              </Suspense>
-            </motion.div>
-          </AnimatePresence>
-
-          <GoogleAd lang={lang} className="mt-12 mb-4" />
-        </div>
-      </main>
-      
-      {/* Pricing Modal */}
-      <PricingModal 
-        isOpen={isPricingOpen} 
-        onClose={() => setIsPricingOpen(false)} 
-        lang={lang} 
-      />
-
-      {/* Legal Modal */}
-      <LegalModal
-        isOpen={isLegalOpen}
-        onClose={() => setIsLegalOpen(false)}
-        lang={lang}
-      />
-
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        lang={lang}
-      />
-    </div>
     </>
   );
 }
