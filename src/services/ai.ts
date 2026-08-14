@@ -246,13 +246,17 @@ export const deepDiagnoseCrop = async (
 ) => {
   return await callAiWithRetry(async () => {
     try {
+      const now = new Date();
+      const currentDateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const currentYear = now.getFullYear();
       const locationContext = coords 
-        ? `Location: ${coords.latitude}, ${coords.longitude} (Bangladesh).` 
-        : `Location: Bangladesh.`;
+        ? `GPS Coordinates: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
+        : `Location: Bangladesh agricultural regions.`;
 
       const userNoteContext = description ? `\nUSER'S ADDITIONAL NOTES/DESCRIPTION: "${description}"\n` : '';
 
       const prompt = `You are a SENIOR AGRICULTURAL PATHOLOGIST and INDEPENDENT DIAGNOSTIC AUDITOR.
+      CURRENT DATE & SEASON: ${currentDateStr} (Year: ${currentYear}).
       
       A user has uploaded images of a ${crop || 'plant'} plant at the ${cropStage || 'unknown'} stage in ${locationContext}.
       ${userNoteContext}
@@ -271,13 +275,13 @@ export const deepDiagnoseCrop = async (
       - If the preliminary claim ("${basicDiagnosis.diagnosis}") is correct, identify the "Technical Signature" (the specific visual mark) that confirms it beyond doubt.
       - If it is incorrect, provide the logical proof for the correction.
       
-      STEP 2: GROUNDING & CONTEXT
-      - Use GOOGLE SEARCH to cross-reference these symptoms with current climate and disease outbreaks in Bangladesh for ${crop}.
-      - Check if the humidity and temperature in ${locationContext} currently support the suspected pathogen.
+      STEP 2: SEARCH GROUNDING & REGIONAL OUTBREAK CONTEXT
+      - Use GOOGLE SEARCH to cross-reference these symptoms with active disease outbreaks, monsoon/climate advisories, and agricultural research bulletins in Bangladesh for ${crop || 'crop'} (targeting reports from DAE, BARI, BRRI, or AIS Bangladesh for ${currentYear}).
+      - Check if regional seasonal weather and humidity in ${locationContext} currently support the suspected pathogen.
       
       STEP 3: FINAL EXPERT VERDICT
       - Provide a final diagnosis with high physiological certainty.
-      - Give EXACT dosages for local brands (ACI, Syngenta, etc.).
+      - Give EXACT dosages for approved local brands in Bangladesh (ACI, Syngenta, Auto Crop Care, etc.).
       - Provide a specific PHI (Pre-Harvest Interval).
 
       CRITICAL: Translate all fields to ${lang === 'bn' ? 'Bangla' : 'English'}.
@@ -577,23 +581,24 @@ export const getMarketInsights = async (
 ) => {
   return await callAiWithRetry(async () => {
     try {
-      const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const today = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const currentYear = now.getFullYear();
       const locationContext = coords 
-        ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
-        : `Location: Unknown (Please advise based on general Bangladesh market trends).`;
+        ? `Precise GPS Location: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
+        : `Location: Bangladesh wholesale markets (Aarong, Karwan Bazar, Shyambazar, Khatunganj, Mohasthan).`;
 
-      const prompt = `Use Google Search to find the LATEST wholesale market price for ${produce} in Bangladesh for TODAY (${today}). 
+      const prompt = `Use Google Search to find the LATEST wholesale market prices and mandi rates for ${produce} in Bangladesh for TODAY (${today}, Year: ${currentYear}). 
       ${locationContext}
-      Search for official market reports, news articles, or agricultural bulletins from ${currentYear}.
-      If ${currentYear} data is absolutely unavailable, use data from ${currentYear - 1}.
+      Search for official Department of Agricultural Marketing (DAM), trading bulletins, agricultural market news, or wholesale mandi updates in Bangladesh for ${currentYear}.
+      If ${currentYear} data is absolutely unavailable, use the most recent data from ${currentYear - 1}.
       
-      CRITICAL: All prices must be in BDT (Taka) and per KG (Kilogram). If you find prices in Maunds (40kg), convert them to per KG.
+      CRITICAL: All prices must be in BDT (Taka) and per KG (Kilogram). If you find prices in Maunds (40kg), convert them accurately to per KG.
       
       RESPONSE FORMAT:
       - Respond in JSON format.
       - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - 'priceDrivers': array of 3-5 strings explaining the key factors currently affecting the price of this produce (e.g., "Recent heavy rains in northern districts", "High transport costs").
+      - 'priceDrivers': array of 3-5 strings explaining the key factors currently affecting the price of this produce (e.g., "Recent heavy rains in northern districts", "High transport costs", "Post-Eid supply shift").
       - 'nearestMarkets': array of objects with 'name' and 'distance'.
       - Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown in 'insights'.`;
       
@@ -657,9 +662,10 @@ export const findGovernmentSchemes = async (
 ) => {
   return await callAiWithRetry(async () => {
     try {
-      const currentYear = new Date().getFullYear();
-      const prompt = `Use Google Search to find the LATEST agricultural subsidies, government schemes, or low-interest loans available for farmers in ${location}, Bangladesh, specifically for ${crop} farming or general agriculture in ${currentYear}.
-      Focus on programs from the Department of Agricultural Extension (DAE), Bangladesh Bank, or Ministry of Agriculture.
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const prompt = `Use Google Search to find the LATEST active agricultural subsidies, government incentive schemes, input support programs, or low-interest agricultural loans for farmers in ${location || 'Bangladesh'}, specifically for ${crop || 'crops'} or general farming in ${currentYear}.
+      Focus on official circulars from the Department of Agricultural Extension (DAE), Bangladesh Krishi Bank, Rajshahi Krishi Unnayan Bank, Bangladesh Bank Agricultural Credit Department, or Ministry of Agriculture (moa.gov.bd).
       
       RESPONSE FORMAT:
       - Respond in JSON format.
