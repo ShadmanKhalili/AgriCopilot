@@ -244,7 +244,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
               processorRef.current = processor;
 
               processor.onaudioprocess = (e) => {
-                if (isMuted) return;
+                if (isMutedRef.current) return;
                 
                 const inputData = e.inputBuffer.getChannelData(0);
                 const pcm16 = new Int16Array(inputData.length);
@@ -396,7 +396,16 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   }, []);
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    setIsMuted(prev => {
+      const next = !prev;
+      isMutedRef.current = next;
+      if (streamRef.current) {
+        streamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = !next;
+        });
+      }
+      return next;
+    });
   };
 
   return (

@@ -603,8 +603,20 @@ export default function AgriCopilot({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 w-full"
     >
-      {/* Ultra-Compact Main Header */}
+      {/* Ultra-Compact Main Header with Predictive Glow */}
       <div className="bg-white rounded-[24px] p-3 md:p-5 shadow-sm border border-gray-100 mb-4 relative overflow-hidden group w-full">
+        {/* Predictive UI Glow Layer */}
+        <motion.div 
+          animate={{ 
+            x: [0, 100, 0, -100, 0],
+            y: [0, -50, 0, 50, 0],
+            scale: [1, 1.2, 1, 0.8, 1],
+            opacity: [0.1, 0.2, 0.1]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-1/2 -left-1/2 w-full h-full bg-green-400 blur-[100px] pointer-events-none"
+        />
+        
         <div className="flex items-center justify-between gap-4 relative z-10">
           <div className="flex items-center space-x-3 md:space-x-5">
             <div className="bg-green-600 p-2 md:p-3 rounded-xl shadow-lg shadow-green-100 flex-shrink-0">
@@ -744,8 +756,16 @@ export default function AgriCopilot({
               onClick={handleDiagnose}
               disabled={images.length === 0 || isLoading || !isOnline}
               aria-busy={isLoading}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none"
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none relative overflow-hidden"
             >
+              {isLoading && (
+                <motion.div 
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                  className="absolute inset-0 bg-white/20 skew-x-12"
+                />
+              )}
               {isLoading ? (
                 <>
                   <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
@@ -762,14 +782,17 @@ export default function AgriCopilot({
           </div>
         </motion.div>
 
-        {/* Results Section */}
+        {/* Results Section with Perceptual Morphing */}
         <div className="space-y-6 w-full">
           <AnimatePresence mode="wait">
             {diagnosis ? (
               <motion.div 
                 key="result"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
+                layout
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 p-1 rounded-[40px] shadow-2xl shadow-green-200 h-full"
               >
                 <div className="bg-white/95 backdrop-blur-xl rounded-[36px] p-5 md:p-8 h-full flex flex-col relative overflow-hidden">

@@ -79,13 +79,13 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.1-flash-lite-preview' : 'gemini-3.1-flash-lite-preview';
-const BACKUP_MODEL = 'gemini-3.1-flash-lite-preview';
-const SEARCH_MODEL = 'gemini-3.1-flash-lite-preview';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.5-flash-lite' : 'gemini-3.5-flash-lite';
+const BACKUP_MODEL = 'gemini-3.5-flash-lite';
+const SEARCH_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
 export const LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
-const CHAT_MODEL = 'gemini-3.1-flash-lite-preview';
+const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
   for (let i = 0; i < retries; i++) {
@@ -119,7 +119,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   const fallbacks = [
     primaryModel,
     customBackupModel || BACKUP_MODEL,
-    'gemini-3.1-flash-lite-preview',
+    'gemini-3.5-flash-lite',
     'gemini-3-flash-preview'
   ];
   
@@ -326,11 +326,10 @@ export const deepDiagnoseCrop = async (
       const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
       contents.push({ parts: [{ text: prompt }] });
 
-      // Always use SEARCH_MODEL (flash-preview) for search grounding
       const response = await generateContent({
         contents,
         config,
-        model: SEARCH_MODEL
+        model: 'gemini-3.7-flash'
       });
       
       if (!response.text) {
