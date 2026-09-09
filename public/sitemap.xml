@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="bn" href="https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/?lang=bn" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/?lang=en" />
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#copilot</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#smart-grade</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#market-connect</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#weather</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#gov-schemes</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#calculator</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/#smart-planting</loc>
+    <lastmod>2026-09-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>

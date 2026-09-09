@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import toast from 'react-hot-toast';
 import { LiveExpertCall } from './LiveExpertCall';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
 
@@ -70,7 +71,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
   const handleAnalyze = async () => {
     if (!isOnline) {
-      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      toast.error(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
       return;
     }
 

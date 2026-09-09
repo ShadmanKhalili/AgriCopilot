@@ -11,6 +11,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 
@@ -79,13 +80,13 @@ export default function MarketConnect({
       setIsDetectingLocation(false);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
       if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      alert(msg);
+      toast.error(msg);
     }
   };
 
   const handleGetInsights = async () => {
     if (!canUse()) {
-      alert(t.limitReached);
+      toast.error(t.limitReached);
       return;
     }
 

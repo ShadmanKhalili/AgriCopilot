@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock, Bot, X, Send } from 'lucide-react';
+import { translations, Language } from '../utils/translations';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from './AuthProvider';
+import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
+import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
+import ReactMarkdown from 'react-markdown';
+import toast from 'react-hot-toast';
 
 interface LinkMetadata {
   title?: string;
@@ -116,14 +125,6 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
     </motion.a>
   );
 }
-import { translations, Language } from '../utils/translations';
-import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
-import { useAuth } from './AuthProvider';
-import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
-import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
-import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
-import ReactMarkdown from 'react-markdown';
 
 interface Props {
   lang: Language;
@@ -265,12 +266,12 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
       
       setSyncStatus(lang === 'bn' ? 'ডেটাবেস আপডেট করা হচ্ছে...' : 'Finalizing Database Update...');
       setTimeout(() => {
-        alert(lang === 'bn' ? `সফলভাবে ${count}টি প্রকল্প আপডেট করা হয়েছে!` : `Successfully synced ${count} schemes from the latest search!`);
+        toast.success(lang === 'bn' ? `সফলভাবে ${count}টি প্রকল্প আপডেট করা হয়েছে!` : `Successfully synced ${count} schemes from the latest search!`);
         setSyncStatus('');
       }, 1000);
     } catch (error) {
       console.error("Sync failed:", error);
-      alert(lang === 'bn' ? "আপডেট করতে ব্যর্থ হয়েছে। কনসোল দেখুন।" : "Failed to sync schemes. check console.");
+      toast.error(lang === 'bn' ? "আপডেট করতে ব্যর্থ হয়েছে। কনসোল দেখুন।" : "Failed to sync schemes. check console.");
       setSyncStatus('');
     } finally {
       setIsSyncing(false);
@@ -282,10 +283,10 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
     setIsSyncing(true);
     try {
       await seedGovSchemes();
-      alert(lang === 'bn' ? "সফলভাবে মূল ক্যাটালগ পুনরুদ্ধার করা হয়েছে!" : "Original curated catalog successfully restored!");
+      toast.success(lang === 'bn' ? "সফলভাবে মূল ক্যাটালগ পুনরুদ্ধার করা হয়েছে!" : "Original curated catalog successfully restored!");
     } catch (error) {
       console.error("Reset failed:", error);
-      alert(lang === 'bn' ? "পুনরায় সেট করতে ব্যর্থ হয়েছে।" : "Failed to reset schemes.");
+      toast.error(lang === 'bn' ? "পুনরায় সেট করতে ব্যর্থ হয়েছে।" : "Failed to reset schemes.");
     } finally {
       setIsSyncing(false);
     }

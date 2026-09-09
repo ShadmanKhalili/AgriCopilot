@@ -25,6 +25,7 @@ export default function LocationDisplay({ coords, lang, color }: Props) {
   const iconColors = {
     green: 'text-green-600',
     orange: 'text-orange-600',
+    emerald: 'text-emerald-600',
     blue: 'text-blue-600',
     indigo: 'text-indigo-600',
   };

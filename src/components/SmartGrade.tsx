@@ -11,6 +11,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'dryFish', 'shrimp', 'salt', 'betelNut', 'mango', 'banana', 'coconut', 'chili'];
@@ -50,7 +51,7 @@ export default function SmartGrade({ lang }: Props) {
         setResult(null);
       } catch (error) {
         console.error("Error optimizing image:", error);
-        alert("Failed to process image. Please try another one.");
+        toast.error("Failed to process image. Please try another one.");
       }
     }
   };
@@ -59,12 +60,12 @@ export default function SmartGrade({ lang }: Props) {
     if (!image) return;
     
     if (!isOnline) {
-      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      toast.error(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
       return;
     }
 
     if (!canUse()) {
-      alert(t.limitReached);
+      toast.error(t.limitReached);
       return;
     }
 
@@ -96,7 +97,7 @@ export default function SmartGrade({ lang }: Props) {
       const errorMsg = isQuotaError 
         ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
         : (error.message || "Error connecting to AI service. Please try again.");
-      alert(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { 
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
-  ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight
+  ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -78,11 +78,8 @@ export default function Layout() {
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
 
-  // Global Location State (Default: Bogura Sadar, Rajshahi Division)
-  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>({
-    latitude: 24.8465,
-    longitude: 89.3777
-  });
+  // Global Location State (Default: null - prompts user for GIS/GPS detection or manual region selection)
+  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
     if (payload?.crop) {
@@ -148,6 +145,27 @@ export default function Layout() {
     ? tabs 
     : tabs.filter(t => t.pillar === selectedPillarFilter || t.pillar === 'account');
 
+  const toggleLanguage = () => {
+    setLang(prev => prev === 'en' ? 'bn' : 'en');
+  };
+
+  const activeTabDetails = tabs.find(tab => tab.id === activeTab);
+
+  // Dynamic SEO & Title synchronization
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    if (activeTabDetails) {
+      document.title = `${activeTabDetails.name} | Agri-Copilot`;
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.setAttribute(
+          'content',
+          `${activeTabDetails.name} - ${activeTabDetails.description} | Agri-Copilot: AI-Powered Climate Intelligence Tools for Bangladesh Agriculture.`
+        );
+      }
+    }
+  }, [activeTabDetails, lang]);
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-emerald-800">
@@ -158,12 +176,6 @@ export default function Layout() {
       </div>
     );
   }
-
-  const toggleLanguage = () => {
-    setLang(prev => prev === 'en' ? 'bn' : 'en');
-  };
-
-  const activeTabDetails = tabs.find(tab => tab.id === activeTab);
 
   return (
     <>
@@ -190,23 +202,23 @@ export default function Layout() {
           className={`
             fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
-            w-80 bg-gradient-to-b from-emerald-950 via-emerald-900 to-green-950 text-white flex flex-col shadow-2xl z-50 h-full shrink-0 border-r border-emerald-800/40
+            w-[86vw] max-w-sm md:w-80 rounded-r-3xl md:rounded-none bg-gradient-to-b from-emerald-950 via-emerald-900 to-green-950 text-white flex flex-col shadow-2xl z-50 h-full shrink-0 border-r border-emerald-800/40 pt-[max(0.25rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]
           `}
           role="navigation"
           aria-label={lang === 'bn' ? 'প্রধান নেভিগেশন' : 'Main navigation'}
         >
           {/* Brand Header */}
-          <div className="p-5 pb-4 flex items-center justify-between border-b border-white/10 bg-black/10">
+          <div className="p-4 sm:p-5 pb-4 flex items-center justify-between border-b border-white/10 bg-black/10">
             <div className="flex items-center space-x-3">
               <motion.div 
                 whileHover={{ rotate: 12, scale: 1.05 }}
                 className="bg-gradient-to-tr from-emerald-400 to-green-500 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/20 text-emerald-950"
                 aria-hidden="true"
               >
-                <Leaf className="w-6 h-6 stroke-[2.5]" />
+                <Leaf className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
               </motion.div>
               <div className="flex flex-col">
-                <span className="font-display font-black text-xl tracking-tight leading-none text-white">
+                <span className="font-display font-black text-lg sm:text-xl tracking-tight leading-none text-white">
                   {lang === 'bn' ? 'স্মার্ট কৃষি-সেবা' : 'Smart Agri-Tools'}
                 </span>
                 <div className="flex items-center space-x-2 mt-1">
@@ -225,7 +237,8 @@ export default function Layout() {
             <button 
               type="button"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden p-2 bg-white/10 rounded-xl hover:bg-white/20 text-white/80 focus:outline-none"
+              aria-label={lang === 'bn' ? 'মেনু বন্ধ করুন' : 'Close Menu'}
+              className="md:hidden p-2.5 bg-white/10 rounded-2xl hover:bg-white/20 active:scale-90 text-white/90 focus:outline-none transition-all cursor-pointer"
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -394,54 +407,64 @@ export default function Layout() {
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
-          <header className="bg-white border-b border-gray-200/80 px-3 sm:px-4 md:px-6 py-2.5 flex items-center justify-between z-20 shrink-0 shadow-xs">
+          <header className="bg-white/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
             {/* Left: Mobile Menu Toggle & Active Module Info */}
-            <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
               <button 
                 type="button"
                 onClick={() => setIsMobileMenuOpen(true)}
                 className="md:hidden p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl transition-all active:scale-95 shrink-0"
-                aria-label="Open Menu"
+                aria-label={lang === 'bn' ? 'মেনু খুলুন' : 'Open Menu'}
               >
                 <Menu className="w-5 h-5" />
               </button>
 
               <div className="flex items-center space-x-2 truncate">
                 {activeTabDetails && (
-                  <div className="flex items-center space-x-2">
-                    <div className="hidden sm:flex p-1.5 bg-emerald-50 text-emerald-700 rounded-xl">
+                  <div className="flex items-center space-x-1.5 sm:space-x-2">
+                    <div className="p-1 sm:p-1.5 bg-emerald-50 text-emerald-700 rounded-xl shrink-0">
                       <activeTabDetails.icon className="w-4 h-4" />
                     </div>
-                    <span className="font-black text-sm sm:text-base text-gray-900 tracking-tight truncate">
+                    <h1 className="font-black text-xs sm:text-base text-gray-900 tracking-tight truncate max-w-[110px] sm:max-w-none m-0 leading-tight">
                       {activeTabDetails.name}
-                    </span>
+                    </h1>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Right: Universal Location Chip, Language Toggle & Actions */}
-            <div className="flex items-center space-x-1.5 sm:space-x-2.5">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               
               {/* Universal Location Chip with 1-Click Switcher */}
               <Tooltip content={lang === 'bn' ? 'উপজেলা বা জেলা পরিবর্তন করুন' : 'Click to change District / Upazila'}>
                 <button
                   type="button"
                   onClick={() => setIsRegionModalOpen(true)}
-                  className="flex items-center space-x-1.5 bg-emerald-50/80 hover:bg-emerald-100/90 text-emerald-900 border border-emerald-200/60 px-2.5 py-1.5 rounded-xl transition-all active:scale-95 shadow-2xs group"
+                  className="flex items-center space-x-1 sm:space-x-1.5 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/70 px-2 py-1.5 sm:px-2.5 rounded-xl transition-all active:scale-95 shadow-2xs group shrink-0"
                 >
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                    {globalLocation ? (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                      </>
+                    )}
                   </span>
-                  <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  <span className="text-xs font-black truncate max-w-[100px] sm:max-w-[160px]">
+                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${globalLocation ? 'text-emerald-700' : 'text-amber-600'}`} />
+                  <span className="text-[11px] sm:text-xs font-black truncate max-w-[70px] sm:max-w-[160px]">
                     {isLocNameLoading ? (
                       <span className="opacity-60">{lang === 'bn' ? 'খোঁজা হচ্ছে...' : 'Locating...'}</span>
                     ) : (
-                      locationName || (lang === 'bn' ? 'বগুড়া সদর' : 'Bogura Sadar')
+                      locationName || (lang === 'bn' ? 'অবস্থান নির্বাচন' : 'Set Location')
                     )}
                   </span>
+                  <ChevronDown className="w-3 h-3 text-emerald-600/70 shrink-0" />
                 </button>
               </Tooltip>
 
@@ -449,7 +472,7 @@ export default function Layout() {
               <button 
                 type="button"
                 onClick={toggleLanguage} 
-                className="flex items-center space-x-1 font-black text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 py-1.5 rounded-xl border border-gray-200 transition-all active:scale-95"
+                className="flex items-center space-x-1 font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 px-2 py-1.5 sm:px-2.5 rounded-xl border border-gray-200 transition-all active:scale-95 shrink-0"
                 title="Toggle Language"
               >
                 <Globe className="w-3.5 h-3.5 text-gray-500" aria-hidden="true" />
@@ -460,7 +483,7 @@ export default function Layout() {
               {user ? (
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all"
+                  className="p-1 sm:p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 transition-all shrink-0"
                   title="Profile"
                 >
                   <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center">
@@ -470,17 +493,17 @@ export default function Layout() {
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="hidden sm:inline-flex items-center space-x-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-xl transition-all shadow-xs"
+                  className="inline-flex items-center space-x-1 sm:space-x-1.5 text-[11px] sm:text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-2 py-1.5 sm:px-3 rounded-xl transition-all shadow-xs active:scale-95 shrink-0"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>{t.signIn}</span>
+                  <span className="hidden sm:inline">{t.signIn}</span>
                 </button>
               )}
             </div>
           </header>
 
           {/* ================= SCROLLABLE MAIN CONTENT ================= */}
-          <main className="flex-1 p-2.5 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] pb-24 md:pb-6">
+          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] pb-28 md:pb-6">
             
             {/* Background Texture Grid */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">

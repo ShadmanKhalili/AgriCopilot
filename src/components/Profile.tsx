@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { seedGovSchemes } from '../data/seedSchemes';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 
 interface Props {
@@ -67,11 +68,11 @@ export default function Profile({ lang, onUpgrade }: Props) {
     setSeeding(true);
     try {
       await seedGovSchemes();
-      alert("Database seeded successfully!");
+      toast.success("Database seeded successfully!");
     } catch (error: any) {
       console.error("Seeding failed detailed error:", error);
       const errorMessage = error.message || String(error);
-      alert(`Failed to seed database: ${errorMessage}`);
+      toast.error(`Failed to seed database: ${errorMessage}`);
     } finally {
       setSeeding(false);
     }

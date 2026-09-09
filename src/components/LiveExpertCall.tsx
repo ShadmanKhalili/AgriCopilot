@@ -3,6 +3,7 @@ import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2, Bot } from 'lucide-reac
 import { getAi, LIVE_API_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality } from '@google/genai';
 import { motion } from 'motion/react';
+import toast from 'react-hot-toast';
 
 interface LiveExpertCallProps {
   diagnosisContext: string;
@@ -177,7 +178,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
 
       const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
       if (!apiKey) {
-        alert(lang === 'bn' 
+        toast.error(lang === 'bn' 
           ? "ভয়েস কল ফিচারের জন্য GEMINI_API_KEY যুক্ত করতে হবে। আপাতত চ্যাট ব্যবহার করুন।" 
           : "Voice calls require GEMINI_API_KEY to be set in your environment. Please use text chat for now.");
         setIsCalling(false);
@@ -297,7 +298,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           onerror: (err: any) => {
             console.error("Live API Error:", err);
             if (err?.message === 'Network error' || err instanceof Event) {
-               alert(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+               toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
             }
             endCall();
           }
@@ -420,8 +421,13 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           className="w-full flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-600 to-emerald-800 text-white p-6 rounded-3xl shadow-xl shadow-green-900/20 border border-green-500/30 transition-all cursor-pointer relative overflow-hidden group focus:ring-4 focus:ring-green-400 outline-none"
         >
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner" aria-hidden="true">
-            <Phone className="w-8 h-8 text-white" />
+          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner relative" aria-hidden="true">
+            <motion.span 
+              className="absolute -inset-1 rounded-full border border-white/30 pointer-events-none"
+              animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+            />
+            <Phone className="w-8 h-8 text-white relative z-10" />
           </div>
           <span className="font-black uppercase tracking-widest text-lg lg:text-xl drop-shadow-sm">
             {lang === 'bn' ? 'ভয়েস কল শুরু করুন' : 'Start Voice Chat'}
@@ -445,11 +451,39 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           <div className="flex flex-col items-center space-y-2 relative z-10 w-full pt-10">
             <motion.div 
               initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              className="w-24 h-24 rounded-full bg-gradient-to-tr from-green-500 to-emerald-400 p-1 mb-4 shadow-[0_0_40px_rgba(34,197,94,0.3)]"
+              animate={
+                callStatus === 'listening'
+                  ? { 
+                      scale: [1, 1.04, 1], 
+                      boxShadow: [
+                        "0 0 25px rgba(34,197,94,0.3)", 
+                        "0 0 45px rgba(34,197,94,0.6)", 
+                        "0 0 25px rgba(34,197,94,0.3)"
+                      ] 
+                    }
+                  : callStatus === 'thinking'
+                  ? { 
+                      scale: [1, 0.97, 1], 
+                      boxShadow: [
+                        "0 0 20px rgba(45,212,191,0.3)", 
+                        "0 0 40px rgba(99,102,241,0.6)", 
+                        "0 0 20px rgba(45,212,191,0.3)"
+                      ] 
+                    }
+                  : { scale: 1, boxShadow: "0 0 40px rgba(34,197,94,0.3)" }
+              }
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              className="w-24 h-24 rounded-full bg-gradient-to-tr from-green-500 to-emerald-400 p-1 mb-4 relative"
             >
-              <div className="w-full h-full rounded-full bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="w-full h-full rounded-full bg-gray-900 flex items-center justify-center overflow-hidden relative">
                 <Bot className="w-12 h-12 text-green-500" />
+                {callStatus === 'thinking' && (
+                  <motion.div 
+                    className="absolute inset-0 bg-teal-500/10"
+                    animate={{ opacity: [0.2, 0.6, 0.2] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
               </div>
             </motion.div>
             
@@ -505,22 +539,146 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
 
             <div className="flex items-center justify-center space-x-12">
               <div className="flex flex-col items-center space-y-3">
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  disabled={isCalling}
-                  aria-pressed={isMuted}
-                  className={`p-6 rounded-full transition-all duration-300 transform active:scale-95 border-2 ${
-                    isMuted 
-                      ? 'bg-red-500/10 border-red-500/50 text-red-500' 
-                      : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
-                  }`}
-                >
-                  {isMuted ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-                </button>
-                <span className="text-[10px] uppercase font-black tracking-widest text-gray-500">
-                  {isMuted ? (lang === 'bn' ? 'আনমিউট' : 'Unmute') : (lang === 'bn' ? 'মিউট' : 'Mute')}
-                </span>
+                <div className="relative flex items-center justify-center">
+                  {/* Subtle motion animations when AI is listening */}
+                  {!isMuted && callStatus === 'listening' && (
+                    <>
+                      <motion.span
+                        className="absolute -inset-3.5 rounded-full border border-emerald-400/50 pointer-events-none"
+                        animate={{
+                          scale: [1, 1.45],
+                          opacity: [0.7, 0]
+                        }}
+                        transition={{
+                          duration: 1.8,
+                          repeat: Infinity,
+                          ease: "easeOut"
+                        }}
+                      />
+                      <motion.span
+                        className="absolute -inset-1.5 rounded-full bg-emerald-500/20 pointer-events-none"
+                        animate={{
+                          scale: [1, 1.25],
+                          opacity: [0.5, 0]
+                        }}
+                        transition={{
+                          duration: 1.8,
+                          delay: 0.35,
+                          repeat: Infinity,
+                          ease: "easeOut"
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {/* Subtle motion animations when AI is processing / thinking */}
+                  {!isMuted && callStatus === 'thinking' && (
+                    <>
+                      <motion.span
+                        className="absolute -inset-3 rounded-full border-2 border-dashed border-teal-400/70 pointer-events-none"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
+                      />
+                      <motion.span
+                        className="absolute -inset-1 rounded-full bg-gradient-to-tr from-teal-400/20 via-emerald-400/10 to-indigo-500/25 blur-sm pointer-events-none"
+                        animate={{
+                          opacity: [0.35, 0.8, 0.35],
+                          scale: [0.98, 1.04, 0.98]
+                        }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                    </>
+                  )}
+
+                  <motion.button
+                    type="button"
+                    onClick={toggleMute}
+                    disabled={isCalling}
+                    aria-pressed={isMuted}
+                    aria-label={
+                      isMuted
+                        ? (lang === 'bn' ? 'মাইক্রোফোন চালু করুন' : 'Unmute microphone')
+                        : callStatus === 'listening'
+                          ? (lang === 'bn' ? 'এআই আপনার কথা শুনছে - মাইক্রোফোন বন্ধ করতে চাপুন' : 'AI is listening - tap to mute')
+                          : callStatus === 'thinking'
+                            ? (lang === 'bn' ? 'এআই উত্তর প্রসেসিং করছে - মিউট করতে চাপুন' : 'AI is processing - tap to mute')
+                            : (lang === 'bn' ? 'মাইক্রোফোন মিউট করুন' : 'Mute microphone')
+                    }
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.94 }}
+                    animate={
+                      isMuted
+                        ? { scale: 1, boxShadow: "0 0 0px rgba(0,0,0,0)" }
+                        : callStatus === 'listening'
+                        ? {
+                            scale: [1, 1.05, 1],
+                            boxShadow: [
+                              "0 0 15px rgba(16, 185, 129, 0.25)",
+                              "0 0 35px rgba(16, 185, 129, 0.55)",
+                              "0 0 15px rgba(16, 185, 129, 0.25)"
+                            ]
+                          }
+                        : callStatus === 'thinking'
+                        ? {
+                            scale: [1, 0.97, 1],
+                            boxShadow: [
+                              "0 0 15px rgba(45, 212, 191, 0.25)",
+                              "0 0 32px rgba(99, 102, 241, 0.5)",
+                              "0 0 15px rgba(45, 212, 191, 0.25)"
+                            ]
+                          }
+                        : { scale: 1, boxShadow: "0 0 10px rgba(255,255,255,0.05)" }
+                    }
+                    transition={{
+                      duration: callStatus === 'thinking' ? 1.5 : 2,
+                      repeat: (!isMuted && (callStatus === 'listening' || callStatus === 'thinking')) ? Infinity : 0,
+                      ease: "easeInOut"
+                    }}
+                    className={`p-6 rounded-full transition-colors duration-300 border-2 relative z-10 ${
+                      isMuted 
+                        ? 'bg-red-500/10 border-red-500/50 text-red-500' 
+                        : callStatus === 'listening'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                          : callStatus === 'thinking'
+                            ? 'bg-teal-500/15 border-teal-300 text-teal-200'
+                            : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {isMuted ? (
+                      <MicOff className="w-8 h-8" />
+                    ) : (
+                      <div className="relative">
+                        <Mic className="w-8 h-8" />
+                        {callStatus === 'listening' && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping" />
+                        )}
+                        {callStatus === 'thinking' && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-teal-300 rounded-full animate-pulse" />
+                        )}
+                      </div>
+                    )}
+                  </motion.button>
+                </div>
+
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-gray-500">
+                    {isMuted ? (lang === 'bn' ? 'আনমিউট' : 'Unmute') : (lang === 'bn' ? 'মিউট' : 'Mute')}
+                  </span>
+                  {!isMuted && (callStatus === 'listening' || callStatus === 'thinking') && (
+                    <motion.span 
+                      initial={{ opacity: 0, y: 2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`text-[9px] font-bold tracking-wider uppercase mt-1 flex items-center gap-1.5 ${
+                        callStatus === 'listening' ? 'text-emerald-400' : 'text-teal-300'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${callStatus === 'listening' ? 'bg-emerald-400 animate-pulse' : 'bg-teal-300 animate-ping'}`} />
+                      {callStatus === 'listening' 
+                        ? (lang === 'bn' ? 'শুনছে...' : 'Listening...')
+                        : (lang === 'bn' ? 'প্রসেসিং...' : 'Processing...')}
+                    </motion.span>
+                  )}
+                </div>
               </div>
               
               <div className="flex flex-col items-center space-y-3">

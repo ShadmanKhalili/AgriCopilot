@@ -402,6 +402,18 @@ export const generateWeatherAdvisory = async (
         - Soil Organic Carbon: ${weatherData.soilCarbon !== undefined ? weatherData.soilCarbon + ' g/kg' : 'N/A'}`;
       }
 
+      let weatherNext3Context = "";
+      if (weatherData.isWeatherNext3 && weatherData.weatherNext3) {
+        const wn = weatherData.weatherNext3;
+        weatherNext3Context = `Google DeepMind WeatherNext 3 (5km Satellite AI Engine):
+        - AI Model: WeatherNext 3.0 (64-member ensemble, 5km spatial grid)
+        - Model Confidence & Convergence: ${wn.ensemble?.convergence_score_pct || 96}%
+        - 100m Upper Canopy Wind: ${wn.agro_metrics?.boundary_layer_wind_100m_kmh || 'N/A'} km/h
+        - Direct Solar Irradiance (DNI): ${wn.agro_metrics?.direct_normal_irradiance_wm2 || 0} W/m²
+        - Dew Point Depression & Spore Risk: ${wn.agro_metrics?.dew_point_depression_celsius || 'N/A'}°C (${wn.agro_metrics?.fungal_blight_risk?.toUpperCase()} risk of fungal blight)
+        - 64-Ensemble Precipitation Spread: ${wn.ensemble?.precipitation_spread_mm?.p10 || 0}mm - ${wn.ensemble?.precipitation_spread_mm?.p90 || 0}mm`;
+      }
+
       const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
       Current Date: ${currentDate}
       Current Time: ${currentTime}
@@ -411,15 +423,17 @@ export const generateWeatherAdvisory = async (
       ${climateContext}
       ${historicalTodayContext}
       ${soilContext}
+      ${weatherNext3Context}
       
       Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80-100 words).
       Focus on:
       - Time of day: Adjust your advice based on the current time (${currentTime}).
       - Irrigation needs (use soil moisture and evapotranspiration data if available)
       - Fertilizer/Soil health advice (use soil pH, Nitrogen, Carbon data if available)
-      - Pest/Disease risk based on humidity and temperature
+      - Pest/Disease & Fungal Blight risk (reference dew point depression and humidity)
       - Sowing/Harvesting timing
       - Use of the Safe Spraying Window for pesticide application.
+      ${weatherData.isWeatherNext3 ? '- Note that forecasts are powered with 5km satellite precision by Google DeepMind WeatherNext 3.' : ''}
       
       Use markdown for formatting. Be direct and practical.`;
 

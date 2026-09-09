@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -97,6 +97,9 @@ export default function AgriCopilot({
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
+  const speechRecognitionRef = useRef<any>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [chatSummary, setChatSummary] = useState<string | null>(null);
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
@@ -185,7 +188,7 @@ export default function AgriCopilot({
         setAudioUrl(null);
       } catch (error) {
         console.error("Error optimizing images:", error);
-        alert("Failed to process one or more images. Please try again.");
+        toast.error(lang === 'bn' ? "ছবি প্রক্রিয়া করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।" : "Failed to process one or more images. Please try again.");
       }
     }
   };
@@ -283,7 +286,7 @@ export default function AgriCopilot({
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Failed to translate content.");
+      toast.error(lang === 'bn' ? "অনুবাদ করতে সমস্যা হয়েছে।" : "Failed to translate content.");
     } finally {
       setIsTranslating(false);
     }
@@ -303,7 +306,7 @@ export default function AgriCopilot({
       setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
     } catch (error) {
       console.error("Chat error:", error);
-      alert(t.tooltips.chatError);
+      toast.error(t.tooltips.chatError);
     } finally {
       setIsChatLoading(false);
       setTimeout(() => {
@@ -311,6 +314,76 @@ export default function AgriCopilot({
       }, 100);
     }
   };
+
+  const toggleVoiceRecording = () => {
+    if (isVoiceListening) {
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch (e) {}
+      }
+      setIsVoiceListening(false);
+      return;
+    }
+
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      toast.error(lang === 'bn' 
+        ? 'আপনার ব্রাউজারে স্পিচ রিকগনিশন সমর্থিত নয়' 
+        : 'Speech recognition is not supported in this browser');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsVoiceListening(true);
+        setIsVoiceProcessing(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        setIsVoiceListening(false);
+        setIsVoiceProcessing(true);
+        const transcript = event?.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setCurrentChatMessage(prev => prev ? `${prev} ${transcript}` : transcript);
+        }
+        setTimeout(() => {
+          setIsVoiceProcessing(false);
+        }, 600);
+      };
+
+      recognition.onerror = (event: any) => {
+        setIsVoiceListening(false);
+        setIsVoiceProcessing(false);
+        if (event?.error !== 'no-speech') {
+          toast.error(lang === 'bn' ? 'ভয়েস শনাক্ত করা যায়নি, আবার চেষ্টা করুন' : 'Could not detect voice, please try again');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsVoiceListening(false);
+        setIsVoiceProcessing(false);
+      };
+
+      speechRecognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Speech recognition error:', err);
+      setIsVoiceListening(false);
+      setIsVoiceProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.abort(); } catch (e) {}
+      }
+    };
+  }, []);
 
   const handleSummarizeAndSave = async () => {
     if (chatMessages.length < 2 || isSummarizing) return;
@@ -370,12 +443,12 @@ export default function AgriCopilot({
     if (images.length === 0) return;
     
     if (!isOnline) {
-      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      toast.error(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
       return;
     }
 
     if (!canUse()) {
-      alert(t.limitReached);
+      toast.error(t.limitReached);
       return;
     }
 
@@ -552,12 +625,12 @@ export default function AgriCopilot({
     if (!diagnosis || images.length === 0) return;
     
     if (!isOnline) {
-      alert(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
+      toast.error(lang === 'bn' ? 'অফলাইনে কাজ হবে না। দয়া করে ইন্টারনেট সংযোগ চালু করুন।' : 'You are currently offline. Please connect to the internet to run this diagnosis.');
       return;
     }
 
     if (!canUse()) {
-      alert(t.limitReached);
+      toast.error(t.limitReached);
       return;
     }
 
@@ -594,7 +667,7 @@ export default function AgriCopilot({
       }
     } catch (error: any) {
       console.error("Deep Diagnosis failed:", error);
-      alert(lang === 'bn' ? 'গভীর বিশ্লেষণে সমস্যা হয়েছে।' : 'Error performing deep analysis. Please try again.');
+      toast.error(lang === 'bn' ? 'গভীর বিশ্লেষণে সমস্যা হয়েছে।' : 'Error performing deep analysis. Please try again.');
     } finally {
       setIsDeepAnalyzing(false);
     }
@@ -677,18 +750,18 @@ export default function AgriCopilot({
                   role="region" 
                   aria-label={lang === 'bn' ? 'আপলোড করা ছবিগুলো' : 'Uploaded photos'}
                 >
-                  <div className="grid grid-cols-5 gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 sm:gap-3">
                     {images.map((img, idx) => (
                       <motion.div 
                         key={idx} 
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        className="relative aspect-square rounded-2xl overflow-hidden border-2 border-green-100 group shadow-sm"
+                        className="relative aspect-square rounded-2xl overflow-hidden border-2 border-green-100 group shadow-xs"
                       >
                         <img 
                           src={`data:${img.mimeType};base64,${img.base64}`} 
                           alt={lang === 'bn' ? `ফসলের ছবি ${idx + 1}` : `Crop photo ${idx + 1}`} 
-                          className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
                           referrerPolicy="no-referrer"
                         />
                         <button 
@@ -698,7 +771,7 @@ export default function AgriCopilot({
                             removeImage(idx);
                           }}
                           aria-label={lang === 'bn' ? 'ছবিটি মুছুন' : 'Remove image'}
-                          className="absolute top-2 right-2 bg-red-500/90 backdrop-blur-sm text-white p-1.5 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 focus:opacity-100 focus:ring-2 focus:ring-red-400 outline-none"
+                          className="absolute top-1.5 right-1.5 bg-red-600/90 backdrop-blur-xs text-white p-1.5 rounded-xl opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-red-700 focus:opacity-100 focus:ring-2 focus:ring-red-400 outline-none shadow-xs"
                         >
                           <X className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
@@ -730,15 +803,15 @@ export default function AgriCopilot({
                 <motion.button
                   type="button"
                   whileHover={{ y: -2 }}
-                  className="w-full bg-gradient-to-br from-green-50 to-white rounded-3xl p-10 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner focus:ring-2 focus:ring-green-500 outline-none" 
+                  className="w-full bg-gradient-to-br from-green-50 to-white rounded-3xl p-6 sm:p-10 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner focus:ring-2 focus:ring-green-500 outline-none" 
                   onClick={() => fileInputRef.current?.click()}
                   aria-label={t.captureImage}
                 >
-                  <div className="bg-white p-5 rounded-[24px] shadow-md mb-4 group-hover:scale-110 transition-transform text-green-600">
-                    <Camera className="w-12 h-12" aria-hidden="true" />
+                  <div className="bg-white p-4 sm:p-5 rounded-[22px] shadow-md mb-3 sm:mb-4 group-hover:scale-105 transition-transform text-green-600">
+                    <Camera className="w-9 h-9 sm:w-12 sm:h-12" aria-hidden="true" />
                   </div>
-                  <p className="text-lg font-black text-green-900 mb-1 tracking-tight">{t.captureImage}</p>
-                  <p className="text-sm text-green-600/70 font-medium">{lang === 'bn' ? 'পাতা বা ফলের ছবি দিন' : 'Upload leaf or fruit photo'}</p>
+                  <p className="text-base sm:text-lg font-black text-green-900 mb-1 tracking-tight">{t.captureImage}</p>
+                  <p className="text-xs sm:text-sm text-green-600/70 font-medium">{lang === 'bn' ? 'পাতা বা ফলের ছবি দিন' : 'Upload leaf or fruit photo'}</p>
                   <input 
                     type="file" 
                     ref={fileInputRef}
@@ -754,12 +827,12 @@ export default function AgriCopilot({
 
             <motion.button
               type="button"
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleDiagnose}
               disabled={images.length === 0 || isLoading || !isOnline}
               aria-busy={isLoading}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none relative overflow-hidden"
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-4 sm:py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-base sm:text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none relative overflow-hidden"
             >
               {isLoading && (
                 <motion.div 
@@ -822,36 +895,36 @@ export default function AgriCopilot({
                   </AnimatePresence>
                   
                   <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-10">
-                      <div className="flex items-center space-x-5">
-                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-4 rounded-2xl shadow-xl shadow-green-100" aria-hidden="true">
-                          <Leaf className="w-7 h-7 text-white" />
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-10">
+                      <div className="flex items-center space-x-3 sm:space-x-5">
+                        <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 sm:p-4 rounded-2xl shadow-xl shadow-green-100 shrink-0" aria-hidden="true">
+                          <Leaf className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-3xl font-black text-gray-900 tracking-tight leading-none mb-1">{t.diagnosisResult}</h3>
+                          <h3 className="text-xl sm:text-3xl font-black text-gray-900 tracking-tight leading-tight mb-0.5 sm:mb-1">{t.diagnosisResult}</h3>
                           <div className="flex items-center">
                             <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
-                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                            <span className="text-[10px] sm:text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
                               <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
                               {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 sm:space-x-3 self-start sm:self-auto">
                         <button 
                           type="button"
                           onClick={handleTranslate}
                           disabled={isTranslating}
                           aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
-                          className="flex items-center space-x-2 text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-5 py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-sm"
+                          className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-xs active:scale-95"
                         >
                           {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Globe className="w-3.5 h-3.5" aria-hidden="true" />}
                           <span>{lang === 'en' ? 'বাংলায় দেখুন' : 'View in English'}</span>
                         </button>
-                        <div className="flex items-center space-x-2 bg-green-50 px-4 py-2.5 rounded-2xl border border-green-100 shadow-sm transition-all hover:bg-green-100/50">
-                          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
-                          <span className="text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
+                        <div className="flex items-center space-x-1.5 sm:space-x-2 bg-green-50 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-green-100 shadow-xs transition-all">
+                          <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
+                          <span className="text-[10px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
                         </div>
                       </div>
                     </div>
@@ -1607,19 +1680,106 @@ export default function AgriCopilot({
                                           handleSendMessage(e as any);
                                         }
                                       }}
-                                      placeholder={lang === 'bn' ? 'আপনার প্রশ্ন লিখুন...' : 'Type your question...'}
+                                      placeholder={
+                                        isVoiceListening 
+                                          ? (lang === 'bn' ? 'শুনছি... আপনার প্রশ্ন বলুন...' : 'Listening... Speak your question...')
+                                          : isVoiceProcessing 
+                                            ? (lang === 'bn' ? 'প্রসেসিং হচ্ছে...' : 'Processing voice...') 
+                                            : (lang === 'bn' ? 'আপনার প্রশ্ন লিখুন বা মুখে বলুন...' : 'Type or speak your question...')
+                                      }
                                       disabled={!diagnosis || isChatLoading || !!chatSummary}
-                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
+                                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-4 pr-24 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 transition-all font-medium"
                                     />
-                                    <button
-                                      type="button"
-                                      onClick={handleSendMessage}
-                                      disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
-                                      aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
-                                      className="absolute right-2 p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
-                                    >
-                                      <Send className="w-4 h-4" aria-hidden="true" />
-                                    </button>
+                                    <div className="absolute right-2 flex items-center space-x-1.5">
+                                      {/* Voice recording button with subtle Framer Motion feedback */}
+                                      <div className="relative flex items-center justify-center">
+                                        {isVoiceListening && (
+                                          <>
+                                            <motion.span
+                                              className="absolute -inset-1.5 rounded-xl border border-red-500/60 pointer-events-none"
+                                              animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
+                                              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+                                            />
+                                            <motion.span
+                                              className="absolute -inset-0.5 rounded-xl bg-red-500/20 pointer-events-none"
+                                              animate={{ scale: [1, 1.2], opacity: [0.5, 0] }}
+                                              transition={{ duration: 1.5, delay: 0.3, repeat: Infinity, ease: 'easeOut' }}
+                                            />
+                                          </>
+                                        )}
+                                        {isVoiceProcessing && (
+                                          <motion.span
+                                            className="absolute -inset-1 rounded-xl border-2 border-dashed border-teal-500/70 pointer-events-none"
+                                            animate={{ rotate: 360 }}
+                                            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                                          />
+                                        )}
+                                        <motion.button
+                                          type="button"
+                                          onClick={toggleVoiceRecording}
+                                          disabled={!diagnosis || isChatLoading || !!chatSummary}
+                                          aria-label={
+                                            isVoiceListening
+                                              ? (lang === 'bn' ? 'রেকর্ডিং বন্ধ করুন' : 'Stop voice recording')
+                                              : (lang === 'bn' ? 'ভয়েসে প্রশ্ন বলুন' : 'Ask question by voice')
+                                          }
+                                          title={
+                                            isVoiceListening
+                                              ? (lang === 'bn' ? 'শুনছে... বন্ধ করতে চাপুন' : 'Listening... tap to finish')
+                                              : isVoiceProcessing
+                                                ? (lang === 'bn' ? 'প্রসেসিং হচ্ছে...' : 'Processing voice...')
+                                                : (lang === 'bn' ? 'ভয়েসে প্রশ্ন বলুন' : 'Ask question by voice')
+                                          }
+                                          whileHover={{ scale: 1.08 }}
+                                          whileTap={{ scale: 0.92 }}
+                                          animate={
+                                            isVoiceListening
+                                              ? {
+                                                  scale: [1, 1.1, 1],
+                                                  boxShadow: [
+                                                    '0 0 6px rgba(239, 68, 68, 0.3)',
+                                                    '0 0 14px rgba(239, 68, 68, 0.6)',
+                                                    '0 0 6px rgba(239, 68, 68, 0.3)'
+                                                  ]
+                                                }
+                                              : isVoiceProcessing
+                                              ? {
+                                                  scale: [1, 0.95, 1],
+                                                  boxShadow: '0 0 10px rgba(20, 184, 166, 0.4)'
+                                                }
+                                              : { scale: 1 }
+                                          }
+                                          transition={{
+                                            duration: isVoiceProcessing ? 1.2 : 1.6,
+                                            repeat: (isVoiceListening || isVoiceProcessing) ? Infinity : 0,
+                                            ease: 'easeInOut'
+                                          }}
+                                          className={`p-2 rounded-xl transition-colors shadow-sm focus:ring-2 focus:ring-green-400 outline-none relative z-10 ${
+                                            isVoiceListening
+                                              ? 'bg-red-500 text-white'
+                                              : isVoiceProcessing
+                                              ? 'bg-teal-600 text-white'
+                                              : 'bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600'
+                                          } disabled:opacity-40`}
+                                        >
+                                          {isVoiceProcessing ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                          ) : (
+                                            <Mic className={`w-4 h-4 ${isVoiceListening ? 'animate-pulse' : ''}`} />
+                                          )}
+                                        </motion.button>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={handleSendMessage}
+                                        disabled={!currentChatMessage.trim() || !diagnosis || isChatLoading || !!chatSummary}
+                                        aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
+                                        className="p-2 bg-green-500 text-white rounded-xl hover:bg-green-600 disabled:opacity-50 disabled:hover:bg-green-500 transition-all shadow-sm focus:ring-2 focus:ring-green-400 outline-none"
+                                      >
+                                        <Send className="w-4 h-4" aria-hidden="true" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
