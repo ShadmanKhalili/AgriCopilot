@@ -42,6 +42,9 @@ export default function LiveVideoCopilot({
   const [transcripts, setTranscripts] = useState<TranscriptTurn[]>([]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const [latestSubtitle, setLatestSubtitle] = useState<{ text: string; role: 'user' | 'model' } | null>(null);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -285,10 +288,26 @@ export default function LiveVideoCopilot({
     }
   };
 
+  // Auto fullscreen on mobile when starting live stream
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
   // Start Gemini 3.8 Live Multimodal Stream
   const startLiveSession = async () => {
     setIsConnecting(true);
     setCameraError(null);
+
+    // Auto-enter fullscreen on mobile screens for native camera app feel
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsFullscreen(true);
+    }
 
     try {
       const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
@@ -506,7 +525,31 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     setLiveState('idle');
   };
 
-  // Capture current frame and send to static diagnostic engine
+  // Handle tap-to-focus
+  const handleTapVideo = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+
+    if ('touches' in e && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if ('clientX' in e) {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
+    } else {
+      return;
+    }
+
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    setFocusPoint({ x, y });
+    playTone(900, 0.05, 0.03);
+
+    setTimeout(() => {
+      setFocusPoint(null);
+    }, 1200);
+  };
   const handleCaptureSnapshot = () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
@@ -538,9 +581,14 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
       {/* Hidden processing canvas */}
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Main Viewfinder Container */}
-      <div className="relative rounded-[28px] overflow-hidden bg-gray-950 border-2 border-emerald-500/30 shadow-2xl aspect-[4/3] sm:aspect-[16/10] max-h-[520px] flex items-center justify-center">
-        
+      {/* Viewfinder Container: Seamlessly toggles between inline card & immersive full-screen viewport */}
+      <div 
+        onClick={isSessionActive ? handleTapVideo : undefined}
+        className={isFullscreen 
+          ? "fixed inset-0 z-[100] bg-black flex flex-col justify-between overflow-hidden touch-none select-none animate-in fade-in duration-300"
+          : "relative rounded-[28px] overflow-hidden bg-gray-950 border-2 border-emerald-500/30 shadow-2xl aspect-[4/3] sm:aspect-[16/10] max-h-[540px] flex items-center justify-center transition-all duration-300"
+        }
+      >
         {/* Video stream element */}
         <video 
           ref={videoRef}
@@ -549,6 +597,22 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
           muted
           className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''} ${!isCameraActive ? 'hidden' : ''}`}
         />
+
+        {/* Tap-To-Focus Target Animation */}
+        <AnimatePresence>
+          {focusPoint && (
+            <motion.div
+              initial={{ scale: 1.5, opacity: 1 }}
+              animate={{ scale: 1, opacity: 0.8 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.25 }}
+              style={{ left: focusPoint.x - 24, top: focusPoint.y - 24 }}
+              className="absolute w-12 h-12 border-2 border-emerald-400 rounded-xl pointer-events-none z-30 shadow-[0_0_12px_rgba(52,211,153,0.8)]"
+            >
+              <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full absolute inset-0 m-auto" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Inactive Camera State / Start CTA */}
         {!isCameraActive && !isConnecting && (
@@ -594,7 +658,7 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               <div className="w-16 h-16 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
               <Sparkles className="w-6 h-6 text-emerald-400 absolute inset-0 m-auto" />
             </div>
-            <div className="text-center">
+            <div className="text-center px-4">
               <h4 className="text-base font-bold text-white">
                 {lang === 'bn' ? 'জেমিনি ৩.৮ লাইভ এর সাথে যুক্ত হচ্ছে...' : 'Connecting to Gemini 3.8 Live...'}
               </h4>
@@ -616,7 +680,9 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
             />
 
             {/* Targeting Reticle Corners */}
-            <div className="absolute inset-6 sm:inset-10 pointer-events-none z-10 flex flex-col justify-between">
+            <div className={`absolute pointer-events-none z-10 flex flex-col justify-between ${
+              isFullscreen ? 'inset-12 sm:inset-20' : 'inset-6 sm:inset-10'
+            }`}>
               <div className="flex justify-between">
                 <div className="w-8 h-8 border-t-2 border-l-2 border-emerald-400 rounded-tl-lg opacity-80" />
                 <div className="w-8 h-8 border-t-2 border-r-2 border-emerald-400 rounded-tr-lg opacity-80" />
@@ -627,8 +693,12 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               </div>
             </div>
 
-            {/* Top Status Badges Bar */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2 z-20 pointer-events-none">
+            {/* Top Status & Controls Bar */}
+            <div className={`absolute top-0 left-0 right-0 flex items-center justify-between gap-2 z-30 ${
+              isFullscreen 
+                ? 'pt-[max(env(safe-area-inset-top),0.75rem)] px-4 sm:px-6 bg-gradient-to-b from-black/80 via-black/40 to-transparent pb-6' 
+                : 'pt-4 px-4'
+            }`}>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 bg-red-600/90 text-white text-[10px] font-black font-mono px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
@@ -640,98 +710,142 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="bg-gray-900/80 backdrop-blur-md text-gray-300 text-[10px] font-mono px-2.5 py-1 rounded-full border border-gray-700/50">
-                  {totalFramesSent} Frames
-                </div>
-                <div className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md ${
+                <div className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg ${
                   liveState === 'speaking' ? 'bg-emerald-500 text-gray-950 animate-pulse' :
-                  liveState === 'listening' ? 'bg-blue-500 text-white' : 'bg-gray-900/80 text-gray-400'
+                  liveState === 'listening' ? 'bg-blue-500 text-white' : 'bg-gray-900/80 text-gray-300'
                 }`}>
                   {liveState === 'speaking' ? (lang === 'bn' ? '🎙️ এআই কথা বলছে' : '🎙️ AI Speaking') :
                    liveState === 'listening' ? (lang === 'bn' ? '👂 শুনছে...' : '👂 Listening...') :
                    (lang === 'bn' ? '👀 পর্যবেক্ষণ করছে' : '👀 Inspecting')}
                 </div>
+
+                {/* Fullscreen / Minimize Toggle Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFullscreen(!isFullscreen);
+                  }}
+                  className="p-2 rounded-xl bg-gray-900/80 hover:bg-gray-800 text-white backdrop-blur-md border border-gray-700/60 transition-all cursor-pointer shadow-lg"
+                  title={isFullscreen ? (lang === 'bn' ? 'মিনিমাইজ' : 'Exit Fullscreen') : (lang === 'bn' ? 'ফুলস্ক্রিন' : 'Fullscreen')}
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4 text-emerald-400" /> : <Maximize2 className="w-4 h-4 text-emerald-400" />}
+                </button>
               </div>
             </div>
 
             {/* Bottom Audio Waveform Overlay */}
-            <div className="absolute bottom-16 sm:bottom-20 left-4 right-4 flex items-center justify-center gap-1 z-20 pointer-events-none">
+            <div className={`absolute left-4 right-4 flex items-center justify-center gap-1 z-20 pointer-events-none ${
+              isFullscreen ? 'bottom-28 sm:bottom-32' : 'bottom-16 sm:bottom-20'
+            }`}>
               {audioLevels.map((lvl, idx) => (
                 <motion.div
                   key={idx}
-                  animate={{ height: Math.max(4, lvl * 48) }}
+                  animate={{ height: Math.max(4, lvl * 52) }}
                   transition={{ duration: 0.08 }}
                   className={`w-1 rounded-full transition-colors ${
-                    liveState === 'speaking' ? 'bg-emerald-400' :
-                    liveState === 'listening' ? 'bg-blue-400' : 'bg-gray-600/60'
+                    liveState === 'speaking' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' :
+                    liveState === 'listening' ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-gray-600/60'
                   }`}
                 />
               ))}
             </div>
 
-            {/* Bottom Floating Control Bar */}
-            <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between gap-2 z-30">
+            {/* Bottom Floating Native Shutter / Action Dock */}
+            <div className={`absolute bottom-0 left-0 right-0 flex items-center justify-between gap-3 z-30 ${
+              isFullscreen 
+                ? 'pb-[max(env(safe-area-inset-bottom),1.25rem)] px-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-8' 
+                : 'pb-3 px-4'
+            }`}>
+              {/* Left group: Camera & Torch */}
               <div className="flex items-center gap-2">
                 {/* Flip Camera */}
                 <button
-                  onClick={flipCamera}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    flipCamera();
+                  }}
                   type="button"
-                  className="p-2.5 rounded-xl bg-gray-900/80 hover:bg-gray-800 text-white backdrop-blur-md border border-gray-700/60 transition-all cursor-pointer shadow-lg"
+                  className="p-3 rounded-2xl bg-gray-900/90 hover:bg-gray-800 text-white backdrop-blur-md border border-gray-700/60 transition-all cursor-pointer shadow-lg active:scale-90"
                   title={lang === 'bn' ? 'ক্যামেরা পরিবর্তন' : 'Flip Camera'}
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
 
                 {/* Torch Toggle */}
                 {isTorchSupported && (
                   <button
-                    onClick={toggleTorch}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleTorch();
+                    }}
                     type="button"
-                    className={`p-2.5 rounded-xl backdrop-blur-md border transition-all cursor-pointer shadow-lg ${
+                    className={`p-3 rounded-2xl backdrop-blur-md border transition-all cursor-pointer shadow-lg active:scale-90 ${
                       isTorchOn 
-                        ? 'bg-amber-400 text-gray-950 border-amber-300' 
-                        : 'bg-gray-900/80 hover:bg-gray-800 text-white border-gray-700/60'
+                        ? 'bg-amber-400 text-gray-950 border-amber-300 shadow-amber-400/30' 
+                        : 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-700/60'
                     }`}
                     title={lang === 'bn' ? 'ফ্ল্যাশলাইট' : 'Torch'}
                   >
-                    {isTorchOn ? <Zap className="w-4 h-4 fill-current" /> : <ZapOff className="w-4 h-4" />}
+                    {isTorchOn ? <Zap className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> : <ZapOff className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </button>
                 )}
+              </div>
 
-                {/* Mic Mute */}
+              {/* Center: Large Shutter / Capture Button */}
+              <div className="flex items-center justify-center">
                 <button
-                  onClick={() => setIsMuted(!isMuted)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCaptureSnapshot();
+                  }}
                   type="button"
-                  className={`p-2.5 rounded-xl backdrop-blur-md border transition-all cursor-pointer shadow-lg ${
-                    isMuted 
-                      ? 'bg-red-500 text-white border-red-400' 
-                      : 'bg-gray-900/80 hover:bg-gray-800 text-white border-gray-700/60'
-                  }`}
-                  title={isMuted ? (lang === 'bn' ? 'আনমিউট করুন' : 'Unmute') : (lang === 'bn' ? 'মিউট করুন' : 'Mute')}
+                  className="relative group p-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-92 cursor-pointer shadow-2xl"
+                  title={lang === 'bn' ? 'প্রেসক্রিপশন নিন' : 'Capture Diagnostic Report'}
                 >
-                  {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 border-4 border-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <Camera className="w-6 h-6 sm:w-7 sm:h-7 text-gray-950" />
+                  </div>
+                  {isFullscreen && (
+                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md">
+                      {lang === 'bn' ? 'প্রেসক্রিপশন' : 'Prescription'}
+                    </span>
+                  )}
                 </button>
               </div>
 
-              {/* Capture Snapshot for Full Prescription */}
-              <button
-                onClick={handleCaptureSnapshot}
-                type="button"
-                className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black text-xs uppercase tracking-wider backdrop-blur-md shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Camera className="w-4 h-4" />
-                <span className="hidden sm:inline">{lang === 'bn' ? 'প্রেসক্রিপশন নিন' : 'Capture Report'}</span>
-              </button>
+              {/* Right group: Mic & End Call */}
+              <div className="flex items-center gap-2">
+                {/* Mic Mute */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMuted(!isMuted);
+                  }}
+                  type="button"
+                  className={`p-3 rounded-2xl backdrop-blur-md border transition-all cursor-pointer shadow-lg active:scale-90 ${
+                    isMuted 
+                      ? 'bg-red-500 text-white border-red-400' 
+                      : 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-700/60'
+                  }`}
+                  title={isMuted ? (lang === 'bn' ? 'আনমিউট করুন' : 'Unmute') : (lang === 'bn' ? 'মিউট করুন' : 'Mute')}
+                >
+                  {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
+                </button>
 
-              {/* End Call Button */}
-              <button
-                onClick={stopAllMedia}
-                type="button"
-                className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase tracking-wider backdrop-blur-md shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <PhoneOff className="w-4 h-4" />
-                <span>{lang === 'bn' ? 'কল কাটুন' : 'End Call'}</span>
-              </button>
+                {/* End Call Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stopAllMedia();
+                  }}
+                  type="button"
+                  className="p-3 rounded-2xl bg-red-600 hover:bg-red-500 text-white border border-red-500/80 backdrop-blur-md shadow-lg shadow-red-600/30 transition-all active:scale-90 cursor-pointer"
+                  title={lang === 'bn' ? 'কল কাটুন' : 'End Call'}
+                >
+                  <PhoneOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
             </div>
           </>
         )}

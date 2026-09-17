@@ -145,10 +145,10 @@ export default function MarketConnect({
       animate={{ opacity: 1, y: 0 }}
       className="w-full space-y-4 md:space-y-6"
     >
-      <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-orange-900/5 border border-orange-100 mb-4 md:mb-6">
+      <div className="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl shadow-orange-900/5 border border-orange-100 mb-4 md:mb-6">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-orange-50 p-2 md:p-3 rounded-xl flex-shrink-0">
-            <TrendingUp className="w-6 h-6 md:w-7 h-7 text-orange-600" />
+          <div className="bg-orange-50 p-2 md:p-2.5 rounded-xl flex-shrink-0">
+            <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
           </div>
           <div>
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.marketConnect}</h2>
@@ -165,12 +165,12 @@ export default function MarketConnect({
           transition={{ delay: 0.1 }}
           className="lg:col-span-4"
         >
-          <div className="bg-white rounded-[32px] p-6 lg:p-8 shadow-xl shadow-orange-900/5 border border-orange-100 relative overflow-hidden space-y-6">
-            <div className="space-y-6 relative z-10">
+          <div className="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl shadow-orange-900/5 border border-orange-100 relative overflow-hidden space-y-4 sm:space-y-6">
+            <div className="space-y-4 sm:space-y-5 relative z-10">
               
               {/* Product Selection */}
-              <div className="space-y-3">
-                <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
+              <div className="space-y-2">
+                <label className="flex items-center text-xs sm:text-sm font-black text-gray-800 uppercase tracking-widest">
                   <Package className="w-4 h-4 mr-2 text-orange-500" />
                   {t.produceName}
                 </label>
@@ -178,7 +178,7 @@ export default function MarketConnect({
                   <select 
                     value={produce} 
                     onChange={(e) => setProduce(e.target.value)}
-                    className="w-full appearance-none rounded-2xl border border-gray-200 shadow-sm focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 bg-gray-50 p-4 pr-10 text-base font-bold text-gray-900 transition-all outline-none"
+                    className="w-full appearance-none rounded-xl sm:rounded-2xl border border-gray-200 shadow-sm focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 bg-gray-50 p-3 sm:p-3.5 pr-10 text-sm sm:text-base font-bold text-gray-900 transition-all outline-none"
                   >
                     {PRODUCE_TYPES.map(p => (
                       <option key={p} value={p}>
@@ -191,16 +191,16 @@ export default function MarketConnect({
               </div>
 
               {/* Location */}
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center text-sm font-black text-gray-800 uppercase tracking-widest">
+                  <label className="flex items-center text-xs sm:text-sm font-black text-gray-800 uppercase tracking-widest">
                     <MapPin className="w-4 h-4 mr-2 text-emerald-500" />
                     Market Region
                   </label>
                   <button 
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
-                    className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl transition-all ${
+                    className={`flex items-center space-x-1 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl transition-all ${
                       coords 
                         ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -219,7 +219,7 @@ export default function MarketConnect({
                 {coords ? (
                   <LocationDisplay coords={coords} lang={lang} color="emerald" />
                 ) : (
-                  <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-2xl text-center">
+                  <div className="p-3.5 sm:p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl sm:rounded-2xl text-center">
                     <p className="text-gray-500 text-xs font-medium">Use your location to find the nearest wholesale rates.</p>
                   </div>
                 )}
@@ -227,7 +227,7 @@ export default function MarketConnect({
 
               {/* Advanced / Premium Toggle */}
               {tier === 'premium' ? (
-                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-2xl border border-amber-100 flex items-center justify-between">
+                <div className="p-3 sm:p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-xl sm:rounded-2xl border border-amber-100 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
                       <input 
@@ -239,7 +239,7 @@ export default function MarketConnect({
                       />
                       <label htmlFor="advancedMarket" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-amber-400' : ''}`}></label>
                     </div>
-                    <label htmlFor="advancedMarket" className={`text-sm font-black uppercase tracking-widest flex items-center text-gray-800`}>
+                    <label htmlFor="advancedMarket" className={`text-xs sm:text-sm font-black uppercase tracking-widest flex items-center text-gray-800`}>
                       <Sparkles className="w-4 h-4 mr-1.5 text-amber-500" />
                       {t.advancedAnalysis}
                     </label>
@@ -249,14 +249,14 @@ export default function MarketConnect({
                   </Tooltip>
                 </div>
               ) : canUsePremium() && (
-                 <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl flex items-center justify-between">
+                 <div className="p-3 sm:p-4 bg-orange-50 border border-orange-100 rounded-xl sm:rounded-2xl flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="bg-orange-100 p-2 rounded-xl">
-                      <Sparkles className="w-5 h-5 text-orange-600" />
+                      <Sparkles className="w-4 h-4 text-orange-600" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-gray-900">Premium Analysis</h4>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">1 free daily run</p>
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900">Premium Analysis</h4>
+                      <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-wider font-bold">1 free daily run</p>
                     </div>
                   </div>
                   <button
@@ -269,8 +269,8 @@ export default function MarketConnect({
               )}
 
               {/* Usage Bar */}
-              <div className="py-2">
-                <div className="flex justify-between items-center mb-2">
+              <div className="py-1">
+                <div className="flex justify-between items-center mb-1.5">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
                   <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
                 </div>
@@ -289,7 +289,7 @@ export default function MarketConnect({
                 whileTap={{ scale: 0.98 }}
                 onClick={handleGetInsights}
                 disabled={isLoading}
-                className="w-full bg-gray-900 text-white font-bold py-4 px-6 rounded-2xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-colors text-lg"
+                className="w-full bg-gray-900 text-white font-bold py-3.5 sm:py-4 px-5 rounded-xl sm:rounded-2xl hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2.5 transition-colors text-base sm:text-lg min-h-[48px] cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -315,21 +315,21 @@ export default function MarketConnect({
                 key="insights"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full"
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 h-full"
               >
                 {/* Cross-Module Linked Action Bar */}
                 {onNavigateTab && (
-                  <div className="md:col-span-2 bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 p-5 md:p-6 rounded-[2rem] text-white flex flex-col sm:flex-row items-center justify-between gap-4 border border-emerald-800 shadow-md">
-                    <div className="flex items-center space-x-3.5 text-left">
-                      <div className="p-3 bg-emerald-500/20 text-emerald-300 rounded-2xl shrink-0 border border-emerald-400/30">
+                  <div className="md:col-span-2 bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 p-4 sm:p-5 md:p-6 rounded-2xl md:rounded-3xl text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 border border-emerald-800 shadow-md">
+                    <div className="flex items-center space-x-3 text-left">
+                      <div className="p-2.5 bg-emerald-500/20 text-emerald-300 rounded-xl shrink-0 border border-emerald-400/30">
                         <Calculator className="w-5 h-5 stroke-[2.5]" />
                       </div>
-                      <div>
-                        <h4 className="font-black text-sm text-white leading-tight">
-                          {lang === 'bn' ? 'এই ফসলের প্রকৃত লাভ ও ব্রেক-ইভেন ব্যয় হিসাব করুন' : 'Calculate Profit Margin & Net Production Cost'}
+                      <div className="min-w-0">
+                        <h4 className="font-black text-xs sm:text-sm text-white leading-tight truncate">
+                          {lang === 'bn' ? 'এই ফসলের প্রকৃত লাভ ও ব্রেক-ইভেন ব্যয় হিসাব করুন' : 'Calculate Profit Margin & Net Cost'}
                         </h4>
-                        <p className="text-xs text-emerald-300 font-medium mt-0.5">
-                          {lang === 'bn' ? 'পাইকার ও ফরিয়াদের কাছে বিক্রির আগে আপনার আসল খরচ জেনে নিন' : 'Know your true baseline cost before trading with intermediaries'}
+                        <p className="text-[11px] sm:text-xs text-emerald-300 font-medium mt-0.5 line-clamp-1">
+                          {lang === 'bn' ? 'পাইকারদের কাছে বিক্রির আগে আপনার আসল উৎপাদন খরচ জানুন' : 'Know your true baseline cost before trading'}
                         </p>
                       </div>
                     </div>
@@ -337,15 +337,15 @@ export default function MarketConnect({
                       <button
                         type="button"
                         onClick={() => onNavigateTab('krishi-profit', { crop: produce })}
-                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-3 px-4 bg-emerald-400 hover:bg-emerald-300 active:scale-95 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md min-h-[44px] cursor-pointer"
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-2.5 px-3.5 bg-emerald-400 hover:bg-emerald-300 active:scale-95 text-emerald-950 font-black text-xs rounded-xl transition-all shadow-md min-h-[40px] cursor-pointer"
                       >
                         <span>{lang === 'bn' ? 'মুনাফা হিসাব' : 'Profit Calculator'}</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
                         onClick={() => onNavigateTab('agri-copilot', { crop: produce })}
-                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-3 px-4 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs rounded-xl border border-white/20 transition-all min-h-[44px] cursor-pointer"
+                        className="flex-1 sm:flex-none flex items-center justify-center space-x-2 py-2.5 px-3.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white font-bold text-xs rounded-xl border border-white/20 transition-all min-h-[40px] cursor-pointer"
                       >
                         <span>{lang === 'bn' ? 'এআই ডাক্তার' : 'AI Doctor'}</span>
                       </button>
@@ -354,42 +354,42 @@ export default function MarketConnect({
                 )}
 
                 {/* Main Executive Summary */}
-                <div className="md:col-span-2 bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
+                <div className="md:col-span-2 bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">
                     <div className="flex items-center space-x-3">
-                      <div className="bg-orange-50 p-2.5 rounded-xl text-orange-600">
-                        <TrendingUp className="w-6 h-6" />
+                      <div className="bg-orange-50 p-2 sm:p-2.5 rounded-xl text-orange-600">
+                        <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-gray-900 tracking-tight">Market Analytics</h3>
+                        <h3 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">Market Analytics</h3>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">Live Assessment</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100 uppercase tracking-widest">
                       Updated {lastUpdated || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="markdown-body text-base leading-relaxed prose prose-orange max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-orange-600">
+                  <div className="markdown-body text-sm sm:text-base leading-relaxed prose prose-orange max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-orange-600">
                     <ReactMarkdown>{insights.insights}</ReactMarkdown>
                   </div>
                 </div>
 
                 {/* Price Drivers */}
                 {insights.priceDrivers && insights.priceDrivers.length > 0 && (
-                  <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm flex flex-col">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-blue-50 p-2.5 rounded-xl text-blue-600 mr-3">
+                  <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm flex flex-col">
+                    <div className="flex items-center mb-4 sm:mb-6">
+                      <div className="bg-blue-50 p-2 sm:p-2.5 rounded-xl text-blue-600 mr-3">
                         <Activity className="w-5 h-5" />
                       </div>
-                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                      <h4 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-widest">
                         {lang === 'bn' ? 'মূল্যের গতিপথ' : 'Price Drivers'}
                       </h4>
                     </div>
-                    <ul className="space-y-4 flex-1">
+                    <ul className="space-y-3 flex-1">
                       {insights.priceDrivers.map((driver: string, idx: number) => (
-                        <li key={idx} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                          <AlertCircle className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700 font-medium leading-relaxed">{driver}</span>
+                        <li key={idx} className="flex items-start space-x-2.5 p-3 sm:p-4 bg-gray-50 rounded-xl sm:rounded-2xl border border-gray-100">
+                          <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0 mt-0.5" />
+                          <span className="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">{driver}</span>
                         </li>
                       ))}
                     </ul>
@@ -398,26 +398,26 @@ export default function MarketConnect({
 
                 {/* Nearest Markets */}
                 {insights.nearestMarkets && (
-                  <div className="bg-white p-6 md:p-8 rounded-[32px] border border-gray-100 shadow-sm flex flex-col">
-                    <div className="flex items-center mb-6">
-                      <div className="bg-emerald-50 p-2.5 rounded-xl text-emerald-600 mr-3">
+                  <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm flex flex-col">
+                    <div className="flex items-center mb-4 sm:mb-6">
+                      <div className="bg-emerald-50 p-2 sm:p-2.5 rounded-xl text-emerald-600 mr-3">
                         <Store className="w-5 h-5" />
                       </div>
-                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                      <h4 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-widest">
                         {lang === 'bn' ? 'নিকটস্থ পাইকারি বাজার' : 'Nearest Wholesale Hubs'}
                       </h4>
                     </div>
-                    <div className="space-y-3 flex-1 overflow-y-auto">
+                    <div className="space-y-2.5 flex-1 overflow-y-auto">
                       {insights.nearestMarkets.map((m: any, idx: number) => (
                         <div 
                           key={idx} 
-                          className="flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 group hover:bg-emerald-50 transition-colors"
+                          className="flex items-center justify-between p-3 sm:p-4 bg-emerald-50/50 rounded-xl sm:rounded-2xl border border-emerald-100 group hover:bg-emerald-50 transition-colors"
                         >
-                          <div className="flex items-center space-x-3">
-                            <Store className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold text-gray-800 text-sm">{m.name}</span>
+                          <div className="flex items-center space-x-2.5 min-w-0">
+                            <Store className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span className="font-bold text-gray-800 text-xs sm:text-sm truncate">{m.name}</span>
                           </div>
-                          <span className="text-[10px] font-black text-emerald-700 bg-white shadow-sm px-3 py-1.5 rounded-xl border border-emerald-100 uppercase overflow-hidden whitespace-nowrap">
+                          <span className="text-[10px] font-black text-emerald-700 bg-white shadow-xs px-2.5 py-1 rounded-lg sm:rounded-xl border border-emerald-100 uppercase overflow-hidden whitespace-nowrap shrink-0 ml-2">
                             {m.distance}
                           </span>
                         </div>
@@ -431,13 +431,13 @@ export default function MarketConnect({
                 key="empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="bg-white rounded-[40px] border border-gray-200 h-full min-h-[500px] flex flex-col items-center justify-center p-10 text-center shadow-sm"
+                className="bg-white rounded-2xl md:rounded-3xl border border-gray-200 h-full min-h-[350px] sm:min-h-[450px] flex flex-col items-center justify-center p-6 sm:p-10 text-center shadow-sm"
               >
-                <div className="bg-gray-50 p-6 rounded-[24px] mb-6">
-                  <BarChart className="w-12 h-12 text-gray-300" />
+                <div className="bg-gray-50 p-5 rounded-2xl mb-4">
+                  <BarChart className="w-10 h-10 text-gray-300" />
                 </div>
-                <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2">Market Intelligence</h3>
-                <p className="text-sm font-medium text-gray-500 max-w-sm leading-relaxed">
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight mb-2">Market Intelligence</h3>
+                <p className="text-xs sm:text-sm font-medium text-gray-500 max-w-sm leading-relaxed">
                   Enter your produce and location to fetch real-time market insights and nearby wholesale pricing.
                 </p>
               </motion.div>

@@ -127,16 +127,16 @@ export default function SmartGrade({ lang }: Props) {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="lg:col-span-12 xl:col-span-5 space-y-5 bg-white p-6 md:p-8 rounded-[28px] md:rounded-[32px] border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden"
+          className="lg:col-span-12 xl:col-span-5 space-y-4 sm:space-y-5 bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 pointer-events-none"></div>
           
-          <div className="relative z-10 space-y-6">
+          <div className="relative z-10 space-y-4 sm:space-y-5">
             <div className="space-y-2">
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.captureBatch}</label>
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-blue-200 rounded-[32px] p-2 text-center cursor-pointer hover:border-blue-400 transition-all bg-blue-50/30 relative overflow-hidden group min-h-[240px] flex items-center justify-center shadow-inner"
+                className="border-2 border-dashed border-blue-200 rounded-2xl md:rounded-3xl p-2 text-center cursor-pointer hover:border-blue-400 transition-all bg-blue-50/30 relative overflow-hidden group min-h-[220px] sm:min-h-[240px] flex items-center justify-center shadow-inner"
               >
                 {image ? (
                   <motion.img 
@@ -148,11 +148,11 @@ export default function SmartGrade({ lang }: Props) {
                     referrerPolicy="no-referrer"
                   />
                 ) : null}
-                <div className="relative z-10 flex flex-col items-center justify-center space-y-4">
-                  <div className="bg-white p-5 rounded-full text-blue-600 shadow-xl group-hover:scale-110 transition-transform border border-blue-50">
-                    <Camera className="w-10 h-10" />
+                <div className="relative z-10 flex flex-col items-center justify-center space-y-3 sm:space-y-4">
+                  <div className="bg-white p-4 sm:p-5 rounded-full text-blue-600 shadow-xl group-hover:scale-110 transition-transform border border-blue-50">
+                    <Camera className="w-8 h-8 sm:w-10 sm:h-10" />
                   </div>
-                  <div className="text-xs font-black text-blue-700 uppercase tracking-widest bg-white/90 backdrop-blur-md px-6 py-2.5 rounded-full shadow-sm border border-blue-100">
+                  <div className="text-xs font-black text-blue-700 uppercase tracking-widest bg-white/90 backdrop-blur-md px-5 sm:px-6 py-2 sm:py-2.5 rounded-full shadow-sm border border-blue-100">
                     {image ? 'Tap to change image' : 'Tap to take photo of batch'}
                   </div>
                 </div>
@@ -167,12 +167,12 @@ export default function SmartGrade({ lang }: Props) {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
               <select 
                 value={produce} 
                 onChange={(e) => setProduce(e.target.value)}
-                className="w-full rounded-2xl border-blue-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50/30 p-4 border text-base font-bold text-gray-900 transition-all"
+                className="w-full rounded-xl sm:rounded-2xl border-blue-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50/30 p-3 sm:p-3.5 border text-sm sm:text-base font-bold text-gray-900 transition-all"
               >
                 {PRODUCE_TYPES.map(p => (
                   <option key={p} value={p}>
@@ -182,7 +182,7 @@ export default function SmartGrade({ lang }: Props) {
               </select>
             </div>
 
-            <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-white p-4 rounded-2xl border border-blue-100 shadow-inner">
+            <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-white p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-100 shadow-inner">
               <div className="flex items-center space-x-3">
                 <div className="relative inline-block w-10 h-6 transition duration-200 ease-in-out rounded-full cursor-pointer">
                   <input 
@@ -195,7 +195,7 @@ export default function SmartGrade({ lang }: Props) {
                   />
                   <label htmlFor="advancedGrade" className={`block h-6 overflow-hidden bg-gray-200 rounded-full cursor-pointer ${isAdvanced ? 'bg-blue-400' : ''}`}></label>
                 </div>
-                <label htmlFor="advancedGrade" className={`text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
+                <label htmlFor="advancedGrade" className={`text-xs sm:text-sm font-black uppercase tracking-widest flex items-center ${tier === 'premium' ? 'text-gray-700' : 'text-gray-400'}`}>
                   <Sparkles className="w-4 h-4 mr-1.5 text-yellow-500" />
                   {t.advancedAnalysis}
                 </label>
@@ -205,8 +205,8 @@ export default function SmartGrade({ lang }: Props) {
               </Tooltip>
             </div>
 
-            <div className="pt-2">
-              <div className="flex justify-between items-center mb-2">
+            <div className="pt-1">
+              <div className="flex justify-between items-center mb-1.5">
                 <div className="flex items-center space-x-1">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
                   <Tooltip content={t.tooltips.usage}>
@@ -225,20 +225,20 @@ export default function SmartGrade({ lang }: Props) {
             </div>
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleGrade}
               disabled={!image || isLoading || !isOnline}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-lg tracking-tight"
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-3.5 sm:py-4 px-5 rounded-xl sm:rounded-2xl hover:shadow-lg hover:shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2.5 transition-all text-base sm:text-lg tracking-tight min-h-[48px] cursor-pointer"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-7 h-7 animate-spin" />
+                  <Loader2 className="w-6 h-6 animate-spin" />
                   <span>{t.gradingBatch}</span>
                 </>
               ) : (
                 <>
-                  <Award className="w-7 h-7" />
+                  <Award className="w-6 h-6" />
                   <span>{t.generateCert}</span>
                 </>
               )}
@@ -247,45 +247,45 @@ export default function SmartGrade({ lang }: Props) {
         </motion.div>
 
         {/* Results Section */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-4 sm:space-y-6">
           <AnimatePresence mode="wait">
             {result ? (
               <motion.div 
                 key="result"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-1 rounded-[28px] md:rounded-[32px] shadow-2xl shadow-blue-200 h-full"
+                className="bg-white rounded-2xl md:rounded-3xl border border-blue-200 shadow-xl overflow-hidden h-full flex flex-col"
               >
-                <div className="bg-white/95 backdrop-blur-xl rounded-[26px] md:rounded-[30px] p-5 md:p-8 h-full flex flex-col relative overflow-hidden">
+                <div className="p-4 sm:p-6 md:p-8 h-full flex flex-col relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
                   
                   <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-6 md:mb-8">
-                      <div className="flex items-center space-x-3 md:space-x-4">
-                        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 md:p-3 rounded-2xl shadow-lg shadow-blue-100">
-                          <FileCheck className="w-5 h-5 md:w-6 h-6 text-white" />
+                    <div className="flex items-center justify-between mb-4 sm:mb-6">
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-2.5 rounded-xl shadow-md text-white">
+                          <FileCheck className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-lg md:text-xl font-black text-gray-900 tracking-tight">{t.certTitle}</h3>
+                          <h3 className="text-base sm:text-lg md:text-xl font-black text-gray-900 tracking-tight">{t.certTitle}</h3>
                           <div className="flex items-center mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 animate-pulse"></span>
                             <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verified by Agri-AI</span>
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Issue Date</p>
-                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-100 uppercase tracking-widest">
+                      <div className="text-right shrink-0">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Issue Date</p>
+                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">
                           {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8 border-b border-gray-100 pb-6 md:pb-8">
-                      <div className="space-y-4 md:space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6 border-b border-gray-100 pb-4 sm:pb-6">
+                      <div className="space-y-3">
                         <div>
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-2">{t.produceType}</p>
-                          <p className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">{t.produce[produce as keyof typeof t.produce]}</p>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.produceType}</p>
+                          <p className="text-xl sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">{t.produce[produce as keyof typeof t.produce]}</p>
                         </div>
                         <div className="flex items-center space-x-4">
                           <div className="bg-green-50 px-3 py-1.5 rounded-xl border border-green-100 flex items-center space-x-2">
@@ -294,12 +294,12 @@ export default function SmartGrade({ lang }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col items-center md:items-end justify-center">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-2">{t.assignedGrade}</p>
+                      <div className="flex flex-col items-start sm:items-end justify-center">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.assignedGrade}</p>
                         <motion.div 
                           initial={{ scale: 0.5, rotate: -10 }}
                           animate={{ scale: 1, rotate: 0 }}
-                          className={`text-6xl md:text-7xl font-black tracking-tighter drop-shadow-xl ${
+                          className={`text-5xl sm:text-6xl md:text-7xl font-black tracking-tighter drop-shadow-md ${
                             result.grade.includes('A') ? 'text-green-600' : result.grade.includes('B') ? 'text-yellow-600' : 'text-red-600'
                           }`}
                         >
@@ -308,25 +308,24 @@ export default function SmartGrade({ lang }: Props) {
                       </div>
                     </div>
 
-                    <div className="space-y-6 flex-1">
+                    <div className="space-y-4 sm:space-y-6 flex-1">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 md:mb-4">{t.justification}</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{t.justification}</p>
                         <motion.div 
-                          initial={{ opacity: 0, y: 20 }}
+                          initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="bg-white rounded-[24px] p-5 md:p-6 border border-gray-100 shadow-sm relative overflow-hidden"
+                          className="bg-gray-50/70 rounded-xl sm:rounded-2xl p-3.5 sm:p-5 border border-gray-100 shadow-inner relative overflow-hidden"
                         >
-                          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-20"></div>
-                          <div className="markdown-body text-sm md:text-base leading-relaxed prose prose-blue max-w-none">
+                          <div className="markdown-body text-xs sm:text-sm md:text-base leading-relaxed prose prose-blue max-w-none">
                             <ReactMarkdown>{result.justification}</ReactMarkdown>
                           </div>
                         </motion.div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <motion.div 
-                          whileHover={{ y: -3 }}
-                          className="bg-gradient-to-br from-white to-blue-50/30 p-4 md:p-5 rounded-[24px] border border-blue-100 shadow-sm"
+                          whileHover={{ y: -2 }}
+                          className="bg-gradient-to-br from-white to-blue-50/30 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-100 shadow-xs"
                         >
                           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex items-center">
                             <Calendar className="w-3 h-3 mr-2 text-blue-500" />

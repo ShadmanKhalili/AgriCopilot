@@ -731,35 +731,35 @@ export default function AgriCopilot({
       </div>
 
       {/* Dual Mode Switcher: Static Image Diagnostic vs Gemini 3.8 Live Video Multimodal Stream */}
-      <div className="bg-emerald-950/10 p-1.5 rounded-2xl border border-emerald-500/20 w-full flex gap-2">
+      <div className="bg-emerald-950/5 p-1 rounded-2xl border border-emerald-500/20 w-full flex gap-1.5 shadow-xs">
         <button
           type="button"
           onClick={() => setCopilotMode('static_upload')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap ${
             copilotMode === 'static_upload'
-              ? 'bg-white text-emerald-950 shadow-md shadow-emerald-900/10 border border-emerald-200'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white text-emerald-950 shadow-sm border border-emerald-200'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
-          <Camera className="w-4 h-4 text-emerald-600" />
-          <span className="truncate">{lang === 'bn' ? '📸 ফটো স্ক্যান ও প্রেসক্রিপশন' : '📸 Photo Scan & Prescription'}</span>
+          <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+          <span className="truncate">{lang === 'bn' ? 'ফটো প্রেসক্রিপশন' : 'Photo Prescription'}</span>
         </button>
 
         <button
           type="button"
           onClick={() => setCopilotMode('live_stream')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition-all cursor-pointer relative ${
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer relative whitespace-nowrap ${
             copilotMode === 'live_stream'
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/30'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-sm shadow-emerald-600/30'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
-          <span className="relative flex h-2 w-2">
+          <span className="relative flex h-2 w-2 shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
-          <Video className="w-4 h-4" />
-          <span className="truncate">{lang === 'bn' ? '📹 জেমিনি ৩.৮ লাইভ ভিডিও' : '📹 Gemini 3.8 Live Video'}</span>
+          <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+          <span className="truncate">{lang === 'bn' ? 'লাইভ ভিডিও এআই' : 'Live Video AI'}</span>
         </button>
       </div>
 

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, Volume2, VolumeX, Globe, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
-import Markdown from 'react-markdown';
-import { translateText, generateWeatherAdvisory, generateSpeech } from '../services/ai';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
@@ -67,7 +65,6 @@ interface WeatherData {
 export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocation }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [advisory, setAdvisory] = useState<string | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isManualLocation, setIsManualLocation] = useState(false);
@@ -75,35 +72,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [forecastModel, setForecastModel] = useState<'weathernext3' | 'standard'>('weathernext3');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const audioRef = React.useRef<HTMLAudioElement>(null);
   const t = translations[lang];
-
-  const handleTranslate = async () => {
-    if (!advisory) return;
-    setIsTranslating(true);
-    try {
-      const targetLang = lang === 'en' ? 'English' : 'Bengali';
-      const translatedText = await translateText(advisory, targetLang);
-      setAdvisory(translatedText);
-      
-      // Stop current speech if any
-      if (isSpeaking) {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }
-        setIsSpeaking(false);
-      }
-    } catch (error) {
-      console.error("Translation error:", error);
-    } finally {
-      setIsTranslating(false);
-    }
-  };
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
   const activeUpazila = activeDistrict?.upazilas.find(u => u.id === selectedUpazila);
@@ -136,63 +105,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         latitude: upazila.lat,
         longitude: upazila.lng
       });
-    }
-  };
-
-  const toggleSpeech = async () => {
-    if (!advisory) return;
-
-    if (isSpeaking) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
-      setIsSpeaking(false);
-      return;
-    }
-
-    setIsAudioLoading(true);
-    try {
-      const plainText = advisory.replace(/[*#_]/g, '');
-      const base64Audio = await generateSpeech(plainText);
-      
-      if (base64Audio) {
-        const binaryString = atob(base64Audio);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        
-        const blob = new Blob([bytes], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        
-        if (audioRef.current) {
-          audioRef.current.src = url;
-          audioRef.current.play();
-          setIsSpeaking(true);
-        }
-      }
-    } catch (error) {
-      console.error("Speech error, attempting Web Speech API fallback:", error);
-      // Seamless browser speech synthesis fallback
-      try {
-        if ('speechSynthesis' in window) {
-          const plainText = advisory.replace(/[*#_`]/g, '');
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(plainText);
-          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-          utterance.onstart = () => setIsSpeaking(true);
-          utterance.onend = () => setIsSpeaking(false);
-          utterance.onerror = () => setIsSpeaking(false);
-          window.speechSynthesis.speak(utterance);
-        }
-      } catch (synthErr) {
-        console.warn("Browser Speech Synthesis fallback failed:", synthErr);
-      }
-    } finally {
-      setIsAudioLoading(false);
     }
   };
 
@@ -463,26 +375,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       
       setWeather(newWeather);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-      // 4. Generate AI Advisory
-      try {
-        const advisoryText = await generateWeatherAdvisory(newWeather, lang, globalLocation);
-        setAdvisory(advisoryText);
-      } catch (aiError: any) {
-        console.error("Advisory generation failed", aiError);
-        const isQuotaError = aiError.message?.includes('429') || aiError.message?.includes('RESOURCE_EXHAUSTED');
-        const fallbackMsg = isQuotaError 
-          ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Weather data loaded, but personalized advisory is delayed. Please check the stats below.')
-          : (lang === 'bn' ? 'পরামর্শ তৈরিতে সমস্যা হয়েছে। ' : "Weather data loaded, but we couldn't generate a personalized AI advisory at this moment. Please check the stats below.");
-        setAdvisory(fallbackMsg);
-      }
     } catch (error: any) {
-      console.error("Weather/Advisory error:", error);
-      const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
-      const errorMsg = isQuotaError
-        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
-        : `Failed to load weather data. Please try again later. (Debug: ${error.message || 'Network error or server timeout. Check your connection.'})`;
-      setAdvisory(errorMsg);
+      console.error("Weather data fetch error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -587,7 +481,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => {
-                setAdvisory(null);
                 fetchWeatherAndAdvisory();
               }}
               className="inline-flex items-center justify-center space-x-2 text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
@@ -698,15 +591,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             />
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="space-y-6 w-full">
             {/* Weather Dashboard Card */}
-            <div className="lg:col-span-5 space-y-6">
             <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white p-8 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white p-6 sm:p-8 rounded-[36px] md:rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden"
             >
-              <div className="flex items-center justify-between mb-10">
+              <div className="flex items-center justify-between mb-8 sm:mb-10">
                 <div>
                   <h3 className="font-black text-gray-900 text-2xl tracking-tight">{t.weatherForecast}</h3>
                   <div className="flex items-center mt-1">
@@ -1060,6 +952,39 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     </div>
                   )}
 
+                  {/* Historical Climate Comparison */}
+                  {(weather.historicalAvgTemp !== undefined || weather.historicalToday !== undefined) && (
+                    <div className="bg-blue-50/40 p-5 rounded-3xl border border-blue-100/80 shadow-sm mt-4">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <History className="w-4 h-4 text-blue-600" />
+                        <h4 className="font-bold text-sm text-gray-900">{lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}</h4>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {weather.historicalToday && (
+                          <div className="bg-white p-3.5 rounded-2xl border border-blue-100/60 shadow-xs">
+                            <p className="text-xs font-bold text-blue-900 mb-2">
+                              {lang === 'bn' ? 'গত বছর আজকের দিনে' : 'Last Year on This Day'}
+                            </p>
+                            <div className="flex flex-wrap gap-4 text-xs text-gray-700">
+                              <span className="flex items-center gap-1"><Thermometer className="w-3.5 h-3.5 text-red-400" /> Max: {weather.historicalToday.maxTemp}°C</span>
+                              <span className="flex items-center gap-1"><Thermometer className="w-3.5 h-3.5 text-blue-400" /> Min: {weather.historicalToday.minTemp}°C</span>
+                              <span className="flex items-center gap-1"><CloudRain className="w-3.5 h-3.5 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {weather.historicalAvgTemp !== undefined && (
+                          <p className="text-xs text-gray-600 px-1 leading-relaxed">
+                            {lang === 'bn' 
+                              ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
+                              : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {lastUpdated && (
                     <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Updated</span>
@@ -1076,174 +1001,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             </motion.div>
           </div>
 
-          {/* AI Advisory Card */}
-          <div className="lg:col-span-7 space-y-6">
-            {/* Historical Climate Comparison */}
-            {(weather?.historicalAvgTemp !== undefined || weather?.historicalToday !== undefined) && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-3xl border border-blue-100 shadow-sm"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <History className="w-5 h-5 text-blue-500" />
-                  <h4 className="font-bold text-gray-900">{lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}</h4>
-                </div>
-                
-                <div className="space-y-4">
-                  {weather.historicalToday && (
-                    <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
-                      <p className="text-sm font-bold text-blue-900 mb-2">
-                        {lang === 'bn' ? 'গত বছর আজকের দিনে' : 'Last Year on This Day'}
-                      </p>
-                      <div className="flex flex-wrap gap-4 text-sm text-gray-700">
-                        <span className="flex items-center gap-1"><Thermometer className="w-4 h-4 text-red-400" /> Max: {weather.historicalToday.maxTemp}°C</span>
-                        <span className="flex items-center gap-1"><Thermometer className="w-4 h-4 text-blue-400" /> Min: {weather.historicalToday.minTemp}°C</span>
-                        <span className="flex items-center gap-1"><CloudRain className="w-4 h-4 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {weather.historicalAvgTemp !== undefined && (
-                    <p className="text-sm text-gray-600 px-1">
-                      {lang === 'bn' 
-                        ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
-                        : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-            )}
-
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 p-1 rounded-[40px] shadow-2xl shadow-blue-200 h-full"
-            >
-              <div className="bg-white/95 backdrop-blur-xl rounded-[38px] p-8 md:p-10 h-full flex flex-col relative overflow-hidden">
-                {/* Translation Loading Overlay */}
-                <AnimatePresence>
-                  {isTranslating && (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4"
-                    >
-                      <div className="relative">
-                        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-                        <Globe className="w-6 h-6 text-blue-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                      </div>
-                      <p className="text-blue-600 font-black uppercase tracking-widest text-xs animate-pulse">
-                        {lang === 'bn' ? 'অনুবাদ করা হচ্ছে...' : 'Translating...'}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center space-x-4">
-                    <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-2xl shadow-lg shadow-blue-100">
-                      <Sparkles className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-gray-900 tracking-tight">{t.farmingAdvisory}</h3>
-                      <p className="text-xs font-bold text-blue-500 uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                        {weather?.isWeatherNext3 ? (
-                          <>
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span>WeatherNext 3 • 5km DeepMind Ensemble</span>
-                          </>
-                        ) : (
-                          'AI-Powered Insights'
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  {advisory && (
-                    <div className="flex items-center space-x-2">
-                      <button 
-                        onClick={handleTranslate}
-                        disabled={isTranslating}
-                        className="flex items-center space-x-1 text-[10px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all"
-                      >
-                        {isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                        <span className="hidden sm:inline">{lang === 'en' ? 'Translate to EN' : 'Translate to BN'}</span>
-                      </button>
-                        <button
-                          onClick={toggleSpeech}
-                          disabled={isAudioLoading}
-                          className={`flex items-center space-x-2 px-4 py-2 rounded-2xl transition-all duration-300 font-black uppercase text-[10px] tracking-widest ${
-                            isSpeaking 
-                              ? 'bg-red-100 text-red-600 shadow-inner' 
-                              : 'bg-green-500 text-white hover:bg-green-600 hover:shadow-lg hover:shadow-green-500/30'
-                          } ${isAudioLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          title={isSpeaking ? "Stop listening" : "Listen to advisory"}
-                        >
-                          {isAudioLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : isSpeaking ? (
-                            <VolumeX className="w-5 h-5" />
-                          ) : (
-                            <Volume2 className="w-5 h-5" />
-                          )}
-                          <span className="hidden sm:inline">
-                            {isSpeaking ? (lang === 'bn' ? 'থামান' : 'Stop') : (lang === 'bn' ? 'শুনুন' : 'Listen')}
-                          </span>
-                        </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  {isLoading ? (
-                    <div className="flex flex-col items-center justify-center h-full py-12 space-y-6">
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-blue-400 rounded-full blur-xl opacity-20 animate-pulse"></div>
-                        <Loader2 className="w-16 h-16 animate-spin text-blue-600 relative z-10" />
-                      </div>
-                      <div className="text-center">
-                        <p className="text-blue-600 font-black text-lg animate-pulse">{t.tooltips.aiThinking}</p>
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Analyzing local climate patterns</p>
-                      </div>
-                    </div>
-                  ) : advisory ? (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="bg-blue-50/50 rounded-3xl p-8 border border-blue-100 shadow-inner"
-                    >
-                      <div className="markdown-body text-gray-800 leading-relaxed prose prose-blue max-w-none">
-                        <Markdown>{advisory}</Markdown>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-                      <div className="bg-gray-50 p-6 rounded-full mb-6">
-                        <AlertTriangle className="w-16 h-16 text-gray-200" />
-                      </div>
-                      <h4 className="text-xl font-bold text-gray-900 mb-2">No Advisory Yet</h4>
-                      <p className="text-gray-400 font-medium max-w-xs mx-auto">Please detect your location to receive personalized farming tips based on real-time weather.</p>
-                    </div>
-                  )}
-                </div>
-
-                {advisory && !isLoading && (
-                  <div className="mt-8 pt-8 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Localized for your GPS</span>
-                    </div>
-                    <Tooltip content="This advice is generated based on your specific location and current weather conditions.">
-                      <HelpCircle className="w-4 h-4 text-gray-300 cursor-help" />
-                    </Tooltip>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        </div>
-
         {/* Integrated Proactive Spray Schedule & Calendar */}
         <div className="mt-8 w-full">
           <CropLifecycleCalendar 
@@ -1253,12 +1010,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         </div>
       </div>
       )}
-      {/* Hidden Audio for TTS */}
-      <audio 
-        ref={audioRef} 
-        onEnded={() => setIsSpeaking(false)} 
-        className="hidden" 
-      />
     </motion.div>
   );
 }

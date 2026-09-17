@@ -248,36 +248,36 @@ export default function MicroclimateRadarSimulator({
 
             {/* 15 km Outer Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[280px] border border-cyan-500/20 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/60 bg-slate-950/80 px-1 rounded -translate-y-2">
-                15 km ({lang === 'bn' ? '১৫ কিমি' : '15 km'})
+              <span className="text-[9px] font-mono text-cyan-400/60 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+                {lang === 'bn' ? '১৫ কিমি' : '15 km'}
               </span>
             </div>
 
             {/* 10 km Mid Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[190px] h-[190px] border border-cyan-500/30 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/70 bg-slate-950/80 px-1 rounded -translate-y-2">
-                10 km ({lang === 'bn' ? '১০ কিমি' : '10 km'})
+              <span className="text-[9px] font-mono text-cyan-400/70 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+                {lang === 'bn' ? '১০ কিমি' : '10 km'}
               </span>
             </div>
 
             {/* 5 km Inner Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] border border-cyan-500/40 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/80 bg-slate-950/80 px-1 rounded -translate-y-2">
-                5 km ({lang === 'bn' ? '৫ কিমি' : '5 km'})
+              <span className="text-[9px] font-mono text-cyan-400/80 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+                {lang === 'bn' ? '৫ কিমি' : '5 km'}
               </span>
             </div>
 
             {/* Cardinal Direction Markers */}
-            <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-mono font-bold text-cyan-400/60 bg-slate-900/80 px-1.5 py-0.5 rounded">
+            <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'উ (N)' : 'N'}
             </span>
-            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono font-bold text-cyan-400/60 bg-slate-900/80 px-1.5 py-0.5 rounded">
+            <span className="absolute bottom-16 left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'দ (S)' : 'S'}
             </span>
-            <span className="absolute top-1/2 right-2 -translate-y-1/2 text-[10px] font-mono font-bold text-cyan-400/60 bg-slate-900/80 px-1.5 py-0.5 rounded">
+            <span className="absolute top-1/2 right-2 -translate-y-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'পূ (E)' : 'E'}
             </span>
-            <span className="absolute top-1/2 left-2 -translate-y-1/2 text-[10px] font-mono font-bold text-cyan-400/60 bg-slate-900/80 px-1.5 py-0.5 rounded">
+            <span className="absolute top-1/2 left-2 -translate-y-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'প (W)' : 'W'}
             </span>
 
@@ -400,81 +400,83 @@ export default function MicroclimateRadarSimulator({
             )}
           </div>
 
-          {/* Top telemetry tags inside the radar screen */}
-          <div className="relative z-10 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-              <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-mono text-cyan-300">
-                {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E
+          {/* Top telemetry & controls bar inside the radar screen */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-xs mb-4">
+            <div className="flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/15">
+              <Navigation className="w-3 h-3 text-cyan-400 shrink-0" />
+              <span className="font-mono text-[10px] text-cyan-300">
+                {coords.latitude.toFixed(2)}°N, {coords.longitude.toFixed(2)}°E
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={() => setShowEchoGuide(!showEchoGuide)}
-                className="flex items-center gap-1.5 bg-blue-950/80 hover:bg-blue-900/90 text-blue-200 border border-blue-700/50 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                className="flex items-center gap-1 bg-blue-950/90 hover:bg-blue-900 text-blue-200 border border-blue-600/50 px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer shadow-sm"
               >
-                <HelpCircle className="w-3.5 h-3.5 text-cyan-300" />
-                <span>{lang === 'bn' ? 'ডপলার প্রতিফলন নির্দেশিকা' : 'Doppler Echo Guide'}</span>
+                <HelpCircle className="w-3 h-3 text-cyan-300 shrink-0" />
+                <span className="hidden sm:inline">{lang === 'bn' ? 'প্রতিফলন নির্দেশিকা' : 'Echo Guide'}</span>
+                <span className="sm:hidden">{lang === 'bn' ? 'নির্দেশিকা' : 'Guide'}</span>
                 {showEchoGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
-              <div className="flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-gray-300">
-                <span className={`w-2 h-2 rounded-full animate-ping ${
+              <div className="flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/15 text-gray-300">
+                <span className={`w-1.5 h-1.5 rounded-full animate-ping ${
                   reflectivityDbz >= 45 ? 'bg-rose-500' : reflectivityDbz >= 30 ? 'bg-amber-400' : 'bg-emerald-400'
                 }`}></span>
-                <span className="font-bold text-[11px]">
-                  {activeLayer === 'radar' 
-                    ? (lang === 'bn' ? 'ডপলার প্রতিফলন (dBZ)' : 'Doppler Echo (dBZ)') 
-                    : activeLayer === 'wind' ? 'Canopy Wind Flow' : 'Thermal Gradient'}
+                <span className="font-bold text-[10px]">
+                  {reflectivityDbz} dBZ
                 </span>
               </div>
             </div>
           </div>
 
           {/* Farmer Location Crosshair Center (Focal Target) */}
-          <div className="relative z-10 flex flex-col items-center justify-center my-6">
-            <div className="relative">
-              <div className="w-7 h-7 rounded-full bg-cyan-500/30 animate-ping absolute -inset-1" />
-              <div className="w-5 h-5 rounded-full bg-cyan-400 border-2 border-white shadow-xl relative flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-blue-950" />
+          <div className="relative z-10 flex flex-col items-center justify-center my-auto py-6">
+            <div className="relative flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-cyan-500/25 animate-ping absolute" />
+              <div className="w-4 h-4 rounded-full bg-cyan-400 border-2 border-white shadow-md relative flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-950" />
               </div>
             </div>
-            <span className="mt-2 text-[11px] font-black uppercase tracking-wider bg-black/85 px-3 py-1 rounded-full text-cyan-200 border border-cyan-500/40 shadow-lg">
-              {lang === 'bn' ? 'আপনার খামার (কেন্দ্র)' : 'Your Farm (Center GPS)'}
+            <span className="mt-1.5 text-[9px] font-bold uppercase tracking-wider bg-black/80 px-2.5 py-0.5 rounded-full text-cyan-200 border border-cyan-500/30 shadow-sm backdrop-blur-xs">
+              {lang === 'bn' ? 'আপনার খামার' : 'Your Farm'}
             </span>
           </div>
 
           {/* Bottom radar spectrum legend & playback control */}
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/10 text-xs">
-            <div className="flex items-center gap-3">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 pt-2.5 mt-auto border-t border-white/10 text-xs bg-slate-950/40 backdrop-blur-xs -mx-2 -mb-2 px-3 py-2 rounded-b-2xl">
+            <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs px-3.5 py-1.5 rounded-xl transition-all shadow-md active:scale-95"
+                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] px-3 py-1.5 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
               >
-                {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                <span>{isPlaying ? (lang === 'bn' ? 'থামান' : 'Pause') : (lang === 'bn' ? 'অ্যানিমেশন চালু' : 'Play Loop')}</span>
+                {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current" />}
+                <span>{isPlaying ? (lang === 'bn' ? 'থামান' : 'Pause') : (lang === 'bn' ? 'চালু' : 'Play')}</span>
               </button>
               <button
+                type="button"
                 onClick={() => { setSelectedHour(0); setIsPlaying(false); }}
-                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 transition-colors"
+                className="p-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-gray-300 transition-colors cursor-pointer"
                 title="Reset to now"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3 h-3" />
               </button>
             </div>
 
             {/* Clear, Labeled dBZ Reflectivity Scale */}
-            <div className="flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-xl border border-white/10">
-              <span className="text-[10px] text-gray-400 font-bold uppercase">
-                {lang === 'bn' ? 'মেঘের ঘনত্ব (dBZ):' : 'Moisture (dBZ):'}
+            <div className="flex items-center gap-1.5 bg-black/60 px-2.5 py-1 rounded-xl border border-white/10">
+              <span className="text-[9px] text-gray-400 font-bold uppercase hidden sm:inline">
+                {lang === 'bn' ? 'ঘনত্ব:' : 'Echo:'}
               </span>
-              <div className="flex items-center gap-1 font-mono text-[9px]">
-                <span className="text-cyan-400">0-15</span>
-                <div className="w-20 h-2.5 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 via-amber-400 to-rose-600 shadow-inner" />
+              <div className="flex items-center gap-1 font-mono text-[8px]">
+                <span className="text-cyan-400">0</span>
+                <div className="w-14 sm:w-16 h-2 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 via-amber-400 to-rose-600 shadow-inner" />
                 <span className="text-rose-400">55+</span>
               </div>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+              <span className={`text-[9px] font-bold px-1 rounded ${
                 reflectivityDbz >= 45 ? 'bg-rose-500/20 text-rose-300' : reflectivityDbz >= 30 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
               }`}>
                 {reflectivityDbz} dBZ

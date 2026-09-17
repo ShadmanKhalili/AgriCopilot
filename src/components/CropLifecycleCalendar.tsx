@@ -294,38 +294,38 @@ export default function CropLifecycleCalendar({
   const harvestDate = timelineEvents[timelineEvents.length - 1]?.dateString || '';
 
   return (
-    <div className="bg-white rounded-[2rem] p-5 md:p-8 border border-green-100 shadow-xl shadow-green-900/5 relative overflow-hidden">
+    <div className="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 border border-green-100 shadow-xl shadow-green-900/5 relative overflow-hidden">
       {/* Background Accent */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-gray-100 relative z-10">
-        <div className="flex items-center space-x-3.5">
-          <div className="bg-gradient-to-br from-green-600 to-emerald-700 p-3 rounded-2xl text-white shadow-lg shadow-green-600/30">
-            <Calendar className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-100 relative z-10">
+        <div className="flex items-center space-x-3 sm:space-x-3.5">
+          <div className="bg-gradient-to-br from-green-600 to-emerald-700 p-2.5 sm:p-3 rounded-2xl text-white shadow-lg shadow-green-600/30 shrink-0">
+            <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-black text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 uppercase tracking-widest">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[9px] sm:text-[10px] font-mono font-black text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 uppercase tracking-widest">
                 Seasonal Lifecycle Tracker
               </span>
             </div>
-            <h3 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
+            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 tracking-tight truncate">
               {lang === 'bn' ? 'ফসলের সময়সূচি ও পরিচর্যা ক্যালেন্ডার' : 'Crop Lifecycle & Spray Schedule'}
             </h3>
           </div>
         </div>
 
         {/* Date Selector & Crop Switcher */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200">
-            <span className="text-xs font-bold text-gray-500 pl-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 bg-gray-50 p-1.5 rounded-xl sm:rounded-2xl border border-gray-200 flex-1 sm:flex-none">
+            <span className="text-[11px] sm:text-xs font-bold text-gray-500 pl-1 sm:pl-2">
               {lang === 'bn' ? 'ফসল:' : 'Crop:'}
             </span>
             <select
               value={cropKey}
               onChange={(e) => setCropKey(e.target.value)}
-              className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-black text-gray-800 outline-none cursor-pointer"
+              className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-1 text-xs font-black text-gray-800 outline-none cursor-pointer flex-1 sm:flex-none"
             >
               <option value="paddy">{lang === 'bn' ? 'ধান' : 'Paddy (Rice)'}</option>
               <option value="potato">{lang === 'bn' ? 'আলু' : 'Potato'}</option>
@@ -334,59 +334,59 @@ export default function CropLifecycleCalendar({
             </select>
           </div>
 
-          <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200">
-            <span className="text-xs font-bold text-gray-500 pl-2">
-              {lang === 'bn' ? 'রোপণ তারিখ:' : 'Sown On:'}
+          <div className="flex items-center space-x-1.5 sm:space-x-2 bg-gray-50 p-1.5 rounded-xl sm:rounded-2xl border border-gray-200 flex-1 sm:flex-none">
+            <span className="text-[11px] sm:text-xs font-bold text-gray-500 pl-1 sm:pl-2">
+              {lang === 'bn' ? 'রোপণ:' : 'Sown:'}
             </span>
             <input
               type="date"
               value={sowingDate}
               onChange={(e) => setSowingDate(e.target.value)}
-              className="bg-white border border-gray-200 rounded-xl px-3 py-1 text-xs font-black text-gray-800 outline-none cursor-pointer"
+              className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 text-xs font-black text-gray-800 outline-none cursor-pointer flex-1 sm:flex-none"
             />
           </div>
         </div>
       </div>
 
       {/* Summary Highlights */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 relative z-10">
-        <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-100 flex items-center space-x-3.5">
-          <div className="p-2.5 bg-emerald-600 rounded-xl text-white">
-            <Sprout className="w-5 h-5" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4 mb-5 sm:mb-8 relative z-10">
+        <div className="bg-emerald-50/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-emerald-100 flex items-center space-x-2.5 sm:space-x-3.5">
+          <div className="p-2 sm:p-2.5 bg-emerald-600 rounded-xl text-white shrink-0">
+            <Sprout className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-[10px] font-black text-emerald-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'জীবনকাল' : 'Growth Cycle'}
             </span>
-            <div className="text-lg font-black text-emerald-950">
+            <div className="text-base sm:text-lg font-black text-emerald-950 truncate">
               {activeConfig.durationDays} {lang === 'bn' ? 'দিন' : 'Days'}
             </div>
           </div>
         </div>
 
-        <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-100 flex items-center space-x-3.5">
-          <div className="p-2.5 bg-blue-600 rounded-xl text-white">
-            <Clock className="w-5 h-5" />
+        <div className="bg-blue-50/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-100 flex items-center space-x-2.5 sm:space-x-3.5">
+          <div className="p-2 sm:p-2.5 bg-blue-600 rounded-xl text-white shrink-0">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-[10px] font-black text-blue-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'আনুমানিক কর্তন' : 'Est. Harvest Date'}
             </span>
-            <div className="text-base font-black text-blue-950">
+            <div className="text-sm sm:text-base font-black text-blue-950 truncate">
               {harvestDate}
             </div>
           </div>
         </div>
 
-        <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-100 flex items-center space-x-3.5">
-          <div className="p-2.5 bg-amber-600 rounded-xl text-white">
-            <ShieldAlert className="w-5 h-5" />
+        <div className="bg-amber-50/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-amber-100 flex items-center space-x-2.5 sm:space-x-3.5">
+          <div className="p-2 sm:p-2.5 bg-amber-600 rounded-xl text-white shrink-0">
+            <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <span className="text-[10px] font-black text-amber-800 uppercase tracking-widest">
+          <div className="min-w-0">
+            <span className="text-[9px] sm:text-[10px] font-black text-amber-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'পরিচর্যা পর্যায়' : 'Key Milestones'}
             </span>
-            <div className="text-lg font-black text-amber-950">
+            <div className="text-base sm:text-lg font-black text-amber-950 truncate">
               {completedStages.length} / {timelineEvents.length} {lang === 'bn' ? 'সম্পন্ন' : 'Done'}
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function CropLifecycleCalendar({
       </div>
 
       {/* Interactive Timeline */}
-      <div className="relative pl-6 md:pl-10 space-y-6 before:absolute before:left-3 md:before:left-5 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-green-500 before:via-emerald-400 before:to-gray-200">
+      <div className="relative pl-6 sm:pl-8 md:pl-10 space-y-4 sm:space-y-5 md:space-y-6 before:absolute before:left-3 sm:before:left-4 md:before:left-5 before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-green-500 before:via-emerald-400 before:to-gray-200">
         {timelineEvents.map((stage, idx) => {
           const isDone = completedStages.includes(idx);
           const typeBadgeColor =
@@ -408,8 +408,8 @@ export default function CropLifecycleCalendar({
               key={idx}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.08 }}
-              className={`relative rounded-3xl p-5 md:p-6 border transition-all ${
+              transition={{ delay: idx * 0.05 }}
+              className={`relative rounded-2xl md:rounded-3xl p-3.5 sm:p-5 md:p-6 border transition-all ${
                 isDone 
                   ? 'bg-gray-50/80 border-gray-200 opacity-70' 
                   : stage.isToday
@@ -420,7 +420,7 @@ export default function CropLifecycleCalendar({
               {/* Timeline Pin */}
               <div 
                 onClick={() => toggleComplete(idx)}
-                className={`absolute -left-[30px] md:-left-[46px] top-6 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer border-2 transition-all ${
+                className={`absolute -left-[27px] sm:-left-[35px] md:-left-[46px] top-4 sm:top-5 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center cursor-pointer border-2 transition-all ${
                   isDone
                     ? 'bg-green-600 border-green-600 text-white'
                     : stage.isToday
@@ -429,45 +429,45 @@ export default function CropLifecycleCalendar({
                 }`}
               >
                 {isDone ? (
-                  <CheckCircle2 className="w-4 h-4 stroke-[3]" />
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
                 ) : (
-                  <span className="text-[10px] font-black">{stage.day}d</span>
+                  <span className="text-[9px] sm:text-[10px] font-black">{stage.day}d</span>
                 )}
               </div>
 
               {/* Stage Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                <div className="flex items-center space-x-2.5">
-                  <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${typeBadgeColor}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 mb-2.5">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${typeBadgeColor}`}>
                     {lang === 'bn' 
-                      ? (stage.type === 'fertilizer' ? 'সার প্রয়োগ' : stage.type === 'irrigation' ? 'সেচ' : stage.type === 'pesticide' ? 'রোগ/পোকা দমন' : 'ফসল কাটা')
+                      ? (stage.type === 'fertilizer' ? 'সার' : stage.type === 'irrigation' ? 'সেচ' : stage.type === 'pesticide' ? 'দমন' : 'কর্তন')
                       : stage.type.toUpperCase()
                     }
                   </span>
-                  <h4 className="text-base md:text-lg font-black text-gray-900">
+                  <h4 className="text-sm sm:text-base md:text-lg font-black text-gray-900 truncate">
                     {lang === 'bn' ? stage.stageNameBn : stage.stageNameEn}
                   </h4>
                 </div>
 
-                <div className="flex items-center space-x-3 text-xs font-mono font-bold text-gray-500">
-                  <span className="bg-gray-100 px-2.5 py-1 rounded-lg">
+                <div className="flex items-center space-x-2 text-[11px] font-mono font-bold text-gray-500 shrink-0">
+                  <span className="bg-gray-100 px-2 py-0.5 rounded-md">
                     {stage.dateString} (Day {stage.day})
                   </span>
                 </div>
               </div>
 
               {/* Action and Care Details */}
-              <div className="space-y-3">
-                <div className="bg-white/80 p-3.5 rounded-2xl border border-gray-100 text-sm font-medium text-gray-800 leading-relaxed">
+              <div className="space-y-2 sm:space-y-2.5">
+                <div className="bg-white/80 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-gray-100 text-xs sm:text-sm font-medium text-gray-800 leading-relaxed">
                   <span className="font-bold text-emerald-700 mr-1.5">
-                    {lang === 'bn' ? 'করণীয়:' : 'Action Required:'}
+                    {lang === 'bn' ? 'করণীয়:' : 'Action:'}
                   </span>
                   {lang === 'bn' ? stage.actionBn : stage.actionEn}
                 </div>
 
                 {/* Risk / Weather Warning */}
-                <div className="flex items-start space-x-2 text-xs text-amber-900 bg-amber-50/70 p-3 rounded-xl border border-amber-100/80">
-                  <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex items-start space-x-2 text-[11px] sm:text-xs text-amber-900 bg-amber-50/70 p-2.5 sm:p-3 rounded-xl border border-amber-100/80">
+                  <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold mr-1">
                       {lang === 'bn' ? 'সতর্কতা:' : 'Key Alert:'}
@@ -478,7 +478,7 @@ export default function CropLifecycleCalendar({
               </div>
 
               {/* Water & Done Actions */}
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+              <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
                 <div className="flex items-center space-x-1.5 text-xs text-blue-600 font-bold">
                   <Droplets className="w-3.5 h-3.5" />
                   <span>
@@ -488,15 +488,15 @@ export default function CropLifecycleCalendar({
 
                 <button
                   onClick={() => toggleComplete(idx)}
-                  className={`text-xs font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  className={`text-[11px] sm:text-xs font-black px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
                     isDone
                       ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                       : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                   }`}
                 >
                   {isDone 
-                    ? (lang === 'bn' ? '✓ সম্পন্ন হয়েছে' : '✓ Completed') 
-                    : (lang === 'bn' ? 'সম্পন্ন হিসেবে চিহ্নিত করুন' : 'Mark as Done')
+                    ? (lang === 'bn' ? '✓ সম্পন্ন' : '✓ Completed') 
+                    : (lang === 'bn' ? 'সম্পন্ন হিসেবে চিহ্নিত' : 'Mark as Done')
                   }
                 </button>
               </div>
