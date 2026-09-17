@@ -8,6 +8,7 @@ import https from "https";
 import helmet from "helmet";
 import { rateLimit } from 'express-rate-limit';
 import compression from "compression";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
@@ -112,6 +113,80 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
+  });
+
+  // Server-side AI Proxy: Securely proxies Gemini API calls using process.env.GEMINI_API_KEY
+  // avoiding client-side HTTP referrer restrictions and keeping secrets off the browser.
+  let serverAiClient: GoogleGenAI | null = null;
+  const getServerAi = () => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+    if (!serverAiClient) {
+      serverAiClient = new GoogleGenAI({ apiKey });
+    }
+    return serverAiClient;
+  };
+
+  app.post("/api/ai-proxy", async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          error: "GEMINI_API_KEY is not configured in server environment."
+        });
+      }
+
+      const client = getServerAi();
+      if (!client) {
+        return res.status(500).json({ error: "Failed to initialize Gemini AI client." });
+      }
+
+      const {
+        model = "gemini-3.5-flash-lite",
+        contents,
+        config,
+        tools,
+        toolConfig,
+        responseModalities,
+        speechConfig,
+        generationConfig
+      } = req.body || {};
+
+      if (!contents) {
+        return res.status(400).json({ error: "Missing 'contents' in request body." });
+      }
+
+      const mergedConfig: any = {
+        ...(config || {}),
+        ...(tools ? { tools } : {}),
+        ...(toolConfig ? { toolConfig } : {}),
+        ...(responseModalities ? { responseModalities } : {}),
+        ...(speechConfig ? { speechConfig } : {}),
+        ...(generationConfig ? { generationConfig } : {})
+      };
+
+      const aiResponse = await client.models.generateContent({
+        model,
+        contents,
+        config: mergedConfig
+      });
+
+      return res.json({
+        text: aiResponse.text || "",
+        candidates: aiResponse.candidates || [],
+        promptFeedback: aiResponse.promptFeedback || null
+      });
+    } catch (error: any) {
+      console.error("[Server AI Proxy Error]:", error?.message || error);
+      const is403 = error?.status === 403 || error?.message?.includes("403") || error?.message?.includes("PERMISSION_DENIED");
+      const isReferrer = error?.message?.includes("REFERRER") || error?.message?.includes("referer");
+      
+      return res.status(error?.status && typeof error.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : 500).json({
+        error: error?.message || "Internal AI Proxy error",
+        isReferrerBlocked: isReferrer,
+        isPermissionDenied: is403
+      });
+    }
   });
 
   // Request logger for API

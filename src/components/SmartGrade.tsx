@@ -347,10 +347,17 @@ export default function SmartGrade({ lang }: Props) {
                       </div>
                     </div>
 
-                    <div className="mt-10 pt-8 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-6">
-                      <div className="flex items-center space-x-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        <Sparkles className="w-4 h-4 text-yellow-500" />
-                        <span>AI Certified Quality Report</span>
+                    <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex flex-col space-y-0.5">
+                        <div className="flex items-center space-x-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>AI Indicative Pre-Grading Assessment</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">
+                          {lang === 'bn' 
+                            ? 'বাজার দরকষাকষির সহায়ক প্রাক-বাছাই • সংবিধিবদ্ধ BSTI/DAM সনদ নয়' 
+                            : 'Farmgate price bargaining aid • Non-statutory BSTI/DAM certificate'}
+                        </p>
                       </div>
                       <motion.button 
                         whileHover={{ scale: 1.05 }}

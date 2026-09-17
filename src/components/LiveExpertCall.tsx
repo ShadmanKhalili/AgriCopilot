@@ -489,7 +489,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
             
             <div className="text-center">
               <h4 id="expert-call-title" className="text-white font-black text-3xl tracking-tight mb-1">
-                {lang === 'bn' ? 'কৃষি বিশেষজ্ঞ' : 'Agri Expert'}
+                {lang === 'bn' ? 'এআই কৃষি বিশেষজ্ঞ' : 'AI Agri-Expert'}
               </h4>
               <p className="text-green-500/80 text-sm font-medium tracking-widest uppercase flex items-center justify-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -500,6 +500,11 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
                       ? (lang === 'bn' ? 'রিং হচ্ছে...' : 'Ringing...') 
                       : (lang === 'bn' ? 'সংযুক্ত করা হচ্ছে...' : 'Connecting...')}
                 </span>
+              </p>
+              <p className="text-gray-400 text-[11px] mt-1.5 max-w-xs mx-auto">
+                {lang === 'bn' 
+                  ? 'লাইভ এআই ভয়েস পরামর্শক • সরকারি কৃষি সহায়তার জন্য ১৬১২৩ ডায়াল করুন' 
+                  : 'Live AI Voice Assistant • For Gov Krishi Hotline dial 16123'}
               </p>
             </div>
           </div>

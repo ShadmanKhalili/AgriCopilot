@@ -132,13 +132,19 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
       className="space-y-4 md:space-y-6"
     >
       <motion.div variants={itemVariants} className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-4 md:mb-6">
-        <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-indigo-50 p-2 md:p-3 rounded-xl flex-shrink-0">
-            <Satellite className="w-6 h-6 md:w-7 h-7 text-indigo-600" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <div className="bg-indigo-50 p-2 md:p-3 rounded-xl flex-shrink-0">
+              <Satellite className="w-6 h-6 md:w-7 h-7 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
+              <p className="text-gray-500 text-[10px] md:text-sm font-medium leading-relaxed">{t.cropHealthDesc}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium leading-relaxed">{t.cropHealthDesc}</p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-200/60 rounded-xl text-indigo-700 text-xs font-semibold self-start sm:self-auto">
+            <Activity className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{lang === 'bn' ? 'সেন্টিনেল-২ (১০মি) ও কৃষি-মডেল' : 'Sentinel-2 (10m) + Agro-Model'}</span>
           </div>
         </div>
       </motion.div>

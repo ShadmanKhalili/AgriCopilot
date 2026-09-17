@@ -2,7 +2,7 @@ import { Type, GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 
-// Helper to call AI via Netlify proxy
+// Helper to call AI via backend proxy
 const callAiProxy = async (params: any) => {
   try {
     const response = await fetch('/api/ai-proxy', {
@@ -31,9 +31,12 @@ const callAiProxy = async (params: any) => {
 
 // Singleton AI instance using platform-injected key
 let aiInstance: GoogleGenAI | null = null;
+let directSdkBlocked = false; // Flag if direct client SDK is blocked by referrer or 403
+
 export const getAi = () => {
-  // If we are in the browser and don't have a key, we'll use the proxy instead
-  // of initializing the SDK here.
+  if (directSdkBlocked) {
+    return null;
+  }
   const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   
   if (apiKey && !aiInstance) {
@@ -45,8 +48,8 @@ export const getAi = () => {
 // Generic wrapper for AI calls that handles Proxy vs Direct SDK
 const generateContent = async (params: any) => {
   const ai = getAi();
-  if (!ai) {
-    // If no API key is set in browser, use Netlify proxy
+  if (!ai || directSdkBlocked) {
+    // Proxy through server route
     return await callAiProxy(params);
   }
   
@@ -72,6 +75,25 @@ const generateContent = async (params: any) => {
       promptFeedback: response.promptFeedback
     };
   } catch (error: any) {
+    const errStr = String(error?.message || error || '');
+    const isPermissionOrReferrer = error?.status === 403 || 
+                                   errStr.includes('403') || 
+                                   errStr.includes('PERMISSION_DENIED') || 
+                                   errStr.includes('REFERRER') || 
+                                   errStr.includes('referer') ||
+                                   errStr.includes('caller does not have permission');
+
+    if (isPermissionOrReferrer) {
+      console.warn("Direct client Gemini SDK call blocked (403/Referrer restriction). Falling back to backend AI proxy:", error?.message);
+      directSdkBlocked = true;
+      try {
+        return await callAiProxy(params);
+      } catch (proxyError) {
+        console.error("Backend AI Proxy also failed:", proxyError);
+        throw proxyError;
+      }
+    }
+
     console.error("Direct AI Call Failed:", error);
     throw error;
   }
@@ -84,15 +106,15 @@ const BACKUP_MODEL = 'gemini-3.5-flash-lite';
 const SEARCH_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
-export const LIVE_API_MODEL = 'gemini-3.1-flash-live-preview';
+export const LIVE_API_MODEL = 'gemini-3.8-live';
 const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
-const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000) => {
+const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 2000) => {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error: any) {
-      const errorStr = JSON.stringify(error).toLowerCase();
+      const errorStr = JSON.stringify(error || {}).toLowerCase() + ' ' + (error?.message || '').toLowerCase();
       const isQuotaError = error.message?.includes('429') || 
                           error.message?.includes('RESOURCE_EXHAUSTED') || 
                           errorStr.includes('quota') || 
@@ -100,13 +122,24 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000
       
       const isNotFoundError = error.message?.includes('404') || 
                               errorStr.includes('not_found');
+
+      const isPermissionDenied = error?.status === 403 || 
+                                 errorStr.includes('403') || 
+                                 errorStr.includes('permission_denied') || 
+                                 errorStr.includes('referrer_blocked') ||
+                                 errorStr.includes('caller does not have permission');
       
+      // If permission is denied / key restricted, retrying immediately won't help unless proxy handles it
+      if (isPermissionDenied) {
+        throw error;
+      }
+
       if (i === retries - 1 && !isNotFoundError) throw error;
       if (isNotFoundError && i === retries - 1) throw error;
       
       // Exponential backoff with jitter
       const backoffFactor = isQuotaError ? 3 : 2;
-      const currentDelay = (delay * Math.pow(backoffFactor, i)) + (Math.random() * 1000);
+      const currentDelay = (delay * Math.pow(backoffFactor, i)) + (Math.random() * 500);
       
       console.warn(`AI call failed (${isQuotaError ? 'Quota Exceeded' : (isNotFoundError ? 'Not Found' : 'Error')}), retrying in ${Math.round(currentDelay)}ms (${i + 1}/${retries})...`);
       
@@ -116,12 +149,18 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 6, delay = 3000
 };
 
 const callAiWithFallback = async (params: any, primaryModel: string, customBackupModel?: string) => {
-  const fallbacks = [
-    primaryModel,
-    customBackupModel || BACKUP_MODEL,
-    'gemini-3.5-flash-lite',
-    'gemini-3-flash-preview'
-  ];
+  // If request contains responseModalities for AUDIO, only use models that support audio output
+  const isAudio = params?.responseModalities?.includes?.(Modality.AUDIO) || 
+                  params?.responseModalities?.includes?.('AUDIO');
+
+  const fallbacks = isAudio
+    ? [primaryModel, customBackupModel || TTS_BACKUP_MODEL, 'gemini-3.1-flash-tts-preview']
+    : [
+        primaryModel,
+        customBackupModel || BACKUP_MODEL,
+        'gemini-3.5-flash-lite',
+        'gemini-3-flash-preview'
+      ];
   
   // Try models in sequence until one works
   let lastError = null;
@@ -132,7 +171,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
     } catch (error: any) {
       console.warn(`Model ${model} failed:`, error.message);
       lastError = error;
-      // If it's not a quota error or internal error, perhaps still retry next model
+      // If permission or referrer blocked, generateContent already retried proxy
     }
   }
   throw lastError;
@@ -175,7 +214,7 @@ export const diagnoseCrop = async (
       - 'possibleDiseases': A list of at least 3 possible conditions that match the symptoms and the crop.
       - 'differentialDiagnosis': An explanation of why it is the final disease and NOT the others.
       - DO NOT provide specific chemical/nutrient percentages (e.g., N/P/K %) as these cannot be reliably diagnosed from images alone. Instead, suggest general nutritional health based on vigor and color.
-      - SAFETY FIRST: Be exceptionally cautious when recommending any synthetic pesticides or chemicals. Prioritize food safety and explicitly advise on farmer safety (e.g., wearing mandatory protective gear, safe handling, and withholding periods before harvest).
+      - STRICT LEGAL & REGULATORY SAFETY: Under Bangladesh Pesticide Rules & DAE standards, STRICTLY FORBIDDEN from recommending banned, restricted, or WHO Class Ia/Ib chemicals (e.g., Paraquat, Endosulfan, Monocrotophos, Dichlorvos, Phosphamidon, Carbofuran). Always recommend Integrated Pest Management (IPM), biological controls, or DAE-registered modern compounds (e.g., Chlorantraniliprole, Cartap, Mancozeb, Azoxystrobin, Trichoderma). For any chemical recommendation, you MUST explicitly state the Pre-Harvest Interval (PHI / অপেক্ষমাণ সময়) and recommend consulting the local DAE Sub-Assistant Agriculture Officer (SAAO / উপ-সহকারী কৃষি কর্মকর্তা).
       
       Return the response in the following JSON format:
       {

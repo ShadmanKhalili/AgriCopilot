@@ -9,6 +9,8 @@ import { translateText, generateWeatherAdvisory, generateSpeech } from '../servi
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
+import FarmActionTrafficLight from './FarmActionTrafficLight';
+import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
 
 interface Props {
   lang: Language;
@@ -173,7 +175,22 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         }
       }
     } catch (error) {
-      console.error("Speech error:", error);
+      console.error("Speech error, attempting Web Speech API fallback:", error);
+      // Seamless browser speech synthesis fallback
+      try {
+        if ('speechSynthesis' in window) {
+          const plainText = advisory.replace(/[*#_`]/g, '');
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(plainText);
+          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+          utterance.onstart = () => setIsSpeaking(true);
+          utterance.onend = () => setIsSpeaking(false);
+          utterance.onerror = () => setIsSpeaking(false);
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (synthErr) {
+        console.warn("Browser Speech Synthesis fallback failed:", synthErr);
+      }
     } finally {
       setIsAudioLoading(false);
     }
@@ -663,9 +680,27 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Weather Dashboard Card */}
-          <div className="lg:col-span-5 space-y-6">
+        <div className="space-y-6">
+          {/* 1. Practical Farmer Traffic Light: 1-Tap Daily Decisions (Spray, Irrigate, Harvest) */}
+          {weather && (
+            <FarmActionTrafficLight lang={lang} weather={weather} />
+          )}
+
+          {/* 2. Executive / Investor Showcase: 48-Hour Microclimate Radar & Simulation with Interactive Scrubber */}
+          {globalLocation && (
+            <MicroclimateRadarSimulator
+              lang={lang}
+              coords={globalLocation}
+              hourlyForecast={weather?.hourlyForecast}
+              currentTemp={weather?.temp}
+              currentWind={weather?.windSpeed}
+              currentRainProb={weather?.rainChance}
+            />
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Weather Dashboard Card */}
+            <div className="lg:col-span-5 space-y-6">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -1207,15 +1242,16 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               </div>
             </motion.div>
           </div>
-
-          {/* Integrated Proactive Spray Schedule & Calendar */}
-          <div className="mt-8">
-            <CropLifecycleCalendar 
-              lang={lang} 
-              weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
-            />
-          </div>
         </div>
+
+        {/* Integrated Proactive Spray Schedule & Calendar */}
+        <div className="mt-8 w-full">
+          <CropLifecycleCalendar 
+            lang={lang} 
+            weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
+          />
+        </div>
+      </div>
       )}
       {/* Hidden Audio for TTS */}
       <audio 

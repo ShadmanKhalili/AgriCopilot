@@ -215,6 +215,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
       pesticide: customCosts.pesticide ?? Math.round(base.pesticide * landRatio),
       labor: customCosts.labor ?? Math.round(base.labor * landRatio),
       transport: customCosts.transport ?? Math.round(base.transport * landRatio),
+      lease: customCosts.lease ?? 0,
     };
   }, [currentBenchmark, landRatio, customCosts]);
 
@@ -258,20 +259,26 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
   };
 
   const copySummarySlip = () => {
+    const tenureNote = costs.lease > 0 
+      ? (lang === 'bn' ? `📑 জমির ধরন: বর্গা/ইজারা (লিজ ফি: ৳${costs.lease.toLocaleString()} টাকা)` : `📑 Land Tenure: Leased/Sharecrop (Rent: ৳${costs.lease.toLocaleString()} BDT)`)
+      : (lang === 'bn' ? `📑 জমির ধরন: নিজস্ব জমি` : `📑 Land Tenure: Owner-Operated`);
+
     const text = lang === 'bn'
       ? `🌾 ফসল উৎপাদন খরচ ও নিট লাভ হিসাব (${currentBenchmark.nameBn})
 📐 জমির পরিমাণ: ${landSize} ${landUnit === 'decimal' ? 'শতাংশ' : landUnit === 'bigha' ? 'বিঘা' : landUnit === 'acre' ? 'একর' : 'কাঠা'}
+${tenureNote}
 💰 মোট উৎপাদন খরচ: ৳${totalCost.toLocaleString()} টাকা
 ⚖️ প্রতি মণ উৎপাদন খরচ (ব্রেক-ইভেন): ৳${breakEvenCostPerMon.toLocaleString()} / মণ (৳${breakEvenCostPerKg}/কেজি)
-📦 আনুমানিক মোট ফলন: ${totalYieldMon} মণ (${Math.round(totalYieldMon * 40)} কেজি)
+📦 আনুমানিক মোট ফলন: ${totalYieldMon} মণ (${Math.round(totalYieldMon * 40)} কেজি, ১৪% আর্দ্রতা মান)
 💵 প্রত্যাশিত বিক্রয়মূল্য: ৳${pricePerMon.toLocaleString()} / মণ
 📈 নিট লাভ / ক্ষতি: ৳${netProfit.toLocaleString()} টাকা (ROI: ${roiPercentage}%)
 💡 পরামর্শ: ফরিয়াদের কাছে ৳${breakEvenCostPerMon} টাকার নিচে বিক্রি করবেন না।`
       : `🌾 Crop Production Cost & Profit Statement (${currentBenchmark.nameEn})
 📐 Land Area: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} Decimals)
+${tenureNote}
 💰 Total Production Cost: ৳${totalCost.toLocaleString()} BDT
 ⚖️ Break-Even Cost per Mon: ৳${breakEvenCostPerMon.toLocaleString()} / Mon (৳${breakEvenCostPerKg}/kg)
-📦 Estimated Harvest: ${totalYieldMon} Mon (${Math.round(totalYieldMon * 40)} kg)
+📦 Estimated Harvest: ${totalYieldMon} Mon (${Math.round(totalYieldMon * 40)} kg, 14% Moisture Standard)
 💵 Selling Market Price: ৳${pricePerMon.toLocaleString()} / Mon
 📈 Net Profit / Loss: ৳${netProfit.toLocaleString()} BDT (ROI: ${roiPercentage}%)
 💡 Farmer Advisory: Do not sell to intermediaries below ৳${breakEvenCostPerMon}/Mon.`;
@@ -376,7 +383,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           <div className="space-y-2">
             <label className="block text-xs font-black text-gray-700 uppercase tracking-wider flex items-center justify-between">
               <span>{lang === 'bn' ? '৩. আনুমানিক মোট ফলন' : '3. Expected Harvest'}</span>
-              <span className="text-[10px] text-emerald-700 font-bold">১ মণ = ৪০ কেজি</span>
+              <span className="text-[10px] text-emerald-700 font-bold">{lang === 'bn' ? '১ মণ = ৪০ কেজি (১৪% আর্দ্রতা মান)' : '1 Mon = 40kg (14% Moisture)'}</span>
             </label>
             <div className="relative">
               <input
@@ -431,7 +438,11 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
       {/* KPI Financial Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Cost */}
-        <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md">
+        <motion.div 
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md"
+        >
           <div className="flex items-center justify-between text-gray-500 mb-2">
             <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'মোট উৎপাদন ব্যয়' : 'Total Expense'}</span>
             <PieChart className="w-4 h-4 text-emerald-600" />
@@ -442,10 +453,14 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           <p className="text-xs text-gray-500 mt-1">
             {lang === 'bn' ? `${normalizedDecimals.toFixed(1)} শতাংশ জমির মোট খরচ` : `For ${normalizedDecimals.toFixed(1)} decimals`}
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 2: Break-Even Baseline */}
-        <div className="bg-white rounded-3xl p-5 border-2 border-amber-200 bg-amber-50/20 shadow-md">
+        <motion.div 
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="bg-white rounded-3xl p-5 border-2 border-amber-200 bg-amber-50/20 shadow-md"
+        >
           <div className="flex items-center justify-between text-amber-800 mb-2">
             <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'প্রতি মণ উৎপাদন খরচ' : 'Break-Even / Mon'}</span>
             <Scale className="w-4 h-4 text-amber-600" />
@@ -456,10 +471,14 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           <p className="text-xs text-amber-800 font-bold mt-1">
             ≈ ৳{breakEvenCostPerKg} / {lang === 'bn' ? 'কেজি' : 'kg'} ({lang === 'bn' ? 'এর কমে বিক্রি করলে ক্ষতি' : 'Minimum selling price'})
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 3: Gross Revenue */}
-        <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md">
+        <motion.div 
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md"
+        >
           <div className="flex items-center justify-between text-gray-500 mb-2">
             <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'মোট বিক্রয়মূল্য' : 'Gross Revenue'}</span>
             <Coins className="w-4 h-4 text-blue-600" />
@@ -470,10 +489,14 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           <p className="text-xs text-gray-500 mt-1">
             {totalYieldMon} {lang === 'bn' ? 'মণ × ৳' : 'Mon × ৳'}{pricePerMon}
           </p>
-        </div>
+        </motion.div>
 
         {/* Card 4: Net Profit */}
-        <div className={`rounded-3xl p-5 shadow-lg text-white ${isProfitable ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-600/20' : 'bg-gradient-to-br from-red-600 to-rose-700 shadow-red-600/20'}`}>
+        <motion.div 
+          whileHover={{ y: -3 }}
+          transition={{ duration: 0.15 }}
+          className={`rounded-3xl p-5 shadow-lg text-white ${isProfitable ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-600/20' : 'bg-gradient-to-br from-red-600 to-rose-700 shadow-red-600/20'}`}
+        >
           <div className="flex items-center justify-between mb-2 text-emerald-100">
             <span className="text-xs font-black uppercase tracking-wider">
               {lang === 'bn' ? (isProfitable ? 'নিট লাভ' : 'সম্ভাব্য ক্ষতি') : (isProfitable ? 'Net Profit' : 'Net Loss')}
@@ -486,7 +509,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           <p className="text-xs text-white/90 font-bold mt-1">
             ROI: {roiPercentage}% ({isProfitable ? (lang === 'bn' ? 'লাভজনক' : 'Profitable') : (lang === 'bn' ? 'ক্ষতিকর' : 'Loss')})
           </p>
-        </div>
+        </motion.div>
       </div>
 
       {/* Itemized Cost Breakdown (Granular & Editable) */}
@@ -615,9 +638,9 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
           </div>
 
           {/* 7. Transport & Packing */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5 md:col-span-2 lg:col-span-3">
+          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
             <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৭. হাট/বাজারে পরিবহন ও বস্তাজাতকরণ খরচ' : '7. Packaging & Transport to Local Market'}</span>
+              <span>{lang === 'bn' ? '৭. হাট/বাজারে পরিবহন ও বস্তাজাতকরণ' : '7. Packaging & Transport to Market'}</span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
@@ -627,6 +650,47 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
                 step="100"
                 value={costs.transport}
                 onChange={(e) => updateCostItem('transport', parseFloat(e.target.value) || 0)}
+                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* 8. Land Lease / Rent (for sharecroppers) */}
+          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-gray-700">
+                <span>{lang === 'bn' ? '৮. জমি বর্গা / ইজারা বা লিজ ফি (প্রযোজ্য ক্ষেত্রে)' : '8. Land Rent / Lease (Sharecroppers)'}</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => updateCostItem('lease' as any, 0)}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
+                    costs.lease === 0 ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-white border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {lang === 'bn' ? 'নিজ জমি (৳০)' : 'Own Land (৳0)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateCostItem('lease' as any, Math.round(5000 * landRatio))}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
+                    costs.lease > 0 ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {lang === 'bn' ? 'বর্গা/লিজ (~৳৫হাজার/বিঘা)' : 'Leased (~৳5k/bigha)'}
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
+              <input
+                type="number"
+                min="0"
+                step="500"
+                value={costs.lease}
+                onChange={(e) => updateCostItem('lease' as any, parseFloat(e.target.value) || 0)}
+                placeholder={lang === 'bn' ? 'নিজস্ব জমি হলে ০ রাখুন' : 'Enter 0 if owner-operated'}
                 className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>

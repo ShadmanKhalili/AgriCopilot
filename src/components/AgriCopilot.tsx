@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff, Video } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { LiveExpertCall } from './LiveExpertCall';
+import LiveVideoCopilot from './LiveVideoCopilot';
 import DosageCalculator from './DosageCalculator';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
@@ -105,6 +106,7 @@ export default function AgriCopilot({
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
+  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('static_upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -432,8 +434,21 @@ export default function AgriCopilot({
         setAudioUrl(URL.createObjectURL(blob));
       }
     } catch (error) {
-      console.error("Audio generation failed:", error);
-      toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+      console.error("Audio generation failed, trying Web Speech fallback:", error);
+      if ('speechSynthesis' in window) {
+        try {
+          const plainText = diagnosis.diagnosis.replace(/[*#_`]/g, '');
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(plainText);
+          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+          window.speechSynthesis.speak(utterance);
+          toast.success(lang === 'bn' ? 'অডিও চালানো হচ্ছে...' : 'Playing voice advisory...');
+        } catch (synthErr) {
+          toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+        }
+      } else {
+        toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+      }
     } finally {
       setIsAudioGenerating(false);
     }
@@ -715,8 +730,61 @@ export default function AgriCopilot({
         </div>
       </div>
 
-      <div className="flex flex-col space-y-4 md:space-y-6 w-full">
-        {/* Input Section */}
+      {/* Dual Mode Switcher: Static Image Diagnostic vs Gemini 3.8 Live Video Multimodal Stream */}
+      <div className="bg-emerald-950/10 p-1.5 rounded-2xl border border-emerald-500/20 w-full flex gap-2">
+        <button
+          type="button"
+          onClick={() => setCopilotMode('static_upload')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+            copilotMode === 'static_upload'
+              ? 'bg-white text-emerald-950 shadow-md shadow-emerald-900/10 border border-emerald-200'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Camera className="w-4 h-4 text-emerald-600" />
+          <span className="truncate">{lang === 'bn' ? '📸 ফটো স্ক্যান ও প্রেসক্রিপশন' : '📸 Photo Scan & Prescription'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCopilotMode('live_stream')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 sm:px-4 rounded-xl font-display font-black text-xs uppercase tracking-wider transition-all cursor-pointer relative ${
+            copilotMode === 'live_stream'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/30'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+          </span>
+          <Video className="w-4 h-4" />
+          <span className="truncate">{lang === 'bn' ? '📹 জেমিনি ৩.৮ লাইভ ভিডিও' : '📹 Gemini 3.8 Live Video'}</span>
+        </button>
+      </div>
+
+      {copilotMode === 'live_stream' ? (
+        <div className="w-full">
+          <LiveVideoCopilot 
+            lang={lang} 
+            locationContext={selectedDistrict ? `${selectedDistrict}, Bangladesh` : "Cox's Bazar, Bangladesh"}
+            onCaptureFrameForDeepDiagnosis={(dataUrl: string) => {
+              const arr = dataUrl.split(',');
+              const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+              const base64 = arr[1];
+              if (base64) {
+                setImages(prev => [{ base64, mimeType: mime }, ...prev.slice(0, 4)]);
+                setCopilotMode('static_upload');
+                toast.success(lang === 'bn' 
+                  ? '📸 লাইভ ফ্রেম যুক্ত হয়েছে! এখন ডায়াগনসিস বাটনে চাপুন।' 
+                  : '📸 Live frame captured! Ready for full prescription.');
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col space-y-4 md:space-y-6 w-full">
+          {/* Input Section */}
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -1202,16 +1270,19 @@ export default function AgriCopilot({
                               </div>
                               <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
                             </div>
-                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-6 prose-sm prose-blue leading-relaxed">
+                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-4 prose-sm prose-blue leading-relaxed">
                               <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
                             </div>
                             
-                            {diagnosis.confidence < 70 && (
-                              <div className="flex items-center space-x-2 text-amber-600 bg-amber-100/50 px-4 py-2 rounded-xl border border-amber-200 w-fit">
-                                <AlertTriangle className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{t.lowConfidenceWarning}</span>
-                              </div>
-                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-blue-200/50 text-[11px] text-blue-800 font-bold">
+                              <span>{lang === 'bn' ? '🏛️ স্থানীয় উপ-সহকারী কৃষি কর্মকর্তা (SAAO) বা কৃষি কল সেন্টারের ১৬১২৩ নম্বরে বিনামূল্যে পরামর্শ নিন' : '🏛️ Consult your local SAAO or dial toll-free Krishi Hotline 16123'}</span>
+                              {diagnosis.confidence < 70 && (
+                                <div className="flex items-center space-x-1.5 text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-black uppercase tracking-wider">{t.lowConfidenceWarning}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* 3. Symptoms and Severity */}
@@ -2077,6 +2148,7 @@ export default function AgriCopilot({
         </motion.div>
 
       </div>
+      )}
     </motion.div>
   );
 }
