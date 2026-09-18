@@ -21,6 +21,7 @@ import LiveVideoCopilot from './LiveVideoCopilot';
 import DosageCalculator from './DosageCalculator';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
 
@@ -513,6 +514,25 @@ export default function AgriCopilot({
             createdAt: new Date().toISOString()
           });
           setLastDiagnosisId(diagDoc.id);
+
+          // Record in Farmer Credit & Insurance Dossier
+          const cropTitle = crop ? crop.charAt(0).toUpperCase() + crop.slice(1) : 'ফসল (Crop)';
+          recordFarmerInteractionEvent({
+            userId: String(user.uid),
+            fullName: user?.displayName || 'কৃষক ভাই (Farmer)',
+            eventType: 'crop_diagnosis',
+            title: lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`,
+            summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 400),
+            keyFacts: [
+              `ফসল: ${cropTitle}`,
+              `রোগের তীব্রতা: ${severity}`,
+              `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 80)}`
+            ],
+            crop: cropTitle,
+            insight: `নিয়মিত রোগ নির্ণয় করছেন (তীব্রতা: ${severity})`
+          }).then(() => {
+            toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
+          }).catch(err => console.warn(err));
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'diagnoses');
         }

@@ -35,31 +35,36 @@ async function startServer() {
   // 0.2 Trust Proxy (Required for rate limiting behind Cloud Run/Nginx)
   app.set('trust proxy', 1);
 
-  // 1. Rate Limiting
+  // 1. Rate Limiting (DDoS & Brute Force Defense)
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: 500, // Increased limit for smoother dashboard experience
+    limit: 600, // Safe threshold for active farmer dashboard sessions
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    message: { error: "Too many requests, please try again later." }
+    message: { error: "Too many requests from this IP, please try again later." }
   });
 
-  // Apply rate limiter to all /api routes
+  // Dedicated stricter limiter for AI proxy (Anti-Quota Exhaustion / Anti-Denial of Wallet)
+  const aiLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    limit: 60, // 60 requests per 5 minutes per IP
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: "AI request rate limit exceeded. Please wait a few moments before trying again." }
+  });
+
+  // Apply general rate limiter to all /api routes
   app.use("/api", limiter);
-
-  // 1.5 AI Service Setup (Server-Side)
-  // AI is now handled strictly on the frontend as per platform standards.
-
 
   // 1. Security Headers with Helmet
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://pagead2.googlesyndication.com", "https://www.googletagmanager.com", "https://apis.google.com"],
+        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://pagead2.googlesyndication.com", "https://tpc.googlesyndication.com", "https://googleads.g.doubleclick.net", "https://www.googletagmanager.com", "https://apis.google.com"],
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         "font-src": ["'self'", "https://fonts.gstatic.com"],
-        "img-src": ["'self'", "data:", "blob:", "https:", "https://pagead2.googlesyndication.com"],
+        "img-src": ["'self'", "data:", "blob:", "https:", "https://pagead2.googlesyndication.com", "https://tpc.googlesyndication.com", "https://*.doubleclick.net", "https://googleads.g.doubleclick.net"],
         "connect-src": [
           "'self'", 
           "data:",
@@ -75,6 +80,9 @@ async function startServer() {
           "https://*.googleapis.com",
           "https://*.firebaseapp.com",
           "https://*.google.com",
+          "https://pagead2.googlesyndication.com",
+          "https://googleads.g.doubleclick.net",
+          "https://tpc.googlesyndication.com",
           "https://fonts.googleapis.com",
           "https://fonts.gstatic.com",
           "wss://*.googleapis.com",
@@ -84,6 +92,8 @@ async function startServer() {
         "frame-src": [
           "'self'", 
           "https://googleads.g.doubleclick.net", 
+          "https://pagead2.googlesyndication.com",
+          "https://tpc.googlesyndication.com",
           "https://www.google.com", 
           "https://content-cloudrun-static-files-pa.googleapis.com",
           "https://*.firebaseapp.com"
@@ -92,23 +102,25 @@ async function startServer() {
       },
     },
     crossOriginEmbedderPolicy: false,
-    frameguard: false,
+    frameguard: false, // Frameguard disabled to allow preview inside Google AI Studio container
   }));
 
-  // 2. Extra Security Headers
+  // 2. Extra Cyber Defense Headers
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Removed X-Frame-Options: SAMEORIGIN to allow AI Studio preview iframe
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(self), camera=(self), microphone=(self)');
     next();
   });
 
-  app.use(express.json());
+  // Enforce bounded JSON payload to prevent memory flooding DoS
+  app.use(express.json({ limit: '10mb' }));
 
   // AdSense & Bot verification
   app.get("/ads.txt", (req, res) => {
     res.type("text/plain");
-    res.send("google.com, pub-8294149074042302, DIRECT, f08c47fec0942fa0");
+    res.send("google.com, pub-8691248886116699, DIRECT, f08c47fec0942fa0");
   });
 
   app.get("/api/health", (req, res) => {
@@ -127,7 +139,7 @@ async function startServer() {
     return serverAiClient;
   };
 
-  app.post("/api/ai-proxy", async (req, res) => {
+  app.post("/api/ai-proxy", aiLimiter, async (req, res) => {
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -154,6 +166,14 @@ async function startServer() {
 
       if (!contents) {
         return res.status(400).json({ error: "Missing 'contents' in request body." });
+      }
+
+      // Input Validation: Ensure contents payload doesn't exceed memory safety boundaries
+      if (typeof contents === 'string' && contents.length > 50000) {
+        return res.status(400).json({ error: "Contents payload exceeds safe size limit (50,000 characters)." });
+      }
+      if (Array.isArray(contents) && contents.length > 100) {
+        return res.status(400).json({ error: "Too many conversation turns in single request (max 100)." });
       }
 
       const mergedConfig: any = {
@@ -507,18 +527,33 @@ async function startServer() {
     };
   }
 
-  // In-memory cache for reverse geocoding
+  function isValidCoordinate(lat: number, lon: number): boolean {
+    return !isNaN(lat) && !isNaN(lon) && isFinite(lat) && isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+  }
+
+  // In-memory bounded cache for reverse geocoding
   const locLookupCache = new Map<string, any>();
 
   // Proxy for Reverse Geocoding with Multi-tier Fallback
   app.get("/api/loc-lookup", async (req, res) => {
-    const lat = parseFloat(req.query.latitude as string || req.query.lat as string) || 23.685;
-    const lon = parseFloat(req.query.longitude as string || req.query.lng as string || req.query.lon as string) || 90.3563;
+    let lat = parseFloat(req.query.latitude as string || req.query.lat as string);
+    let lon = parseFloat(req.query.longitude as string || req.query.lng as string || req.query.lon as string);
+    
+    if (!isValidCoordinate(lat, lon)) {
+      lat = 23.685;
+      lon = 90.3563;
+    }
+
     const lang = (req.query.localityLanguage as string || req.query.lang as string || 'en').toLowerCase().startsWith('bn') ? 'bn' : 'en';
 
     const cacheKey = `${lat.toFixed(3)}_${lon.toFixed(3)}_${lang}`;
     if (locLookupCache.has(cacheKey)) {
       return res.json(locLookupCache.get(cacheKey));
+    }
+
+    // Guard against unbounded cache memory growth DoS
+    if (locLookupCache.size > 1000) {
+      locLookupCache.clear();
     }
 
     // Tier 1: Try OpenStreetMap Nominatim with strict timeout
@@ -886,12 +921,19 @@ async function startServer() {
 
   // Proxy for Soil API
   app.get("/api/soil-properties", async (req, res) => {
-    const lat = parseFloat(req.query.lat as string) || 23.685;
-    const lon = parseFloat(req.query.lon as string) || 90.3563;
+    let lat = parseFloat(req.query.lat as string);
+    let lon = parseFloat(req.query.lon as string);
+    if (!isValidCoordinate(lat, lon)) {
+      lat = 23.685;
+      lon = 90.3563;
+    }
     const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
 
     if (soilCache.has(cacheKey)) {
       return res.json(soilCache.get(cacheKey));
+    }
+    if (soilCache.size > 1000) {
+      soilCache.clear();
     }
 
     try {
@@ -976,54 +1018,101 @@ async function startServer() {
   // AI PROXY ROUTES REMOVED (AI moved to frontend)
 
 
-  // Link Preview Helper (Hardened against SSRF)
+  // Helper function to validate URLs and prevent Server-Side Request Forgery (SSRF)
+  function isSafeTargetUrl(urlString: string): { safe: boolean; error?: string; urlObj?: URL } {
+    let urlObj: URL;
+    try {
+      urlObj = new URL(urlString);
+    } catch {
+      return { safe: false, error: "Invalid URL format" };
+    }
+
+    // 1. Strictly enforce HTTP or HTTPS protocols
+    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+      return { safe: false, error: "Only HTTP and HTTPS protocols are permitted" };
+    }
+
+    const hostname = urlObj.hostname.toLowerCase().trim();
+
+    // 2. Block loopback, local, and reserved cloud metadata domains
+    const blockedExactHosts = [
+      'localhost',
+      'localhost.localdomain',
+      '127.0.0.1',
+      '0.0.0.0',
+      '::1',
+      '[::1]',
+      'metadata.google.internal',
+      'metadata.goog',
+      '169.254.169.254',
+      'instance-data'
+    ];
+
+    if (blockedExactHosts.includes(hostname)) {
+      return { safe: false, error: "Access to loopback or cloud metadata endpoints is prohibited" };
+    }
+
+    // 3. Block private IP ranges (RFC 1918, RFC 3927 link-local, Carrier-grade NAT)
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const ipMatch = hostname.match(ipv4Regex);
+    if (ipMatch) {
+      const a = Number(ipMatch[1]);
+      const b = Number(ipMatch[2]);
+      if (a === 10 || a === 127 || a === 0) return { safe: false, error: "Access to private address space is prohibited" };
+      if (a === 169 && b === 254) return { safe: false, error: "Access to link-local address space is prohibited" };
+      if (a === 172 && b >= 16 && b <= 31) return { safe: false, error: "Access to private address space is prohibited" };
+      if (a === 192 && b === 168) return { safe: false, error: "Access to private address space is prohibited" };
+      if (a === 100 && b >= 64 && b <= 127) return { safe: false, error: "Access to shared carrier address space is prohibited" };
+    }
+
+    // 4. Block IPv6 private addresses
+    if (hostname.startsWith('[') || hostname.includes(':')) {
+      if (hostname === '::1' || hostname === '[::1]' || hostname.startsWith('fe80:') || hostname.startsWith('fc00:') || hostname.startsWith('fd00:')) {
+        return { safe: false, error: "Access to IPv6 private address space is prohibited" };
+      }
+    }
+
+    // 5. Block internal cloud hostnames
+    if (hostname.endsWith('.internal') || hostname.endsWith('.local') || hostname.endsWith('.corp')) {
+      return { safe: false, error: "Access to internal domain spaces is prohibited" };
+    }
+
+    return { safe: true, urlObj };
+  }
+
+  // Link Preview Helper (Hardened against SSRF & Resource Exhaustion)
   app.get("/api/link-preview", async (req, res) => {
     const { url } = req.query;
     if (!url || typeof url !== 'string') {
-      return res.status(400).json({ error: "URL is required" });
+      return res.status(400).json({ error: "URL query parameter is required" });
     }
 
-    let urlObj: URL;
-    try {
-      urlObj = new URL(url);
-    } catch {
-      return res.status(400).json({ error: "Invalid URL" });
+    const validation = isSafeTargetUrl(url);
+    if (!validation.safe || !validation.urlObj) {
+      return res.status(403).json({ error: validation.error || "Forbidden URL destination" });
     }
-
-    // SSRF Prevention: Block internal/local hostnames
-    const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254'];
-    if (blockedHosts.includes(urlObj.hostname) || urlObj.hostname.startsWith('192.168.') || urlObj.hostname.startsWith('10.')) {
-      return res.status(403).json({ error: "Access to internal resources is prohibited" });
-    }
+    const urlObj = validation.urlObj;
 
     try {
-      console.log(`Fetching link preview for: ${url}`);
+      console.log(`Fetching sanitized link preview for: ${url}`);
       
       const response = await axios.get(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8',
           'Accept-Encoding': 'gzip, deflate, br',
           'Cache-Control': 'max-age=0',
           'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
           'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
           'Referer': urlObj.origin + '/'
         },
         httpsAgent: new https.Agent({
-          // NOTE: Some local portals might have SSL certificate issues.
-          // In a high-security environment, this should be set to true.
           rejectUnauthorized: process.env.NODE_ENV === 'production'
         }),
-        timeout: 10000,
-        maxRedirects: 10,
+        timeout: 6000,
+        maxContentLength: 1024 * 1024, // 1MB maximum payload to prevent memory exhaustion DoS
+        maxRedirects: 5,
         validateStatus: (status) => status < 500
       });
 

@@ -13,6 +13,7 @@ import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
+import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'dryFish', 'shrimp', 'salt', 'betelNut', 'mango', 'banana', 'coconut', 'chili'];
 
@@ -87,6 +88,21 @@ export default function SmartGrade({ lang }: Props) {
             estimatedPriceBdt: gradeResult.estimatedPriceBdt,
             createdAt: new Date().toISOString()
           });
+
+          recordFarmerInteractionEvent({
+            userId: user.uid,
+            fullName: user.displayName || 'কৃষক ভাই (Farmer)',
+            eventType: 'smart_grading',
+            title: lang === 'bn' ? `ফসলের মান সনদ: ${produce} (গ্রেড ${gradeResult.grade})` : `Quality Certificate: ${produce} (Grade ${gradeResult.grade})`,
+            summary: gradeResult.justification.substring(0, 300),
+            keyFacts: [
+              `ফসল: ${produce}`,
+              `মান গ্রেড: ${gradeResult.grade}`,
+              `আনুমানিক বাজারদর: ৳${gradeResult.estimatedPriceBdt}`
+            ],
+            crop: produce,
+            insight: `গ্রেড ${gradeResult.grade} ফসল উৎপাদনে সক্ষম (বাজার সংযোগ প্রাক-যোগ্য)`
+          }).catch(e => console.warn(e));
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'certificates');
         }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, History, FileText, Award, Calendar, ChevronRight, UserCircle, TrendingUp, Database, Loader2, HelpCircle, Crown, Sprout } from 'lucide-react';
+import { User, History, FileText, Award, Calendar, ChevronRight, UserCircle, TrendingUp, Database, Loader2, HelpCircle, Crown, Sprout, ShieldCheck, Sparkles } from 'lucide-react';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -10,6 +10,7 @@ import { seedGovSchemes } from '../data/seedSchemes';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
+import FarmerDossier from './FarmerDossier';
 
 interface Props {
   lang: Language;
@@ -49,6 +50,7 @@ interface PlantingIntentRecord {
 export default function Profile({ lang, onUpgrade }: Props) {
   const { user, userProfile, signIn } = useAuth();
   const { currentUsage, limit: usageLimit, tier } = useUsageTracking();
+  const [viewMode, setViewMode] = useState<'dossier' | 'account'>('dossier');
   const [diagnoses, setDiagnoses] = useState<DiagnosisRecord[]>([]);
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
   const [marketQueries, setMarketQueries] = useState<MarketQueryRecord[]>([]);
@@ -151,33 +153,76 @@ export default function Profile({ lang, onUpgrade }: Props) {
     fetchHistory();
   }, [user]);
 
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <UserCircle className="w-16 h-16 mb-4 opacity-20" />
-        <p>{t.signIn}</p>
-      </div>
-    );
-  }
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="space-y-6"
     >
-      <div className="bg-white rounded-[40px] p-5 md:p-8 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-6 md:mb-8">
+      {/* Top Header & View Mode Switcher */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 md:p-6 shadow-md border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-indigo-50 p-3 md:p-4 rounded-2xl flex-shrink-0">
-            <UserCircle className="w-6 h-6 md:w-8 h-8 text-indigo-600" />
+          <div className="bg-emerald-50 dark:bg-emerald-950/50 p-3 rounded-2xl flex-shrink-0 text-emerald-600 dark:text-emerald-400">
+            <ShieldCheck className="w-6 h-6 md:w-8 h-8" />
           </div>
           <div>
-            <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight leading-tight">{t.profile}</h2>
-            <p className="text-gray-500 text-xs md:text-base font-medium">{t.profileDesc}</p>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
+              {lang === 'bn' ? 'কৃষক প্রোফাইল ও স্মার্ট কৃষি কার্ড' : 'Farmer Profile & Smart Krishi Dossier'}
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm">
+              {lang === 'bn' ? 'কৃষিঋণ, ফসল বীমা ও লাইভ পরামর্শের স্বয়ংক্রিয় ইতিহাস' : 'Credit scoring, crop insurance eligibility & live session history'}
+            </p>
           </div>
+        </div>
+
+        {/* View Toggle Tabs */}
+        <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+          <button
+            onClick={() => setViewMode('dossier')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'dossier'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            {lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card'}
+          </button>
+          <button
+            onClick={() => setViewMode('account')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'account'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            {lang === 'bn' ? 'অ্যাকাউন্ট ও ইতিহাস' : 'Account & Logs'}
+          </button>
         </div>
       </div>
 
+      {viewMode === 'dossier' ? (
+        <FarmerDossier lang={lang} />
+      ) : !user ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
+          <UserCircle className="w-16 h-16 text-slate-300" />
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">
+              {t.signIn}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm">
+              {lang === 'bn' ? 'আপনার পূর্ববর্তী রোগ নির্ণয় ও সনদের ক্লাউড হিস্টোরি দেখতে সাইন ইন করুন।' : 'Sign in to view your past diagnosis and certificate logs.'}
+            </p>
+          </div>
+          <button
+            onClick={signIn}
+            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            {t.signIn}
+          </button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Account Info */}
         <div className="lg:col-span-1 space-y-8">
@@ -481,6 +526,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
           </motion.div>
         </div>
       </div>
+      )}
     </motion.div>
   );
 }

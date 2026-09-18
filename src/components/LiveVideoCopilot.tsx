@@ -9,6 +9,8 @@ import { LiveServerMessage, Modality } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
+import { useAuth } from './AuthProvider';
+import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 
 interface LiveVideoCopilotProps {
   lang: Language;
@@ -28,6 +30,7 @@ export default function LiveVideoCopilot({
   locationContext = "Cox's Bazar / Bangladesh",
   onCaptureFrameForDeepDiagnosis
 }: LiveVideoCopilotProps) {
+  const { user } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -515,6 +518,30 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(t => t.stop());
       mediaStreamRef.current = null;
+    }
+
+    // Progressively save session summary to farmer profile if dialogue occurred
+    if (transcripts.length > 0 || callDuration > 5) {
+      const summaryText = transcripts.length > 0
+        ? transcripts.map(t => `${t.role === 'user' ? 'কৃষক' : 'বিশেষজ্ঞ'}: ${t.text}`).slice(-4).join(' | ')
+        : (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সফলভাবে সম্পন্ন হয়েছে।' : 'Live video consultation session completed.');
+      
+      recordFarmerInteractionEvent({
+        userId: user?.uid || 'guest_farmer_demo',
+        fullName: user?.displayName || 'কৃষক ভাই (Farmer)',
+        eventType: 'voice_consultation',
+        title: lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video Consultation Session',
+        summary: summaryText.substring(0, 500),
+        keyFacts: [
+          `কলের ব্যাপ্তি: ${Math.max(1, Math.round(callDuration))} সেকেন্ড`,
+          `পরামর্শের মাধ্যম: লাইভ ভিডিও এআই`,
+          `অবস্থান: ${locationContext}`
+        ],
+        district: locationContext.includes('Cox') ? 'কক্সবাজার' : undefined,
+        insight: lang === 'bn' ? 'লাইভ ক্যামেরা প্রদর্শন করে সরাসরি বিশেষজ্ঞ পরামর্শ নিয়েছেন।' : 'Conducted live visual crop consultation.'
+      }).then(() => {
+        toast.success(lang === 'bn' ? 'সেশনের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Session summary saved to your Krishi Dossier!');
+      }).catch(err => console.warn(err));
     }
 
     setIsSessionActive(false);

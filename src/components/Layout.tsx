@@ -20,6 +20,7 @@ const CommunityRadar = lazy(() => import('./CommunityRadar'));
 const GovSchemes = lazy(() => import('./GovSchemes'));
 const UserGuide = lazy(() => import('./UserGuide'));
 const Profile = lazy(() => import('./Profile'));
+const FarmerDossier = lazy(() => import('./FarmerDossier'));
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 
 import PricingModal from './PricingModal';
@@ -34,7 +35,7 @@ import RegionModal from './RegionModal';
 import MobileBottomNav from './MobileBottomNav';
 import { useLocationName } from '../hooks/useLocationName';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'user-guide' | 'profile' | 'admin-dashboard';
+type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'user-guide' | 'profile' | 'admin-dashboard';
 
 type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
 
@@ -238,6 +239,15 @@ export default function Layout() {
     },
 
     // Pillar 4: Support & Farm Settings (সহায়তা ও প্রোফাইল)
+    { 
+      id: 'farmer-dossier', 
+      name: lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card & Loans', 
+      icon: ShieldCheck, 
+      description: lang === 'bn' ? 'ডিজিটাল ক্রেডিট স্কোর, ফসল বীমা ও লাইভ ইতিহাস' : 'Digital credit score, crop insurance & history', 
+      pillar: 'support', 
+      subcategory: lang === 'bn' ? 'ডিজিটাল প্রোফাইল ও ঋণ' : 'Credit & Insurance Dossier',
+      badge: 'PRO'
+    },
     { 
       id: 'user-guide', 
       name: t.userGuide, 
@@ -952,6 +962,9 @@ export default function Layout() {
                     </div>
                     <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
+                    </div>
+                    <div className={activeTab === 'farmer-dossier' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('farmer-dossier') && <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} />}
                     </div>
                     <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}

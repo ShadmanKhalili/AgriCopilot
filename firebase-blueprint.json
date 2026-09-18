@@ -144,6 +144,56 @@
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "description", "eligibility", "howToApply", "crops", "districts", "lastUpdated"]
+    },
+    "FarmerProfile": {
+      "title": "FarmerProfile",
+      "description": "Progressively compiled agricultural dossier for credit scoring and crop insurance",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Farmer UID" },
+        "fullName": { "type": "string" },
+        "creditReadinessScore": { "type": "number", "description": "Score from 0 to 100" },
+        "insuranceRiskTier": { "type": "string", "enum": ["Low", "Moderate", "High"] },
+        "primaryCrop": { "type": "string" },
+        "cropsGrown": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "totalLandDecimals": { "type": "number" },
+        "locationDistrict": { "type": "string" },
+        "locationUpazila": { "type": "string" },
+        "soilType": { "type": "string" },
+        "irrigationType": { "type": "string" },
+        "totalSessionsCompleted": { "type": "number" },
+        "totalDiagnoses": { "type": "number" },
+        "lastInteractionSummary": { "type": "string" },
+        "lastInteractionDate": { "type": "string", "format": "date-time" },
+        "keyInsights": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fullName", "creditReadinessScore", "updatedAt", "createdAt"]
+    },
+    "FarmerTimelineEvent": {
+      "title": "FarmerTimelineEvent",
+      "description": "Chronological logged event extracted from live sessions, image uploads, or weather alerts",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Farmer UID" },
+        "eventType": { "type": "string", "enum": ["voice_consultation", "crop_diagnosis", "weather_alert", "smart_grading", "market_mandi", "planting_intent"] },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "keyFacts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidenceScore": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "eventType", "title", "summary", "createdAt"]
     }
   },
   "firestore": {
@@ -174,6 +224,14 @@
     "/gov_schemes/{schemeId}": {
       "schema": { "$ref": "#/entities/GovScheme" },
       "description": "Stores curated government schemes for farmers"
+    },
+    "/farmer_profiles/{userId}": {
+      "schema": { "$ref": "#/entities/FarmerProfile" },
+      "description": "Stores master farmer credit and insurance dossiers"
+    },
+    "/farmer_timeline_events/{eventId}": {
+      "schema": { "$ref": "#/entities/FarmerTimelineEvent" },
+      "description": "Stores chronological interaction timeline events"
     }
   }
 }

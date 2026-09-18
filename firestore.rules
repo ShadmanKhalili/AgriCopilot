@@ -1,13 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Global Safety Net
+    // 0. Global Zero-Trust Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
     // ===============================================================
-    // Shared Primitives
+    // Shared Security Primitives & Guards
     // ===============================================================
     
     function isSignedIn() {
@@ -23,14 +23,8 @@ service cloud.firestore {
         (request.auth.token.email == "sadmankhalili@gmail.com" && request.auth.token.email_verified == true);
     }
 
-    function isDatabaseAdmin() {
-      // Identity isolation: We don't want users to spoof admin role in their profile
-      // so we use a hardcoded email for the bootstrapper admin
-      return isAdmin();
-    }
-
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -41,34 +35,39 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Pillars: Standard type checks with size bounds
     function isStr(val, min, max) {
       return val is string && val.size() >= min && val.size() <= max;
     }
 
     function isTimestamp(val) {
-      // Perceived as ISO string by the app
-      return val is string && val.size() >= 19;
+      return val is string && val.size() >= 19 && val.size() <= 50;
     }
 
     // ===============================================================
-    // Entity Validators (Pillar 2)
+    // Entity Schema Validators
     // ===============================================================
 
     function isValidUser(data) {
-      // uid, email, name, role, tier, usageCount, lastUsedDate, createdAt
       return data.keys().hasAll(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
              isStr(data.uid, 1, 128) &&
              isStr(data.email, 3, 128) &&
-             data.usageCount is number &&
+             data.role in ['agri-preneur', 'hub-manager', 'admin'] &&
+             data.tier in ['free', 'premium', 'anon'] &&
+             data.usageCount is number && data.usageCount >= 0 &&
              isTimestamp(data.createdAt);
     }
 
     function isValidDiagnosis(data) {
-      // userId, crop, cropStage, analysisType, diagnosisText, qualitativeSeverity, symptomsBreakdown, verificationAdvice, createdAt
       return data.keys().hasAll(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt']) &&
              isStr(data.userId, 1, 128) &&
+             isStr(data.crop, 1, 128) &&
+             isStr(data.cropStage, 1, 128) &&
+             isStr(data.analysisType, 1, 64) &&
              isStr(data.diagnosisText, 1, 30000) &&
+             data.qualitativeSeverity in ['Low', 'Medium', 'High'] &&
+             data.symptomsBreakdown is list &&
+             data.symptomsBreakdown.size() <= 25 &&
+             isStr(data.verificationAdvice, 1, 10000) &&
              isTimestamp(data.createdAt);
     }
 
@@ -79,7 +78,7 @@ service cloud.firestore {
              isStr(data.produce, 1, 128) &&
              isStr(data.grade, 1, 64) &&
              isStr(data.justification, 1, 5000) &&
-             data.estimatedPriceBdt is number &&
+             data.estimatedPriceBdt is number && data.estimatedPriceBdt >= 0 &&
              isTimestamp(data.createdAt);
     }
 
@@ -106,8 +105,8 @@ service cloud.firestore {
       let requiredFields = ['userId', 'latitude', 'longitude', 'landType', 'landSize', 'irrigation', 'previousCrop', 'budget', 'targetTime', 'recommendedCrop', 'createdAt'];
       return data.keys().hasAll(requiredFields) &&
              isStr(data.userId, 1, 128) &&
-             data.latitude is number &&
-             data.longitude is number &&
+             data.latitude is number && data.latitude >= -90 && data.latitude <= 90 &&
+             data.longitude is number && data.longitude >= -180 && data.longitude <= 180 &&
              isStr(data.landType, 1, 128) &&
              isStr(data.landSize, 1, 128) &&
              isStr(data.irrigation, 1, 128) &&
@@ -118,15 +117,38 @@ service cloud.firestore {
              isTimestamp(data.createdAt);
     }
 
+    function isValidFarmerProfile(data) {
+      let requiredFields = ['userId', 'fullName', 'creditReadinessScore', 'updatedAt', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
+             isStr(data.fullName, 1, 128) &&
+             data.creditReadinessScore is number && 
+             data.creditReadinessScore >= 0 && data.creditReadinessScore <= 100 &&
+             isTimestamp(data.updatedAt) &&
+             isTimestamp(data.createdAt);
+    }
+
+    function isValidTimelineEvent(data) {
+      let requiredFields = ['userId', 'eventType', 'title', 'summary', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             isStr(data.userId, 1, 128) &&
+             data.eventType in ['voice_consultation', 'crop_diagnosis', 'weather_alert', 'smart_grading', 'market_mandi', 'planting_intent'] &&
+             isStr(data.title, 1, 256) &&
+             isStr(data.summary, 1, 10000) &&
+             isTimestamp(data.createdAt);
+    }
+
     // ===============================================================
-    // Rules Enforcement
+    // Collection Rules & Attribute-Based Access Control (ABAC)
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isSignedIn() && isValidUser(incoming()) && 
                     incoming().uid == request.auth.uid &&
-                    userId == request.auth.uid;
+                    userId == request.auth.uid &&
+                    isValidId(userId) &&
+                    (incoming().role != 'admin' || isAdmin()); // Prevent Privilege Escalation
       allow update: if isSignedIn() && isValidUser(incoming()) &&
                     isOwner(userId) &&
                     incoming().uid == existing().uid &&
@@ -135,30 +157,31 @@ service cloud.firestore {
                     (
                       isAdmin() || 
                       (
-                        // Tier upgrade or Usage Count sync
+                        // Tier upgrade or Usage Count sync without privilege escalation
                         incoming().diff(existing()).affectedKeys().hasAny(['tier', 'usageCount', 'lastUsedDate', 'name']) &&
-                        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name'])
+                        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name']) &&
+                        incoming().role == existing().role
                       )
                     );
       allow delete: if isAdmin();
     }
 
     match /diagnoses/{diagnosisId} {
-      // Secure List Query (Pillar 8)
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(diagnosisId);
       
       allow create: if isSignedIn() && isValidDiagnosis(incoming()) &&
-                    incoming().userId == request.auth.uid;
+                    incoming().userId == request.auth.uid &&
+                    isValidId(diagnosisId);
       
       allow update: if isSignedIn() && isValidDiagnosis(incoming()) &&
                     existing().userId == request.auth.uid &&
                     incoming().userId == existing().userId &&
                     incoming().createdAt == existing().createdAt &&
+                    isValidId(diagnosisId) &&
                     (
                       isAdmin() ||
                       (
-                        // Action based update
                         incoming().diff(existing()).affectedKeys().hasAny(['deepDiagnosis', 'deepDiagnosedAt', 'helpful', 'chatSummary']) &&
                         incoming().diff(existing()).affectedKeys().hasOnly(['deepDiagnosis', 'deepDiagnosedAt', 'helpful', 'chatSummary', 'updatedAt'])
                       )
@@ -168,7 +191,7 @@ service cloud.firestore {
 
     match /certificates/{certificateId} {
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(certificateId);
       allow create: if isSignedIn() && isValidCertificate(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     isValidId(certificateId);
@@ -177,7 +200,7 @@ service cloud.firestore {
 
     match /alerts/{alertId} {
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(alertId);
       allow create: if isSignedIn() && isValidAlert(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     isValidId(alertId);
@@ -186,7 +209,7 @@ service cloud.firestore {
 
     match /market_queries/{queryId} {
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(queryId);
       allow create: if isSignedIn() && isValidMarketQuery(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     isValidId(queryId);
@@ -195,7 +218,7 @@ service cloud.firestore {
 
     match /planting_intents/{intentId} {
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(intentId);
       allow create: if isSignedIn() && isValidPlantingIntent(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     isValidId(intentId);
@@ -205,6 +228,40 @@ service cloud.firestore {
     match /gov_schemes/{schemeId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /farmer_profiles/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isSignedIn() && isValidFarmerProfile(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    userId == request.auth.uid &&
+                    isValidId(userId);
+      allow update: if isSignedIn() && isValidFarmerProfile(incoming()) &&
+                    isOwner(userId) &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt &&
+                    isValidId(userId) &&
+                    (
+                      isAdmin() ||
+                      incoming().diff(existing()).affectedKeys().hasOnly([
+                        'fullName', 'creditReadinessScore', 'insuranceRiskTier', 
+                        'primaryCrop', 'cropsGrown', 'totalLandDecimals', 
+                        'locationDistrict', 'locationUpazila', 'soilType', 
+                        'irrigationType', 'totalSessionsCompleted', 'totalDiagnoses', 
+                        'lastInteractionSummary', 'lastInteractionDate', 'keyInsights', 'updatedAt'
+                      ])
+                    );
+      allow delete: if isAdmin();
+    }
+
+    match /farmer_timeline_events/{eventId} {
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(eventId);
+      allow create: if isSignedIn() && isValidTimelineEvent(incoming()) &&
+                    incoming().userId == request.auth.uid &&
+                    isValidId(eventId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }
