@@ -74,7 +74,7 @@ export default function PricingModal({ isOpen, onClose, lang }: Props) {
                   <ul className="space-y-4 mb-8 flex-1">
                     {[
                       { text: "10 uses per tab / day", icon: Check },
-                      { text: "Standard Gemini Flash model", icon: Check },
+                      { text: "Standard AI Model", icon: Check },
                       { text: "Basic Market Insights", icon: Check }
                     ].map((item, i) => (
                       <li key={i} className="flex items-start space-x-3">
@@ -119,7 +119,7 @@ export default function PricingModal({ isOpen, onClose, lang }: Props) {
                       {[
                         { text: "Unlimited UI Usage (100 cap/day)", icon: Zap },
                         { text: "1 Premium Analysis per tab / day", icon: Sparkles, highlight: true },
-                        { text: "Powered by Gemini Flash", icon: Check },
+                        { text: "Powered by Advanced AI", icon: Check },
                         { text: "Save Chat History", icon: Check }
                       ].map((item, i) => (
                         <li key={i} className="flex items-start space-x-3">

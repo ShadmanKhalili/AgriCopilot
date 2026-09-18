@@ -317,7 +317,7 @@ export default function LiveVideoCopilot({
       if (!apiKey) {
         toast.error(lang === 'bn' 
           ? "লাইভ ভিডিও ফিচারের জন্য GEMINI_API_KEY কনফিগার থাকতে হবে।" 
-          : "Gemini 3.8 Live requires GEMINI_API_KEY.");
+          : "Live video assistant requires GEMINI_API_KEY.");
         setIsConnecting(false);
         return;
       }
@@ -426,8 +426,8 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               }, 1000);
 
               toast.success(lang === 'bn' 
-                ? '🔴 জেমিনি ৩.৮ লাইভ ভিডিও ও ভয়েস সংযুক্ত হয়েছে!' 
-                : '🔴 Gemini 3.8 Live Multimodal session connected!');
+                ? '🔴 লাইভ মাল্টিমোডাল এআই সেশন সংযুক্ত হয়েছে!' 
+                : '🔴 Live Multimodal AI session connected!');
 
             } catch (mediaErr) {
               console.error("Audio pipeline error:", mediaErr);
@@ -613,7 +613,11 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
         onClick={isSessionActive ? handleTapVideo : undefined}
         className={isFullscreen 
           ? "fixed inset-0 z-[100] bg-black flex flex-col justify-between overflow-hidden touch-none select-none animate-in fade-in duration-300"
-          : "relative rounded-[28px] overflow-hidden bg-gray-950 border-2 border-emerald-500/30 shadow-2xl aspect-[4/3] sm:aspect-[16/10] max-h-[540px] flex items-center justify-center transition-all duration-300"
+          : `relative rounded-[28px] overflow-hidden bg-gray-950 border-2 border-emerald-500/30 shadow-2xl flex items-center justify-center transition-all duration-300 ${
+              isCameraActive 
+                ? "aspect-[4/3] sm:aspect-[16/10] max-h-[540px]" 
+                : "min-h-[420px] sm:min-h-[460px] py-8 px-4"
+            }`
         }
       >
         {/* Video stream element */}
@@ -643,25 +647,25 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
 
         {/* Inactive Camera State / Start CTA */}
         {!isCameraActive && !isConnecting && (
-          <div className="p-6 text-center text-white space-y-4 max-w-md mx-auto z-10">
-            <div className="relative mx-auto w-20 h-20 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-0.5 shadow-xl shadow-emerald-500/20">
-              <div className="w-full h-full rounded-[22px] bg-gray-900/90 flex items-center justify-center">
-                <Video className="w-9 h-9 text-emerald-400 animate-pulse" />
+          <div className="p-4 sm:p-6 text-center text-white space-y-4 max-w-md mx-auto z-10 my-auto">
+            <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-0.5 shadow-xl shadow-emerald-500/20">
+              <div className="w-full h-full rounded-[18px] sm:rounded-[22px] bg-gray-900/90 flex items-center justify-center">
+                <Video className="w-7 h-7 sm:w-9 sm:h-9 text-emerald-400 animate-pulse" />
               </div>
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-mono font-bold uppercase tracking-wider mb-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-2">
                 <Sparkles className="w-3.5 h-3.5" />
-                Gemini 3.8 Live Multimodal
+                {lang === 'bn' ? 'লাইভ মাল্টিমোডাল এআই' : 'Live Multimodal AI'}
               </div>
               <h3 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white">
                 {lang === 'bn' ? 'লাইভ ক্যামেরা ও ভয়েস সহকারী' : 'Live Camera & Voice Copilot'}
               </h3>
-              <p className="text-xs sm:text-sm text-gray-400 mt-1.5 leading-relaxed">
+              <p className="text-xs sm:text-sm text-gray-300 mt-1.5 leading-relaxed">
                 {lang === 'bn' 
-                  ? 'আপনার ফোন ক্যামেরা ফসলের দিকে ধরুন এবং সরাসরি কথা বলুন। জেমিনি ৩.৮ লাইভ ভিডিও দেখে তৎক্ষণাৎ রোগ নির্ণয় ও সমাধান জানাবে।' 
-                  : 'Point your camera at the crop and speak naturally. Gemini 3.8 Live inspects the video in real-time and speaks back.'}
+                  ? 'আপনার ফোন ক্যামেরা ফসলের দিকে ধরুন এবং সরাসরি কথা বলুন। এআই সরাসরি ভিডিও দেখে তৎক্ষণাৎ রোগ নির্ণয় ও সমাধান জানাবে।' 
+                  : 'Point your camera at the crop and speak naturally. The AI inspects the video in real-time and speaks back.'}
               </p>
             </div>
 
@@ -687,7 +691,7 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
             </div>
             <div className="text-center px-4">
               <h4 className="text-base font-bold text-white">
-                {lang === 'bn' ? 'জেমিনি ৩.৮ লাইভ এর সাথে যুক্ত হচ্ছে...' : 'Connecting to Gemini 3.8 Live...'}
+                {lang === 'bn' ? 'লাইভ এআই এর সাথে যুক্ত হচ্ছে...' : 'Connecting to Live AI...'}
               </h4>
               <p className="text-xs text-gray-400 mt-1">
                 {lang === 'bn' ? 'ক্যামেরা ও দ্বি-মুখী অডিও চ্যানেল প্রস্তুত হচ্ছে' : 'Initializing bidirectional camera & audio stream'}
@@ -884,8 +888,8 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
           <ShieldCheck className="w-4 h-4 text-emerald-700 flex-shrink-0" />
           <span className="font-bold">
             {lang === 'bn' 
-              ? 'নিরাপত্তা নীতি: জেমিনি ৩.৮ কোনো ক্ষতিকর বা নিষিদ্ধ কীটনাশক সুপারিশ করে না।' 
-              : 'Safety Policy: Gemini 3.8 never recommends banned or restricted chemicals.'}
+              ? 'নিরাপত্তা নীতি: এআই কোনো ক্ষতিকর বা নিষিদ্ধ কীটনাশক সুপারিশ করে না।' 
+              : 'Safety Policy: The AI never recommends banned or restricted chemicals.'}
           </span>
         </div>
         <div className="flex items-center gap-1.5 font-black text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-xl">

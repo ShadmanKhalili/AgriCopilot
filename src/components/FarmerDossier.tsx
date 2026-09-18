@@ -120,7 +120,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold uppercase tracking-wider border border-emerald-400/30">
               <Sparkles className="w-3.5 h-3.5" />
-              {lang === 'bn' ? 'প্রগ্রেসিভ এআই কৃষক প্রোফাইলিং' : 'Progressive AI Farmer Profiling'}
+              {lang === 'bn' ? 'ডিজিটাল কৃষক প্রোফাইল' : 'Digital Farmer Profile'}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
               {lang === 'bn' ? 'স্মার্ট কৃষি কার্ড ও ডিজিটাল ক্রেডিট প্রোফাইল' : 'Smart Krishi Card & Farmer Credit Dossier'}

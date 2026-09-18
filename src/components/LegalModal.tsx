@@ -71,8 +71,8 @@ export default function LegalModal({ isOpen, onClose, lang }: Props) {
               </h3>
               <p>
                 {lang === 'bn' 
-                ? 'আমরা আপনার আপলোড করা ছবিগুলো এনালাইসিসের জন্য Google Gemini AI-তে পাঠাই। আমাদের সিস্টেমে ছবিগুলো সাময়িকভাবে বা আপনার অ্যাকাউন্টে ইতিহাস হিসেবে রাখা হতে পারে। এই ছবি সাধারণ এআই মডেল প্রশিক্ষণের জন্য ব্যবহার করা হয় না।'
-                : 'Images you upload are processed through Google Gemini AI to provide a diagnosis. They are temporarily processed and stored securely in your private history. These images are NOT used to train public foundational AI models.'}
+                ? 'আমরা আপনার আপলোড করা ছবিগুলো বিশ্লেষণের জন্য Google AI সিস্টেমে পাঠাই। আমাদের সিস্টেমে ছবিগুলো সাময়িকভাবে বা আপনার অ্যাকাউন্টে ইতিহাস হিসেবে রাখা হতে পারে। এই ছবি উন্মুক্ত সাধারণ এআই মডেল প্রশিক্ষণের জন্য ব্যবহার করা হয় না।'
+                : 'Images you upload are processed securely through Google AI to provide a diagnosis. They are temporarily processed and stored securely in your private history. These images are NOT used to train public foundational AI models.'}
               </p>
             </section>
 

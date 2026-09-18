@@ -422,8 +422,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
                 <Sparkles className="w-5 h-5 text-orange-600" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-gray-900">Premium Analysis (Gemini 3.1 Flash)</h4>
-                <p className="text-xs text-gray-500">Use your 1 free daily premium run for this tab.</p>
+                <h4 className="text-sm font-bold text-gray-900">
+                  {lang === 'bn' ? 'উন্নত প্রিমিয়াম এআই বিশ্লেষণ' : 'Advanced Premium AI Analysis'}
+                </h4>
+                <p className="text-xs text-gray-500">
+                  {lang === 'bn' ? 'আপনার আজকের ১টি ফ্রি প্রিমিয়াম বিশ্লেষণ ব্যবহার করুন।' : 'Use your 1 free daily premium analysis for this tab.'}
+                </p>
               </div>
             </div>
             <button

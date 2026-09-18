@@ -195,7 +195,7 @@ export default function MarketConnect({
                 <div className="flex items-center justify-between">
                   <label className="flex items-center text-xs sm:text-sm font-black text-gray-800 uppercase tracking-widest">
                     <MapPin className="w-4 h-4 mr-2 text-emerald-500" />
-                    Market Region
+                    {lang === 'bn' ? 'বাজার অঞ্চল / অবস্থান' : 'Market Region'}
                   </label>
                   <button 
                     onClick={handleDetectLocation}

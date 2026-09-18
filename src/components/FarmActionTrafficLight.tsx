@@ -204,15 +204,12 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 relative z-10 border-b border-gray-100 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-3 w-3 relative">
+            <span className="flex h-2.5 w-2.5 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
-              {lang === 'bn' ? '১-ক্লিক মাঠ সিদ্ধান্ত' : '1-Tap Daily Farm Action'}
-            </span>
-            <span className="text-[11px] text-gray-400 font-bold hidden md:inline">
-              WeatherNext 3 Engine
+            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {lang === 'bn' ? 'দৈনিক মাঠ সিদ্ধান্ত' : 'Daily Field Decision'}
             </span>
           </div>
           <h3 className="text-xl md:text-2xl font-black text-gray-900 mt-1 flex items-center gap-2">

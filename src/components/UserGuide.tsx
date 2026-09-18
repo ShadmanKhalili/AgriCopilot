@@ -1,6 +1,6 @@
 import React from 'react';
 import { translations, Language } from '../utils/translations';
-import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2, HelpCircle, Crown, Satellite, Cloud, Calculator, Waves } from 'lucide-react';
+import { BookOpen, Leaf, Award, ShieldAlert, TrendingUp, CheckCircle2, HelpCircle, Crown, Satellite, Cloud, Calculator, Waves, PhoneCall, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import Tooltip from './Tooltip';
 
@@ -209,8 +209,10 @@ export default function UserGuide({ lang }: Props) {
           </div>
           <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase italic">{t.guidePricing}</h3>
         </div>
-        <p className="text-gray-500 leading-relaxed text-xl max-w-3xl font-medium relative z-10">
-          Access different performance levels and limits based on your account type.
+        <p className="text-gray-500 leading-relaxed text-base md:text-xl max-w-3xl font-medium relative z-10">
+          {lang === 'bn' 
+            ? 'আপনার অ্যাকাউন্টের ধরন অনুযায়ী দৈনিক ব্যবহার ও সেবা সুবিধাসমূহ।' 
+            : 'Access different performance levels and limits based on your account type.'}
         </p>
         
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 relative z-10">
@@ -256,6 +258,41 @@ export default function UserGuide({ lang }: Props) {
               </div>
             </motion.div>
           </Tooltip>
+        </div>
+      </motion.div>
+
+      {/* Emergency & Official Krishi Call Center Support */}
+      <motion.div variants={itemVariants} className="mt-8 bg-gradient-to-br from-emerald-700 via-emerald-800 to-teal-900 p-8 md:p-10 rounded-[40px] text-white shadow-2xl shadow-emerald-950/20 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div className="flex items-center space-x-5">
+            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0">
+              <PhoneCall className="w-8 h-8 text-emerald-300 animate-pulse" />
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                {lang === 'bn' ? 'কৃষি সম্প্রসারণ অধিদপ্তর (DAE)' : 'Department of Agricultural Extension'}
+              </div>
+              <h3 className="text-2xl md:text-3xl font-black tracking-tight mt-0.5">
+                {lang === 'bn' ? 'জাতীয় কৃষি কল সেন্টার' : 'National Krishi Call Center'}
+              </h3>
+              <p className="text-emerald-100/80 text-xs md:text-sm mt-1 max-w-xl font-medium">
+                {lang === 'bn' 
+                  ? 'যেকোনো মোবাইল অপারেটর থেকে সম্পূর্ণ বিনামূল্যে সরাসরি সরকারি কৃষি বিশেষজ্ঞের সাথে পরামর্শ করুন।' 
+                  : 'Get free, direct agricultural consultation with government agronomists from any operator.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <a 
+              href="tel:16123"
+              className="inline-flex items-center space-x-3 bg-white text-emerald-950 hover:bg-emerald-50 px-6 py-4 rounded-2xl font-black text-base md:text-lg shadow-xl shadow-black/10 transition-all active:scale-95 group shrink-0"
+            >
+              <PhoneCall className="w-5 h-5 text-emerald-600 group-hover:rotate-12 transition-transform" />
+              <span>{lang === 'bn' ? 'কল করুন: ১৬১২৩' : 'Dial: 16123'}</span>
+            </a>
+          </div>
         </div>
       </motion.div>
     </motion.div>

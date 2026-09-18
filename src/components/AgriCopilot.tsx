@@ -734,18 +734,11 @@ export default function AgriCopilot({
               <Radar className="w-5 h-5 md:w-7 h-7 text-white" />
             </div>
             <div>
-              <div className="flex items-center space-x-1.5 mb-0.5">
-                <span className="text-[8px] md:text-[9px] font-display font-black text-green-700 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 uppercase tracking-widest">Live Engine</span>
-              </div>
               <h1 className="text-lg md:text-2xl font-display font-black text-gray-900 tracking-tight leading-none uppercase">
                 {t.agriCopilot}
               </h1>
+              <p className="text-xs text-gray-500 font-medium mt-1">{t.agriCopilotDesc}</p>
             </div>
-          </div>
-          
-          <div className="hidden sm:flex flex-col items-end opacity-40">
-            <div className="font-mono text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">{t.agriCopilotDesc}</div>
-            <div className="font-mono text-[8px] font-bold text-gray-300 uppercase">System: v3.1.2_Stable</div>
           </div>
         </div>
       </div>
@@ -816,14 +809,16 @@ export default function AgriCopilot({
           <div className="relative z-10 space-y-6">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-y-2 mb-4">
-                <label className="block font-display font-black text-gray-500 uppercase tracking-[0.2em] text-[10px] sm:text-xs">{t.captureImage}</label>
-                <div className="flex gap-2">
-                  <span className="text-[10px] font-mono font-bold text-green-700 bg-green-100/50 px-2.5 py-1 rounded-full border border-green-200/50 uppercase tracking-widest">{images.length}/5 Photo Payload</span>
+                <label className="block font-display font-black text-gray-700 uppercase tracking-wider text-xs sm:text-sm">{t.captureImage}</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    {images.length}/5 {lang === 'bn' ? 'টি ছবি' : 'Photos'}
+                  </span>
                   {(images.length > 0 || crop || cropStage || analysisType || description || diagnosis) && (
                     <button
                       onClick={handleClearAll}
                       type="button"
-                      className="text-[10px] font-mono font-bold text-red-700 bg-red-100/50 px-2.5 py-1 rounded-full border border-red-200/50 uppercase tracking-widest hover:bg-red-200/50 transition-all cursor-pointer"
+                      className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
                       aria-label="Clear all inputs"
                     >
                       {lang === 'bn' ? 'সব মুছুন' : 'Clear All'}
@@ -891,15 +886,19 @@ export default function AgriCopilot({
                 <motion.button
                   type="button"
                   whileHover={{ y: -2 }}
-                  className="w-full bg-gradient-to-br from-green-50 to-white rounded-3xl p-6 sm:p-10 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner focus:ring-2 focus:ring-green-500 outline-none" 
+                  className="w-full bg-gradient-to-br from-green-50/70 to-white rounded-3xl p-6 sm:p-8 border-2 border-dashed border-green-200 flex flex-col items-center justify-center text-center group hover:border-green-400 transition-all cursor-pointer shadow-inner focus:ring-2 focus:ring-green-500 outline-none" 
                   onClick={() => fileInputRef.current?.click()}
                   aria-label={t.captureImage}
                 >
-                  <div className="bg-white p-4 sm:p-5 rounded-[22px] shadow-md mb-3 sm:mb-4 group-hover:scale-105 transition-transform text-green-600">
-                    <Camera className="w-9 h-9 sm:w-12 sm:h-12" aria-hidden="true" />
+                  <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm mb-3 group-hover:scale-105 transition-transform text-green-600 border border-green-100">
+                    <Camera className="w-8 h-8 sm:w-10 sm:h-10" aria-hidden="true" />
                   </div>
-                  <p className="text-base sm:text-lg font-black text-green-900 mb-1 tracking-tight">{t.captureImage}</p>
-                  <p className="text-xs sm:text-sm text-green-600/70 font-medium">{lang === 'bn' ? 'পাতা বা ফলের ছবি দিন' : 'Upload leaf or fruit photo'}</p>
+                  <p className="text-sm sm:text-base font-bold text-gray-900 mb-1 tracking-tight">
+                    {lang === 'bn' ? 'ক্যামেরা চালু করুন বা ছবি নির্বাচন করুন' : 'Tap to capture or select crop photo'}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {lang === 'bn' ? 'আক্রান্ত পাতা, কাণ্ড বা ফলের পরিষ্কার ছবি দিন (সর্বোচ্চ ৫টি)' : 'Clear photos of affected plant leaf or fruit (up to 5)'}
+                  </p>
                   <input 
                     type="file" 
                     ref={fileInputRef}
@@ -1158,10 +1157,11 @@ export default function AgriCopilot({
                             <div className="absolute top-0 right-0 w-full h-full pointer-events-none opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: 'radial-gradient(#166534 0.5px, transparent 0.5px)', backgroundSize: '20px 20px' }}></div>
                             
                             <div className="relative z-10">
-                              <div className="flex items-center justify-between mb-10 border-b border-green-50 pb-6">
-                                <span className="font-display font-black text-sm uppercase tracking-[0.3em] text-green-700">Digital Diagnosis Core</span>
+                              <div className="flex items-center justify-between mb-8 border-b border-green-50 pb-5">
+                                <span className="font-display font-black text-sm uppercase tracking-wider text-green-800">
+                                  {lang === 'bn' ? 'রোগ নির্ণয় ও সমাধান' : 'Crop Diagnosis & Treatment'}
+                                </span>
                                 <div className="flex items-center gap-3">
-                                  <span className="font-mono text-[11px] text-gray-300 font-bold bg-gray-50 px-3 py-1 rounded-full border border-gray-100 hidden sm:inline-block">ANALYSIS_SEQ: {lastDiagnosisId?.slice(-6) || 'LIVE'}</span>
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(diagnosis.diagnosis);
@@ -1425,8 +1425,10 @@ export default function AgriCopilot({
                                           <ShieldAlert className="w-7 h-7 text-white" />
                                         </div>
                                         <div>
-                                          <h3 className="font-display font-black text-blue-900 tracking-tight uppercase text-xl leading-none">{lang === 'bn' ? 'গভীর কৃষি বিশ্লেষণ' : 'Master Agronomist Analysis'}</h3>
-                                          <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mt-1.5 inline-block">Grounding Search Active</span>
+                                          <h3 className="font-display font-black text-blue-900 tracking-tight uppercase text-xl leading-none">{lang === 'bn' ? 'গভীর কৃষি বিশ্লেষণ' : 'Detailed Field Analysis'}</h3>
+                                          <span className="text-xs font-semibold text-blue-600 mt-1 inline-block">
+                                            {lang === 'bn' ? 'কৃষি গবেষণা ও বৈজ্ঞানিক তথ্যসূত্র ভিত্তিক' : 'Based on Agricultural Research & Field Data'}
+                                          </span>
                                         </div>
                                       </div>
                                     </div>
@@ -1911,38 +1913,25 @@ export default function AgriCopilot({
           className="mt-8 space-y-6 bg-white/50 backdrop-blur-sm p-6 sm:p-8 rounded-[32px] border border-gray-100 shadow-sm"
         >
           <div className="flex items-center space-x-2 mb-2">
-            <h3 className="font-black text-gray-700 uppercase tracking-widest text-sm">Additional Configuration & Details</h3>
+            <h3 className="font-black text-gray-700 uppercase tracking-wider text-sm">
+              {lang === 'bn' ? 'অতিরিক্ত তথ্য ও বিবরণ' : 'Additional Details & Settings'}
+            </h3>
           </div>
           <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3 col-span-2">
+              <div className="space-y-2 col-span-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCrop('')}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200 ${
-                      crop === '' 
-                        ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' 
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-green-50 hover:border-green-200'
-                    }`}
-                  >
-                    {lang === 'bn' ? 'স্বয়ংক্রিয়' : 'Auto detect'}
-                  </button>
+                <select 
+                  value={crop} 
+                  onChange={(e) => setCrop(e.target.value)}
+                  className="w-full rounded-2xl border-green-100 shadow-sm focus:border-green-500 focus:ring-green-500 bg-green-50/30 p-4 border text-base font-bold text-gray-900 transition-all cursor-pointer"
+                >
+                  <option value="">{lang === 'bn' ? 'স্বয়ংক্রিয় সনাক্তকরণ' : 'Auto detect'}</option>
                   {CROPS.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setCrop(c)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all duration-200 ${
-                        crop === c 
-                          ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105' 
-                          : 'bg-white text-gray-600 border-gray-200 hover:bg-green-50 hover:border-green-200'
-                      }`}
-                    >
-                      {t.crops[c as keyof typeof t.crops]}
-                    </button>
+                    <option key={c} value={c}>
+                      {t.crops[c as keyof typeof t.crops] || c}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
               <div className="space-y-2 col-span-2">
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.cropStage}</label>
@@ -1959,95 +1948,6 @@ export default function AgriCopilot({
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-3xl border border-green-100 shadow-sm flex flex-col space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 id="location-label" className="font-black text-gray-900 text-sm uppercase tracking-widest mb-1">{t.location}</h4>
-                  <p className="text-xs text-gray-500 font-medium">{globalLocation ? t.tooltips.locationDetected : t.tooltips.locationDesc}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsManualLocation(!isManualLocation)}
-                    className={`p-2 rounded-xl transition-colors border focus:ring-2 focus:ring-amber-400 outline-none ${
-                      isManualLocation 
-                        ? 'bg-amber-50 border-amber-200 text-amber-700' 
-                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                    aria-label={isManualLocation ? (lang === 'bn' ? 'জিপিএস ব্যবহার করুন' : 'Use GPS') : (lang === 'bn' ? 'ম্যানুয়ালি সেট করুন' : 'Set Manually')}
-                    aria-pressed={isManualLocation}
-                  >
-                    <Navigation className="w-4 h-4" aria-hidden="true" />
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleDetectLocation}
-                    disabled={isDetectingLocation}
-                    className={`flex items-center space-x-2 font-black uppercase tracking-widest px-5 py-3 rounded-2xl transition-all shadow-sm focus:ring-2 focus:ring-green-500 outline-none ${
-                      globalLocation 
-                        ? 'bg-green-50 text-green-700 hover:bg-green-100' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    } disabled:opacity-50`}
-                    aria-label={t.tooltips.detectLocation}
-                  >
-                    {isDetectingLocation ? (
-                      <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                    ) : globalLocation ? (
-                      <Navigation className="w-4 h-4" aria-hidden="true" />
-                    ) : (
-                      <MapPin className="w-4 h-4" aria-hidden="true" />
-                    )}
-                    <span className="text-xs">{isDetectingLocation ? t.tooltips.detecting : globalLocation ? 'Update' : t.tooltips.detectLocation}</span>
-                  </button>
-                </div>
-              </div>
-
-              {isManualLocation && (
-                <div 
-                  className="pt-2 border-t border-green-50 flex flex-col gap-2"
-                  role="group"
-                  aria-labelledby="location-label"
-                >
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => {
-                      setSelectedDistrict(e.target.value);
-                      const newDistrict = geoData.find(d => d.id === e.target.value);
-                      if (newDistrict && newDistrict.upazilas.length > 0) {
-                        handleManualLocationChange(newDistrict.upazilas[0].id);
-                      } else {
-                        setSelectedUpazila('');
-                      }
-                    }}
-                    className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                    aria-label={lang === 'bn' ? 'জেলা নির্বাচন করুন' : 'Select District'}
-                  >
-                    <option value="">{lang === 'bn' ? 'জেলা নির্বাচন করুন (ঐচ্ছিক)' : 'Select District (Optional)'}</option>
-                    {geoData.map(d => (
-                      <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={selectedUpazila}
-                    onChange={(e) => handleManualLocationChange(e.target.value)}
-                    className="w-full bg-green-50/30 border border-green-100 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                    disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
-                    aria-label={lang === 'bn' ? 'উপজেলা নির্বাচন করুন' : 'Select Upazila'}
-                  >
-                    <option value="">{lang === 'bn' ? 'উপজেলা নির্বাচন করুন (ঐচ্ছিক)' : 'Select Upazila (Optional)'}</option>
-                    {activeDistrict?.upazilas.map(u => (
-                      <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-green-600 mt-2 font-medium">
-                    {t.manualLocationNotice}
-                  </p>
-                </div>
-              )}
-
-              {locationError && <p className="text-[10px] text-red-500 font-bold">{locationError}</p>}
             </div>
 
             {globalLocation && (

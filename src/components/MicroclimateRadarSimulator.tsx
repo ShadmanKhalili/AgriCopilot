@@ -182,7 +182,7 @@ export default function MicroclimateRadarSimulator({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-700/50">
-                WeatherNext 3.0 Real-time GIS
+                {lang === 'bn' ? 'স্মার্ট এআই রাডার ও জিআইএস' : 'Real-time AI Radar & GIS'}
               </span>
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -553,9 +553,8 @@ export default function MicroclimateRadarSimulator({
               {currentInsight.text}
             </p>
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10px] opacity-75 font-mono">
-              <span>Model: WeatherNext 3.0</span>
-              <span>Google DeepMind AI Engine</span>
+            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] opacity-80 font-medium">
+              <span>{lang === 'bn' ? 'লাইভ রাডার ও স্যাটেলাইট পর্যবেক্ষণ' : 'Live radar & satellite observation'}</span>
             </div>
           </div>
         </div>

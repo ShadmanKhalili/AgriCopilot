@@ -489,7 +489,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
             <TableProperties className={`w-4 h-4 shrink-0 ${designMode === 'comparison-matrix' ? 'text-amber-400' : 'text-stone-500'}`} />
             <div className="min-w-0">
               <div className="text-xs font-bold truncate">
-                {lang === 'bn' ? '৪. তুলনামূলক মেট্রিক্স' : '4. Comparison Matrix'}
+                {lang === 'bn' ? '৪. জাতের তুলনামূলক তালিকা' : '4. Variety Comparison Table'}
               </div>
               <div className={`text-[10px] truncate ${designMode === 'comparison-matrix' ? 'text-stone-300' : 'text-stone-500'}`}>
                 {lang === 'bn' ? 'পাশাপাশি জাতের তুলনা টেবিল' : 'Side-by-side data table'}
@@ -1149,8 +1149,8 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                 ? 'কৃষি গবেষক ও সিদ্ধান্ত গ্রহণকারী কৃষকদের জন্য তথ্যবহুল ডেটা টেবিল। ফলন, মেয়াদ ও সহনশীলতার তুলনা এক নজরে পাওয়া যায়।'
                 : 'Dense, structured comparison matrix favored by agronomists. Side-by-side metric comparison across duration, yield, and tolerance.'}
             </div>
-            <span className="text-[11px] font-mono font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shrink-0 ml-3">
-              Analytical Matrix
+            <span className="text-[11px] font-semibold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200 shrink-0 ml-3">
+              {lang === 'bn' ? 'তুলনামূলক টেবিল' : 'Comparison Table'}
             </span>
           </div>
 
@@ -1322,10 +1322,10 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
           </div>
           <div>
             <h3 className="text-xl font-black text-stone-900">
-              {lang === 'bn' ? 'দুর্যোগোত্তর ফসল বাঁচানোর জরুরি প্রটোকল' : 'Post-Disaster Field Emergency Recovery Protocol'}
+              {lang === 'bn' ? 'দুর্যোগোত্তর ফসল বাঁচানোর জরুরি করণীয়' : 'Post-Disaster Field Recovery Guide'}
             </h3>
             <p className="text-xs text-stone-500">
-              {lang === 'bn' ? 'বন্যা পরবর্তী বা নোনা পানি প্রবেশের পর তাৎক্ষণিক পদক্ষেপ' : 'Validated agronomic rescue operations after floods, saline surges, or droughts.'}
+              {lang === 'bn' ? 'বন্যা পরবর্তী বা নোনা পানি প্রবেশের পর তাৎক্ষণিক পদক্ষেপ' : 'Agronomic rescue operations after floods, saline surges, or droughts.'}
             </p>
           </div>
         </div>

@@ -100,14 +100,12 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <Calculator className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                Precision Spray Engine
-              </span>
-            </div>
             <h3 className="text-base md:text-lg font-black text-gray-900 tracking-tight">
-              {lang === 'bn' ? 'স্প্রে ও ওষুধের সঠিক ডোজ ক্যালকুলেটর' : 'Interactive Knapsack & Dosage Calculator'}
+              {lang === 'bn' ? 'স্প্রে ও ওষুধের সঠিক ডোজ ক্যালকুলেটর' : 'Knapsack & Spray Dosage Calculator'}
             </h3>
+            <p className="text-xs text-gray-500 font-medium">
+              {lang === 'bn' ? 'জমির পরিমাপ অনুযায়ী পানি ও কীটনাশকের নির্ভুল অনুপাত' : 'Calculate exact water and chemical ratio for your land'}
+            </p>
           </div>
         </div>
 

@@ -111,8 +111,60 @@ export default function Layout() {
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
 
-  // Global Location State (Default: null - prompts user for GIS/GPS detection or manual region selection)
-  const [globalLocation, setGlobalLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // Global Location State with localStorage persistence
+  const [globalLocation, setGlobalLocationState] = useState<{ latitude: number; longitude: number } | null>(() => {
+    try {
+      const saved = localStorage.getItem('smart_krishi_global_location');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse saved location:", e);
+    }
+    return null;
+  });
+
+  const setGlobalLocation = (loc: { latitude: number; longitude: number } | null) => {
+    setGlobalLocationState(loc);
+    if (loc) {
+      try {
+        localStorage.setItem('smart_krishi_global_location', JSON.stringify(loc));
+      } catch (e) {
+        console.warn("Could not save location:", e);
+      }
+    }
+  };
+
+  // Ask GPS only ONCE across the entire app on first load if not already saved
+  useEffect(() => {
+    if (globalLocation) return;
+    const hasAsked = localStorage.getItem('smart_krishi_gps_checked');
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = {
+            latitude: Number(pos.coords.latitude.toFixed(4)),
+            longitude: Number(pos.coords.longitude.toFixed(4)),
+          };
+          setGlobalLocation(coords);
+          localStorage.setItem('smart_krishi_gps_checked', 'true');
+        },
+        (err) => {
+          console.warn("GPS auto-detection skipped or denied:", err.message);
+          // Default to Dhaka if permission denied or unavailable
+          const defaultLoc = { latitude: 23.8103, longitude: 90.4125 };
+          setGlobalLocation(defaultLoc);
+          localStorage.setItem('smart_krishi_gps_checked', 'true');
+        },
+        { timeout: 7000, enableHighAccuracy: false, maximumAge: 300000 }
+      );
+    } else {
+      setGlobalLocation({ latitude: 23.8103, longitude: 90.4125 });
+    }
+  }, []);
 
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
     if (payload?.crop) {
@@ -152,8 +204,7 @@ export default function Layout() {
       icon: Leaf, 
       description: t.agriCopilotDesc, 
       pillar: 'health', 
-      subcategory: t.subcatDoctor || (lang === 'bn' ? 'এআই রোগ নিদান' : 'AI Crop Doctor'), 
-      badge: 'AI Live' 
+      subcategory: t.subcatDoctor || (lang === 'bn' ? 'এআই রোগ নিদান' : 'AI Crop Doctor')
     },
     { 
       id: 'crop-health', 
@@ -161,8 +212,7 @@ export default function Layout() {
       icon: Satellite, 
       description: t.cropHealthDesc, 
       pillar: 'health', 
-      subcategory: t.subcatSatellite || (lang === 'bn' ? 'স্যাটেলাইট নজরদারি' : 'Satellite NDVI'), 
-      badge: 'Sentinel' 
+      subcategory: t.subcatSatellite || (lang === 'bn' ? 'স্যাটেলাইট নজরদারি' : 'Satellite NDVI')
     },
     { 
       id: 'community-radar', 
@@ -170,8 +220,7 @@ export default function Layout() {
       icon: Radar, 
       description: t.communityRadarDesc, 
       pillar: 'health', 
-      subcategory: t.subcatRadar || (lang === 'bn' ? 'বালাই প্রাদুর্ভাব রাডার' : 'Pest Alerts'), 
-      badge: lang === 'bn' ? 'লাইভ' : 'Live' 
+      subcategory: t.subcatRadar || (lang === 'bn' ? 'বালাই প্রাদুর্ভাব রাডার' : 'Pest Alerts')
     },
 
     // Pillar 2: Weather & Climate Intelligence (আবহাওয়া ও জলবায়ু বুদ্ধিমত্তা)
@@ -181,8 +230,7 @@ export default function Layout() {
       icon: Cloud, 
       description: t.weatherAdvisoryDesc, 
       pillar: 'weather', 
-      subcategory: t.subcatWeather || (lang === 'bn' ? 'আবহাওয়া ও রাডার' : 'Forecast & Radar'), 
-      badge: 'DeepMind' 
+      subcategory: t.subcatWeather || (lang === 'bn' ? 'আবহাওয়া ও রাডার' : 'Forecast & Radar')
     },
     { 
       id: 'smart-planting', 
@@ -198,8 +246,7 @@ export default function Layout() {
       icon: Waves, 
       description: t.climateResilienceDesc, 
       pillar: 'weather', 
-      subcategory: t.subcatResilience || (lang === 'bn' ? 'দুর্যোগ সহনশীল জাত' : 'Resilient Varieties'), 
-      badge: lang === 'bn' ? 'জাত' : 'Guide' 
+      subcategory: t.subcatResilience || (lang === 'bn' ? 'দুর্যোগ সহনশীল জাত' : 'Resilient Varieties')
     },
 
     // Pillar 3: Agri-Economics & Markets (কৃষি অর্থনীতি ও বাজার)
@@ -209,8 +256,7 @@ export default function Layout() {
       icon: Calculator, 
       description: t.krishiProfitDesc, 
       pillar: 'economics', 
-      subcategory: t.subcatProfit || (lang === 'bn' ? 'উৎপাদন খরচ ও লাভ' : 'Cost & Margin'), 
-      badge: lang === 'bn' ? 'নতুন' : 'New' 
+      subcategory: t.subcatProfit || (lang === 'bn' ? 'উৎপাদন খরচ ও লাভ' : 'Cost & Margin')
     },
     { 
       id: 'market-connect', 
@@ -218,8 +264,7 @@ export default function Layout() {
       icon: TrendingUp, 
       description: t.marketConnectDesc, 
       pillar: 'economics', 
-      subcategory: t.subcatMarket || (lang === 'bn' ? 'পাইকারি বাজার দর' : 'Wholesale Mandi'), 
-      badge: 'DAM' 
+      subcategory: t.subcatMarket || (lang === 'bn' ? 'পাইকারি বাজার দর' : 'Wholesale Mandi')
     },
     { 
       id: 'smart-grade', 
@@ -245,8 +290,7 @@ export default function Layout() {
       icon: ShieldCheck, 
       description: lang === 'bn' ? 'ডিজিটাল ক্রেডিট স্কোর, ফসল বীমা ও লাইভ ইতিহাস' : 'Digital credit score, crop insurance & history', 
       pillar: 'support', 
-      subcategory: lang === 'bn' ? 'ডিজিটাল প্রোফাইল ও ঋণ' : 'Credit & Insurance Dossier',
-      badge: 'PRO'
+      subcategory: lang === 'bn' ? 'ডিজিটাল প্রোফাইল ও ঋণ' : 'Credit & Insurance Dossier'
     },
     { 
       id: 'user-guide', 
@@ -268,9 +312,9 @@ export default function Layout() {
       id: 'admin-dashboard' as const, 
       name: 'Admin Hub', 
       icon: BarChart3, 
-      description: 'Protocol & Analytics', 
+      description: 'Analytics & Management', 
       pillar: 'support' as const, 
-      subcategory: 'System Telemetry',
+      subcategory: 'Overview',
       badge: 'Admin'
     }] : []),
   ];
@@ -390,12 +434,13 @@ export default function Layout() {
             text-slate-900 dark:text-white flex flex-col shadow-2xl z-50 h-full shrink-0 
             border-r border-emerald-200/80 dark:border-emerald-800/40 
             pt-[max(0.25rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]
+            overflow-hidden
           `}
           role="navigation"
           aria-label={lang === 'bn' ? 'প্রধান নেভিগেশন' : 'Main navigation'}
         >
           {/* Brand Header */}
-          <div className="p-4 sm:p-5 pb-4 flex items-center justify-between border-b border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/10">
+          <div className="p-4 sm:p-5 pb-4 flex items-center justify-between border-b border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/10 shrink-0">
             <div className="flex items-center space-x-3">
               <motion.div 
                 whileHover={{ rotate: 12, scale: 1.05 }}
@@ -432,7 +477,7 @@ export default function Layout() {
           </div>
 
           {/* Pillar Category Filter Tabs (Quick Filter) & Search */}
-          <div className="px-3 pt-3 pb-1 space-y-2">
+          <div className="px-3 pt-3 pb-1 space-y-2 shrink-0">
             <div className="grid grid-cols-5 gap-1 p-1 bg-emerald-50/90 dark:bg-emerald-950/80 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/40">
               {pillarCategories.map((cat) => {
                 const isCatActive = selectedPillarFilter === cat.key;
@@ -476,9 +521,9 @@ export default function Layout() {
             </div>
           </div>
           
-          {/* Categorized and Subcategorized Navigation List */}
+          {/* Categorized and Subcategorized Navigation List (Smoothly Scrollable) */}
           <nav 
-            className="flex-1 px-3 py-2 space-y-4 overflow-y-auto custom-scrollbar"
+            className="flex-1 min-h-0 px-3 py-2 space-y-4 overflow-y-auto overscroll-contain touch-pan-y custom-scrollbar"
             role="tablist"
             aria-orientation="vertical"
           >
@@ -614,56 +659,8 @@ export default function Layout() {
             )}
           </nav>
           
-          {/* Sidebar Footer: Theme Switcher, DAE Hotline & Auth */}
-          <div className="p-3.5 border-t border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/15 space-y-2.5 shrink-0">
-            
-            {/* Theme Switcher in Sidebar */}
-            <div className="flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-white/5 border border-emerald-200/80 dark:border-white/10 text-xs shadow-2xs">
-              <div className="flex items-center space-x-2">
-                <div className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300">
-                  {theme === 'light' ? (
-                    <Sun className="w-4 h-4 text-amber-500" />
-                  ) : (
-                    <Moon className="w-4 h-4 text-emerald-300" />
-                  )}
-                </div>
-                <div>
-                  <div className="font-black text-[11px] text-slate-800 dark:text-white leading-tight">
-                    {theme === 'light' ? t.lightMode : t.darkMode}
-                  </div>
-                  <div className="text-[9.5px] text-slate-500 dark:text-emerald-400/80">
-                    {theme === 'light' ? (lang === 'bn' ? 'উজ্জ্বল মোড' : 'Daylight theme') : (lang === 'bn' ? 'রাত্রিকালীন মোড' : 'Night theme')}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="px-2.5 py-1 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white font-black text-[10.5px] transition-all active:scale-95 cursor-pointer border border-emerald-300/60 dark:border-white/10"
-              >
-                {theme === 'light' ? (lang === 'bn' ? 'ডার্ক মোড' : 'Dark Mode') : (lang === 'bn' ? 'লাইট মোড' : 'Light Mode')}
-              </button>
-            </div>
-
-            {/* Quick DAE Toll-Free Call Box */}
-            <a 
-              href="tel:16123"
-              className="flex items-center justify-between p-2.5 bg-white hover:bg-emerald-100/70 dark:bg-emerald-900/50 dark:hover:bg-emerald-900/80 rounded-2xl border border-emerald-200 dark:border-emerald-700/40 text-emerald-900 dark:text-emerald-200 text-xs transition-colors group shadow-2xs"
-            >
-              <div className="flex items-center space-x-2.5">
-                <div className="p-1.5 bg-emerald-500 text-white dark:text-emerald-950 rounded-xl group-hover:scale-105 transition-transform">
-                  <PhoneCall className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <div className="font-black text-[11px] text-slate-900 dark:text-white leading-tight">
-                    {lang === 'bn' ? 'কৃষি কল সেন্টার' : 'Krishi Call Center'}
-                  </div>
-                  <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-mono font-bold">16123 (বিনামূল্যে)</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-emerald-700 dark:text-emerald-300 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-            </a>
-
+          {/* Sidebar Footer: Auth & Privacy/Terms */}
+          <div className="p-3.5 border-t border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/15 space-y-2 shrink-0">
             {/* Auth Button */}
             {user ? (
               <div className="flex items-center justify-between bg-white dark:bg-white/5 p-2 rounded-2xl border border-emerald-200 dark:border-white/10 shadow-2xs">
@@ -718,7 +715,7 @@ export default function Layout() {
           
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
-            {/* Left: Mobile Menu Toggle & Active Module Info */}
+            {/* Left: Mobile Menu Toggle & Brand Logo */}
             <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
               <button 
                 type="button"
@@ -729,22 +726,14 @@ export default function Layout() {
                 <Menu className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center space-x-2 truncate">
-                {activeTabDetails && (
-                  <div className="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
-                    <div className="p-1 sm:p-1.5 bg-emerald-50 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded-xl shrink-0">
-                      <activeTabDetails.icon className="w-4 h-4" />
-                    </div>
-                    <div className="flex items-center space-x-1.5 min-w-0">
-                      <h1 className="font-black text-xs sm:text-base text-gray-900 dark:text-white tracking-tight truncate max-w-[110px] sm:max-w-[200px] md:max-w-none m-0 leading-tight">
-                        {activeTabDetails.name}
-                      </h1>
-                      <span className="hidden sm:inline-flex items-center text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 dark:bg-emerald-900/70 dark:text-emerald-300 dark:border-emerald-700/50 shrink-0">
-                        {activeTabDetails.subcategory}
-                      </span>
-                    </div>
-                  </div>
-                )}
+              {/* Mobile App Branding (Clean, persistent, never duplicates tab title) */}
+              <div className="flex md:hidden items-center space-x-2 min-w-0">
+                <div className="p-1.5 bg-gradient-to-tr from-emerald-500 to-green-600 text-white rounded-xl shadow-xs shrink-0">
+                  <Leaf className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <span className="font-display font-black text-sm text-emerald-950 dark:text-white tracking-tight truncate">
+                  {lang === 'bn' ? 'স্মার্ট কৃষি' : 'Smart Krishi'}
+                </span>
               </div>
             </div>
 

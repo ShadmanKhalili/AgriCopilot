@@ -385,6 +385,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   useEffect(() => {
     if (globalLocation) {
       fetchWeatherAndAdvisory();
+    } else {
+      // Seamlessly fall back to default location rather than blocking the tab
+      setGlobalLocation({ latitude: 23.8103, longitude: 90.4125 });
     }
   }, [globalLocation]);
 
@@ -450,12 +453,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 }`}
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>{t.weatherNext3 || 'WeatherNext 3 (Google AI)'}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
-                  forecastModel === 'weathernext3' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
-                }`}>
-                  5km AI
-                </span>
+                <span>{lang === 'bn' ? 'স্মার্ট এআই পূর্বাভাস' : 'Smart AI Forecast'}</span>
               </button>
 
               <button
@@ -630,9 +628,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                             <Satellite className="w-5 h-5 text-blue-300 animate-pulse" />
                           </div>
                           <div>
-                            <span className="text-[10px] font-black tracking-widest uppercase text-blue-300">Google DeepMind</span>
+                            <span className="text-[10px] font-black tracking-widest uppercase text-blue-300">Google AI</span>
                             <h4 className="text-base font-black text-white flex items-center gap-2">
-                              WeatherNext 3.0
+                              {lang === 'bn' ? 'উন্নত এআই আবহাওয়া মডেল' : 'Advanced Weather AI'}
                               <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-400/30">
                                 5km AI
                               </span>
@@ -640,21 +638,19 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">AI Convergence</span>
+                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider block">
+                            {lang === 'bn' ? 'মডেলের নির্ভুলতা' : 'Model Accuracy'}
+                          </span>
                           <span className="text-xs font-black text-emerald-400">
-                            {weather.ensembleConfidence || 96}% {lang === 'bn' ? 'কনভারজেন্স' : 'Confidence'}
+                            {weather.ensembleConfidence || 96}% {lang === 'bn' ? 'নির্ভুল' : 'Confidence'}
                           </span>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-blue-200/90 pt-2.5 border-t border-white/10 font-medium">
-                        <span className="inline-flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-blue-100 pt-2.5 border-t border-white/10 font-medium">
+                        <span className="inline-flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                          64-Member Ensemble
+                          {lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও রাডার সংযুক্ত পূর্বাভাস' : 'Live Satellite & Radar Assimilated Forecast'}
                         </span>
-                        <span>•</span>
-                        <span>50% Lower Rain Error</span>
-                        <span>•</span>
-                        <span>Live Geostationary Ingestion</span>
                       </div>
                     </div>
                   )}
@@ -757,10 +753,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-black uppercase tracking-widest text-indigo-900 flex items-center gap-1.5">
                           <Zap className="w-4 h-4 text-amber-500" />
-                          {lang === 'bn' ? 'ওয়েদারনেক্সট ৩ এগ্রো-মেট্রিক' : 'WeatherNext 3 Microclimate'}
+                          {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
                         </h4>
                         <span className="text-[10px] bg-blue-100/80 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                          64-Member Spread
+                          {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
                         </span>
                       </div>
 
@@ -832,13 +828,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </p>
                         </div>
 
-                        {/* Ensemble Rain Spread */}
+                        {/* Rain Range */}
                         <div className="bg-gradient-to-br from-purple-50 to-white p-4 rounded-3xl border border-purple-100 shadow-sm">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5 text-purple-700">
                               <CloudRain className="w-4 h-4" />
                               <span className="text-[10px] font-black uppercase tracking-wider">
-                                {lang === 'bn' ? 'বৃষ্টিপাত বিস্তার (P10-P90)' : 'Rain Spread (P10-P90)'}
+                                {lang === 'bn' ? 'সম্ভাব্য বৃষ্টিপাতের পরিমাণ' : 'Expected Rain Range'}
                               </span>
                             </div>
                           </div>
@@ -865,7 +861,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           <span>{t.hourlyForecastTrend || '24-Hour AI Weather Trend'}</span>
                         </h4>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          WeatherNext 3 Hourly
+                          {lang === 'bn' ? 'প্রতি ঘণ্টার পূর্বাভাস' : 'Hourly AI Forecast'}
                         </span>
                       </div>
                       <div className="flex gap-2.5 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-blue-200">

@@ -114,13 +114,19 @@ export default function CommunityRadar({ lang }: Props) {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader2 className="w-9 h-9 animate-spin text-red-500 mb-3" />
-          <p className="text-red-500 font-black uppercase tracking-widest text-xs animate-pulse">Scanning Network...</p>
+          <p className="text-red-600 font-bold uppercase tracking-wider text-xs">
+            {lang === 'bn' ? 'তথ্য অনুসন্ধান করা হচ্ছে...' : 'Checking pest alerts...'}
+          </p>
         </div>
       ) : alerts.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm p-6">
           <Radar className="w-14 h-14 text-gray-200 mx-auto mb-3" />
-          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">No Severe Alerts</h3>
-          <p className="text-gray-500 text-xs sm:text-sm">The network is currently clear of severe outbreaks.</p>
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
+            {lang === 'bn' ? 'কোনো গুরুতর সতর্কতা নেই' : 'No Severe Alerts'}
+          </h3>
+          <p className="text-gray-500 text-xs sm:text-sm">
+            {lang === 'bn' ? 'আপনার এলাকায় বর্তমানে কোনো বড় ধরনের বালাই প্রাদুর্ভাব পাওয়া যায়নি।' : 'No major pest outbreaks currently reported in your area.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-5">

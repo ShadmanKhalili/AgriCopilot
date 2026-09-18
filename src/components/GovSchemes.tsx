@@ -255,7 +255,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
     if (!window.confirm(lang === 'bn' ? "গুগল সার্চের মাধ্যমে প্রকল্পগুলো আপডেট করবেন? এটি এআই ব্যবহার করে এবং কিছুটা সময় নিতে পারে।" : "Sync curated schemes with Google Search? This uses AI and takes a few moments.")) return;
     
     setIsSyncing(true);
-    setSyncStatus(lang === 'bn' ? 'এআই ইঞ্জিন চালু হচ্ছে...' : 'Initializing AI Engine...');
+    setSyncStatus(lang === 'bn' ? 'অনুসন্ধান শুরু হচ্ছে...' : 'Starting search...');
     
     try {
       // Simulate phases for user transparency

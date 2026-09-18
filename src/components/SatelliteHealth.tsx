@@ -144,7 +144,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-200/60 rounded-xl text-indigo-700 text-xs font-semibold self-start sm:self-auto">
             <Activity className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{lang === 'bn' ? 'সেন্টিনেল-২ (১০মি) ও কৃষি-মডেল' : 'Sentinel-2 (10m) + Agro-Model'}</span>
+            <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও কৃষি বিশ্লেষণ' : 'Live Satellite & Crop Analysis'}</span>
           </div>
         </div>
       </motion.div>

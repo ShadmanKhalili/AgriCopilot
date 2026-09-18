@@ -194,11 +194,9 @@ export default function AdminDashboard({ lang }: { lang: 'en' | 'bn' }) {
                 <BarChart3 className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-4xl font-display font-black text-white tracking-tighter leading-none mb-2 uppercase">AGRI-OPS HUB</h1>
-                <div className="flex items-center space-x-3 text-[9px] font-mono font-bold text-gray-400 uppercase tracking-[0.3em]">
-                  <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div> SYSTEM LIVE</span>
-                  <span className="opacity-30">|</span>
-                  <span>v3.0.42_STABLE</span>
+                <h1 className="text-2xl md:text-4xl font-display font-black text-white tracking-tighter leading-none mb-2 uppercase">Admin Dashboard</h1>
+                <div className="flex items-center space-x-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping"></div> Live Operations</span>
                 </div>
               </div>
             </div>
@@ -325,20 +323,20 @@ export default function AdminDashboard({ lang }: { lang: 'en' | 'bn' }) {
 
             <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-                <h3 className="font-display font-black text-xs uppercase tracking-[0.3em] text-gray-400">Live Global Protocol Log</h3>
+                <h3 className="font-display font-black text-xs uppercase tracking-wider text-gray-500">Recent Platform Activity</h3>
                 <div className="flex items-center space-x-2">
-                   <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
-                   <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Direct Stream Active</span>
+                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live Updates</span>
                 </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50/50">
-                      <th className="px-8 py-4 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Identity_ID</th>
-                      <th className="px-8 py-4 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Entity_Type</th>
-                      <th className="px-8 py-4 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Operational_Status</th>
-                      <th className="px-8 py-4 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Sat_Feedback</th>
+                      <th className="px-8 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">ID</th>
+                      <th className="px-8 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Crop / Type</th>
+                      <th className="px-8 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-8 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Feedback</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -414,11 +412,11 @@ export default function AdminDashboard({ lang }: { lang: 'en' | 'bn' }) {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50">
-                    <th className="px-8 py-5 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Entity Info</th>
-                    <th className="px-8 py-5 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Protocol Type</th>
-                    <th className="px-8 py-5 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Sync_Status</th>
-                    <th className="px-8 py-5 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Access_Level</th>
-                    <th className="px-8 py-5 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Action</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">User Info</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Access Tier</th>
+                    <th className="px-8 py-5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">

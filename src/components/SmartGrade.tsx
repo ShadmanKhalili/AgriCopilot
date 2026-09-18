@@ -168,8 +168,10 @@ export default function SmartGrade({ lang }: Props) {
                   <div className="bg-white p-4 sm:p-5 rounded-full text-blue-600 shadow-xl group-hover:scale-110 transition-transform border border-blue-50">
                     <Camera className="w-8 h-8 sm:w-10 sm:h-10" />
                   </div>
-                  <div className="text-xs font-black text-blue-700 uppercase tracking-widest bg-white/90 backdrop-blur-md px-5 sm:px-6 py-2 sm:py-2.5 rounded-full shadow-sm border border-blue-100">
-                    {image ? 'Tap to change image' : 'Tap to take photo of batch'}
+                  <div className="text-xs font-bold text-blue-700 bg-white/95 backdrop-blur-md px-5 sm:px-6 py-2 rounded-full shadow-sm border border-blue-100">
+                    {image 
+                      ? (lang === 'bn' ? 'ছবি পরিবর্তন করুন' : 'Change photo')
+                      : (lang === 'bn' ? 'ক্যামেরা চালু করুন বা ছবি নির্বাচন করুন' : 'Take photo or upload produce')}
                   </div>
                 </div>
                 <input 
