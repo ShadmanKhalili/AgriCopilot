@@ -34,6 +34,7 @@ import AuthModal from './AuthModal';
 import RegionModal from './RegionModal';
 import MobileBottomNav from './MobileBottomNav';
 import { useLocationName } from '../hooks/useLocationName';
+import { detectUserLocation } from '../utils/geolocation';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'user-guide' | 'profile' | 'admin-dashboard';
 
@@ -111,14 +112,18 @@ export default function Layout() {
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
 
-  // Global Location State with localStorage persistence
+  // Global Location State with localStorage persistence (cleansed for Bangladesh regional bounds)
   const [globalLocation, setGlobalLocationState] = useState<{ latitude: number; longitude: number } | null>(() => {
     try {
       const saved = localStorage.getItem('smart_krishi_global_location');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
-          return parsed;
+          // Invalidate any stale foreign coordinates previously cached outside Bangladesh territory
+          if (parsed.latitude >= 20.4 && parsed.latitude <= 26.9 && parsed.longitude >= 87.8 && parsed.longitude <= 92.9) {
+            return parsed;
+          }
+          localStorage.removeItem('smart_krishi_global_location');
         }
       }
     } catch (e) {
@@ -138,32 +143,25 @@ export default function Layout() {
     }
   };
 
-  // Ask GPS only ONCE across the entire app on first load if not already saved
+  // Initialize location with high accuracy GPS on first launch
   useEffect(() => {
     if (globalLocation) return;
-    const hasAsked = localStorage.getItem('smart_krishi_gps_checked');
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = {
-            latitude: Number(pos.coords.latitude.toFixed(4)),
-            longitude: Number(pos.coords.longitude.toFixed(4)),
-          };
-          setGlobalLocation(coords);
-          localStorage.setItem('smart_krishi_gps_checked', 'true');
-        },
-        (err) => {
-          console.warn("GPS auto-detection skipped or denied:", err.message);
-          // Default to Dhaka if permission denied or unavailable
-          const defaultLoc = { latitude: 23.8103, longitude: 90.4125 };
-          setGlobalLocation(defaultLoc);
-          localStorage.setItem('smart_krishi_gps_checked', 'true');
-        },
-        { timeout: 7000, enableHighAccuracy: false, maximumAge: 300000 }
-      );
-    } else {
-      setGlobalLocation({ latitude: 23.8103, longitude: 90.4125 });
-    }
+    
+    detectUserLocation()
+      .then((coords) => {
+        setGlobalLocation({
+          latitude: Number(coords.latitude.toFixed(5)),
+          longitude: Number(coords.longitude.toFixed(5)),
+        });
+        localStorage.setItem('smart_krishi_gps_checked', 'true');
+      })
+      .catch((err) => {
+        console.warn("GPS initial auto-detection skipped or denied:", err);
+        // Fallback default: Dhaka center
+        const defaultLoc = { latitude: 23.8103, longitude: 90.4125 };
+        setGlobalLocation(defaultLoc);
+        localStorage.setItem('smart_krishi_gps_checked', 'true');
+      });
   }, []);
 
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
@@ -454,11 +452,11 @@ export default function Layout() {
                   {lang === 'bn' ? 'স্মার্ট কৃষি-সেবা' : 'Smart Agri-Tools'}
                 </span>
                 <div className="flex items-center space-x-2 mt-1">
-                  <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-300 tracking-[0.1em] opacity-80 uppercase">
-                    AI-Studio Krishi
+                  <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400">
+                    Smart Krishi Platform
                   </span>
                   {(userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
-                    <span className="text-[8px] bg-yellow-400 text-gray-900 font-black px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                    <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300/80 font-bold px-1.5 py-0.2 rounded-md">
                       Admin
                     </span>
                   )}
@@ -562,16 +560,16 @@ export default function Layout() {
                           <PillarIcon className="w-3.5 h-3.5" />
                         </div>
                         <div className="min-w-0">
-                          <span className="font-black text-[11px] uppercase tracking-wider text-emerald-950 dark:text-emerald-200 block truncate">
+                          <span className="font-bold text-xs tracking-tight text-emerald-950 dark:text-emerald-200 block truncate">
                             {pillar.title}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[9.5px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
                         {pillarTabs.length}
                       </span>
                     </div>
-                    <div className="text-[9.5px] text-emerald-700/80 dark:text-emerald-400/70 pl-7 leading-tight mb-1 truncate">
+                    <div className="text-[10.5px] text-emerald-700/80 dark:text-emerald-400/70 pl-7 leading-tight mb-1 truncate">
                       {pillar.subtitle}
                     </div>
 
@@ -621,19 +619,19 @@ export default function Layout() {
                               </div>
                               <div className="min-w-0 flex-1 pr-1">
                                 <div className="flex items-center space-x-1.5 truncate">
-                                  <span className={`font-black text-xs tracking-tight truncate ${isActive ? 'text-white dark:text-emerald-950' : 'text-slate-800 dark:text-emerald-50'}`}>
+                                  <span className={`font-bold text-xs tracking-tight truncate ${isActive ? 'text-white dark:text-emerald-950' : 'text-slate-800 dark:text-emerald-50'}`}>
                                     {tab.name}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1.5 mt-0.5">
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md tracking-tight shrink-0 ${
+                                  <span className={`text-[9.5px] font-medium px-1.5 py-0.5 rounded-md tracking-tight shrink-0 ${
                                     isActive 
-                                      ? 'bg-emerald-800/90 text-emerald-100 border border-emerald-600 dark:bg-emerald-100 dark:text-emerald-900 dark:border-emerald-300/80 font-black' 
+                                      ? 'bg-emerald-800/90 text-emerald-100 border border-emerald-600 dark:bg-emerald-100 dark:text-emerald-900 dark:border-emerald-300/80 font-semibold' 
                                       : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-emerald-950/80 dark:text-emerald-300/90 dark:border-emerald-700/50'
                                   }`}>
                                     {tab.subcategory}
                                   </span>
-                                  <span className={`text-[9.5px] truncate ${isActive ? 'text-emerald-100/90 dark:text-emerald-800' : 'text-slate-500 dark:text-emerald-300/70'}`}>
+                                  <span className={`text-[10px] truncate ${isActive ? 'text-emerald-100/90 dark:text-emerald-800' : 'text-slate-500 dark:text-emerald-300/70'}`}>
                                     {tab.description}
                                   </span>
                                 </div>
@@ -641,7 +639,7 @@ export default function Layout() {
                             </div>
 
                             {tab.badge && (
-                              <span className={`relative z-10 text-[8.5px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 ml-1 ${
+                              <span className={`relative z-10 text-[9px] font-semibold px-2 py-0.5 rounded-full tracking-wide shrink-0 ml-1 ${
                                 isActive 
                                   ? 'bg-white text-emerald-900 dark:bg-emerald-800 dark:text-white' 
                                   : 'bg-emerald-100 text-emerald-800 border border-emerald-300/70 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
@@ -940,6 +938,8 @@ export default function Layout() {
                           persistedProduce={marketProduce}
                           setPersistedProduce={setMarketProduce}
                           onNavigateTab={handleNavigateTab}
+                          globalLocation={globalLocation}
+                          setGlobalLocation={setGlobalLocation}
                         />
                       )}
                     </div>

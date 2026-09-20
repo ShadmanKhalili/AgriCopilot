@@ -439,74 +439,78 @@ ${tenureNote}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Cost */}
         <motion.div 
-          whileHover={{ y: -3 }}
+          whileHover={{ y: -2 }}
           transition={{ duration: 0.15 }}
-          className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md"
+          className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs"
         >
-          <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'মোট উৎপাদন ব্যয়' : 'Total Expense'}</span>
-            <PieChart className="w-4 h-4 text-emerald-600" />
+          <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
+            <span className="text-xs font-semibold">{lang === 'bn' ? 'মোট উৎপাদন ব্যয়' : 'Total Expense'}</span>
+            <PieChart className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-black text-gray-900">
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white tabular-nums">
             ৳ {totalCost.toLocaleString()}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 tabular-nums">
             {lang === 'bn' ? `${normalizedDecimals.toFixed(1)} শতাংশ জমির মোট খরচ` : `For ${normalizedDecimals.toFixed(1)} decimals`}
           </p>
         </motion.div>
 
         {/* Card 2: Break-Even Baseline */}
         <motion.div 
-          whileHover={{ y: -3 }}
+          whileHover={{ y: -2 }}
           transition={{ duration: 0.15 }}
-          className="bg-white rounded-3xl p-5 border-2 border-amber-200 bg-amber-50/20 shadow-md"
+          className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-amber-200/90 dark:border-amber-900/50 shadow-xs"
         >
-          <div className="flex items-center justify-between text-amber-800 mb-2">
-            <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'প্রতি মণ উৎপাদন খরচ' : 'Break-Even / Mon'}</span>
-            <Scale className="w-4 h-4 text-amber-600" />
+          <div className="flex items-center justify-between text-amber-700 dark:text-amber-400 mb-2">
+            <span className="text-xs font-semibold">{lang === 'bn' ? 'প্রতি মণ উৎপাদন খরচ' : 'Break-Even / Mon'}</span>
+            <Scale className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-black text-amber-950">
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950 dark:text-amber-200 tabular-nums">
             ৳ {breakEvenCostPerMon.toLocaleString()}
           </div>
-          <p className="text-xs text-amber-800 font-bold mt-1">
+          <p className="text-xs text-amber-800 dark:text-amber-300/80 font-medium mt-1 tabular-nums">
             ≈ ৳{breakEvenCostPerKg} / {lang === 'bn' ? 'কেজি' : 'kg'} ({lang === 'bn' ? 'এর কমে বিক্রি করলে ক্ষতি' : 'Minimum selling price'})
           </p>
         </motion.div>
 
         {/* Card 3: Gross Revenue */}
         <motion.div 
-          whileHover={{ y: -3 }}
+          whileHover={{ y: -2 }}
           transition={{ duration: 0.15 }}
-          className="bg-white rounded-3xl p-5 border border-gray-100 shadow-md"
+          className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs"
         >
-          <div className="flex items-center justify-between text-gray-500 mb-2">
-            <span className="text-xs font-black uppercase tracking-wider">{lang === 'bn' ? 'মোট বিক্রয়মূল্য' : 'Gross Revenue'}</span>
-            <Coins className="w-4 h-4 text-blue-600" />
+          <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
+            <span className="text-xs font-semibold">{lang === 'bn' ? 'মোট বিক্রয়মূল্য' : 'Gross Revenue'}</span>
+            <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-black text-blue-900">
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white tabular-nums">
             ৳ {grossRevenue.toLocaleString()}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 tabular-nums">
             {totalYieldMon} {lang === 'bn' ? 'মণ × ৳' : 'Mon × ৳'}{pricePerMon}
           </p>
         </motion.div>
 
         {/* Card 4: Net Profit */}
         <motion.div 
-          whileHover={{ y: -3 }}
+          whileHover={{ y: -2 }}
           transition={{ duration: 0.15 }}
-          className={`rounded-3xl p-5 shadow-lg text-white ${isProfitable ? 'bg-gradient-to-br from-emerald-600 to-teal-700 shadow-emerald-600/20' : 'bg-gradient-to-br from-red-600 to-rose-700 shadow-red-600/20'}`}
+          className={`rounded-2xl p-5 text-white shadow-xs border ${
+            isProfitable 
+              ? 'bg-emerald-700 border-emerald-800 dark:bg-emerald-800 dark:border-emerald-700' 
+              : 'bg-rose-700 border-rose-800 dark:bg-rose-800 dark:border-rose-700'
+          }`}
         >
-          <div className="flex items-center justify-between mb-2 text-emerald-100">
-            <span className="text-xs font-black uppercase tracking-wider">
+          <div className="flex items-center justify-between mb-2 text-white/90">
+            <span className="text-xs font-semibold">
               {lang === 'bn' ? (isProfitable ? 'নিট লাভ' : 'সম্ভাব্য ক্ষতি') : (isProfitable ? 'Net Profit' : 'Net Loss')}
             </span>
-            {isProfitable ? <TrendingUp className="w-5 h-5 text-white" /> : <TrendingDown className="w-5 h-5 text-white" />}
+            {isProfitable ? <TrendingUp className="w-4 h-4 text-white" /> : <TrendingDown className="w-4 h-4 text-white" />}
           </div>
-          <div className="text-2xl md:text-3xl font-black">
+          <div className="text-2xl md:text-3xl font-bold tracking-tight tabular-nums">
             ৳ {Math.abs(netProfit).toLocaleString()}
           </div>
-          <p className="text-xs text-white/90 font-bold mt-1">
+          <p className="text-xs text-white/90 font-medium mt-1 tabular-nums">
             ROI: {roiPercentage}% ({isProfitable ? (lang === 'bn' ? 'লাভজনক' : 'Profitable') : (lang === 'bn' ? 'ক্ষতিকর' : 'Loss')})
           </p>
         </motion.div>

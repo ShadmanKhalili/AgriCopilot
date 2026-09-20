@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { findNearestLocation } from '../utils/geoData';
 
 // In-memory cache across hook instances and tab navigation
 const locationCache = new Map<string, string>();
@@ -10,7 +11,10 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
   const [locationName, setLocationName] = useState<string | null>(() => {
     if (lat === null || lon === null) return null;
     const cacheKey = `${lat}_${lon}_${lang}`;
-    return locationCache.get(cacheKey) || null;
+    if (locationCache.has(cacheKey)) return locationCache.get(cacheKey)!;
+    // Compute immediate exact nearest Bangladesh administrative location
+    const nearest = findNearestLocation(lat, lon, lang);
+    return nearest.shortName;
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,6 +29,10 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
       setLocationName(locationCache.get(cacheKey)!);
       return;
     }
+
+    // Immediately calculate exact local Upazila / District match
+    const localMatch = findNearestLocation(lat, lon, lang);
+    setLocationName(localMatch.shortName);
 
     let isMounted = true;
     const controller = new AbortController();
@@ -44,28 +52,30 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
         const data = await response.json();
         
         if (isMounted) {
-          // Construct a readable location name
-          const parts: string[] = [];
-          if (data.locality) parts.push(data.locality);
-          if (data.city && data.city !== data.locality) parts.push(data.city);
-          if (data.principalSubdivision && !parts.includes(data.principalSubdivision)) {
-            parts.push(data.principalSubdivision);
-          }
-          
-          const result = parts.length > 0 
-            ? parts.join(', ') 
-            : (data.displayName || `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+          let resolvedName = localMatch.shortName;
 
-          locationCache.set(cacheKey, result);
-          setLocationName(result);
+          // If location is outside Bangladesh, prioritize the default localMatch (Dhaka)
+          if (localMatch.isWithinBangladesh) {
+            if (data.locality && data.city && data.locality !== data.city) {
+              resolvedName = `${data.locality}, ${data.city}`;
+            } else if (data.locality) {
+              resolvedName = `${data.locality}, ${localMatch.district[lang.toLowerCase().startsWith('bn') ? 'bn_name' : 'name']}`;
+            } else if (data.city) {
+              resolvedName = data.city;
+            } else if (data.displayName) {
+              resolvedName = data.displayName;
+            }
+          }
+
+          locationCache.set(cacheKey, resolvedName);
+          setLocationName(resolvedName);
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') return;
         
         if (isMounted) {
-          const fallback = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-          locationCache.set(cacheKey, fallback);
-          setLocationName(fallback);
+          locationCache.set(cacheKey, localMatch.shortName);
+          setLocationName(localMatch.shortName);
         }
       } finally {
         if (isMounted) {

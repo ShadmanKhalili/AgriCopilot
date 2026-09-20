@@ -38,6 +38,8 @@ interface Props {
   persistedProduce?: string;
   setPersistedProduce?: (produce: string) => void;
   onNavigateTab?: (tab: any, payload?: any) => void;
+  globalLocation?: { latitude: number; longitude: number } | null;
+  setGlobalLocation?: (loc: { latitude: number; longitude: number }) => void;
 }
 
 export default function MarketConnect({ 
@@ -46,19 +48,29 @@ export default function MarketConnect({
   setPersistedInsights,
   persistedProduce,
   setPersistedProduce,
-  onNavigateTab
+  onNavigateTab,
+  globalLocation,
+  setGlobalLocation
 }: Props) {
   const [produce, setProduce] = useState(persistedProduce || PRODUCE_TYPES[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [insights, setInsights] = useState<any | null>(persistedInsights || null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isAdvanced, setIsAdvanced] = useState(false);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(globalLocation || null);
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+  const [accuracy, setAccuracy] = useState<number | undefined>(undefined);
   const { user } = useAuth();
   const { canUse, canUsePremium, incrementUsage, incrementPremiumUsage, tier, currentUsage, limit } = useUsageTracking('market-connect');
   const [usePremium, setUsePremium] = useState(false);
   const t = translations[lang];
+
+  // Sync with globalLocation if changed from outside
+  React.useEffect(() => {
+    if (globalLocation) {
+      setCoords(globalLocation);
+    }
+  }, [globalLocation]);
 
   // Sync with persisted state
   React.useEffect(() => {
@@ -72,15 +84,30 @@ export default function MarketConnect({
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
     try {
-      const coords = await detectUserLocation();
-      setCoords(coords);
+      const loc = await detectUserLocation();
+      const newCoords = { latitude: loc.latitude, longitude: loc.longitude };
+      setCoords(newCoords);
+      setAccuracy(loc.accuracy);
+      if (setGlobalLocation) {
+        setGlobalLocation(newCoords);
+      }
       setIsDetectingLocation(false);
+      toast.success(lang === 'bn' ? 'সঠিক অবস্থান সনাক্ত হয়েছে' : 'Location accurately detected');
     } catch (error: any) {
       console.error("Error detecting location:", error);
       setIsDetectingLocation(false);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (error.code === 1) msg = lang === 'bn' ? "জিপিএস অনুমতি দেওয়া হয়নি। ব্রাউজার লোকেশন অন করুন।" : "Permission denied. Please allow location access in your browser.";
       toast.error(msg);
+    }
+  };
+
+  const handleSelectMarketPreset = (lat: number, lng: number) => {
+    const newCoords = { latitude: lat, longitude: lng };
+    setCoords(newCoords);
+    setAccuracy(undefined);
+    if (setGlobalLocation) {
+      setGlobalLocation(newCoords);
     }
   };
 
@@ -216,11 +243,37 @@ export default function MarketConnect({
                     <span>{isDetectingLocation ? t.tooltips.detecting : coords ? t.tooltips.locationDetected : t.tooltips.detectLocation}</span>
                   </button>
                 </div>
+                {/* Major Wholesale Market Hubs Quick Select */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-gray-400 mr-1">
+                    {lang === 'bn' ? 'প্রধান মোকাম:' : 'Major Mandis:'}
+                  </span>
+                  {[
+                    { nameBn: 'কারওয়ান বাজার', nameEn: 'Kawran Bazar', lat: 23.7516, lng: 90.3944 },
+                    { nameBn: 'শ্যামবাজার', nameEn: 'Shyambazar', lat: 23.7099, lng: 90.4125 },
+                    { nameBn: 'খাতুনগঞ্জ', nameEn: 'Khatunganj', lat: 22.3384, lng: 91.8391 },
+                    { nameBn: 'কক্সবাজার', nameEn: 'Cox\'s Bazar', lat: 21.4272, lng: 92.0058 },
+                  ].map(m => (
+                    <button
+                      key={m.nameEn}
+                      type="button"
+                      onClick={() => handleSelectMarketPreset(m.lat, m.lng)}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-800 transition-colors"
+                    >
+                      {lang === 'bn' ? m.nameBn : m.nameEn}
+                    </button>
+                  ))}
+                </div>
+
                 {coords ? (
-                  <LocationDisplay coords={coords} lang={lang} color="emerald" />
+                  <LocationDisplay coords={coords} lang={lang} color="emerald" accuracy={accuracy} />
                 ) : (
                   <div className="p-3.5 sm:p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl sm:rounded-2xl text-center">
-                    <p className="text-gray-500 text-xs font-medium">Use your location to find the nearest wholesale rates.</p>
+                    <p className="text-gray-500 text-xs font-medium">
+                      {lang === 'bn' 
+                        ? 'আপনার এলাকার পাইকারি রেট জানতে জিপিএস চালু করুন অথবা মোকাম নির্বাচন করুন।' 
+                        : 'Use GPS or select a wholesale market to see accurate regional rates.'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -354,42 +407,42 @@ export default function MarketConnect({
                 )}
 
                 {/* Main Executive Summary */}
-                <div className="md:col-span-2 bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
-                  <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-100">
+                <div className="md:col-span-2 bg-white dark:bg-stone-900 p-4 sm:p-6 md:p-7 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-stone-100 dark:border-stone-800">
                     <div className="flex items-center space-x-3">
-                      <div className="bg-orange-50 p-2 sm:p-2.5 rounded-xl text-orange-600">
+                      <div className="bg-orange-50 dark:bg-orange-950/60 p-2 sm:p-2.5 rounded-xl text-orange-600 dark:text-orange-400">
                         <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
                       <div>
-                        <h3 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">Market Analytics</h3>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">Live Assessment</p>
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white tracking-tight">Market Analytics</h3>
+                        <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">Live Assessment</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-100 uppercase tracking-widest">
+                    <span className="text-xs font-semibold text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/60 px-2.5 py-1 rounded-full border border-orange-200/60 dark:border-orange-900/40 tabular-nums">
                       Updated {lastUpdated || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <div className="markdown-body text-sm sm:text-base leading-relaxed prose prose-orange max-w-none prose-headings:font-black prose-headings:tracking-tight prose-a:text-orange-600">
+                  <div className="markdown-body text-sm sm:text-base leading-relaxed prose prose-orange max-w-none prose-headings:font-bold prose-headings:tracking-tight prose-a:text-orange-600">
                     <ReactMarkdown>{insights.insights}</ReactMarkdown>
                   </div>
                 </div>
 
                 {/* Price Drivers */}
                 {insights.priceDrivers && insights.priceDrivers.length > 0 && (
-                  <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm flex flex-col">
-                    <div className="flex items-center mb-4 sm:mb-6">
-                      <div className="bg-blue-50 p-2 sm:p-2.5 rounded-xl text-blue-600 mr-3">
+                  <div className="bg-white dark:bg-stone-900 p-4 sm:p-6 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs flex flex-col">
+                    <div className="flex items-center mb-4 sm:mb-5">
+                      <div className="bg-blue-50 dark:bg-blue-950/60 p-2 sm:p-2.5 rounded-xl text-blue-600 dark:text-blue-400 mr-3">
                         <Activity className="w-5 h-5" />
                       </div>
-                      <h4 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-widest">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
                         {lang === 'bn' ? 'মূল্যের গতিপথ' : 'Price Drivers'}
                       </h4>
                     </div>
-                    <ul className="space-y-3 flex-1">
+                    <ul className="space-y-2.5 flex-1">
                       {insights.priceDrivers.map((driver: string, idx: number) => (
-                        <li key={idx} className="flex items-start space-x-2.5 p-3 sm:p-4 bg-gray-50 rounded-xl sm:rounded-2xl border border-gray-100">
+                        <li key={idx} className="flex items-start space-x-2.5 p-3 sm:p-3.5 bg-stone-50/70 dark:bg-stone-800/60 rounded-xl border border-stone-200/80 dark:border-stone-700/70">
                           <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500 shrink-0 mt-0.5" />
-                          <span className="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">{driver}</span>
+                          <span className="text-xs sm:text-sm text-stone-700 dark:text-stone-300 font-normal leading-relaxed">{driver}</span>
                         </li>
                       ))}
                     </ul>
@@ -398,26 +451,26 @@ export default function MarketConnect({
 
                 {/* Nearest Markets */}
                 {insights.nearestMarkets && (
-                  <div className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-sm flex flex-col">
-                    <div className="flex items-center mb-4 sm:mb-6">
-                      <div className="bg-emerald-50 p-2 sm:p-2.5 rounded-xl text-emerald-600 mr-3">
+                  <div className="bg-white dark:bg-stone-900 p-4 sm:p-6 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs flex flex-col">
+                    <div className="flex items-center mb-4 sm:mb-5">
+                      <div className="bg-emerald-50 dark:bg-emerald-950/60 p-2 sm:p-2.5 rounded-xl text-emerald-600 dark:text-emerald-400 mr-3">
                         <Store className="w-5 h-5" />
                       </div>
-                      <h4 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-widest">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
                         {lang === 'bn' ? 'নিকটস্থ পাইকারি বাজার' : 'Nearest Wholesale Hubs'}
                       </h4>
                     </div>
-                    <div className="space-y-2.5 flex-1 overflow-y-auto">
+                    <div className="space-y-2 flex-1 overflow-y-auto">
                       {insights.nearestMarkets.map((m: any, idx: number) => (
                         <div 
                           key={idx} 
-                          className="flex items-center justify-between p-3 sm:p-4 bg-emerald-50/50 rounded-xl sm:rounded-2xl border border-emerald-100 group hover:bg-emerald-50 transition-colors"
+                          className="flex items-center justify-between p-3 sm:p-3.5 bg-emerald-50/50 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-900/40 group hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
                         >
                           <div className="flex items-center space-x-2.5 min-w-0">
-                            <Store className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span className="font-bold text-gray-800 text-xs sm:text-sm truncate">{m.name}</span>
+                            <Store className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="font-semibold text-stone-800 dark:text-stone-200 text-xs sm:text-sm truncate">{m.name}</span>
                           </div>
-                          <span className="text-[10px] font-black text-emerald-700 bg-white shadow-xs px-2.5 py-1 rounded-lg sm:rounded-xl border border-emerald-100 uppercase overflow-hidden whitespace-nowrap shrink-0 ml-2">
+                          <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-white dark:bg-stone-800 shadow-2xs px-2.5 py-1 rounded-lg border border-emerald-100 dark:border-emerald-800/50 tabular-nums overflow-hidden whitespace-nowrap shrink-0 ml-2">
                             {m.distance}
                           </span>
                         </div>

@@ -62,7 +62,7 @@ export default function MobileBottomNav({
     {
       id: 'support',
       targetTab: 'user-guide',
-      tabs: ['user-guide', 'profile', 'admin-dashboard'],
+      tabs: ['user-guide', 'profile', 'admin-dashboard', 'farmer-dossier'],
       label: t.quickSupport || (lang === 'bn' ? 'সহায়তা' : 'Support'),
       icon: BookOpen,
       badge: null

@@ -79,6 +79,9 @@ async function startServer() {
           "https://services.sentinel-hub.com", 
           "https://*.googleapis.com",
           "https://*.firebaseapp.com",
+          "https://*.firebaseio.com",
+          "https://*.web.app",
+          "https://*.firebase.google.com",
           "https://*.google.com",
           "https://pagead2.googlesyndication.com",
           "https://googleads.g.doubleclick.net",
@@ -87,6 +90,7 @@ async function startServer() {
           "https://fonts.gstatic.com",
           "wss://*.googleapis.com",
           "wss://*.google.com",
+          "wss://*.firebaseio.com",
           "blob:"
         ],
         "frame-src": [
@@ -406,22 +410,55 @@ async function startServer() {
     }
   });
 
-  // Proxy for IP Geolocation fallback
+  // Proxy for IP Geolocation fallback (strictly aligned with Bangladesh regional focus)
   app.get("/api/ip-location", async (req, res) => {
     try {
-      const response = await axios.get('https://get.geojs.io/v1/ip/geo.json', { timeout: 4000 });
-      if (response.data && response.data.latitude && response.data.longitude) {
-        return res.json(response.data);
+      const forwarded = req.headers['x-forwarded-for'];
+      const rawClientIp = typeof forwarded === 'string' 
+        ? forwarded.split(',')[0].trim() 
+        : (req.socket.remoteAddress || '');
+
+      let geoUrl = 'https://get.geojs.io/v1/ip/geo.json';
+      // Only query specific IP if it's a valid public IPv4/IPv6 that is not local/loopback/private
+      if (
+        rawClientIp && 
+        !rawClientIp.startsWith('127.') && 
+        !rawClientIp.startsWith('10.') && 
+        !rawClientIp.startsWith('172.') && 
+        !rawClientIp.startsWith('192.168.') &&
+        rawClientIp !== '::1'
+      ) {
+        geoUrl = `https://get.geojs.io/v1/ip/geo/${rawClientIp}.json`;
       }
-    } catch {
-      // Fallback below
+
+      const response = await axios.get(geoUrl, { timeout: 3500 });
+      if (response.data && response.data.latitude && response.data.longitude) {
+        const lat = parseFloat(response.data.latitude);
+        const lon = parseFloat(response.data.longitude);
+        // Strict verification: coordinate must be within Bangladesh territory [20.5..26.8° N, 88.0..92.8° E]
+        if (!isNaN(lat) && !isNaN(lon) && lat >= 20.0 && lat <= 27.0 && lon >= 87.5 && lon <= 93.0) {
+          return res.json({
+            ...response.data,
+            latitude: lat,
+            longitude: lon,
+            isWithinBangladesh: true
+          });
+        }
+      }
+    } catch (e) {
+      // Graceful fallback below
     }
-    // Default Bangladesh center (Dhaka)
+
+    // Default Bangladesh center (Dhaka Farmgate / Sher-e-Bangla Nagar Agro-Center)
     res.json({
-      latitude: 23.685,
-      longitude: 90.3563,
+      latitude: 23.8103,
+      longitude: 90.4125,
       city: "Dhaka",
-      country: "Bangladesh"
+      region: "Dhaka Division",
+      country: "Bangladesh",
+      country_code: "BD",
+      isFallback: true,
+      isWithinBangladesh: true
     });
   });
 

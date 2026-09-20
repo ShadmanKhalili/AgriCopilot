@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff, Video } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff, Video, Compass } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -94,8 +94,9 @@ export default function AgriCopilot({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isManualLocation, setIsManualLocation] = useState(false);
   const isOnline = useNetworkStatus();
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedUpazila, setSelectedUpazila] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState(geoData[0]?.id || '1');
+  const [selectedUpazila, setSelectedUpazila] = useState(geoData[0]?.upazilas[0]?.id || '');
+  const [locationAccuracy, setLocationAccuracy] = useState<number | undefined>(undefined);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -228,16 +229,34 @@ export default function AgriCopilot({
 
     try {
       const coords = await detectUserLocation();
-      setGlobalLocation(coords);
+      setGlobalLocation({
+        latitude: coords.latitude,
+        longitude: coords.longitude
+      });
+      setLocationAccuracy(coords.accuracy);
       setIsDetectingLocation(false);
     } catch (error: any) {
       console.error("Error detecting location:", error);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (error.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      if (error.code === 1) msg = lang === 'bn' ? "জিপিএস অনুমতি দেওয়া হয়নি। ব্রাউজার পারমিশন চেক করুন অথবা ম্যানুয়ালি জেলা/উপজেলা নির্বাচন করুন।" : "Permission denied. Please allow location access in your browser or select your region manually.";
+      else if (error.code === 3) msg = lang === 'bn' ? "জিপিএস সংযোগ সময়সীমা অতিক্রম করেছে। অনুগ্রহ করে ম্যানুয়ালি এলাকা নির্বাচন করুন।" : "Location request timed out. Please select your region manually.";
       setLocationError(msg);
       setIsDetectingLocation(false);
       setIsManualLocation(true);
+    }
+  };
+
+  const handleDistrictChange = (districtId: string) => {
+    setSelectedDistrict(districtId);
+    const dist = geoData.find(d => d.id === districtId);
+    if (dist) {
+      const firstUpazila = dist.upazilas[0];
+      setSelectedUpazila(firstUpazila?.id || '');
+      setGlobalLocation({
+        latitude: firstUpazila?.lat || dist.lat,
+        longitude: firstUpazila?.lng || dist.lng
+      });
+      setLocationAccuracy(undefined);
     }
   };
 
@@ -249,6 +268,7 @@ export default function AgriCopilot({
         latitude: upazila.lat,
         longitude: upazila.lng
       });
+      setLocationAccuracy(undefined);
     }
   };
 
@@ -1307,37 +1327,36 @@ export default function AgriCopilot({
 
                           {/* 3. Symptoms and Severity */}
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                             {/* Severity */}
                             <motion.div 
-                              whileHover={{ y: -4, scale: 1.01 }}
-                              className="bg-white/80 backdrop-blur-md rounded-3xl p-6 border border-gray-100 shadow-lg shadow-gray-200/50 flex flex-col justify-center relative overflow-hidden"
+                              whileHover={{ y: -2 }}
+                              className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/90 dark:border-stone-800 shadow-xs flex flex-col justify-center relative overflow-hidden"
                             >
-                              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-gray-100 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 opacity-50"></div>
-                              <div className="flex items-center space-x-3 mb-4">
-                                <div className="p-2.5 bg-gray-50 rounded-2xl">
-                                  <AlertTriangle className="w-5 h-5 text-gray-500" />
+                              <div className="flex items-center space-x-2.5 mb-3.5">
+                                <div className="p-2 bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 rounded-xl border border-amber-200/60 dark:border-amber-900/40">
+                                  <AlertTriangle className="w-4 h-4" />
                                 </div>
-                                <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'সংক্রমণের মাত্রা' : 'Severity Level'}</p>
+                                <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">{lang === 'bn' ? 'সংক্রমণের মাত্রা' : 'Severity Level'}</p>
                               </div>
                               
-                              <div className="flex items-center space-x-4">
-                                <div className={`flex-1 h-3 rounded-full overflow-hidden bg-gray-100`}>
+                              <div className="flex items-center space-x-3">
+                                <div className="flex-1 h-2.5 rounded-full overflow-hidden bg-stone-100 dark:bg-stone-800">
                                   <motion.div 
                                     initial={{ width: 0 }}
                                     animate={{ width: diagnosis.qualitativeSeverity === 'High' ? '100%' : diagnosis.qualitativeSeverity === 'Medium' ? '60%' : '30%' }}
-                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                    transition={{ duration: 0.8, ease: 'easeOut' }}
                                     className={`h-full ${
                                       diagnosis.qualitativeSeverity === 'High' ? 'bg-red-500' : 
                                       diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-500' : 
-                                      'bg-green-500'
+                                      'bg-emerald-500'
                                     }`}
                                   />
                                 </div>
-                                <div className={`px-5 py-2 rounded-xl font-black text-lg shadow-sm ${
-                                  diagnosis.qualitativeSeverity === 'High' ? 'bg-red-50 text-red-600 border border-red-100' : 
-                                  diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 
-                                  'bg-green-50 text-green-600 border border-green-100'
+                                <div className={`px-3.5 py-1.5 rounded-xl font-bold text-sm tabular-nums ${
+                                  diagnosis.qualitativeSeverity === 'High' ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-300' : 
+                                  diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300' : 
+                                  'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
                                 }`}>
                                   {diagnosis.qualitativeSeverity === 'High' && lang === 'bn' ? 'উচ্চ' : 
                                    diagnosis.qualitativeSeverity === 'Medium' && lang === 'bn' ? 'মাঝারি' : 
@@ -1349,27 +1368,26 @@ export default function AgriCopilot({
 
                             {/* Symptoms Breakdown */}
                             <motion.div 
-                              whileHover={{ y: -4, scale: 1.01 }}
-                              className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-3xl p-6 border border-indigo-100/50 shadow-lg shadow-indigo-100/50 relative overflow-hidden flex flex-col"
+                              whileHover={{ y: -2 }}
+                              className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/90 dark:border-stone-800 shadow-xs relative overflow-hidden flex flex-col"
                             >
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-white/40 rounded-full blur-xl -translate-y-1/2 translate-x-1/2"></div>
-                              <div className="flex items-center space-x-3 mb-4">
-                                <div className="p-2.5 bg-white rounded-2xl shadow-sm">
-                                  <Bug className="w-5 h-5 text-indigo-500" />
+                              <div className="flex items-center space-x-2.5 mb-3.5">
+                                <div className="p-2 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40">
+                                  <Bug className="w-4 h-4" />
                                 </div>
-                                <p className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">{lang === 'bn' ? 'শনাক্তকৃত লক্ষণ' : 'Visible Symptoms'}</p>
+                                <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">{lang === 'bn' ? 'শনাক্তকৃত লক্ষণ' : 'Visible Symptoms'}</p>
                               </div>
-                              <ul className="space-y-2.5 flex-1 font-medium">
+                              <ul className="space-y-2 flex-1 font-normal">
                                 {diagnosis.symptomsBreakdown?.slice(0, 4).map((symptom: string, idx: number) => (
                                   <motion.li 
-                                    initial={{ opacity: 0, x: -10 }}
+                                    initial={{ opacity: 0, x: -6 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: idx * 0.1 }}
+                                    transition={{ delay: idx * 0.06 }}
                                     key={idx} 
-                                    className="flex items-start text-sm text-indigo-900/80"
+                                    className="flex items-start text-xs text-stone-700 dark:text-stone-300"
                                   >
-                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0 mr-2.5"></div>
-                                    <span className="leading-snug">{symptom}</span>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0 mr-2"></div>
+                                    <span className="leading-relaxed">{symptom}</span>
                                   </motion.li>
                                 ))}
                               </ul>
@@ -1379,13 +1397,13 @@ export default function AgriCopilot({
                           {/* Differential Diagnosis (Chain of Thought Output) */}
                           {(diagnosis.possibleDiseases?.length > 0 || diagnosis.differentialDiagnosis) && (
                             <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
+                              initial={{ opacity: 0, y: 8 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm relative z-10"
+                              className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/90 dark:border-stone-800 shadow-xs relative z-10"
                             >
-                              <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center">
-                                <Activity className="w-4 h-4 mr-2" />
-                                {lang === 'bn' ? 'সম্ভাব্য রোগ ও পার্থক্য' : 'Differential Diagnosis'}
+                              <h4 className="text-xs font-semibold text-stone-600 dark:text-stone-400 mb-3 flex items-center">
+                                <Activity className="w-4 h-4 mr-2 text-stone-400" />
+                                {lang === 'bn' ? 'সম্ভাব্য অন্যান্য রোগ ও লক্ষণ তুলনা' : 'Differential Diagnosis & Comparison'}
                               </h4>
                               
                               {diagnosis.possibleDiseases && diagnosis.possibleDiseases.length > 0 && (
@@ -1950,9 +1968,108 @@ export default function AgriCopilot({
               </div>
             </div>
 
-            {globalLocation && (
-              <LocationDisplay coords={globalLocation} lang={lang} color="green" />
-            )}
+            {/* Location & GPS Controls */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">
+                  {lang === 'bn' ? 'ফসলের মাঠের অবস্থান (জিপিএস / এলাকা)' : 'Crop Field Location (GPS / Region)'}
+                </label>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={handleDetectLocation}
+                    disabled={isDetectingLocation}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {isDetectingLocation ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>{lang === 'bn' ? 'সনাক্ত হচ্ছে...' : 'Detecting...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>{lang === 'bn' ? 'জিপিএস রিফ্রেশ' : 'Detect GPS'}</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsManualLocation(!isManualLocation)}
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-colors"
+                  >
+                    <span>{isManualLocation ? (lang === 'bn' ? 'লুকান' : 'Hide') : (lang === 'bn' ? 'জেলা/উপজেলা' : 'Select District')}</span>
+                  </button>
+                </div>
+              </div>
+
+              {locationError && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p>{locationError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsManualLocation(true)}
+                      className="mt-1.5 font-bold text-amber-900 underline hover:no-underline"
+                    >
+                      {lang === 'bn' ? 'এখান থেকে জেলা ও উপজেলা বেছে নিন' : 'Choose District & Upazila here'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isManualLocation && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-gray-50/80 rounded-2xl border border-gray-200"
+                >
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1">
+                      {lang === 'bn' ? 'জেলা' : 'District'}
+                    </label>
+                    <select
+                      value={selectedDistrict}
+                      onChange={(e) => handleDistrictChange(e.target.value)}
+                      className="w-full text-sm font-bold bg-white rounded-xl border border-gray-200 p-2.5 outline-none focus:border-green-500"
+                    >
+                      {geoData.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {lang === 'bn' ? d.bn_name : d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-500 mb-1">
+                      {lang === 'bn' ? 'উপজেলা' : 'Upazila'}
+                    </label>
+                    <select
+                      value={selectedUpazila}
+                      onChange={(e) => handleManualLocationChange(e.target.value)}
+                      className="w-full text-sm font-bold bg-white rounded-xl border border-gray-200 p-2.5 outline-none focus:border-green-500"
+                    >
+                      {activeDistrict?.upazilas.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {lang === 'bn' ? u.bn_name : u.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </motion.div>
+              )}
+
+              {globalLocation && (
+                <LocationDisplay 
+                  coords={globalLocation} 
+                  lang={lang} 
+                  color="green" 
+                  accuracy={locationAccuracy}
+                  isManual={isManualLocation}
+                />
+              )}
+            </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">

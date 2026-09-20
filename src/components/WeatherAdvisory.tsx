@@ -419,24 +419,24 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 w-full"
     >
-      <div className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-blue-900/5 border border-blue-100 mb-4 md:mb-6">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl p-4 md:p-6 border border-stone-200/80 dark:border-stone-800 mb-4 md:mb-6 shadow-xs">
         <div className="flex items-center space-x-3 md:space-x-4">
-          <div className="bg-blue-50 p-2 md:p-3 rounded-xl flex-shrink-0">
-            <Cloud className="w-6 h-6 md:w-7 h-7 text-blue-600" />
+          <div className="bg-blue-50 dark:bg-blue-950/60 p-2 md:p-3 rounded-xl flex-shrink-0 text-blue-600 dark:text-blue-400">
+            <Cloud className="w-6 h-6 md:w-7 h-7" />
           </div>
           <div>
-            <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.weatherAdvisory}</h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.weatherAdvisoryDesc}</p>
+            <h2 className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">{t.weatherAdvisory}</h2>
+            <p className="text-stone-500 dark:text-stone-400 text-xs md:text-sm font-normal mt-0.5">{t.weatherAdvisoryDesc}</p>
           </div>
         </div>
       </div>
         
         {globalLocation && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 md:p-4 rounded-[24px] border border-blue-100 shadow-sm mb-4 md:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-stone-900 p-3 md:p-4 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs mb-4 md:mb-6">
             <div className="flex items-center gap-1.5 bg-blue-50/70 p-1.5 rounded-2xl border border-blue-100/80 w-full sm:w-auto">
               <button
                 type="button"
@@ -594,7 +594,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             <motion.div 
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white p-6 sm:p-8 rounded-[36px] md:rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 relative overflow-hidden"
+              className="bg-white dark:bg-stone-900 p-6 sm:p-8 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs relative overflow-hidden"
             >
               <div className="flex items-center justify-between mb-8 sm:mb-10">
                 <div>
@@ -684,65 +684,65 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                       <Tooltip content={getHumidityTooltip(weather.humidity) || ""}>
                         <motion.div 
-                          whileHover={{ scale: 1.02 }}
-                          className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-100/50 shadow-sm h-full"
+                          whileHover={{ y: -2 }}
+                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
                         >
-                          <div className="flex items-center text-blue-500 mb-3">
-                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                              <Droplets className="w-5 h-5" />
+                          <div className="flex items-center text-blue-600 dark:text-blue-400 mb-2.5">
+                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
+                              <Droplets className="w-4 h-4" />
                             </div>
-                            <span className="text-xs font-black uppercase tracking-wider">{t.humidity}</span>
+                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.humidity}</span>
                           </div>
-                          <span className="text-3xl font-black text-gray-900">{weather.humidity.toFixed(2)}%</span>
+                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.humidity.toFixed(1)}%</span>
                         </motion.div>
                       </Tooltip>
                     
                       <Tooltip content={getWindTooltip(weather.windSpeed) || ""}>
                         <motion.div 
-                          whileHover={{ scale: 1.02 }}
-                          className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-100/50 shadow-sm h-full"
+                          whileHover={{ y: -2 }}
+                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
                         >
-                          <div className="flex items-center text-indigo-500 mb-3">
-                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                              <Wind className="w-5 h-5" />
+                          <div className="flex items-center text-indigo-600 dark:text-indigo-400 mb-2.5">
+                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
+                              <Wind className="w-4 h-4" />
                             </div>
-                            <span className="text-xs font-black uppercase tracking-wider">{t.windSpeed}</span>
+                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.windSpeed}</span>
                           </div>
-                          <span className="text-3xl font-black text-gray-900">{weather.windSpeed.toFixed(1)}</span>
-                          <span className="text-xs font-bold text-gray-400 ml-1">km/h</span>
+                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.windSpeed.toFixed(1)}</span>
+                          <span className="text-xs font-medium text-stone-400 ml-1">km/h</span>
                         </motion.div>
                       </Tooltip>
 
                       <Tooltip content={getRainTooltip(weather.rainChance) || ""}>
                         <motion.div 
-                          whileHover={{ scale: 1.02 }}
-                          className="bg-gradient-to-br from-cyan-50 to-white p-5 rounded-3xl border border-cyan-100/50 shadow-sm h-full"
+                          whileHover={{ y: -2 }}
+                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
                         >
-                          <div className="flex items-center text-cyan-500 mb-3">
-                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                              <CloudRain className="w-5 h-5" />
+                          <div className="flex items-center text-cyan-600 dark:text-cyan-400 mb-2.5">
+                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
+                              <CloudRain className="w-4 h-4" />
                             </div>
-                            <span className="text-xs font-black uppercase tracking-wider">{t.rainChance}</span>
+                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.rainChance}</span>
                           </div>
-                          <span className="text-3xl font-black text-gray-900">{weather.rainChance}%</span>
+                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.rainChance}%</span>
                         </motion.div>
                       </Tooltip>
 
                       <Tooltip content={getUvTooltip(weather.uvIndex) || ""}>
                         <motion.div 
-                          whileHover={{ scale: 1.02 }}
-                          className="bg-gradient-to-br from-orange-50 to-white p-5 rounded-3xl border border-orange-100/50 shadow-sm h-full"
+                          whileHover={{ y: -2 }}
+                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
                         >
-                          <div className="flex items-center text-orange-500 mb-3">
-                            <div className="p-2 bg-white rounded-xl shadow-sm mr-2">
-                              <Sun className="w-5 h-5" />
+                          <div className="flex items-center text-amber-600 dark:text-amber-400 mb-2.5">
+                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
+                              <Sun className="w-4 h-4" />
                             </div>
-                            <span className="text-xs font-black uppercase tracking-wider">{t.uvIndex}</span>
+                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.uvIndex}</span>
                           </div>
-                          <span className="text-3xl font-black text-gray-900">{weather.uvIndex}</span>
+                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.uvIndex}</span>
                         </motion.div>
                       </Tooltip>
                   </div>

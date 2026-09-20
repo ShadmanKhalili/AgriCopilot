@@ -29,8 +29,14 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const isOffline = errMsg.includes('unavailable') || 
+                    errMsg.includes('offline') || 
+                    errMsg.includes('Could not reach Cloud Firestore') ||
+                    (error as any)?.code === 'unavailable';
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -46,7 +52,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     },
     operationType,
     path
+  };
+
+  if (isOffline) {
+    console.warn('Firestore operating in offline / queued mode:', errMsg);
+    // Do not throw fatal error for temporary connection hiccups
+    return;
   }
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }

@@ -4051,3 +4051,70 @@ export const geoData: District[] = [
     ]
   }
 ];
+
+export function findNearestLocation(lat: number, lng: number, lang: string = 'bn'): {
+  district: District;
+  upazila?: Upazila;
+  displayName: string;
+  shortName: string;
+  isWithinBangladesh: boolean;
+  distanceKm: number;
+} {
+  let closestDistrict = geoData[0];
+  let closestUpazila: Upazila | undefined = undefined;
+  let minDistanceSq = Infinity;
+
+  for (const d of geoData) {
+    if (d.upazilas && d.upazilas.length > 0) {
+      for (const u of d.upazilas) {
+        const uLat = typeof u.lat === 'number' ? u.lat : d.lat;
+        const uLng = typeof u.lng === 'number' ? u.lng : d.lng;
+        const dLat = uLat - lat;
+        const dLng = uLng - lng;
+        const distSq = dLat * dLat + dLng * dLng;
+        if (distSq < minDistanceSq) {
+          minDistanceSq = distSq;
+          closestDistrict = d;
+          closestUpazila = u;
+        }
+      }
+    } else {
+      const dLat = d.lat - lat;
+      const dLng = d.lng - lng;
+      const distSq = dLat * dLat + dLng * dLng;
+      if (distSq < minDistanceSq) {
+        minDistanceSq = distSq;
+        closestDistrict = d;
+        closestUpazila = undefined;
+      }
+    }
+  }
+
+  // Approx conversion: 1 degree latitude ~ 111 km
+  const distanceKm = Math.round(Math.sqrt(minDistanceSq) * 111);
+  // Bangladesh territory check: approx 20.4 to 26.9 N, 87.8 to 92.9 E, and max distance to nearest BD upazila <= 120km
+  const isWithinBangladesh = (lat >= 20.4 && lat <= 26.9 && lng >= 87.8 && lng <= 92.9) && distanceKm <= 120;
+
+  const isBn = lang.toLowerCase().startsWith('bn');
+  const distName = isBn ? closestDistrict.bn_name : closestDistrict.name;
+  const upazilaName = closestUpazila ? (isBn ? closestUpazila.bn_name : closestUpazila.name) : undefined;
+
+  let shortName = upazilaName && upazilaName !== distName 
+    ? `${upazilaName}, ${distName}` 
+    : distName;
+  
+  if (!isWithinBangladesh && distanceKm > 100) {
+    shortName = isBn ? 'ঢাকা (ডিফল্ট)' : 'Dhaka (Default)';
+  }
+
+  const displayName = `${shortName}, ${isBn ? 'বাংলাদেশ' : 'Bangladesh'}`;
+
+  return {
+    district: closestDistrict,
+    upazila: closestUpazila,
+    displayName,
+    shortName,
+    isWithinBangladesh,
+    distanceKm
+  };
+}
