@@ -101,13 +101,13 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.5-flash-lite' : 'gemini-3.5-flash-lite';
-const BACKUP_MODEL = 'gemini-3.5-flash-lite';
-const SEARCH_MODEL = 'gemini-3.5-flash-lite';
+const getModelName = (isAdvanced?: boolean) => 'gemini-3.8-flash';
+const BACKUP_MODEL = 'gemini-3.8-flash';
+const SEARCH_MODEL = 'gemini-3.8-flash';
 const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
 const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
 export const LIVE_API_MODEL = 'gemini-3.8-live';
-const CHAT_MODEL = 'gemini-3.5-flash-lite';
+const CHAT_MODEL = 'gemini-3.8-flash';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 2000) => {
   for (let i = 0; i < retries; i++) {
@@ -638,30 +638,108 @@ export const getMarketInsights = async (
       const today = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       const currentYear = now.getFullYear();
       const locationContext = coords 
-        ? `Precise GPS Location: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
-        : `Location: Bangladesh wholesale markets (Aarong, Karwan Bazar, Shyambazar, Khatunganj, Mohasthan).`;
+        ? `GPS Location: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
+        : `Location: Bangladesh wholesale markets (Kawran Bazar, Shyambazar, Khatunganj, Mohasthan, Cox's Bazar).`;
 
-      const prompt = `Use Google Search to find the LATEST wholesale market prices and mandi rates for ${produce} in Bangladesh for TODAY (${today}, Year: ${currentYear}). 
-      ${locationContext}
-      Search for official Department of Agricultural Marketing (DAM), trading bulletins, agricultural market news, or wholesale mandi updates in Bangladesh for ${currentYear}.
-      If ${currentYear} data is absolutely unavailable, use the most recent data from ${currentYear - 1}.
-      
-      CRITICAL: All prices must be in BDT (Taka) and per KG (Kilogram). If you find prices in Maunds (40kg), convert them accurately to per KG.
-      
-      RESPONSE FORMAT:
-      - Respond in JSON format.
-      - 'insights': string summary in ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - 'priceDrivers': array of 3-5 strings explaining the key factors currently affecting the price of this produce (e.g., "Recent heavy rains in northern districts", "High transport costs", "Post-Eid supply shift").
-      - 'nearestMarkets': array of objects with 'name' and 'distance'.
-      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}. Use markdown in 'insights'.`;
+      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.
+Perform an in-depth web search using Google Search for the latest live market prices, arrival trends, and retail dynamics for "${produce}" in Bangladesh as of TODAY (${today}, Year: ${currentYear}).
+
+YOUR SEARCH TASKS:
+1. MAINSTREAM WHOLESALE MANDI PRICES & TRENDS:
+   - Search for wholesale auction prices and mandi bulletins at Kawran Bazar (কারওয়ান বাজার), Shyambazar (শ্যামবাজার), Khatunganj (খাতুনগঞ্জ), and Department of Agricultural Marketing (DAM - dam.gov.bd).
+   - Find minimum, maximum, and average wholesale prices per KG in BDT.
+   - Note arrival supply volume (পর্যাপ্ত / মাঝারি / ঘাটতি) and price momentum (উর্ধ্বমুখী / স্থিতিশীল / নিম্নমুখী).
+
+2. SUPERMARKET & E-COMMERCE RETAIL PRICES:
+   - Search supermarket websites and retail apps in Bangladesh: Shwapno (স্বপ্ন / shwapno.com), Meena Bazar (মীনা বাজার / meenabazaronline.com), Agora (আগোরা / agorasuperstores.com), and Chaldal (চালডাল / chaldal.com) for "${produce}".
+   - Find exact packaged/graded retail price per KG.
+   - Note packaging condition (যেমন: গ্রেডেড প্যাকেট, খোলা, নেট ব্যাগ) and stock availability.
+
+3. VALUE-CHAIN MARGIN SPREAD & FARMER GUIDANCE:
+   - Calculate percentage markup between wholesale mandi rate and supermarket retail shelf rate.
+   - Provide concrete, actionable bargaining advice for farmers (e.g., selling directly, sorting Grade-A for supermarket supply contracts, timing delivery to Karwan Bazar vs local cold storage).
+
+CRITICAL REQUIREMENTS:
+- All prices must be strictly in BDT (Taka) and per KG (Kilogram). Convert Maunds (40kg) accurately to per KG.
+- Deliver results in structured JSON format matching the schema.
+- Language for summaries, notes, and tips: ${lang === 'bn' ? 'Bangla (সহজ ও বাস্তবমুখী বাংলা)' : 'English'}.
+${locationContext}`;
       
       const config: any = {
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            insights: { type: Type.STRING },
+            insights: { 
+              type: Type.STRING, 
+              description: 'Executive market analysis markdown with headings, bullets, and clear trend highlights.' 
+            },
+            wholesaleRates: {
+              type: Type.OBJECT,
+              properties: {
+                minPriceBdt: { type: Type.NUMBER },
+                maxPriceBdt: { type: Type.NUMBER },
+                avgPriceBdt: { type: Type.NUMBER },
+                unit: { type: Type.STRING },
+                primaryMarket: { type: Type.STRING },
+                trend: { type: Type.STRING }
+              },
+              required: ['minPriceBdt', 'maxPriceBdt', 'avgPriceBdt', 'unit', 'primaryMarket', 'trend']
+            },
+            supermarketRates: {
+              type: Type.OBJECT,
+              properties: {
+                minPriceBdt: { type: Type.NUMBER },
+                maxPriceBdt: { type: Type.NUMBER },
+                avgPriceBdt: { type: Type.NUMBER },
+                unit: { type: Type.STRING },
+                trend: { type: Type.STRING }
+              },
+              required: ['minPriceBdt', 'maxPriceBdt', 'avgPriceBdt', 'unit']
+            },
+            supermarkets: {
+              type: Type.ARRAY,
+              description: 'Prices gathered from Shwapno, Meena Bazar, Agora, Chaldal',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  pricePerKgBdt: { type: Type.NUMBER },
+                  packagingType: { type: Type.STRING },
+                  stockStatus: { type: Type.STRING },
+                  websiteUrl: { type: Type.STRING }
+                },
+                required: ['name', 'pricePerKgBdt', 'packagingType', 'stockStatus']
+              }
+            },
+            mandiHubs: {
+              type: Type.ARRAY,
+              description: 'Mainstream wholesale mandis like Kawran Bazar, Shyambazar, Khatunganj',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  mandiName: { type: Type.STRING },
+                  wholesalePriceBdt: { type: Type.NUMBER },
+                  arrivalVolume: { type: Type.STRING },
+                  trend: { type: Type.STRING }
+                },
+                required: ['mandiName', 'wholesalePriceBdt', 'arrivalVolume', 'trend']
+              }
+            },
+            marginSpread: {
+              type: Type.OBJECT,
+              properties: {
+                spreadPercentage: { type: Type.NUMBER },
+                middlemanMarkupEstimate: { type: Type.STRING },
+                farmerDirectOpportunity: { type: Type.STRING }
+              },
+              required: ['spreadPercentage', 'middlemanMarkupEstimate', 'farmerDirectOpportunity']
+            },
             priceDrivers: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            farmerActionTips: {
               type: Type.ARRAY,
               items: { type: Type.STRING }
             },
@@ -676,7 +754,7 @@ export const getMarketInsights = async (
               }
             }
           },
-          required: ['insights', 'priceDrivers']
+          required: ['insights', 'wholesaleRates', 'supermarketRates', 'supermarkets', 'mandiHubs', 'marginSpread', 'priceDrivers', 'farmerActionTips']
         },
         tools: [{ googleSearch: {} }]
       };
@@ -688,11 +766,15 @@ export const getMarketInsights = async (
           toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
         });
-        return JSON.parse(response.text || '{}');
+        const parsed = JSON.parse(response.text || '{}');
+        return parsed;
       } catch (searchError) {
         console.warn("Google Search model failed, falling back to standard generation:", searchError);
+        const fallbackPrompt = `Provide realistic in-depth market intelligence for ${produce} in Bangladesh around ${today}.
+Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets (Shwapno, Meena Bazar, Agora, Chaldal). Return JSON matching schema in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
+
         const fallbackResponse = await generateContent({
-          contents: [{ parts: [{ text: `Provide estimated market insight for ${produce} for the period around ${today}. Return JSON with 'insights' and 'priceDrivers'. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
+          contents: [{ parts: [{ text: fallbackPrompt }] }],
           config: {
             responseMimeType: 'application/json',
             responseSchema: config.responseSchema

@@ -27,7 +27,7 @@ interface TranscriptTurn {
 
 export default function LiveVideoCopilot({
   lang,
-  locationContext = "Cox's Bazar / Bangladesh",
+  locationContext = "Bangladesh",
   onCaptureFrameForDeepDiagnosis
 }: LiveVideoCopilotProps) {
   const { user } = useAuth();
@@ -48,6 +48,14 @@ export default function LiveVideoCopilot({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
   const [latestSubtitle, setLatestSubtitle] = useState<{ text: string; role: 'user' | 'model' } | null>(null);
+  const [lastSavedSession, setLastSavedSession] = useState<{
+    title: string;
+    summary: string;
+    crop?: string;
+    keyFacts: string[];
+    transcriptsCount: number;
+  } | null>(null);
+  const [isSavingSummary, setIsSavingSummary] = useState(false);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -64,6 +72,9 @@ export default function LiveVideoCopilot({
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const isMutedRef = useRef(false);
+  const speechRecognitionRef = useRef<any>(null);
+  const transcriptsRef = useRef<TranscriptTurn[]>([]);
+  const callDurationRef = useRef<number>(0);
 
   // Sync ref
   useEffect(() => {
@@ -422,8 +433,48 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
 
               // Duration Timer
               durationIntervalRef.current = setInterval(() => {
+                callDurationRef.current += 1;
                 setCallDuration(prev => prev + 1);
               }, 1000);
+
+              // Initialize Speech Recognition for continuous transcription of farmer queries
+              const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+              if (SpeechRecognitionClass) {
+                try {
+                  const recognition = new SpeechRecognitionClass();
+                  recognition.continuous = true;
+                  recognition.interimResults = true;
+                  recognition.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+                  
+                  recognition.onresult = (event: any) => {
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                      const spoken = event.results[i][0]?.transcript?.trim();
+                      if (event.results[i].isFinal && spoken) {
+                        const turn: TranscriptTurn = {
+                          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                          role: 'user',
+                          text: spoken,
+                          timestamp: new Date().toISOString()
+                        };
+                        transcriptsRef.current.push(turn);
+                        setTranscripts(prev => [...prev, turn]);
+                        setLatestSubtitle({ text: spoken, role: 'user' });
+                      } else if (spoken) {
+                        setLatestSubtitle({ text: spoken, role: 'user' });
+                      }
+                    }
+                  };
+
+                  recognition.onerror = (e: any) => {
+                    console.warn("Speech recognition notice:", e);
+                  };
+
+                  recognition.start();
+                  speechRecognitionRef.current = recognition;
+                } catch (srErr) {
+                  console.warn("Web Speech API unavailable:", srErr);
+                }
+              }
 
               toast.success(lang === 'bn' 
                 ? '🔴 লাইভ মাল্টিমোডাল এআই সেশন সংযুক্ত হয়েছে!' 
@@ -439,6 +490,25 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (base64Audio) {
               playAudioChunk(base64Audio);
+            }
+
+            // Extract any textual advice returned by Gemini Live
+            if (message.serverContent?.modelTurn?.parts) {
+              const textParts = message.serverContent.modelTurn.parts
+                .map((p: any) => p.text)
+                .filter((t: any): t is string => typeof t === 'string' && t.trim().length > 0);
+              if (textParts.length > 0) {
+                const aiText = textParts.join(' ').trim();
+                const turn: TranscriptTurn = {
+                  id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                  role: 'model',
+                  text: aiText,
+                  timestamp: new Date().toISOString()
+                };
+                transcriptsRef.current.push(turn);
+                setTranscripts(prev => [...prev, turn]);
+                setLatestSubtitle({ text: aiText, role: 'model' });
+              }
             }
 
             // Interruption handling
@@ -476,6 +546,125 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     }
   };
 
+  // Comprehensive extraction of live session data into farmer profile & credit dossier
+  const saveLiveSessionDossier = async (dialogueTurns: TranscriptTurn[], duration: number) => {
+    const effectiveUid = user?.uid || 'guest_farmer_demo';
+    const effectiveName = user?.displayName || '';
+    const ai = getAi();
+
+    // 1. If dialogue occurred, run deep AI distillation with zero hallucinations
+    if (dialogueTurns.length > 0 && ai) {
+      const dialogueText = dialogueTurns
+        .map(t => `${t.role === 'user' ? 'কৃষক' : 'কৃষি বিশেষজ্ঞ'}: ${t.text}`)
+        .join('\n');
+
+      const prompt = `You are a certified senior agronomist and agricultural data auditor in Bangladesh.
+A live video and voice consultation session just took place between a farmer and an AI agronomist.
+Session Duration: ${Math.round(duration)} seconds.
+Location context: ${locationContext}.
+Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
+
+REAL CONVERSATION TRANSCRIPT:
+${dialogueText}
+
+TASK:
+Deeply examine what was discussed during the live consultation.
+Extract factual agricultural insights without ANY hallucination. If a crop or disease was not mentioned or identifiable, leave it null.
+
+Return a JSON object with this exact structure:
+{
+  "crop": "Detected crop (e.g., টমেটো, মরিচ, ধান, বেগুন, আলু) or null",
+  "diseaseOrIssue": "Identified disease, pest, or problem or null",
+  "farmerQuestions": ["List of specific issues, questions, or symptoms mentioned by the farmer"],
+  "expertRecommendations": ["Key advice, organic IPM solutions, fertilizer tips, dosage, safety precautions given"],
+  "sessionTitle": "Concise, descriptive title for this session (in ${lang === 'bn' ? 'Bangla' : 'English'})",
+  "comprehensiveSummary": "A clear, detailed 2-3 sentence summary of what was discussed, what symptoms were reported, and what advice was provided (in ${lang === 'bn' ? 'Bangla' : 'English'})",
+  "keyFacts": ["Array of 3-5 concise factual bullet points (e.g., 'ফসল: মরিচ', 'লক্ষণ: পাতা কুঁকড়ে যাওয়া', 'পরামর্শ: নিম তেল স্প্রে') in ${lang === 'bn' ? 'Bangla' : 'English'}"],
+  "insightForCreditProfile": "Credit & farm management observation (e.g. 'সরাসরি ভিডিওতে উদ্ভিদের বালাই শনাক্ত করে সময়মতো আইপিএম ব্যবস্থা গ্রহণ করেছেন') in ${lang === 'bn' ? 'Bangla' : 'English'}"
+}`;
+
+      try {
+        const resp = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json'
+          }
+        });
+        const parsed = JSON.parse(resp.text || '{}');
+        const title = parsed.sessionTitle || (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video & Voice Consultation Session');
+        const summary = parsed.comprehensiveSummary || dialogueText.substring(0, 500);
+        const keyFacts: string[] = Array.isArray(parsed.keyFacts) && parsed.keyFacts.length > 0 
+          ? parsed.keyFacts 
+          : [
+              `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
+              `পদ্ধতি: লাইভ মাল্টিমোডাল এআই পরামর্শ`,
+              ...(parsed.crop ? [`ফসল: ${parsed.crop}`] : [])
+            ];
+        const crop = parsed.crop || undefined;
+        const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় বিশেষজ্ঞ পরামর্শ নিয়েছেন' : 'Conducted live visual consultation');
+
+        await recordFarmerInteractionEvent({
+          userId: effectiveUid,
+          fullName: effectiveName,
+          eventType: 'voice_consultation',
+          title,
+          summary,
+          keyFacts,
+          crop,
+          insight
+        });
+
+        setLastSavedSession({
+          title,
+          summary,
+          crop,
+          keyFacts,
+          transcriptsCount: dialogueTurns.length
+        });
+
+        toast.success(lang === 'bn' 
+          ? 'সেশনের বিস্তারিত কথপোকথন ও সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
+          : 'Consultation dialogue and summary saved to your Krishi Dossier!');
+        return;
+      } catch (aiErr) {
+        console.warn("AI extraction error, falling back to direct dialogue logging:", aiErr);
+      }
+    }
+
+    // 2. Factual fallback when silent camera check or AI parse failed (NO hallucinated crops or locations)
+    const summaryText = dialogueTurns.length > 0
+      ? dialogueTurns.map(t => `${t.role === 'user' ? 'কৃষক' : 'বিশেষজ্ঞ'}: ${t.text}`).slice(-6).join(' | ')
+      : (lang === 'bn' 
+          ? `কৃষক ${Math.max(1, Math.round(duration))} সেকেন্ডের জন্য লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন। কোনো নির্দিষ্ট রোগের কথপোকথন রেকর্ড করা হয়নি।` 
+          : `Farmer conducted a ${Math.max(1, Math.round(duration))}s visual crop check. No specific dialogue recorded.`);
+
+    const title = lang === 'bn' ? 'লাইভ ক্যামেরা পরিদর্শন সেশন' : 'Live Camera Field Inspection';
+    const keyFacts = [
+      `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
+      `পদ্ধতি: লাইভ ক্যামেরা ভিজ্যুয়াল চেক`
+    ];
+
+    await recordFarmerInteractionEvent({
+      userId: effectiveUid,
+      fullName: effectiveName,
+      eventType: 'voice_consultation',
+      title,
+      summary: summaryText.substring(0, 500),
+      keyFacts,
+      insight: lang === 'bn' ? 'নিয়মিত লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন' : 'Conducted live camera inspection'
+    });
+
+    setLastSavedSession({
+      title,
+      summary: summaryText,
+      keyFacts,
+      transcriptsCount: dialogueTurns.length
+    });
+
+    toast.success(lang === 'bn' ? 'সেশনের রেকর্ড আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Inspection logged to your Krishi Dossier!');
+  };
+
   // Stop all media & connections
   const stopAllMedia = () => {
     if (frameIntervalRef.current) {
@@ -489,6 +678,13 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
+    }
+
+    if (speechRecognitionRef.current) {
+      try {
+        speechRecognitionRef.current.stop();
+      } catch (e) {}
+      speechRecognitionRef.current = null;
     }
 
     sourceNodesRef.current.forEach(node => {
@@ -520,28 +716,14 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
       mediaStreamRef.current = null;
     }
 
-    // Progressively save session summary to farmer profile if dialogue occurred
-    if (transcripts.length > 0 || callDuration > 5) {
-      const summaryText = transcripts.length > 0
-        ? transcripts.map(t => `${t.role === 'user' ? 'কৃষক' : 'বিশেষজ্ঞ'}: ${t.text}`).slice(-4).join(' | ')
-        : (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সফলভাবে সম্পন্ন হয়েছে।' : 'Live video consultation session completed.');
-      
-      recordFarmerInteractionEvent({
-        userId: user?.uid || 'guest_farmer_demo',
-        fullName: user?.displayName || 'কৃষক ভাই (Farmer)',
-        eventType: 'voice_consultation',
-        title: lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video Consultation Session',
-        summary: summaryText.substring(0, 500),
-        keyFacts: [
-          `কলের ব্যাপ্তি: ${Math.max(1, Math.round(callDuration))} সেকেন্ড`,
-          `পরামর্শের মাধ্যম: লাইভ ভিডিও এআই`,
-          `অবস্থান: ${locationContext}`
-        ],
-        district: locationContext.includes('Cox') ? 'কক্সবাজার' : undefined,
-        insight: lang === 'bn' ? 'লাইভ ক্যামেরা প্রদর্শন করে সরাসরি বিশেষজ্ঞ পরামর্শ নিয়েছেন।' : 'Conducted live visual crop consultation.'
-      }).then(() => {
-        toast.success(lang === 'bn' ? 'সেশনের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Session summary saved to your Krishi Dossier!');
-      }).catch(err => console.warn(err));
+    // Capture duration and transcripts for persistent dossier compounding
+    const currentTranscripts = [...transcriptsRef.current];
+    const currentDuration = callDurationRef.current || callDuration;
+
+    if (currentTranscripts.length > 0 || currentDuration >= 4) {
+      setIsSavingSummary(true);
+      saveLiveSessionDossier(currentTranscripts, currentDuration)
+        .finally(() => setIsSavingSummary(false));
     }
 
     setIsSessionActive(false);
@@ -549,6 +731,7 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     setIsCameraActive(false);
     setIsTorchOn(false);
     setCallDuration(0);
+    callDurationRef.current = 0;
     setLiveState('idle');
   };
 
@@ -765,6 +948,27 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               </div>
             </div>
 
+            {/* Live Realtime Subtitles Overlay */}
+            {latestSubtitle && latestSubtitle.text && (
+              <div className={`absolute left-4 right-4 flex justify-center z-25 pointer-events-none ${
+                isFullscreen ? 'bottom-36 sm:bottom-40' : 'bottom-24 sm:bottom-28'
+              }`}>
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="max-w-md sm:max-w-lg px-4 py-2 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 text-center shadow-2xl"
+                >
+                  <span className="text-[10px] uppercase font-black text-emerald-400 mr-2">
+                    {latestSubtitle.role === 'user' ? (lang === 'bn' ? '🗣️ কৃষক' : '🗣️ Farmer') : (lang === 'bn' ? '🤖 এআই কৃষিবিদ' : '🤖 AI Agronomist')}:
+                  </span>
+                  <span className="text-xs sm:text-sm font-semibold text-white leading-relaxed">
+                    {latestSubtitle.text}
+                  </span>
+                </motion.div>
+              </div>
+            )}
+
             {/* Bottom Audio Waveform Overlay */}
             <div className={`absolute left-4 right-4 flex items-center justify-center gap-1 z-20 pointer-events-none ${
               isFullscreen ? 'bottom-28 sm:bottom-32' : 'bottom-16 sm:bottom-20'
@@ -896,6 +1100,87 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
           <span>🏛️ সরকারি হটলাইন: ১৬১২৩</span>
         </div>
       </div>
+
+      {/* Realtime / Post-Session Insights Card */}
+      {isSavingSummary && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3 text-emerald-800 dark:text-emerald-300 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin text-emerald-600 shrink-0" />
+          <span className="font-semibold">
+            {lang === 'bn' 
+              ? 'সেশনের বিস্তারিত কথপোকথন বিশ্লেষণ করা হচ্ছে এবং স্মার্ট কৃষক প্রোফাইলে সংযুক্ত হচ্ছে...' 
+              : 'Analyzing live consultation dialogue and updating Smart Farmer Dossier...'}
+          </span>
+        </div>
+      )}
+
+      {lastSavedSession && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-5 border border-emerald-500/20 shadow-sm space-y-3.5">
+          <div className="flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-700 pb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                  {lastSavedSession.title}
+                </h4>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {lang === 'bn' ? 'সরাসরি লাইভ সেশন থেকে সংগৃহীত ও স্মার্ট কৃষক কার্ডে সংরক্ষিত' : 'Extracted from live stream & saved to Krishi Dossier'}
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">
+              {lang === 'bn' ? 'সংরক্ষিত' : 'Verified'}
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+            {lastSavedSession.summary}
+          </p>
+
+          {lastSavedSession.keyFacts.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                {lang === 'bn' ? 'সংগৃহীত মূল তথ্যসমূহ:' : 'Key Extracted Facts:'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {lastSavedSession.keyFacts.map((fact, idx) => (
+                  <span 
+                    key={idx}
+                    className="text-xs px-2.5 py-1 rounded-xl bg-gray-100 dark:bg-gray-700/60 text-gray-800 dark:text-gray-200 border border-gray-200/60 dark:border-gray-600"
+                  >
+                    • {fact}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {transcripts.length > 0 && (
+            <details className="text-xs group border-t border-gray-100 dark:border-gray-700/50 pt-2.5">
+              <summary className="font-bold text-emerald-600 dark:text-emerald-400 cursor-pointer list-none flex items-center justify-between">
+                <span>{lang === 'bn' ? `কথোপকথন রেকর্ড (${transcripts.length}টি উক্তি)` : `Full Conversation Record (${transcripts.length} turns)`}</span>
+                <span className="text-[10px] text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-2.5 space-y-2 max-h-48 overflow-y-auto pr-1">
+                {transcripts.map((t) => (
+                  <div 
+                    key={t.id} 
+                    className={`p-2 rounded-xl text-xs ${
+                      t.role === 'user' 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 border border-emerald-200/50' 
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                    }`}
+                  >
+                    <span className="font-bold mr-1.5">
+                      {t.role === 'user' ? (lang === 'bn' ? 'কৃষক:' : 'Farmer:') : (lang === 'bn' ? 'বিশেষজ্ঞ:' : 'AI Agronomist:')}
+                    </span>
+                    <span>{t.text}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
 }

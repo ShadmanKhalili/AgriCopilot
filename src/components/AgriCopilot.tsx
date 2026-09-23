@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, Mic, MicOff, Video, Compass } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -24,6 +24,659 @@ import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
+
+const SAMPLE_DIAGNOSIS_CASES = [
+  {
+    crop: 'paddy',
+    categoryBn: 'ধান',
+    categoryEn: 'Paddy / Rice',
+    titleBn: 'ধানের ব্লাস্ট ও পাতা পোড়া রোগ',
+    titleEn: 'Rice Blast & Blight',
+    descBn: 'পাতায় ডিম্বাকৃতি বাদামি দাগ ও নোড সংক্রমণ',
+    descEn: 'Spindle-shaped brown lesions with ash center',
+    sampleDiagnosis: {
+      disease: 'Rice Blast (Magnaporthe oryzae)',
+      diseaseBn: 'ধানের ব্লাস্ট রোগ (ম্যাগনাপর্থে ওরাইজি)',
+      confidence: 94,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Fungal infection exacerbated by high humidity and excess nitrogen.',
+      organicRemedy: 'Spray neem seed extract (50g/L water) or trichoderma harzianum suspension during early morning.',
+      chemicalRemedy: 'Foliar application of Tricyclazole 75 WP @ 0.75g/L water or Nativo 75 WG @ 0.6g/L.',
+      verificationAdvice: 'Inspect the leaf collar and panicle neck for characteristic diamond-shaped lesions.',
+      symptomsBreakdown: [
+        'Spindle-shaped spots with necrotic grey centers on leaf blade',
+        'Brown to black discoloration at panicle nodes',
+        'Premature leaf senescence and reduced grain filling'
+      ]
+    }
+  },
+  {
+    crop: 'paddy',
+    categoryBn: 'ধান',
+    categoryEn: 'Paddy / Rice',
+    titleBn: 'ধানের বাদামি গাছফড়িং (বিপিএইচ) ও খোল পোড়া',
+    titleEn: 'Rice Brown Plant Hopper & Sheath Blight',
+    descBn: 'গাছের গোড়ায় পোকার ঝাঁক ও হপারবার্ন ছোপ',
+    descEn: 'Hopper burn circular drying patches with sheath lesions',
+    sampleDiagnosis: {
+      disease: 'Brown Plant Hopper (BPH) & Sheath Blight (Rhizoctonia solani)',
+      diseaseBn: 'বাদামি গাছফড়িং (বিপিএইচ) ও খোল পোড়া রোগ',
+      confidence: 92,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Dense planting, stagnant warm water, and excessive urea usage.',
+      organicRemedy: 'Drain standing water for 3-4 days to expose base, encourage spiders/mirid bugs, and spray Beauveria bassiana.',
+      chemicalRemedy: 'Pymetrozine (Chess 50 WDG) @ 0.6g/L or Dinotefuran 20 SG @ 0.4g/L directed strictly at the plant base.',
+      verificationAdvice: 'Part the tillers near ground water level and vigorously shake plants over white paper to count falling nymphs.',
+      symptomsBreakdown: [
+        'Rapid circular yellowing and drying ("hopper burn") in field patches',
+        'Serpentine snake-skin lesions on leaf sheaths just above waterline',
+        'Honeydew secretion leading to black sooty mold at tiller bases'
+      ]
+    }
+  },
+  {
+    crop: 'paddy',
+    categoryBn: 'ধান',
+    categoryEn: 'Paddy / Rice',
+    titleBn: 'ধানের ব্যাক্টেরিয়াল পাতা পোড়া (বিএলবি)',
+    titleEn: 'Rice Bacterial Leaf Blight (BLB)',
+    descBn: 'পাতার কিনার থেকে ঢেউ খেলানো হলদে দাগ',
+    descEn: 'Wavy water-soaked margins turning straw-yellow',
+    sampleDiagnosis: {
+      disease: 'Bacterial Leaf Blight (Xanthomonas oryzae)',
+      diseaseBn: 'ধানের ব্যাক্টেরিয়াল পাতা পোড়া (বিএলবি)',
+      confidence: 90,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Bacterial infection spread through storm winds, rain splashing, and injured leaves.',
+      organicRemedy: 'Topdress with Muriate of Potash (MoP) 5kg/bigha, spray copper hydroxide 2g/L, and withhold urea application.',
+      chemicalRemedy: 'Bismerthiazol (Bactroban) @ 1.5g/L + Copper Oxychloride @ 2g/L or Streptocycline @ 0.2g/L.',
+      verificationAdvice: 'Cut freshly infected leaf edge, place in clear glass of water, and look for milky bacterial ooze streaming from cut vein.',
+      symptomsBreakdown: [
+        'Wavy, undulating lesion margins starting from leaf tips downward',
+        'Translucent amber-colored bacterial droplets on early morning dew',
+        'Straw-bleached leaves causing complete blighting of upper canopy'
+      ]
+    }
+  },
+  {
+    crop: 'potato',
+    categoryBn: 'আলু',
+    categoryEn: 'Potato',
+    titleBn: 'আলুর নাবী ধসা (লেসব্লাইট)',
+    titleEn: 'Potato Late Blight',
+    descBn: 'পাতার কিনারায় ভেজা জলছাপ ও সাদা ছত্রাক',
+    descEn: 'Water-soaked lesions with white down on leaf underside',
+    sampleDiagnosis: {
+      disease: 'Late Blight (Phytophthora infestans)',
+      diseaseBn: 'আলুর নাবী ধসা রোগ (ফাইটোপথোরা ইনফেস্ট্যান্স)',
+      confidence: 95,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Cold humid weather with persistent fog and prolonged leaf wetness.',
+      organicRemedy: 'Apply copper hydroxide dust or Bordeaux mixture (1%) as preventive barrier.',
+      chemicalRemedy: 'Mancozeb (Indofil M-45) @ 2g/L or Metalaxyl+Mancozeb (Ridomil Gold) @ 2g/L water.',
+      verificationAdvice: 'Check lower leaf undersides in the early morning for delicate white cottony fungal growth.',
+      symptomsBreakdown: [
+        'Irregular water-soaked spots turning rapidly dark brown to purplish-black',
+        'White mildew ring on the underside of infected leaflets',
+        'Rotting odor from severely affected foliage canopy'
+      ]
+    }
+  },
+  {
+    crop: 'potato',
+    categoryBn: 'আলু',
+    categoryEn: 'Potato',
+    titleBn: 'আলুর আগাম ধসা (আর্লি ব্লাইট)',
+    titleEn: 'Potato Early Blight',
+    descBn: 'পাতায় সমকেন্দ্রিক বলয়াকার বাদামি দাগ',
+    descEn: 'Target-board concentric rings on older lower leaves',
+    sampleDiagnosis: {
+      disease: 'Early Blight (Alternaria solani)',
+      diseaseBn: 'আলুর আগাম ধসা রোগ (অল্টারনারিয়া সোলানি)',
+      confidence: 89,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Alternating wet and dry periods affecting mature or nitrogen-stressed plants.',
+      organicRemedy: 'Apply Trichoderma harzianum or spray garlic extract; remove lower yellow senescent foliage.',
+      chemicalRemedy: 'Azoxystrobin + Difenoconazole (Amistar Top) @ 1ml/L or Chlorothalonil @ 2g/L.',
+      verificationAdvice: 'Examine dark spots under sunlight to observe clear circular rings like an archery target.',
+      symptomsBreakdown: [
+        'Dark brown necrotic spots surrounded by chlorotic yellow halos',
+        'Characteristic concentric target-board ridges within lesions',
+        'Premature defoliation of lower leaves moving upward'
+      ]
+    }
+  },
+  {
+    crop: 'tomato',
+    categoryBn: 'টমেটো',
+    categoryEn: 'Tomato',
+    titleBn: 'টমেটোর পাতা কোঁকড়ানো ভাইরাস (ToLCV)',
+    titleEn: 'Tomato Leaf Curl Virus',
+    descBn: 'পাতা উপরের দিকে কুঁকড়ে যাওয়া ও শিরা হলুদ',
+    descEn: 'Upward leaf curling, thickening, and stunted terminal growth',
+    sampleDiagnosis: {
+      disease: 'Tomato Leaf Curl Virus (ToLCV)',
+      diseaseBn: 'টমেটোর পাতা কোঁকড়ানো ভাইরাস (ToLCV)',
+      confidence: 91,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Whitefly (Bemisia tabaci) transmission under dry warm conditions.',
+      organicRemedy: 'Erect yellow sticky traps (1 trap/100 sq meters) and spray soap-water emulsion (5ml/L).',
+      chemicalRemedy: 'Imidacloprid (Admire 200 SL) @ 0.5ml/L or Acetamiprid @ 0.5g/L to control vector.',
+      verificationAdvice: 'Check young apical shoots for upward cupping and observe whitefly activity on undersides.',
+      symptomsBreakdown: [
+        'Severe upward curling and crinkling of young leaflets',
+        'Interveinal chlorosis with prominent thickened vein networks',
+        'Stunted internode elongation with bushy canopy cluster'
+      ]
+    }
+  },
+  {
+    crop: 'tomato',
+    categoryBn: 'টমেটো',
+    categoryEn: 'Tomato',
+    titleBn: 'টমেটোর নাবী ধসা ও ফল পচা',
+    titleEn: 'Tomato Late Blight & Fruit Rot',
+    descBn: 'কাঁচা ফলে তামাটে শক্ত দাগ ও পাতার ডগা পচন',
+    descEn: 'Greasy bronze blotches on green fruit with stem rotting',
+    sampleDiagnosis: {
+      disease: 'Late Blight (Phytophthora infestans)',
+      diseaseBn: 'টমেটোর নাবী ধসা ও ফল পচা রোগ',
+      confidence: 93,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Continuous cloudy overcast skies, high humidity (>90%), and temperatures between 15-22°C.',
+      organicRemedy: 'Remove and burn all infected green fruits and lower leaves immediately; spray copper oxychloride 2g/L.',
+      chemicalRemedy: 'Dimethomorph + Mancozeb (Acrobat MZ) @ 2g/L or Cymoxanil + Mancozeb (Curzate) @ 2g/L.',
+      verificationAdvice: 'Touch infected fruit spots — feel firm, greasy texture without immediate soft watery collapse.',
+      symptomsBreakdown: [
+        'Dark olivaceous greasy lesions on fruit shoulders',
+        'Rapid brown girdling cankers along green stems',
+        'White fungal bloom on fruit underside in damp conditions'
+      ]
+    }
+  },
+  {
+    crop: 'brinjal',
+    categoryBn: 'বেগুন',
+    categoryEn: 'Brinjal / Eggplant',
+    titleBn: 'বেগুনের ডগা ও ফল ছিদ্রকারী পোকা',
+    titleEn: 'Brinjal Shoot & Fruit Borer (BSFB)',
+    descBn: 'কচি ডগা নুয়ে পড়া ও ফলে ছোট ছিদ্র ও বিষ্ঠা',
+    descEn: 'Wilting shoot tips and boreholes plugged with frass',
+    sampleDiagnosis: {
+      disease: 'Brinjal Fruit & Shoot Borer (Leucinodes orbonalis)',
+      diseaseBn: 'বেগুনের ডগা ও ফল ছিদ্রকারী পোকা',
+      confidence: 96,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Lepidopteran larvae boring into tender vegetative shoots and developing fruits.',
+      organicRemedy: 'Clipping and burying wilted shoots weekly; install Lucin-lure sex pheromone traps @ 4-5 per bigha.',
+      chemicalRemedy: 'Spinosad 45 SC (Tracer) @ 0.4ml/L or Chlorantraniliprole 18.5 SC (Coragen) @ 0.3ml/L.',
+      verificationAdvice: 'Snap off bent wilted shoot tips — split open lengthwise to spot the pinkish caterpillar inside.',
+      symptomsBreakdown: [
+        'Sudden wilting and drooping of tender apical shoots',
+        'Circular entry boreholes on maturing fruits surrounded by larval frass',
+        'Deformed, unmarketable fruits with internal pulp hollowed out'
+      ]
+    }
+  },
+  {
+    crop: 'brinjal',
+    categoryBn: 'বেগুন',
+    categoryEn: 'Brinjal / Eggplant',
+    titleBn: 'বেগুনের ফোমোপসিস ব্লাইট ও ফল পচা',
+    titleEn: 'Brinjal Phomopsis Blight',
+    descBn: 'পাতায় বৃত্তাকার দাগ ও ফলে শুকনো বাদামি পচন',
+    descEn: 'Concentric lesions with black pycnidia on leaves and fruit',
+    sampleDiagnosis: {
+      disease: 'Phomopsis Blight (Phomopsis vexans)',
+      diseaseBn: 'বেগুনের ফোমোপসিস ব্লাইট ও ফল পচন রোগ',
+      confidence: 88,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Fungal spores splashing from old debris under warm rainy conditions.',
+      organicRemedy: 'Seed treatment with hot water (50°C for 25 min) and soil drenching with Trichoderma.',
+      chemicalRemedy: 'Carbendazim 50 WP @ 1g/L or Mancozeb @ 2.5g/L sprayed every 10-12 days.',
+      verificationAdvice: 'Use magnifying lens to see tiny pimple-like black dots (pycnidia) arranged inside leaf spots.',
+      symptomsBreakdown: [
+        'Circular clearly demarcated brown spots with pale centers on leaves',
+        'Sunken brown rotting patches covering large sections of fruit',
+        'Mummified black dry fruits clinging to the plant'
+      ]
+    }
+  },
+  {
+    crop: 'chili',
+    categoryBn: 'মরিচ',
+    categoryEn: 'Chili / Pepper',
+    titleBn: 'মরিচের অ্যানথ্রাকনোজ ও ডাইব্যাক (ফল পচা)',
+    titleEn: 'Chili Anthracnose & Dieback',
+    descBn: 'পাকা মরিচে গোল দাগ ও ডাল ওপর থেকে শুকানো',
+    descEn: 'Sunken necrotic spots on ripe pods and branch dieback',
+    sampleDiagnosis: {
+      disease: 'Chili Anthracnose (Colletotrichum capsici)',
+      diseaseBn: 'মরিচের অ্যানথ্রাকনোজ ও ডাইব্যাক রোগ',
+      confidence: 93,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Fungus thriving during high moisture and rainfall when fruits reach turning/red ripe stage.',
+      organicRemedy: 'Use disease-free treated seeds, practice 2-year crop rotation, and spray Pseudomonas fluorescens (5g/L).',
+      chemicalRemedy: 'Azoxystrobin + Difenoconazole (Amistar Top) @ 1ml/L or Propiconazole (Tilt 250 EC) @ 0.5ml/L.',
+      verificationAdvice: 'Inspect ripe pods for concentric rings of tiny black dots surrounded by straw-colored sunken rims.',
+      symptomsBreakdown: [
+        'Circular, sunken necrotic lesions on ripening and red chili pods',
+        'Acervuli forming concentric rings of black dots inside fruit lesions',
+        'Twigs drying backward from tip toward the stem axis ("dieback")'
+      ]
+    }
+  },
+  {
+    crop: 'chili',
+    categoryBn: 'মরিচ',
+    categoryEn: 'Chili / Pepper',
+    titleBn: 'মরিচের থ্রিপস ও মাকড় (পাতা কোঁকড়ানো)',
+    titleEn: 'Chili Thrips & Mite Complex (Murda)',
+    descBn: 'পাতা নৌকার মতো উল্টে কুঁকড়ে যাওয়া ও খর্বাকৃতি',
+    descEn: 'Upward/downward leaf curling with bronzed underside',
+    sampleDiagnosis: {
+      disease: 'Chili Leaf Curl (Thrips & Yellow Mite Complex)',
+      diseaseBn: 'মরিচের থ্রিপস ও মাকড় আক্রমণ (মুড়দা রোগ)',
+      confidence: 91,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Combined feeding by tiny sap-sucking yellow mites and thrips in warm weather.',
+      organicRemedy: 'Spray neem oil (5ml/L) with soap nut water; dust sulfur (80% WP) @ 2g/L for mites.',
+      chemicalRemedy: 'Diafenthiuron 50 WP (Pegasus) @ 1g/L or Fipronil 5 SC @ 1.5ml/L + Abamectin 1.8 EC @ 1ml/L.',
+      verificationAdvice: 'Look at the leaf curl: upward boat-shaped = thrips; downward inverted cup = mites.',
+      symptomsBreakdown: [
+        'Upward boat-shaped curling and brittle leaves caused by thrips',
+        'Downward inverted spoon curling and bronzed underside caused by yellow mites',
+        'Bud drop and clustering of small terminal rosettes'
+      ]
+    }
+  },
+  {
+    crop: 'watermelon',
+    categoryBn: 'তরমুজ',
+    categoryEn: 'Watermelon',
+    titleBn: 'তরমুজের আঠা ঝরা রোগ (গামি স্টেম ব্লাইট)',
+    titleEn: 'Watermelon Gummy Stem Blight',
+    descBn: 'কাণ্ড ফেটে বাদামি আঠালো রস নির্গমন ও পাতা শুকানো',
+    descEn: 'Amber gummy exudate oozing from cracked stem crowns',
+    sampleDiagnosis: {
+      disease: 'Gummy Stem Blight (Didymella bryoniae)',
+      diseaseBn: 'তরমুজের আঠা ঝরা রোগ (ডিডিমেলা ব্রায়োনি)',
+      confidence: 92,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Soil-borne fungus invading stem wounds during warm temperatures (24-28°C) and high humidity.',
+      organicRemedy: 'Avoid stem injuries during weeding; paste Trichoderma harzianum or Bordeaux paste directly onto stem lesions.',
+      chemicalRemedy: 'Thiophanate Methyl 70 WP @ 1.5g/L or Tebuconazole + Trifloxystrobin (Nativo) @ 0.6g/L.',
+      verificationAdvice: 'Check crown area just above ground line for characteristic cracked bark with dark reddish-brown sticky droplets.',
+      symptomsBreakdown: [
+        'Water-soaked circular lesions on leaves spreading from margins inward',
+        'Stem cracking at ground level with gummy amber fluid exudation',
+        'Sudden daytime vine collapse while roots remain structurally intact'
+      ]
+    }
+  },
+  {
+    crop: 'betelLeaf',
+    categoryBn: 'পান',
+    categoryEn: 'Betel Leaf / Paan',
+    titleBn: 'পানের গোড়া ও মূল পচা রোগ (ফুট রট)',
+    titleEn: 'Betel Vine Foot & Root Rot',
+    descBn: 'পানের লতা হলদে হয়ে ঢলে পড়া ও গোড়ায় কালো দাগ',
+    descEn: 'Sudden vine wilting with black rotting girdles at collar',
+    sampleDiagnosis: {
+      disease: 'Foot Rot & Leaf Rot (Phytophthora parasitica var. piperina)',
+      diseaseBn: 'পানের গোড়া ও লতা পচা রোগ',
+      confidence: 94,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Excess dampness, poor drainage in Boroj (pan baroj), and contaminated cuttings.',
+      organicRemedy: 'Ensure trench drainage outside Boroj; drench soil with Trichoderma-enriched mustard oil cake.',
+      chemicalRemedy: 'Soil drenching with Metalaxyl + Mancozeb (Ridomil Gold) @ 2g/L or Fosetyl-Al (Aliette) @ 2.5g/L.',
+      verificationAdvice: 'Gently pull the wilted vine — collar zone slips off easily showing shredded dark brown vascular strands.',
+      symptomsBreakdown: [
+        'Rapid yellowing and flaccid wilting of leaves from top to bottom',
+        'Black collar rot just at soil line that emits foul rotting odor',
+        'Wet-oil spot lesions expanding quickly across leaf blades in rainy months'
+      ]
+    }
+  },
+  {
+    crop: 'onion',
+    categoryBn: 'পেঁয়াজ',
+    categoryEn: 'Onion',
+    titleBn: 'পেঁয়াজের বেগুনি দাগ রোগ (পার্পল ব্লচ)',
+    titleEn: 'Onion Purple Blotch',
+    descBn: 'পাতায় লম্বাটে বেগুনি কেন্দ্রের দাগ ও ডগা ভাঙা',
+    descEn: 'Sunken purplish-brown elliptical leaf spots',
+    sampleDiagnosis: {
+      disease: 'Purple Blotch (Alternaria porri)',
+      diseaseBn: 'পেঁয়াজের বেগুনি দাগ রোগ (অল্টারনারিয়া পরি)',
+      confidence: 91,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Spreads during foggy mornings, heavy dews, and temperatures between 21-30°C.',
+      organicRemedy: 'Spray garlic clove extract (5%) or copper hydroxide dust; maintain proper furrow drainage.',
+      chemicalRemedy: 'Rovral 50 WP (Iprodione) @ 2g/L or Difenoconazole (Score 250 EC) @ 0.5ml/L.',
+      verificationAdvice: 'Observe the center of leaf lesions — distinctly purplish or dark violet surrounded by yellow halos.',
+      symptomsBreakdown: [
+        'Small sunken whitish spots rapidly turning purplish in center',
+        'Spots enlarge and girdle the tubular leaf, causing it to snap over',
+        'Bulb rot developing in storage starting from infected neck tissues'
+      ]
+    }
+  },
+  {
+    crop: 'maize',
+    categoryBn: 'ভুট্টা',
+    categoryEn: 'Maize / Corn',
+    titleBn: 'ভুট্টার ফল আর্মিওয়ার্ম কীড়া আক্রমণ',
+    titleEn: 'Maize Fall Armyworm (FAW)',
+    descBn: 'কচি শিষ ও পাতার গোছায় করাত দিয়ে কাটার মতো ক্ষত',
+    descEn: 'Ragged shot-hole defoliation and dense sawdust-like frass in whorl',
+    sampleDiagnosis: {
+      disease: 'Fall Armyworm (Spodoptera frugiperda)',
+      diseaseBn: 'ভুট্টার ফল আর্মিওয়ার্ম কীড়া আক্রমণ',
+      confidence: 95,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Invasive noctuid moth larvae actively voracious on young corn whorls.',
+      organicRemedy: 'Handpick egg masses; apply fine wood ash or dry sand mixed with neem powder directly inside whorls.',
+      chemicalRemedy: 'Emamectin Benzoate 5 SG (Proclaim) @ 1g/L or Spinetoram 11.7 SC (Delegate) @ 0.5ml/L into the whorl.',
+      verificationAdvice: 'Look inside the leaf whorl: spot the caterpillar with 4 dark spots arranged in a square on the 8th segment.',
+      symptomsBreakdown: [
+        'Extensive ragged windowing and "shot-hole" tears in unfurling leaves',
+        'Large accumulation of coarse, moist sawdust-like frass inside the central funnel',
+        'Bored husks and eaten kernels at the tip of developing ears'
+      ]
+    }
+  },
+  {
+    crop: 'mustard',
+    categoryBn: 'সরিষা',
+    categoryEn: 'Mustard',
+    titleBn: 'সরিষার জাবপোকা (এফিড) আক্রমণ',
+    titleEn: 'Mustard Aphid Infestation',
+    descBn: 'মুকুল ও কচি ফলে লাখ লাখ কালচে পোকার আস্তরণ',
+    descEn: 'Dense clusters of greenish-black aphids on flowers and pods',
+    sampleDiagnosis: {
+      disease: 'Mustard Aphid (Lipaphis erysimi)',
+      diseaseBn: 'সরিষার জাবপোকা আক্রমণ',
+      confidence: 94,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Overcast, calm, cloudy weather with morning fog during flowering and pod development.',
+      organicRemedy: 'Spray liquid dish soap solution (5ml/L) or tobacco leaf decoction; conserve ladybird beetles.',
+      chemicalRemedy: 'Imidacloprid 200 SL @ 0.5ml/L or Dimethoate 40 EC (Rogor) @ 1.5ml/L in the late afternoon.',
+      verificationAdvice: 'Gently shake the flowering twig: sticky honeydew glistening with thousands of tiny sap suckers.',
+      symptomsBreakdown: [
+        'Curled, yellowed inflorescences incapable of setting healthy pods',
+        'Stunted, sickly plants coated with black sooty mold fungus',
+        'Shriveled, light grains causing severe oil yield loss'
+      ]
+    }
+  },
+  {
+    crop: 'cucumber',
+    categoryBn: 'শসা ও করলা',
+    categoryEn: 'Cucumber / Gourd',
+    titleBn: 'শসার ডাউনি মিলডিউ (হলুদ ছোপ রোগ)',
+    titleEn: 'Cucumber Downy Mildew',
+    descBn: 'পাতার শিরা দিয়ে সীমাবদ্ধ চারকোনা হলুদ ছোপ',
+    descEn: 'Angular chlorotic yellow patches delineated by leaf veins',
+    sampleDiagnosis: {
+      disease: 'Downy Mildew (Pseudoperonospora cubensis)',
+      diseaseBn: 'শসা ও লাউ জাতীয় ফসলের ডাউনি মিলডিউ রোগ',
+      confidence: 90,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Airborne sporangia germinating rapidly in the presence of free water or morning fog.',
+      organicRemedy: 'Trellis vines off wet soil; spray baking soda (5g/L) + neem oil emulsion as preventive.',
+      chemicalRemedy: 'Cymoxanil + Mancozeb (Curzate) @ 2g/L or Fenamidone + Mancozeb (Sectin) @ 2g/L.',
+      verificationAdvice: 'Flip the leaf over: under every angular yellow spot on the top side, note grayish-purple fuzzy mildew underneath.',
+      symptomsBreakdown: [
+        'Angular, vein-delimited bright yellow patches on the upper leaf surface',
+        'Purplish-brown downy fungal felt on the underside during humid mornings',
+        'Leaves crisp and scorch brown, creating a "fired" canopy appearance'
+      ]
+    }
+  },
+  {
+    crop: 'jute',
+    categoryBn: 'পাট',
+    categoryEn: 'Jute',
+    titleBn: 'পাটের কাণ্ড পচা রোগ (স্টেম রট)',
+    titleEn: 'Jute Stem Rot',
+    descBn: 'পাটের কাণ্ডে বাদামি ছোপ ও আঁশ ফেটে নষ্ট হওয়া',
+    descEn: 'Dark lesions on stem node resulting in shredding fibers',
+    sampleDiagnosis: {
+      disease: 'Jute Stem Rot (Macrophomina phaseolina)',
+      diseaseBn: 'পাটের কাণ্ড পচা রোগ',
+      confidence: 89,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Seed-borne and soil-borne fungus active in poorly drained soil during monsoon downpours.',
+      organicRemedy: 'Seed treatment with Trichoderma; avoid dense broadcast sowing by line sowing with proper spacing.',
+      chemicalRemedy: 'Carbendazim 50 WP (Autostin) @ 1.5g/L or Mancozeb @ 2.5g/L sprayed targeting stems.',
+      verificationAdvice: 'Peel back bark at infected node: notice charcoal-like black sclerotia embedded in fiber bundles.',
+      symptomsBreakdown: [
+        'Brown, sunken necrotic spots centered on nodes along the green stem',
+        'Fiber decay causing stem lodging and breakage during strong winds',
+        'Shredded, black, brittle bark with lost fiber tensile strength'
+      ]
+    }
+  },
+  {
+    crop: 'chili',
+    categoryBn: 'মরিচ',
+    categoryEn: 'Chili / Pepper',
+    titleBn: 'মরিচের ডাই-ব্যাক ও অ্যানথ্রাকনোজ (ফল পচা)',
+    titleEn: 'Chili Anthracnose & Die-back',
+    descBn: 'ডাল শুকিয়ে যাওয়া ও পাকা মরিচে গোল গোল ক্ষত',
+    descEn: 'Twig die-back starting from top with sunken fruit lesions',
+    sampleDiagnosis: {
+      disease: 'Chili Anthracnose & Die-back (Colletotrichum capsici)',
+      diseaseBn: 'মরিচের অ্যানথ্রাকনোজ ও ডাল শুকিয়ে যাওয়া (ডাই-ব্যাক) রোগ',
+      confidence: 93,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Fungal spores splashing from rain and dew during warm, humid conditions.',
+      organicRemedy: 'Collect and burn dead twigs; spray garlic cloves extract (50g/L) or neem leaf extract.',
+      chemicalRemedy: 'Azoxystrobin + Difenoconazole (Amistar Top) @ 1ml/L or Propiconazole (Tilt 250 EC) @ 0.5ml/L.',
+      verificationAdvice: 'Look for sunken circular black spots with concentric rings on ripe chili pods.',
+      symptomsBreakdown: [
+        'Twig tips turn brown and dry downwards ("die-back")',
+        'Sunken circular water-soaked spots on red and green chilies',
+        'Premature fruit drop and black speckles on stems'
+      ]
+    }
+  },
+  {
+    crop: 'chili',
+    categoryBn: 'মরিচ',
+    categoryEn: 'Chili / Pepper',
+    titleBn: 'মরিচের পাতা কোঁকড়ানো (থ্রিপস ও মাইট)',
+    titleEn: 'Chili Leaf Curl (Thrips & Mites)',
+    descBn: 'পাতা নৌকা বা বাটির মতো কুঁকড়ে যাওয়া',
+    descEn: 'Upward or downward boat-shaped curling with stunted growth',
+    sampleDiagnosis: {
+      disease: 'Chili Leaf Curl Complex (Thrips & Yellow Mite)',
+      diseaseBn: 'মরিচের পাতা কোঁকড়ানো রোগ (চুষি পোকা ও লাল মাকড়)',
+      confidence: 91,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Thrips feeding causes upward cupping; yellow mites cause downward inverted boat cupping.',
+      organicRemedy: 'Spray neem oil (3ml/L) with liquid soap; place blue and yellow sticky traps in field.',
+      chemicalRemedy: 'Fipronil (Ascend 5 SC) @ 1ml/L for thrips; Fenpyroximate or Abamectin @ 1.2ml/L for mites.',
+      verificationAdvice: 'Hold curled leaves against sunlight to check for silvery scrape marks and minute mites.',
+      symptomsBreakdown: [
+        'Upward boat-shaped curl indicates thrips; downward curling indicates mite infestation',
+        'Brittle, thickened foliage with bronzed appearance underneath',
+        'Flower dropping and severely stunted bushy plant canopy'
+      ]
+    }
+  },
+  {
+    crop: 'watermelon',
+    categoryBn: 'তরমুজ',
+    categoryEn: 'Watermelon',
+    titleBn: 'তরমুজের ফিউজারিয়াম উইল্ট (লতা ঢলে পড়া)',
+    titleEn: 'Watermelon Fusarium Wilt',
+    descBn: 'হঠাৎ দুপুরের রোদে তরমুজের গাছ নুয়ে পড়ে শুকিয়ে যাওয়া',
+    descEn: 'Sudden daytime wilting of runners followed by vine collapse',
+    sampleDiagnosis: {
+      disease: 'Fusarium Wilt (Fusarium oxysporum f. sp. niveum)',
+      diseaseBn: 'তরমুজের ফিউজারিয়াম উইল্ট বা লতা ঢলে পড়া রোগ',
+      confidence: 92,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Soil-borne fungal pathogen invading vascular roots in warm sandy soils.',
+      organicRemedy: 'Soil solarization; drench root zone with Trichoderma viride enriched vermicompost.',
+      chemicalRemedy: 'Carbendazim 50 WP @ 2g/L or Thiophanate-methyl (Topsin-M) @ 1.5g/L drenching around stem base.',
+      verificationAdvice: 'Slice base of runner stem vertically: notice reddish-brown vascular discoloration inside.',
+      symptomsBreakdown: [
+        'Vines wilt during hot midday sun and temporarily recover at night',
+        'Permanent yellowing and dry shriveling of runners within 3-4 days',
+        'Brown vascular streaks inside stem xylem bundles'
+      ]
+    }
+  },
+  {
+    crop: 'betelLeaf',
+    categoryBn: 'পান পাতা',
+    categoryEn: 'Betel Leaf / Paan',
+    titleBn: 'পানের গোড়া পচা ও ডাঁটা পচা রোগ',
+    titleEn: 'Betel Vine Foot Rot & Stem Rot',
+    descBn: 'লতার গোড়ায় কালো পচন ও পাতা ঝরে বরজ ফাঁকা হওয়া',
+    descEn: 'Dark basal stem rot leading to sudden vine wilting in boroj',
+    sampleDiagnosis: {
+      disease: 'Betel Leaf Foot & Stem Rot (Phytophthora parasitica & Sclerotium rolfsii)',
+      diseaseBn: 'পানের গোড়া পচা ও বরজের ডাঁটা পচা রোগ',
+      confidence: 95,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Excessive humidity inside betel conservatory (boroj) and poor root drainage.',
+      organicRemedy: 'Improve boroj aeration; apply mustard oil cake with Trichoderma around vine bases.',
+      chemicalRemedy: 'Drench soil with Bordeaux mixture (1%) or Metalaxyl + Mancozeb (Ridomil Gold) @ 2g/L.',
+      verificationAdvice: 'Inspect stem base near soil line: soft brown water-soaked rotting with mustard-seed-like sclerotia.',
+      symptomsBreakdown: [
+        'Dark brown to black slimy rot on stem right at the soil line',
+        'Rapid yellowing, drooping, and shedding of lush green betel leaves',
+        'White fungal threads visible at moist base under dense shade'
+      ]
+    }
+  },
+  {
+    crop: 'onion',
+    categoryBn: 'পেঁয়াজ ও রসুন',
+    categoryEn: 'Onion & Garlic',
+    titleBn: 'পেঁয়াজের পার্পল ব্লচ (বেগুনি দাগ রোগ)',
+    titleEn: 'Onion Purple Blotch',
+    descBn: 'পাতায় ডিম্বাকার জলছাপ দাগের মাঝে বেগুনি কেন্দ্র',
+    descEn: 'Sunken purplish-brown lesions on tubular leaves and seed stalks',
+    sampleDiagnosis: {
+      disease: 'Purple Blotch (Alternaria porri)',
+      diseaseBn: 'পেঁয়াজের পার্পল ব্লচ বা বেগুনি দাগ রোগ',
+      confidence: 90,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'High relative humidity (80-90%) and temperatures around 21-30°C.',
+      organicRemedy: 'Crop rotation with non-allium crops; spray garlic extract and ensure wide spacing.',
+      chemicalRemedy: 'Iprodione (Rovral 50 WP) @ 2g/L or Difenoconazole (Score 250 EC) @ 1ml/L + sticker.',
+      verificationAdvice: 'Look for elongated purplish-brown spots surrounded by chlorotic yellow halos on leaves.',
+      symptomsBreakdown: [
+        'Small water-soaked lesions expanding into purplish-brown center',
+        'Leaves snap and collapse at the lesion point during windy periods',
+        'Premature drying of onion tops reducing bulb size and storage quality'
+      ]
+    }
+  },
+  {
+    crop: 'wheat',
+    categoryBn: 'গম',
+    categoryEn: 'Wheat',
+    titleBn: 'গমের ব্লাস্ট ও পাতা মরিচা রোগ',
+    titleEn: 'Wheat Blast & Leaf Rust',
+    descBn: 'শীষের কিছু অংশ সাদা হয়ে যাওয়া ও পাতায় বাদামি গুঁড়ো',
+    descEn: 'Bleached white spikelets with rust pustules on leaf surface',
+    sampleDiagnosis: {
+      disease: 'Wheat Blast (Magnaporthe oryzae Triticum) & Leaf Rust (Puccinia triticina)',
+      diseaseBn: 'গমের ব্লাস্ট ও পাতা মরিচা (রাস্ট) রোগ',
+      confidence: 94,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Warm unseasonal rain and high humidity during wheat heading stage.',
+      organicRemedy: 'Plant blast-resistant certified seeds (e.g. BARI Gom 33); timely early sowing.',
+      chemicalRemedy: 'Nativo 75 WG (Tebuconazole + Trifloxystrobin) @ 0.6g/L applied at first heading.',
+      verificationAdvice: 'Examine wheat ears: bleached white spikelets while rest of ear remains green.',
+      symptomsBreakdown: [
+        'Complete or partial bleaching of wheat ear above the infection point',
+        'Grey fungal mold at the rachis node of the ear',
+        'Shriveled, light grains causing drastic harvest loss'
+      ]
+    }
+  },
+  {
+    crop: 'tea',
+    categoryBn: 'চা পাতা',
+    categoryEn: 'Tea',
+    titleBn: 'চায়ের লাল মাকড় ও রেড রাস্ট (শ্যাওলা রোগ)',
+    titleEn: 'Tea Red Spider Mite & Red Rust',
+    descBn: 'পাতার উপরিভাগ তামাটে লাল ও ছোট ছোট শ্যাওলা দাগ',
+    descEn: 'Bronzed leaf surface with orange algal patches on tea branches',
+    sampleDiagnosis: {
+      disease: 'Red Spider Mite (Oligonychus coffeae) & Red Rust (Cephaleuros parasiticus)',
+      diseaseBn: 'চায়ের লাল মাকড় আক্রমণ ও রেড রাস্ট রোগ',
+      confidence: 88,
+      severity: 'Medium',
+      qualitativeSeverity: 'Medium',
+      cause: 'Dry spells and hot sunny exposed sections in tea gardens.',
+      organicRemedy: 'Maintain shade trees; spray wettable sulfur (2g/L) during early morning.',
+      chemicalRemedy: 'Propargite 57 EC (Omite) @ 2ml/L or Hexythiazox @ 1ml/L targeted under leaves.',
+      verificationAdvice: 'Rub fingers on red leaf: orange stain left on skin indicates active mite colony.',
+      symptomsBreakdown: [
+        'Upper surface of mature leaves turns rusty bronze or brick-red',
+        'Dull, dry appearance with reduced flushing of two leaves and a bud',
+        'Defoliation of maintenance leaves during dry winter and pre-monsoon'
+      ]
+    }
+  },
+  {
+    crop: 'pulse',
+    categoryBn: 'ডাল ও মসুর',
+    categoryEn: 'Pulses & Lentil',
+    titleBn: 'মসুরের স্টেমফিলিয়াম ব্লাইট (পাতা পোড়া)',
+    titleEn: 'Lentil Stemphylium Blight',
+    descBn: 'গাছের ডালপালা ও পাতায় বাদামি দাগ হয়ে দ্রুত ঝরে পড়া',
+    descEn: 'Small pinhead spots coalescing into brown foliage blight',
+    sampleDiagnosis: {
+      disease: 'Stemphylium Blight (Stemphylium botryosum)',
+      diseaseBn: 'মসুরের স্টেমফিলিয়াম ব্লাইট বা পাতা ঝলসানো রোগ',
+      confidence: 91,
+      severity: 'High',
+      qualitativeSeverity: 'High',
+      cause: 'Overcast skies, heavy morning fog, and dense vegetative growth.',
+      organicRemedy: 'Avoid dense seed broadcast; spray bio-fungicide Trichoderma suspension early.',
+      chemicalRemedy: 'Iprodione (Rovral 50 WP) @ 2g/L or Azoxystrobin @ 1ml/L at first appearance of spots.',
+      verificationAdvice: 'Check canopy during morning fog: leaves show water-soaked spots rapidly turning ash-grey.',
+      symptomsBreakdown: [
+        'Minute pinhead spots on leaflets rapidly expanding to blight the leaf',
+        'Twigs and branches turn greyish-white and foliage drops prematurely',
+        'Severe pod abortion resulting in empty or shriveled grains'
+      ]
+    }
+  }
+];
 
 interface Props {
   lang: Language;
@@ -108,9 +761,21 @@ export default function AgriCopilot({
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
-  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('static_upload');
+  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
+  const [customContextText, setCustomContextText] = useState('');
+
+  const scrollToContextSection = () => {
+    const el = document.getElementById('agri-additional-context-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+      const input = document.getElementById('custom-context-input-field');
+      input?.focus();
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
@@ -169,6 +834,28 @@ export default function AgriCopilot({
     setAudioUrl(null);
     setChatSummary(null);
     setLastDiagnosisId(null);
+    toast.success(lang === 'bn' ? 'ফলাফল মুছে নতুন রোগ নির্ণয়ের জন্য প্রস্তুত করা হয়েছে' : 'Ready for fresh diagnosis');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectSampleDiagnosis = (sc: typeof SAMPLE_DIAGNOSIS_CASES[0]) => {
+    setCrop(sc.crop);
+    if (setPersistedCrop) setPersistedCrop(sc.crop);
+    setDiagnosis(sc.sampleDiagnosis);
+    if (setPersistedDiagnosis) setPersistedDiagnosis(sc.sampleDiagnosis);
+    
+    // Initialize active chat session for this sample
+    const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+    const sampleDiagText = `${sc.sampleDiagnosis.diseaseBn} (${sc.sampleDiagnosis.disease}). Symptoms: ${sc.sampleDiagnosis.symptomsBreakdown.join(', ')}. Remedies: ${sc.sampleDiagnosis.chemicalRemedy}`;
+    const session = startAgriChat(sampleDiagText, lang, locationContext);
+    setChatSession(session);
+    setChatMessages([]);
+    setChatSummary(null);
+
+    toast.success(lang === 'bn' ? `${sc.titleBn} নমুনা লোড হয়েছে` : `Loaded ${sc.titleEn} sample`);
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 150);
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,12 +921,16 @@ export default function AgriCopilot({
         longitude: coords.longitude
       });
       setLocationAccuracy(coords.accuracy);
+      if (coords.permissionDenied) {
+        setLocationError(lang === 'bn' ? "জিপিএস অনুমতি পাওয়া যায়নি; আঞ্চলিক কেন্দ্র ব্যবহার করা হচ্ছে।" : "GPS permission not granted; using approximate regional hub.");
+      }
       setIsDetectingLocation(false);
     } catch (error: any) {
-      console.error("Error detecting location:", error);
+      const errorMsg = error?.message || (error?.code ? `Location error (code ${error.code})` : "Failed to detect location.");
+      console.warn("Location detection notice in AgriCopilot:", errorMsg);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error.code === 1) msg = lang === 'bn' ? "জিপিএস অনুমতি দেওয়া হয়নি। ব্রাউজার পারমিশন চেক করুন অথবা ম্যানুয়ালি জেলা/উপজেলা নির্বাচন করুন।" : "Permission denied. Please allow location access in your browser or select your region manually.";
-      else if (error.code === 3) msg = lang === 'bn' ? "জিপিএস সংযোগ সময়সীমা অতিক্রম করেছে। অনুগ্রহ করে ম্যানুয়ালি এলাকা নির্বাচন করুন।" : "Location request timed out. Please select your region manually.";
+      if (error?.code === 1) msg = lang === 'bn' ? "জিপিএস অনুমতি দেওয়া হয়নি। ব্রাউজার পারমিশন চেক করুন অথবা ম্যানুয়ালি জেলা/উপজেলা নির্বাচন করুন।" : "Permission denied. Please allow location access in your browser or select your region manually.";
+      else if (error?.code === 3) msg = lang === 'bn' ? "জিপিএস সংযোগ সময়সীমা অতিক্রম করেছে। অনুগ্রহ করে ম্যানুয়ালি এলাকা নির্বাচন করুন।" : "Location request timed out. Please select your region manually.";
       setLocationError(msg);
       setIsDetectingLocation(false);
       setIsManualLocation(true);
@@ -317,7 +1008,16 @@ export default function AgriCopilot({
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentChatMessage.trim() || !chatSession || isChatLoading) return;
+    if (!currentChatMessage.trim() || isChatLoading) return;
+
+    let activeSession = chatSession;
+    if (!activeSession && diagnosis) {
+      const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
+      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      activeSession = startAgriChat(diagText, lang, locationContext);
+      setChatSession(activeSession);
+    }
+    if (!activeSession) return;
 
     const userMessage = currentChatMessage.trim();
     setCurrentChatMessage('');
@@ -325,10 +1025,43 @@ export default function AgriCopilot({
     setIsChatLoading(true);
 
     try {
-      const response = await chatSession.sendMessage({ message: userMessage });
+      const response = await activeSession.sendMessage({ message: userMessage });
       setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
     } catch (error) {
       console.error("Chat error:", error);
+      toast.error(t.tooltips.chatError);
+    } finally {
+      setIsChatLoading(false);
+      setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
+  const handleAddContextPrompt = async (contextSnippet: string) => {
+    if (!diagnosis || isChatLoading) return;
+
+    let activeSession = chatSession;
+    if (!activeSession) {
+      const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
+      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      activeSession = startAgriChat(diagText, lang, locationContext);
+      setChatSession(activeSession);
+    }
+
+    const formattedPrompt = lang === 'bn'
+      ? `আমার ফসলে নতুন লক্ষণ ও ফিল্ড পরিস্থিতি: "${contextSnippet}"। এই নতুন তথ্য অনুযায়ী আমার তাৎক্ষণিক কী সতর্কতা ও ব্যবস্থা নেওয়া উচিত?`
+      : `Additional field context for this crop: "${contextSnippet}". Based on this specific condition, what immediate measures should I take and what should I apply or avoid?`;
+
+    setChatMessages(prev => [...prev, { role: 'user', text: formattedPrompt }]);
+    setIsChatLoading(true);
+
+    try {
+      const response = await activeSession.sendMessage({ message: formattedPrompt });
+      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+      toast.success(lang === 'bn' ? 'নতুন তথ্যের আলোকে পরামর্শ যোগ করা হয়েছে' : 'Advisory updated with new context');
+    } catch (error) {
+      console.error("Chat context error:", error);
       toast.error(t.tooltips.chatError);
     } finally {
       setIsChatLoading(false);
@@ -516,47 +1249,52 @@ export default function AgriCopilot({
       
       await incrementUsage();
 
+      const allowedSeverities = ['Low', 'Medium', 'High'];
+      const diagSeverity = allowedSeverities.includes(result.qualitativeSeverity) ? result.qualitativeSeverity : 'Medium';
+
       // Save to Firestore if user is logged in
       if (user) {
         try {
-          const allowedSeverities = ['Low', 'Medium', 'High'];
-          const severity = allowedSeverities.includes(result.qualitativeSeverity) ? result.qualitativeSeverity : 'Medium';
-
           const diagDoc = await addDoc(collection(db, 'diagnoses'), {
             userId: String(user.uid),
             crop: String(crop || ''),
             cropStage: String(cropStage || ''),
             analysisType: String(analysisType || ''),
             diagnosisText: String(result.diagnosis || 'No diagnosis provided'),
-            qualitativeSeverity: String(severity),
+            qualitativeSeverity: String(diagSeverity),
             symptomsBreakdown: Array.isArray(result.symptomsBreakdown) ? result.symptomsBreakdown : [],
             verificationAdvice: String(result.verificationAdvice || 'Consult an expert.'),
             createdAt: new Date().toISOString()
           });
           setLastDiagnosisId(diagDoc.id);
-
-          // Record in Farmer Credit & Insurance Dossier
-          const cropTitle = crop ? crop.charAt(0).toUpperCase() + crop.slice(1) : 'ফসল (Crop)';
-          recordFarmerInteractionEvent({
-            userId: String(user.uid),
-            fullName: user?.displayName || 'কৃষক ভাই (Farmer)',
-            eventType: 'crop_diagnosis',
-            title: lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`,
-            summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 400),
-            keyFacts: [
-              `ফসল: ${cropTitle}`,
-              `রোগের তীব্রতা: ${severity}`,
-              `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 80)}`
-            ],
-            crop: cropTitle,
-            insight: `নিয়মিত রোগ নির্ণয় করছেন (তীব্রতা: ${severity})`
-          }).then(() => {
-            toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
-          }).catch(err => console.warn(err));
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'diagnoses');
         }
       }
+
+      // Record in Farmer Credit & Insurance Dossier (both for logged in and guest users)
+      const effectiveUid = user?.uid || 'guest_farmer_demo';
+      const cropTitle = crop ? crop.trim() : '';
+      recordFarmerInteractionEvent({
+        userId: effectiveUid,
+        fullName: user?.displayName || '',
+        eventType: 'crop_diagnosis',
+        title: cropTitle 
+          ? (lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`)
+          : (lang === 'bn' ? 'ফসল রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন' : 'Crop Health & Disease Evaluation'),
+        summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 1000),
+        keyFacts: [
+          ...(cropTitle ? [`ফসল: ${cropTitle}`] : []),
+          `রোগের তীব্রতা: ${diagSeverity}`,
+          `লক্ষণ: ${(result.symptomsBreakdown || []).slice(0, 2).join(', ') || 'পাতার দাগ/ক্ষতি'}`,
+          `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 120)}`
+        ],
+        crop: cropTitle || undefined,
+        district: selectedDistrict || undefined,
+        insight: `নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন (তীব্রতা: ${diagSeverity})`
+      }).then(() => {
+        toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
+      }).catch(err => console.warn(err));
     } catch (error: any) {
       console.error("Diagnosis failed:", error);
       const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
@@ -763,28 +1501,15 @@ export default function AgriCopilot({
         </div>
       </div>
 
-      {/* Dual Mode Switcher: Static Image Diagnostic vs Gemini 3.8 Live Video Multimodal Stream */}
-      <div className="bg-emerald-950/5 p-1 rounded-2xl border border-emerald-500/20 w-full flex gap-1.5 shadow-xs">
-        <button
-          type="button"
-          onClick={() => setCopilotMode('static_upload')}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap ${
-            copilotMode === 'static_upload'
-              ? 'bg-white text-emerald-950 shadow-sm border border-emerald-200'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-          }`}
-        >
-          <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
-          <span className="truncate">{lang === 'bn' ? 'ফটো প্রেসক্রিপশন' : 'Photo Prescription'}</span>
-        </button>
-
+      {/* Dual Mode Switcher: Live Video Multimodal Stream (Primary) vs Photo Prescription */}
+      <div className="bg-emerald-950/5 dark:bg-emerald-950/20 p-1 rounded-2xl border border-emerald-500/20 w-full flex gap-1.5 shadow-xs">
         <button
           type="button"
           onClick={() => setCopilotMode('live_stream')}
           className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer relative whitespace-nowrap ${
             copilotMode === 'live_stream'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-sm shadow-emerald-600/30'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
           <span className="relative flex h-2 w-2 shrink-0">
@@ -792,7 +1517,20 @@ export default function AgriCopilot({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
           <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-          <span className="truncate">{lang === 'bn' ? 'লাইভ ভিডিও এআই' : 'Live Video AI'}</span>
+          <span className="truncate">{lang === 'bn' ? 'লাইভ ভিডিও এআই (প্রধান)' : 'Live Video AI (Primary)'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setCopilotMode('static_upload')}
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap ${
+            copilotMode === 'static_upload'
+              ? 'bg-white dark:bg-stone-800 text-emerald-950 dark:text-emerald-300 shadow-sm border border-emerald-200 dark:border-emerald-800'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 hover:bg-white/50'
+          }`}
+        >
+          <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="truncate">{lang === 'bn' ? 'ফটো প্রেসক্রিপশন' : 'Photo Prescription'}</span>
         </button>
       </div>
 
@@ -800,7 +1538,7 @@ export default function AgriCopilot({
         <div className="w-full">
           <LiveVideoCopilot 
             lang={lang} 
-            locationContext={selectedDistrict ? `${selectedDistrict}, Bangladesh` : "Cox's Bazar, Bangladesh"}
+            locationContext={selectedDistrict ? `${selectedDistrict}, Bangladesh` : "Bangladesh"}
             onCaptureFrameForDeepDiagnosis={(dataUrl: string) => {
               const arr = dataUrl.split(',');
               const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
@@ -932,53 +1670,135 @@ export default function AgriCopilot({
               )}
             </div>
 
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleDiagnose}
-              disabled={images.length === 0 || isLoading || !isOnline}
-              aria-busy={isLoading}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-4 sm:py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-base sm:text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none relative overflow-hidden"
-            >
-              {isLoading && (
-                <motion.div 
-                  initial={{ x: "-100%" }}
-                  animate={{ x: "100%" }}
-                  transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-                  className="absolute inset-0 bg-white/20 skew-x-12"
-                />
-              )}
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
-                  <span>{t.analyzing}</span>
-                </>
-              ) : (
-                <>
-                  <Leaf className="w-7 h-7" aria-hidden="true" />
-                  <span>{t.diagnoseDisease}</span>
-                </>
-              )}
-            </motion.button>
+            {diagnosis ? (
+              <div className="space-y-2 pt-1">
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDiagnose}
+                  disabled={images.length === 0 || isLoading || !isOnline}
+                  aria-busy={isLoading}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3.5 sm:py-4 px-5 rounded-2xl hover:shadow-lg hover:shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2.5 transition-all text-sm sm:text-base tracking-tight focus:ring-4 focus:ring-emerald-400 outline-none cursor-pointer"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                      <span>{t.analyzing}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5" aria-hidden="true" />
+                      <span>{lang === 'bn' ? 'নতুন লক্ষণ/ছবি দিয়ে আপডেট' : 'Update with New Context'}</span>
+                    </>
+                  )}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="w-full py-2.5 px-4 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-rose-700 dark:text-rose-300 font-bold text-xs rounded-xl flex items-center justify-center space-x-2 transition-all cursor-pointer border border-stone-200 dark:border-stone-700 active:scale-98"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>{lang === 'bn' ? 'ফলাফল মুছে নতুন পরীক্ষা শুরু করুন' : 'Clear Results & Start Over'}</span>
+                </button>
+              </div>
+            ) : (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleDiagnose}
+                disabled={images.length === 0 || isLoading || !isOnline}
+                aria-busy={isLoading}
+                className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white font-black py-4 sm:py-5 px-6 rounded-2xl hover:shadow-lg hover:shadow-green-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 transition-all text-base sm:text-lg tracking-tight focus:ring-4 focus:ring-green-400 outline-none relative overflow-hidden cursor-pointer"
+              >
+                {isLoading && (
+                  <motion.div 
+                    initial={{ x: "-100%" }}
+                    animate={{ x: "100%" }}
+                    transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                    className="absolute inset-0 bg-white/20 skew-x-12"
+                  />
+                )}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" />
+                    <span>{t.analyzing}</span>
+                  </>
+                ) : (
+                  <>
+                    <Leaf className="w-7 h-7" aria-hidden="true" />
+                    <span>{t.diagnoseDisease}</span>
+                  </>
+                )}
+              </motion.button>
+            )}
 
           </div>
         </motion.div>
 
-        {/* Results Section with Perceptual Morphing */}
+        {/* Results Section with Monochromatic Skeleton & Flat Depth (Rank 8 & Rank 2) */}
         <div className="space-y-6 w-full">
           <AnimatePresence mode="wait">
-            {diagnosis ? (
+            {isLoading ? (
+              <motion.div 
+                key="skeleton"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 p-5 sm:p-7 space-y-6 shadow-xs"
+              >
+                {/* Header Skeleton */}
+                <div className="flex items-center justify-between pb-4 border-b border-stone-100 dark:border-stone-800">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-stone-100 dark:bg-stone-800 animate-pulse" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-44 bg-stone-200 dark:bg-stone-700 rounded-md animate-pulse" />
+                      <div className="h-3 w-24 bg-stone-100 dark:bg-stone-800 rounded-md animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="h-6 w-20 bg-stone-100 dark:bg-stone-800 rounded-full animate-pulse" />
+                </div>
+
+                {/* Analysis Body Wireframe */}
+                <div className="space-y-2.5">
+                  <div className="h-3.5 w-4/5 bg-stone-100 dark:bg-stone-800 rounded animate-pulse" />
+                  <div className="h-3.5 w-full bg-stone-100 dark:bg-stone-800 rounded animate-pulse" />
+                  <div className="h-3.5 w-5/6 bg-stone-100 dark:bg-stone-800 rounded animate-pulse" />
+                  <div className="h-3.5 w-2/3 bg-stone-100 dark:bg-stone-800 rounded animate-pulse" />
+                </div>
+
+                {/* Metric Cards Skeleton */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  <div className="p-4 rounded-xl border border-stone-200/60 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 space-y-2">
+                    <div className="h-3 w-28 bg-stone-200 dark:bg-stone-700 rounded animate-pulse" />
+                    <div className="h-5 w-16 bg-stone-200 dark:bg-stone-700 rounded animate-pulse" />
+                  </div>
+                  <div className="p-4 rounded-xl border border-stone-200/60 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-800/40 space-y-2">
+                    <div className="h-3 w-32 bg-stone-200 dark:bg-stone-700 rounded animate-pulse" />
+                    <div className="h-5 w-24 bg-stone-200 dark:bg-stone-700 rounded animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Micro-Progress status */}
+                <div className="flex items-center justify-center space-x-2 pt-2 text-stone-400 text-xs font-mono">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>{lang === 'bn' ? 'ফসলের লক্ষণ ও ক্ষত পরীক্ষা করা হচ্ছে...' : 'Analyzing crop pathology & disease markers...'}</span>
+                </div>
+              </motion.div>
+            ) : diagnosis ? (
               <motion.div 
                 key="result"
                 layout
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="bg-gradient-to-br from-green-600 via-emerald-600 to-green-700 p-1 rounded-[40px] shadow-2xl shadow-green-200 h-full"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 p-5 md:p-8 shadow-xs relative overflow-hidden h-full flex flex-col"
               >
-                <div className="bg-white/95 backdrop-blur-xl rounded-[36px] p-5 md:p-8 h-full flex flex-col relative overflow-hidden">
+                  <div ref={resultsRef} className="absolute top-0 left-0 w-1 h-1 pointer-events-none opacity-0" />
                   <div className="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-30 pointer-events-none"></div>
                   
                   {/* Translation Loading Overlay */}
@@ -1018,13 +1838,35 @@ export default function AgriCopilot({
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2 sm:space-x-3 self-start sm:self-auto">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 self-start sm:self-auto">
+                        <button 
+                          type="button"
+                          onClick={handleClearAll}
+                          aria-label={lang === 'bn' ? 'নতুন রোগ নির্ণয় শুরু করুন' : 'Start fresh diagnosis'}
+                          title={lang === 'bn' ? 'বর্তমান ফলাফল মুছে নতুন রোগ পরীক্ষা শুরু করুন' : 'Clear results and start over'}
+                          className="flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-black text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-rose-200 uppercase tracking-widest transition-all focus:ring-2 focus:ring-rose-400 outline-none shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>{lang === 'bn' ? 'নতুন পরীক্ষা' : 'Start Over'}</span>
+                        </button>
+
+                        <button 
+                          type="button"
+                          onClick={scrollToContextSection}
+                          aria-label={lang === 'bn' ? 'নতুন লক্ষণ বা তথ্য যোগ করুন' : 'Add new symptoms or context'}
+                          title={lang === 'bn' ? 'ফসলের বর্তমান অবস্থা বা নতুন পরিস্থিতি যোগ করে পরামর্শ আপডেট করুন' : 'Add new field context or symptoms'}
+                          className="flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-black text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 uppercase tracking-widest transition-all focus:ring-2 focus:ring-emerald-400 outline-none shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                          <span>{lang === 'bn' ? 'নতুন তথ্য যোগ' : 'Add Context'}</span>
+                        </button>
+
                         <button 
                           type="button"
                           onClick={handleTranslate}
                           disabled={isTranslating}
                           aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
-                          className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 sm:px-5 py-2 sm:py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-xs active:scale-95"
+                          className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-xs active:scale-95 cursor-pointer"
                         >
                           {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Globe className="w-3.5 h-3.5" aria-hidden="true" />}
                           <span>{lang === 'en' ? 'বাংলায় দেখুন' : 'View in English'}</span>
@@ -1033,6 +1875,39 @@ export default function AgriCopilot({
                           <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
                           <span className="text-[10px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Guidance Ribbon: Start Over or Add Context */}
+                    <div className="bg-emerald-50/60 dark:bg-emerald-950/40 p-3 sm:p-3.5 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs mb-2">
+                      <div className="flex items-center space-x-2 text-xs text-stone-700 dark:text-stone-300">
+                        <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="font-bold text-stone-900 dark:text-stone-100">
+                          {lang === 'bn' ? 'ফলাফল পরবর্তী করণীয়:' : 'Next steps:'}
+                        </span>
+                        <span className="text-[11px] text-stone-600 dark:text-stone-400">
+                          {lang === 'bn' 
+                            ? 'প্রথম ব্যাচের ফলাফল পেয়েছেন? নতুন লক্ষণ/সার প্রয়োগের তথ্য যোগ করতে পারেন, অথবা অন্য ফসলের জন্য নতুন পরীক্ষা শুরু করতে পারেন।' 
+                            : 'Got first batch results? Add new symptoms/fertilizer context to refine or start fresh for another crop.'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={scrollToContextSection}
+                          className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 bg-white dark:bg-stone-800 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-700 flex items-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{lang === 'bn' ? 'নতুন লক্ষণ যোগ' : 'Add Context'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearAll}
+                          className="text-xs font-bold text-rose-700 dark:text-rose-400 hover:text-rose-800 bg-white dark:bg-stone-800 px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-700 flex items-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{lang === 'bn' ? 'নতুন পরীক্ষা' : 'Start Over'}</span>
+                        </button>
                       </div>
                     </div>
                     
@@ -1055,116 +1930,6 @@ export default function AgriCopilot({
                         </motion.div>
                       ) : (
                         <>
-                          {/* Cross-Module Deep-Links & Next Best Actions */}
-                          {onNavigateTab && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-green-950 rounded-[2.2rem] p-5 sm:p-6 text-white shadow-xl border border-emerald-800/80 mb-6 relative overflow-hidden"
-                            >
-                              <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center space-x-2.5">
-                                  <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
-                                    <Sparkles className="w-4 h-4" />
-                                  </div>
-                                  <div>
-                                    <h4 className="font-display font-black text-xs uppercase tracking-widest text-white leading-tight">
-                                      {lang === 'bn' ? 'পরবর্তী প্রয়োজনীয় পদক্ষেপ ও সেবা' : 'Connected Agri-Tools & Next Steps'}
-                                    </h4>
-                                    <p className="text-[11px] text-emerald-300 font-medium">
-                                      {lang === 'bn' ? 'এই ফসলের জন্য সমন্বিত ডিজিটাল কৃষি সেবা' : 'Linked farmer tools for this crop diagnosis'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <span className="text-[10px] bg-emerald-500 text-emerald-950 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm shrink-0">
-                                  {crop ? (t.crops[crop as keyof typeof t.crops] || crop) : (lang === 'bn' ? 'স্মার্ট সেবা' : 'Smart Action')}
-                                </span>
-                              </div>
-                              
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                {/* 1. Krishi Profit */}
-                                <button
-                                  type="button"
-                                  onClick={() => onNavigateTab('krishi-profit', { crop: crop || 'potato' })}
-                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
-                                >
-                                  <div className="p-2.5 bg-emerald-400 text-emerald-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
-                                    <Calculator className="w-4 h-4 stroke-[2.5]" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
-                                      <span>{lang === 'bn' ? 'উৎপাদন ব্যয় ও লাভ' : 'Cost & Profit'}</span>
-                                      <ArrowRight className="w-3 h-3 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="text-[10px] text-emerald-200 truncate mt-0.5 font-medium">
-                                      {lang === 'bn' ? 'ব্রেক-ইভেন ও খরচের হিসাব' : 'Estimate profit margin'}
-                                    </div>
-                                  </div>
-                                </button>
-
-                                {/* 2. Market Connect */}
-                                <button
-                                  type="button"
-                                  onClick={() => onNavigateTab('market-connect', { produce: crop || 'tomato' })}
-                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
-                                >
-                                  <div className="p-2.5 bg-amber-400 text-amber-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
-                                    <TrendingUp className="w-4 h-4 stroke-[2.5]" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
-                                      <span>{lang === 'bn' ? 'পাইকারি বাজারদর' : 'Mandi Rates'}</span>
-                                      <ArrowRight className="w-3 h-3 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="text-[10px] text-amber-200 truncate mt-0.5 font-medium">
-                                      {lang === 'bn' ? 'আড়তের লাইভ দর ও ট্রেন্ড' : 'Wholesale price trends'}
-                                    </div>
-                                  </div>
-                                </button>
-
-                                {/* 3. Climate Resilience */}
-                                <button
-                                  type="button"
-                                  onClick={() => onNavigateTab('climate-resilience')}
-                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
-                                >
-                                  <div className="p-2.5 bg-sky-400 text-sky-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
-                                    <Waves className="w-4 h-4 stroke-[2.5]" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
-                                      <span>{lang === 'bn' ? 'সহনশীল জাত গাইড' : 'Resilient Seeds'}</span>
-                                      <ArrowRight className="w-3 h-3 text-sky-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="text-[10px] text-sky-200 truncate mt-0.5 font-medium">
-                                      {lang === 'bn' ? 'বন্যা/খরা/লবণাক্ততা' : 'Flood/saline varieties'}
-                                    </div>
-                                  </div>
-                                </button>
-
-                                {/* 4. Satellite Health */}
-                                <button
-                                  type="button"
-                                  onClick={() => onNavigateTab('crop-health')}
-                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
-                                >
-                                  <div className="p-2.5 bg-teal-400 text-teal-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
-                                    <Satellite className="w-4 h-4 stroke-[2.5]" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
-                                      <span>{lang === 'bn' ? 'স্যাটেলাইট স্ক্যান' : 'Satellite Scan'}</span>
-                                      <ArrowRight className="w-3 h-3 text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="text-[10px] text-teal-200 truncate mt-0.5 font-medium">
-                                      {lang === 'bn' ? 'জমির NDVI স্বাস্থ্য সূচক' : 'Field vegetation index'}
-                                    </div>
-                                  </div>
-                                </button>
-                              </div>
-                            </motion.div>
-                          )}
-
                           {/* 1. AI Suggestion (Diagnosis Text) */}
                           <motion.div 
                             initial={{ opacity: 0 }}
@@ -1303,23 +2068,23 @@ export default function AgriCopilot({
                           </motion.div>
 
                           {/* 2. Verification Advice */}
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[32px] p-8 shadow-inner">
-                            <div className="flex items-center space-x-3 mb-4">
-                              <div className="bg-white p-2 rounded-xl shadow-sm">
-                                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                          <div className="bg-stone-50 dark:bg-stone-800/60 border border-stone-200/80 dark:border-stone-700 rounded-2xl p-5 shadow-xs">
+                            <div className="flex items-center space-x-2.5 mb-3">
+                              <div className="bg-white dark:bg-stone-700 p-2 rounded-xl shadow-2xs">
+                                <ShieldAlert className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                               </div>
-                              <p className="text-xs font-black text-blue-900 uppercase tracking-widest">{t.confidenceAdvice}</p>
+                              <p className="text-xs font-bold text-stone-800 dark:text-stone-200">{t.confidenceAdvice}</p>
                             </div>
-                            <div className="markdown-body text-sm text-blue-900/80 font-medium mb-4 prose-sm prose-blue leading-relaxed">
+                            <div className="markdown-body text-xs sm:text-sm text-stone-700 dark:text-stone-300 font-normal mb-3 prose-stone dark:prose-invert leading-relaxed">
                               <ReactMarkdown>{diagnosis.verificationAdvice}</ReactMarkdown>
                             </div>
                             
-                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-blue-200/50 text-[11px] text-blue-800 font-bold">
+                            <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-stone-200/80 dark:border-stone-700 text-[11px] text-stone-600 dark:text-stone-400 font-medium">
                               <span>{lang === 'bn' ? '🏛️ স্থানীয় উপ-সহকারী কৃষি কর্মকর্তা (SAAO) বা কৃষি কল সেন্টারের ১৬১২৩ নম্বরে বিনামূল্যে পরামর্শ নিন' : '🏛️ Consult your local SAAO or dial toll-free Krishi Hotline 16123'}</span>
                               {diagnosis.confidence < 70 && (
-                                <div className="flex items-center space-x-1.5 text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200">
+                                <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
                                   <AlertTriangle className="w-3.5 h-3.5" />
-                                  <span className="text-[10px] font-black uppercase tracking-wider">{t.lowConfidenceWarning}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">{t.lowConfidenceWarning}</span>
                                 </div>
                               )}
                             </div>
@@ -1372,7 +2137,7 @@ export default function AgriCopilot({
                               className="bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/90 dark:border-stone-800 shadow-xs relative overflow-hidden flex flex-col"
                             >
                               <div className="flex items-center space-x-2.5 mb-3.5">
-                                <div className="p-2 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 rounded-xl border border-indigo-200/60 dark:border-indigo-900/40">
+                                <div className="p-2 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 rounded-xl border border-stone-200 dark:border-stone-700">
                                   <Bug className="w-4 h-4" />
                                 </div>
                                 <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">{lang === 'bn' ? 'শনাক্তকৃত লক্ষণ' : 'Visible Symptoms'}</p>
@@ -1386,7 +2151,7 @@ export default function AgriCopilot({
                                     key={idx} 
                                     className="flex items-start text-xs text-stone-700 dark:text-stone-300"
                                   >
-                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0 mr-2"></div>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-500 mt-1.5 shrink-0 mr-2"></div>
                                     <span className="leading-relaxed">{symptom}</span>
                                   </motion.li>
                                 ))}
@@ -1649,12 +2414,87 @@ export default function AgriCopilot({
                               </div>
 
                               {diagnosis && (
-                                <div className="mb-6">
+                                <div className="space-y-4 mb-6">
                                   <LiveExpertCall 
                                     diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
                                     lang={lang} 
                                     locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
                                   />
+
+                                   {/* Quick Field Context Injector */}
+                                  <div 
+                                    id="agri-additional-context-section"
+                                    className="bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/90 dark:border-emerald-800/60 rounded-2xl p-3.5 sm:p-4 shadow-2xs scroll-mt-24"
+                                  >
+                                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="p-1 rounded-lg bg-emerald-600 text-white">
+                                          <Sparkles className="w-3.5 h-3.5" />
+                                        </div>
+                                        <h5 className="text-xs font-black text-emerald-950 dark:text-emerald-200 tracking-tight">
+                                          {lang === 'bn' ? 'নতুন ফিল্ড লক্ষণ বা অতিরিক্ত তথ্য যোগ করুন:' : 'Add Field Context & Symptoms:'}
+                                        </h5>
+                                      </div>
+                                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                                        {lang === 'bn' ? '১-ক্লিকে প্রেসক্রিপশন আপডেট' : '1-Click Refine'}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-emerald-900/80 dark:text-emerald-300/80 mb-2.5 leading-snug">
+                                      {lang === 'bn' 
+                                        ? 'জমির সাম্প্রতিক অবস্থা বা লক্ষণ নির্বাচন করুন, অথবা নিচে লিখে পাঠান। এআই তাত্ক্ষণিকভাবে নতুন পরিস্থিতির আলোকে করণীয় আপডেট করে দেবে:' 
+                                        : 'Select recent observations or type below to immediately refine advisory with new context:'}
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3">
+                                      {[
+                                        { bn: 'মাটিতে অতিরিক্ত পানি জমে আছে', en: 'Waterlogged soil condition' },
+                                        { bn: '২ দিন আগে কীটনাশক স্প্রে করা হয়েছে', en: 'Sprayed pesticide 2 days ago' },
+                                        { bn: 'পাতা দ্রুত হলুদ হয়ে ঝরে পড়ছে', en: 'Leaves turning yellow and falling rapidly' },
+                                        { bn: 'পাতার নিচে সাদা মাছি বা কীড়া দেখা যাচ্ছে', en: 'Whiteflies or caterpillars visible under leaf' },
+                                        { bn: 'আশেপাশের জমিতেও একই সংক্রমণ ছড়িয়েছে', en: 'Spreading across neighboring fields' },
+                                        { bn: 'ইউরিয়া সার বেশি প্রয়োগ করা হয়েছিল', en: 'Excess urea fertilizer applied recently' },
+                                        { bn: 'গাছের বয়স ৩০-৪০ দিন (ফুল ধরার পর্যায়)', en: 'Plant age 30-40 days (flowering stage)' }
+                                      ].map((tag, tagIdx) => (
+                                        <button
+                                          key={tagIdx}
+                                          type="button"
+                                          onClick={() => handleAddContextPrompt(lang === 'bn' ? tag.bn : tag.en)}
+                                          disabled={isChatLoading}
+                                          className="text-[11px] font-medium bg-white dark:bg-stone-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-stone-700 dark:text-stone-300 hover:text-emerald-900 dark:hover:text-emerald-200 px-2.5 py-1.5 rounded-xl border border-emerald-200/70 dark:border-emerald-800/80 transition-all active:scale-95 text-left flex items-center space-x-1 cursor-pointer disabled:opacity-50 shadow-2xs"
+                                        >
+                                          <span className="text-emerald-600 font-black">+</span>
+                                          <span>{lang === 'bn' ? tag.bn : tag.en}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    {/* Custom Context Field Input Form */}
+                                    <form
+                                      onSubmit={(e) => {
+                                        e.preventDefault();
+                                        if (!customContextText.trim() || isChatLoading) return;
+                                        handleAddContextPrompt(customContextText.trim());
+                                        setCustomContextText('');
+                                      }}
+                                      className="flex items-center gap-2 pt-1 border-t border-emerald-200/60 dark:border-emerald-800/40"
+                                    >
+                                      <input
+                                        id="custom-context-input-field"
+                                        type="text"
+                                        value={customContextText}
+                                        onChange={(e) => setCustomContextText(e.target.value)}
+                                        placeholder={lang === 'bn' ? 'অথবা আপনার নিজস্ব লক্ষণ বা তথ্য লিখুন (যেমন: গতকাল বৃষ্টি হয়েছে)...' : 'Or type custom symptoms/context (e.g., heavy rain yesterday)...'}
+                                        className="flex-1 bg-white dark:bg-stone-900 border border-emerald-200 dark:border-emerald-700/80 rounded-xl px-3 py-2 text-xs text-stone-800 dark:text-stone-200 placeholder-stone-400 focus:outline-none focus:border-emerald-500 shadow-2xs"
+                                      />
+                                      <button
+                                        type="submit"
+                                        disabled={!customContextText.trim() || isChatLoading}
+                                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold shrink-0 transition-all flex items-center space-x-1 cursor-pointer active:scale-95 shadow-xs"
+                                      >
+                                        <span>{lang === 'bn' ? 'যুক্ত করুন' : 'Apply'}</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    </form>
+                                  </div>
                                 </div>
                               )}
 
@@ -1904,7 +2744,7 @@ export default function AgriCopilot({
                               whileTap={{ scale: 0.98 }}
                               onClick={handleVerifyWithExpert}
                               disabled={isFindingExpert}
-                              className="text-gray-500 hover:text-blue-600 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 transition-all border border-transparent hover:border-blue-100 hover:bg-blue-50"
+                              className="text-gray-500 hover:text-blue-600 py-3 px-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center space-x-2 transition-all border border-transparent hover:border-blue-100 hover:bg-blue-50 cursor-pointer"
                             >
                               {isFindingExpert ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -1914,11 +2754,143 @@ export default function AgriCopilot({
                               <span>{isFindingExpert ? t.findingExpert : t.verifyWithExpert} (Indicative)</span>
                             </motion.button>
                           </div>
+
+                          {/* 5. Start Fresh / Reset Card */}
+                          <div className="p-4 sm:p-5 rounded-2xl bg-stone-100/90 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left mt-4 shadow-2xs">
+                            <div className="min-w-0">
+                              <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center justify-center sm:justify-start space-x-1.5">
+                                <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
+                                <span>{lang === 'bn' ? 'অন্য কোনো ফসলের রোগ নির্ণয় করতে চান?' : 'Need to diagnose another plant or crop?'}</span>
+                              </h4>
+                              <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                                {lang === 'bn' 
+                                  ? 'বর্তমান ফলাফল মুছে নতুন ছবি, লাইভ ভিডিও বা নমুনা দিয়ে শুরু করতে পারেন।' 
+                                  : 'Reset current results to capture fresh photos, use live video AI, or test sample cases.'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleClearAll}
+                              className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-2 shrink-0 transition-all cursor-pointer shadow-sm active:scale-95"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>{lang === 'bn' ? 'নতুন পরীক্ষা শুরু করুন' : 'Start Fresh Scan'}</span>
+                            </button>
+                          </div>
+
+                          {/* 6. Cross-Module Deep-Links & Connected Services (Always placed at the absolute end) */}
+                          {onNavigateTab && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-green-950 rounded-[2.2rem] p-5 sm:p-6 text-white shadow-xl border border-emerald-800/80 my-4 relative overflow-hidden"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center space-x-2.5">
+                                  <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
+                                    <Sparkles className="w-4 h-4" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-display font-black text-xs uppercase tracking-widest text-white leading-tight">
+                                      {lang === 'bn' ? 'সম্পর্কিত ডিজিটাল কৃষি সেবা' : 'Linked Agricultural Modules'}
+                                    </h4>
+                                    <p className="text-[11px] text-emerald-300 font-medium">
+                                      {lang === 'bn' ? 'এই ফসলের বাজার ও রোগ প্রতিরোধে সরাসরি যুক্ত হোন' : 'Seamlessly connect with market and diagnostic tools'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] bg-emerald-500 text-emerald-950 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm shrink-0">
+                                  {crop ? (t.crops[crop as keyof typeof t.crops] || crop) : (lang === 'bn' ? 'স্মার্ট সেবা' : 'Smart Action')}
+                                </span>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                {/* 1. Krishi Profit */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('krishi-profit', { crop: crop || 'potato' })}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-emerald-400 text-emerald-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Calculator className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'উৎপাদন ব্যয় ও লাভ' : 'Cost & Profit'}</span>
+                                      <ArrowRight className="w-3 h-3 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-emerald-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'ব্রেক-ইভেন ও খরচের হিসাব' : 'Estimate profit margin'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 2. Market Connect */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('market-connect', { produce: crop || 'tomato' })}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-amber-400 text-amber-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'পাইকারি বাজারদর' : 'Mandi Rates'}</span>
+                                      <ArrowRight className="w-3 h-3 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-amber-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'আড়তের লাইভ দর ও ট্রেন্ড' : 'Wholesale price trends'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 3. Climate Resilience */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('climate-resilience')}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-sky-400 text-sky-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Waves className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'সহনশীল জাত গাইড' : 'Resilient Seeds'}</span>
+                                      <ArrowRight className="w-3 h-3 text-sky-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-sky-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'বন্যা/খরা/লবণাক্ততা' : 'Flood/saline varieties'}
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* 4. Satellite Health */}
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('crop-health')}
+                                  className="flex items-center space-x-3 p-3 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
+                                >
+                                  <div className="p-2.5 bg-teal-400 text-teal-950 rounded-xl group-hover:scale-105 transition-transform shrink-0 shadow-sm">
+                                    <Satellite className="w-4 h-4 stroke-[2.5]" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-black text-xs text-white leading-tight truncate flex items-center justify-between">
+                                      <span>{lang === 'bn' ? 'স্যাটেলাইট স্ক্যান' : 'Satellite Scan'}</span>
+                                      <ArrowRight className="w-3 h-3 text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                    <div className="text-[10px] text-teal-200 truncate mt-0.5 font-medium">
+                                      {lang === 'bn' ? 'জমির NDVI স্বাস্থ্য সূচক' : 'Field vegetation index'}
+                                    </div>
+                                  </div>
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
                         </>
                       )}
                     </div>
                   </div>
-                </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -2180,12 +3152,61 @@ export default function AgriCopilot({
                 {t.disclaimerText}
               </p>
             </div>
-
             
         </motion.div>
 
       </div>
       )}
+
+      {/* Sample Crop Disease Diagnosis & Symptoms Dropdown (Last item of tab) */}
+      <div className="mt-4 pt-3 border-t border-stone-200/60 dark:border-stone-800 w-full">
+        <div className="bg-stone-50/90 dark:bg-stone-900/90 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="p-1.5 rounded-xl bg-emerald-100/70 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 shrink-0">
+              <Leaf className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <label htmlFor="sample-scenarios-select" className="text-xs font-bold text-stone-800 dark:text-stone-200 block truncate cursor-pointer">
+                {lang === 'bn' ? 'নমুনা ফসল রোগ নির্ণয় ও লক্ষণ পরিস্থিতি' : 'Sample Crop Disease Scenarios'}
+              </label>
+              <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                {lang === 'bn' ? 'ড্রপডাউন থেকে নমুনা রোগ বেছে নিয়ে পরীক্ষা করুন' : 'Select a sample scenario from the dropdown menu'}
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-80 shrink-0">
+            <select
+              id="sample-scenarios-select"
+              defaultValue=""
+              onChange={(e) => {
+                const idx = parseInt(e.target.value, 10);
+                if (!isNaN(idx) && SAMPLE_DIAGNOSIS_CASES[idx]) {
+                  handleSelectSampleDiagnosis(SAMPLE_DIAGNOSIS_CASES[idx]);
+                  setCopilotMode('static_upload');
+                }
+              }}
+              className="w-full text-xs font-medium bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2 text-stone-800 dark:text-stone-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs"
+            >
+              <option value="" disabled>
+                {lang === 'bn' ? 'নমুনা নির্বাচন করুন (১৮টি আঞ্চলিক রোগ)...' : 'Select sample scenario (18 regional cases)...'}
+              </option>
+              {Array.from(new Set(SAMPLE_DIAGNOSIS_CASES.map(s => lang === 'bn' ? s.categoryBn : s.categoryEn))).map(cat => (
+                <optgroup key={cat} label={`— ${cat} —`}>
+                  {SAMPLE_DIAGNOSIS_CASES
+                    .map((sc, originalIdx) => ({ sc, originalIdx }))
+                    .filter(({ sc }) => (lang === 'bn' ? sc.categoryBn : sc.categoryEn) === cat)
+                    .map(({ sc, originalIdx }) => (
+                      <option key={originalIdx} value={originalIdx}>
+                        {lang === 'bn' ? `${sc.titleBn} (${sc.descBn})` : `${sc.titleEn} (${sc.descEn})`}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }

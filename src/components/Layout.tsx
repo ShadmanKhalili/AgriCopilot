@@ -29,6 +29,8 @@ import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import GoogleAd from './GoogleAd';
 import OfflineBanner from './OfflineBanner';
+import { PWAInstallButton } from './PWAInstallButton';
+import { OfflineIndicator } from './OfflineIndicator';
 import LegalModal from './LegalModal';
 import AuthModal from './AuthModal';
 import RegionModal from './RegionModal';
@@ -657,8 +659,8 @@ export default function Layout() {
             )}
           </nav>
           
-          {/* Sidebar Footer: Auth & Privacy/Terms */}
-          <div className="p-3.5 border-t border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/15 space-y-2 shrink-0">
+          {/* Sidebar Footer: Auth */}
+          <div className="p-3 border-t border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/15 shrink-0">
             {/* Auth Button */}
             {user ? (
               <div className="flex items-center justify-between bg-white dark:bg-white/5 p-2 rounded-2xl border border-emerald-200 dark:border-white/10 shadow-2xs">
@@ -696,15 +698,6 @@ export default function Layout() {
                 <span>{t.signIn}</span>
               </button>
             )}
-
-            <div className="text-center pt-0.5">
-              <button 
-                onClick={() => setIsLegalOpen(true)}
-                className="text-[9px] text-emerald-800/70 hover:text-emerald-950 dark:text-emerald-300/60 dark:hover:text-emerald-300 underline underline-offset-2 uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                {lang === 'bn' ? 'গোপনীয়তা ও শর্তাবলী' : 'Privacy & Terms'}
-              </button>
-            </div>
           </div>
         </div>
 
@@ -713,7 +706,7 @@ export default function Layout() {
           
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
-            {/* Left: Mobile Menu Toggle & Brand Logo */}
+            {/* Left: Mobile Menu Toggle */}
             <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
               <button 
                 type="button"
@@ -723,16 +716,6 @@ export default function Layout() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-
-              {/* Mobile App Branding (Clean, persistent, never duplicates tab title) */}
-              <div className="flex md:hidden items-center space-x-2 min-w-0">
-                <div className="p-1.5 bg-gradient-to-tr from-emerald-500 to-green-600 text-white rounded-xl shadow-xs shrink-0">
-                  <Leaf className="w-4 h-4 stroke-[2.5]" />
-                </div>
-                <span className="font-display font-black text-sm text-emerald-950 dark:text-white tracking-tight truncate">
-                  {lang === 'bn' ? 'স্মার্ট কৃষি' : 'Smart Krishi'}
-                </span>
-              </div>
             </div>
 
             {/* Right: Universal Location Chip, Theme Toggle, Language Toggle & Actions */}
@@ -801,6 +784,9 @@ export default function Layout() {
                 <Globe className="w-3.5 h-3.5 text-gray-500 dark:text-emerald-400" aria-hidden="true" />
                 <span>{lang === 'en' ? 'বাংলা' : 'EN'}</span>
               </button>
+
+              {/* Install PWA Button for Android / Desktop / iOS */}
+              <PWAInstallButton lang={lang} />
 
               {/* Profile or Sign-in Quick Pill */}
               {user ? (
@@ -1016,6 +1002,9 @@ export default function Layout() {
           onClose={() => setIsAuthModalOpen(false)}
           lang={lang}
         />
+
+        {/* Global Offline Mode Status Indicator */}
+        <OfflineIndicator lang={lang} />
       </div>
     </>
   );

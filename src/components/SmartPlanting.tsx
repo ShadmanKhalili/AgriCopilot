@@ -59,10 +59,10 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
       setGlobalLocation(coords);
       setIsDetectingLocation(false);
     } catch (error: any) {
-      console.error("Error getting location:", error);
+      console.warn("Location detection notice in SmartPlanting:", error?.message || error);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (error.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      if (error?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (error?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
       setLocationError(msg);
       setIsDetectingLocation(false);
       setIsManualLocation(true);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight, ChevronDown, ChevronUp, Sliders, Database, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
@@ -9,6 +9,7 @@ import { detectUserLocation } from '../utils/geolocation';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
 import FarmActionTrafficLight from './FarmActionTrafficLight';
 import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
+import { saveCachedWeather, getCachedWeather, formatCacheAge } from '../utils/offlineCache';
 
 interface Props {
   lang: Language;
@@ -24,6 +25,7 @@ interface HourlyForecastItem {
   wind: number;
   condition: string;
   dni?: number;
+  rawTime?: string;
 }
 
 interface WeatherData {
@@ -71,7 +73,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [selectedDistrict, setSelectedDistrict] = useState(geoData[0].id);
   const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [forecastModel, setForecastModel] = useState<'weathernext3' | 'standard'>('weathernext3');
+  const [showSensorMetrology, setShowSensorMetrology] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [cacheInfo, setCacheInfo] = useState<{ isCached: boolean; timestamp?: number; isFallback?: boolean } | null>(null);
   const t = translations[lang];
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
@@ -87,10 +91,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       setGlobalLocation(coords);
       setIsDetecting(false);
     } catch (error: any) {
-      console.error("Location error:", error);
+      console.warn("Location detection notice in WeatherAdvisory:", error?.message || error);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (error.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      if (error?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (error?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
       setLocationError(msg);
       setIsDetecting(false);
       setIsManualLocation(true);
@@ -151,7 +155,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             }
           }
 
-          const maxHours = Math.min(currentIndex + 24, wnData.hourly.time.length);
+          const maxHours = Math.min(currentIndex + 48, wnData.hourly.time.length);
           for (let i = currentIndex; i < maxHours; i++) {
             const hTime = new Date(wnData.hourly.time[i]).toLocaleTimeString([], { hour: 'numeric' });
             const hCode = wnData.hourly.weather_code?.[i] || 0;
@@ -168,7 +172,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               rainProb: wnData.hourly.precipitation_probability?.[i] ?? 0,
               wind: wnData.hourly.wind_speed_10m?.[i] ?? 0,
               condition: hCond,
-              dni: wnData.hourly.direct_normal_irradiance?.[i] ?? 0
+              dni: wnData.hourly.direct_normal_irradiance?.[i] ?? 0,
+              rawTime: wnData.hourly.time[i]
             });
           }
         }
@@ -217,6 +222,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           throw new Error("Invalid weather data format received from Open-Meteo");
         }
 
+        const standardHourlyItems: HourlyForecastItem[] = [];
+
         // Calculate Safe Spraying Window & Current hour-based data
         if (weatherData.hourly) {
           const times = weatherData.hourly.time;
@@ -230,6 +237,27 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               currentIndex = i;
               break;
             }
+          }
+
+          const maxHours = Math.min(currentIndex + 48, times.length);
+          for (let i = currentIndex; i < maxHours; i++) {
+            const hTime = new Date(times[i]).toLocaleTimeString([], { hour: 'numeric' });
+            const hCode = weatherData.hourly.weather_code?.[i] || 0;
+            let hCond = 'Sunny';
+            if (hCode >= 1 && hCode <= 3) hCond = 'Partly Cloudy';
+            else if (hCode >= 51 && hCode <= 67) hCond = 'Rainy';
+            else if (hCode >= 80 && hCode <= 82) hCond = 'Showers';
+            else if (hCode >= 95) hCond = 'Thunderstorm';
+
+            standardHourlyItems.push({
+              time: hTime,
+              temp: Math.round(temps?.[i] ?? 0),
+              humidity: 75,
+              rainProb: Math.round(rainProbs?.[i] ?? 0),
+              wind: Math.round(windSpeeds?.[i] ?? 0),
+              condition: hCond,
+              rawTime: times[i]
+            });
           }
 
           for (let i = currentIndex; i < Math.min(currentIndex + 24, times.length - 2); i++) {
@@ -284,7 +312,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           soilMoisture: currentSoilMoisture,
           evapotranspiration: weatherData.daily?.et0_fao_evapotranspiration?.[0],
           safeSprayingWindow,
-          isWeatherNext3: false
+          isWeatherNext3: false,
+          hourlyForecast: standardHourlyItems
         };
       }
       
@@ -374,9 +403,18 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       if (soilCarbon !== undefined) newWeather.soilCarbon = soilCarbon;
       
       setWeather(newWeather);
+      setCacheInfo(null);
+      saveCachedWeather(`${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`, newWeather);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (error: any) {
-      console.error("Weather data fetch error:", error);
+      console.error("Weather data fetch error, retrieving offline cache:", error);
+      const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
+      const cached = getCachedWeather(locKey);
+      if (cached) {
+        setWeather(cached.data);
+        setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
+        setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -384,11 +422,26 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
   useEffect(() => {
     if (globalLocation) {
+      const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
+      const cached = getCachedWeather(locKey);
+      if (cached && !weather) {
+        setWeather(cached.data);
+        setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
+        setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
       fetchWeatherAndAdvisory();
     } else {
       // Seamlessly fall back to default location rather than blocking the tab
       setGlobalLocation({ latitude: 23.8103, longitude: 90.4125 });
     }
+
+    const handleForceRefresh = () => {
+      fetchWeatherAndAdvisory();
+    };
+    window.addEventListener('agri:force-refresh-cache', handleForceRefresh);
+    return () => {
+      window.removeEventListener('agri:force-refresh-cache', handleForceRefresh);
+    };
   }, [globalLocation]);
 
   const getHumidityTooltip = (val: number) => {
@@ -434,60 +487,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
         </div>
       </div>
-        
-        {globalLocation && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-stone-900 p-3 md:p-4 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs mb-4 md:mb-6">
-            <div className="flex items-center gap-1.5 bg-blue-50/70 p-1.5 rounded-2xl border border-blue-100/80 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  if (forecastModel !== 'weathernext3') {
-                    setForecastModel('weathernext3');
-                    fetchWeatherAndAdvisory('weathernext3');
-                  }
-                }}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs md:text-sm transition-all ${
-                  forecastModel === 'weathernext3'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                    : 'text-gray-600 hover:text-blue-700 hover:bg-white/60'
-                }`}
-              >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>{lang === 'bn' ? 'স্মার্ট এআই পূর্বাভাস' : 'Smart AI Forecast'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (forecastModel !== 'standard') {
-                    setForecastModel('standard');
-                    fetchWeatherAndAdvisory('standard');
-                  }
-                }}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl font-bold text-xs md:text-sm transition-all ${
-                  forecastModel === 'standard'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
-                    : 'text-gray-600 hover:text-blue-700 hover:bg-white/60'
-                }`}
-              >
-                <Layers className="w-4 h-4" />
-                <span>{t.standardEngine || 'Standard Multi-Model'}</span>
-              </button>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                fetchWeatherAndAdvisory();
-              }}
-              className="inline-flex items-center justify-center space-x-2 text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-600 px-4 py-2.5 rounded-xl border border-blue-100 hover:bg-blue-100 transition-colors"
-            >
-              <RefreshCcw className="w-3.5 h-3.5" />
-              <span>{lang === 'bn' ? 'পুনরায় লোড করুন' : 'Refresh Data'}</span>
-            </motion.button>
-          </div>
-        )}
 
       {!globalLocation ? (
         <motion.div 
@@ -571,25 +570,143 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
         </motion.div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          {/* Core Weather Header: Location & High-level Status */}
+          <motion.div 
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-stone-900 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">
+                    {t.weatherForecast}
+                  </h2>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-200/60 dark:border-emerald-800">
+                    <span className="recording-dot shrink-0" />
+                    <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ডেটা' : 'Live Ingest'}</span>
+                  </span>
+                </div>
+                {globalLocation && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <LocationDisplay coords={globalLocation} lang={lang} color="emerald" />
+                    {cacheInfo?.isCached && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-200 dark:border-amber-800">
+                        <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        <span>
+                          {cacheInfo.isFallback 
+                            ? (lang === 'bn' ? "কক্সবাজার অফলাইন ক্যাশ সক্রিয়" : "Cox's Bazar Offline Cache")
+                            : (lang === 'bn' 
+                                ? `অফলাইন ক্যাশ • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'bn')}`
+                                : `Offline Cache • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'en')}`)}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-3 self-start sm:self-auto">
+                {weather && (
+                  <div className="flex items-center space-x-3 bg-stone-50 dark:bg-stone-800/60 px-3.5 py-2 rounded-xl border border-stone-200/80 dark:border-stone-700">
+                    <div>
+                      {weather.condition === 'Sunny' ? (
+                        <Sun className="w-7 h-7 text-amber-500" />
+                      ) : (
+                        <CloudRain className="w-7 h-7 text-sky-500" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-baseline">
+                        <span className="text-xl font-bold text-stone-900 dark:text-stone-100 tabular-nums">
+                          {weather.temp.toFixed(1)}
+                        </span>
+                        <span className="text-xs font-semibold text-stone-400 ml-0.5">°C</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider block">
+                        {weather.condition}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <button 
+                  onClick={handleDetectLocation} 
+                  className="p-2.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer shadow-xs"
+                  title={lang === 'bn' ? 'জিপিএস অবস্থান রিফ্রেশ করুন' : 'Refresh GPS Location'}
+                  aria-label="Refresh GPS Location"
+                >
+                  <Navigation className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
           {/* 1. Practical Farmer Traffic Light: 1-Tap Daily Decisions (Spray, Irrigate, Harvest) */}
           {weather && (
             <FarmActionTrafficLight lang={lang} weather={weather} />
           )}
 
-          {/* 2. Executive / Investor Showcase: 48-Hour Microclimate Radar & Simulation with Interactive Scrubber */}
-          {globalLocation && (
-            <MicroclimateRadarSimulator
-              lang={lang}
-              coords={globalLocation}
-              hourlyForecast={weather?.hourlyForecast}
-              currentTemp={weather?.temp}
-              currentWind={weather?.windSpeed}
-              currentRainProb={weather?.rainChance}
-            />
-          )}
+          {/* 2. Progressive Disclosure Toggle: Field Metrology & Sensor Readings */}
+          {weather && (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setShowSensorMetrology(!showSensorMetrology)}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50/80 transition-all cursor-pointer shadow-xs group text-left"
+              >
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                        {lang === 'bn' ? 'ফিল্ড সেন্সর ও আবহাওয়া ডেটা' : 'Field Metrology & Sensor Readings'}
+                      </span>
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
+                        {lang === 'bn' ? 'গভীর বৈজ্ঞানিক বিশ্লেষণ' : 'Technical Telemetry'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 font-normal truncate">
+                      {lang === 'bn' 
+                        ? 'ক্যানোপি উইন্ড, সৌর বিকিরণ (DNI), মাটির পিএইচ, আর্দ্রতা ও ২৪ ঘণ্টার বিশদ চার্ট' 
+                        : 'Canopy wind, solar DNI, soil health indices, and microclimate simulation'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1.5 text-stone-500 group-hover:text-stone-800 dark:group-hover:text-stone-200 shrink-0 ml-3">
+                  <span className="text-xs font-semibold hidden sm:inline">
+                    {showSensorMetrology 
+                      ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Metrology') 
+                      : (lang === 'bn' ? 'বিশদ দেখুন' : 'Show Metrology')}
+                  </span>
+                  {showSensorMetrology ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </button>
 
-          <div className="space-y-6 w-full">
+              <AnimatePresence>
+                {showSensorMetrology && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden space-y-5 pt-1"
+                  >
+                    {/* 48-Hour Microclimate Radar & Simulation */}
+                    {globalLocation && (
+                      <MicroclimateRadarSimulator
+                        lang={lang}
+                        coords={globalLocation}
+                        hourlyForecast={weather?.hourlyForecast}
+                        currentTemp={weather?.temp}
+                        currentWind={weather?.windSpeed}
+                        currentRainProb={weather?.rainChance}
+                      />
+                    )}
+
+                    <div className="space-y-6 w-full">
             {/* Weather Dashboard Card */}
             <motion.div 
               initial={{ opacity: 0, y: 15 }}
@@ -648,7 +765,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-blue-100 pt-2.5 border-t border-white/10 font-medium">
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                          <span className="recording-dot shrink-0" />
                           {lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও রাডার সংযুক্ত পূর্বাভাস' : 'Live Satellite & Radar Assimilated Forecast'}
                         </span>
                       </div>
@@ -829,20 +946,20 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         </div>
 
                         {/* Rain Range */}
-                        <div className="bg-gradient-to-br from-purple-50 to-white p-4 rounded-3xl border border-purple-100 shadow-sm">
+                        <div className="bg-sky-50/70 dark:bg-sky-950/40 p-4 rounded-2xl border border-sky-100 dark:border-sky-900/40 shadow-xs">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-purple-700">
+                            <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-300">
                               <CloudRain className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">
+                              <span className="text-[10px] font-bold uppercase tracking-wider">
                                 {lang === 'bn' ? 'সম্ভাব্য বৃষ্টিপাতের পরিমাণ' : 'Expected Rain Range'}
                               </span>
                             </div>
                           </div>
-                          <div className="text-xl font-black text-gray-900">
+                          <div className="text-xl font-bold text-stone-900 dark:text-stone-100">
                             {weather.precipitationSpread?.p10 ?? 0} - {weather.precipitationSpread?.p90 ?? (weather.rainfall > 0 ? (weather.rainfall * 1.5).toFixed(1) : '2.0')}
-                            <span className="text-xs text-gray-500 ml-1 font-semibold">mm</span>
+                            <span className="text-xs text-stone-500 ml-1 font-semibold">mm</span>
                           </div>
-                          <p className="text-[10px] text-gray-500 mt-1 font-medium">
+                          <p className="text-[10px] text-stone-500 mt-1 font-medium">
                             {lang === 'bn' 
                               ? `ভারী বৃষ্টির সম্ভাবনা: ${weather.heavyRainRisk ?? 10}%`
                               : `Heavy Rain Risk: ${weather.heavyRainRisk ?? 10}%`}
@@ -997,15 +1114,20 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             </motion.div>
           </div>
 
-        {/* Integrated Proactive Spray Schedule & Calendar */}
-        <div className="mt-8 w-full">
-          <CropLifecycleCalendar 
-            lang={lang} 
-            weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
-          />
-        </div>
-      </div>
+          {/* Integrated Proactive Spray Schedule & Calendar */}
+          <div className="mt-4 w-full">
+            <CropLifecycleCalendar 
+              lang={lang} 
+              weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
+            />
+          </div>
+        </motion.div>
       )}
+    </AnimatePresence>
+  </div>
+)}
+</div>
+)}
     </motion.div>
   );
 }

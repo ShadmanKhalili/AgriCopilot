@@ -46,7 +46,7 @@ export default function RegionModal({
       setIsDetecting(false);
       onClose();
     } catch (err: any) {
-      console.error('GPS detect error in modal', err);
+      console.warn('GPS detect notice in modal:', err?.message || err);
       setDetectError(lang === 'bn' ? 'জিপিএস অবস্থান পাওয়া যায়নি। তালিকা থেকে উপজেলা নির্বাচন করুন।' : 'Could not detect GPS. Please select your Upazila from the list.');
       setIsDetecting(false);
     }

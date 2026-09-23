@@ -4,6 +4,8 @@ export interface DetectedCoordinates {
   accuracy?: number;
   isFallback?: boolean;
   isWithinBangladesh?: boolean;
+  permissionDenied?: boolean;
+  source?: 'gps_high' | 'gps_standard' | 'ip_fallback' | 'default_hub';
 }
 
 // Bangladesh bounding box: 20.5° N - 26.8° N, 88.0° E - 92.8° E
@@ -34,11 +36,12 @@ export async function getFallbackLocation(): Promise<DetectedCoordinates> {
         longitude: withinBd ? lon : BD_BOUNDS.defaultLng,
         accuracy: data.accuracy || 1000,
         isFallback: true,
-        isWithinBangladesh: withinBd
+        isWithinBangladesh: withinBd,
+        source: 'ip_fallback'
       };
     }
   } catch (error) {
-    console.warn("Fallback IP location failed, using Dhaka center:", error);
+    console.warn("Fallback IP location notice, using central agro-hub:", error);
   }
 
   return {
@@ -46,75 +49,129 @@ export async function getFallbackLocation(): Promise<DetectedCoordinates> {
     longitude: BD_BOUNDS.defaultLng,
     accuracy: 5000,
     isFallback: true,
-    isWithinBangladesh: true
+    isWithinBangladesh: true,
+    source: 'default_hub'
   };
 }
 
-export function detectUserLocation(): Promise<DetectedCoordinates> {
+export interface DetectLocationOptions {
+  allowFallback?: boolean;
+  timeout?: number;
+}
+
+export function detectUserLocation(options: DetectLocationOptions = { allowFallback: true, timeout: 8000 }): Promise<DetectedCoordinates> {
+  const allowFallback = options.allowFallback !== false;
+  const timeoutMs = options.timeout || 8000;
+
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      getFallbackLocation()
-        .then(resolve)
-        .catch(() => reject(new Error("Geolocation is not supported by your browser or device.")));
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      if (allowFallback) {
+        getFallbackLocation().then(resolve).catch(() => {
+          resolve({
+            latitude: BD_BOUNDS.defaultLat,
+            longitude: BD_BOUNDS.defaultLng,
+            accuracy: 5000,
+            isFallback: true,
+            isWithinBangladesh: true,
+            source: 'default_hub'
+          });
+        });
+      } else {
+        const err = new Error("Geolocation is not supported by this browser or environment.");
+        (err as any).code = 2;
+        reject(err);
+      }
       return;
     }
 
     const sanitizeCoordinates = (
       position: GeolocationPosition, 
-      isFallback = false
+      source: 'gps_high' | 'gps_standard' = 'gps_high'
     ): DetectedCoordinates => {
       let lat = position.coords.latitude;
       let lon = position.coords.longitude;
       const acc = position.coords.accuracy;
       const withinBd = isInsideBangladesh(lat, lon);
 
-      // If user's device/proxy reported coordinates outside Bangladesh,
-      // warn in console but adjust to default Dhaka agro-center if wildly displaced
       if (!withinBd) {
-        console.warn(`Detected GPS coordinates (${lat}, ${lon}) outside Bangladesh boundary. Snapping to Bangladesh central hub for agricultural accuracy.`);
+        console.warn(`Detected GPS coordinates (${lat}, ${lon}) outside Bangladesh boundary. Snapping to central agro-hub.`);
       }
 
       return {
         latitude: withinBd ? lat : BD_BOUNDS.defaultLat,
         longitude: withinBd ? lon : BD_BOUNDS.defaultLng,
         accuracy: Math.round(acc),
-        isFallback,
-        isWithinBangladesh: withinBd
+        isFallback: !withinBd,
+        isWithinBangladesh: withinBd,
+        source
       };
     };
 
-    // Step 1: Try High-Accuracy Hardware GPS (critical for live crop field / farm positioning)
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve(sanitizeCoordinates(position, false));
-      },
-      (highAccError) => {
-        console.warn("High-accuracy GPS attempt failed (code: " + highAccError.code + "), trying standard accuracy...", highAccError.message);
-        
-        // If user explicitly denied browser permission, do not try coarse location; propagate error
-        if (highAccError.code === 1 /* PERMISSION_DENIED */) {
-          reject(highAccError);
-          return;
-        }
+    const handleFailure = (geoError: any, isDenied: boolean) => {
+      const errorMsg = geoError?.message || (isDenied ? "Permission denied" : "Location unavailable");
+      console.info("GPS detection note:", errorMsg);
 
-        // Step 2: Try standard accuracy with a reasonable timeout
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            resolve(sanitizeCoordinates(position, false));
-          },
-          (standardError) => {
-            console.warn("Standard HTML5 Geolocation failed (code: " + standardError.code + "), attempting fallback IP location...", standardError.message);
-            getFallbackLocation()
-              .then(resolve)
-              .catch(() => {
-                reject(standardError);
-              });
-          },
-          { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      if (allowFallback) {
+        getFallbackLocation()
+          .then((fallbackCoords) => {
+            resolve({
+              ...fallbackCoords,
+              permissionDenied: isDenied
+            });
+          })
+          .catch(() => {
+            resolve({
+              latitude: BD_BOUNDS.defaultLat,
+              longitude: BD_BOUNDS.defaultLng,
+              accuracy: 5000,
+              isFallback: true,
+              isWithinBangladesh: true,
+              permissionDenied: isDenied,
+              source: 'default_hub'
+            });
+          });
+      } else {
+        const standardErr = new Error(errorMsg);
+        (standardErr as any).code = geoError?.code || (isDenied ? 1 : 2);
+        reject(standardErr);
+      }
+    };
+
+    // Step 1: Try High-Accuracy Hardware GPS
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve(sanitizeCoordinates(position, 'gps_high'));
+        },
+        (highAccError) => {
+          const isDenied = highAccError?.code === 1;
+          
+          // If explicitly denied or in restricted iframe, do not wait for second prompt
+          if (isDenied) {
+            handleFailure(highAccError, true);
+            return;
+          }
+
+          // Step 2: Try standard accuracy with short timeout
+          try {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                resolve(sanitizeCoordinates(position, 'gps_standard'));
+              },
+              (standardError) => {
+                handleFailure(standardError, standardError?.code === 1);
+              },
+              { enableHighAccuracy: false, timeout: Math.min(timeoutMs, 5000), maximumAge: 60000 }
+            );
+          } catch (e) {
+            handleFailure(e, false);
+          }
+        },
+        { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
+      );
+    } catch (e) {
+      handleFailure(e, false);
+    }
   });
 }
 

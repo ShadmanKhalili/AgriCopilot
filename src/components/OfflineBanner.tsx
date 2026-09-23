@@ -1,7 +1,7 @@
 import React from 'react';
-import { WifiOff } from 'lucide-react';
+import { WifiOff, Database } from 'lucide-react';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-import { translations, Language } from '../utils/translations';
+import { Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
@@ -10,25 +10,32 @@ interface Props {
 
 export default function OfflineBanner({ lang }: Props) {
   const isOnline = useNetworkStatus();
-  const t = translations[lang];
 
   return (
     <AnimatePresence>
       {!isOnline && (
         <motion.div
-          initial={{ opacity: 0, y: -50 }}
+          initial={{ opacity: 0, y: -40 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -50 }}
-          className="bg-red-500 text-white px-4 py-2 flex items-center justify-center space-x-2 fixed top-0 left-0 right-0 z-50 shadow-md"
+          exit={{ opacity: 0, y: -40 }}
+          className="bg-stone-900 text-stone-100 border-b border-stone-700/80 px-4 py-2 flex flex-wrap items-center justify-center gap-2 fixed top-0 left-0 right-0 z-50 shadow-md backdrop-blur-xs text-xs font-medium"
         >
-          <WifiOff className="w-5 h-5" />
-          <span className="text-sm font-medium">
-            {lang === 'bn' 
-              ? 'আপনি অফলাইনে আছেন। কিছু এআই ফিচার ইন্টারনেট ছাড়া কাজ করবে না। দয়া করে ছবি তুলে রাখুন, নেটওয়ার্ক পেলে পুনরায় চেষ্টা করুন।'
-              : 'You are currently offline. Please take a photo with your camera now, and upload it to AgriCopilot when you return to internet access.'}
-          </span>
+          <div className="flex items-center space-x-1.5 text-amber-400 font-semibold">
+            <WifiOff className="w-4 h-4" />
+            <span>{lang === 'bn' ? 'অফলাইন মোড' : 'Offline Mode'}</span>
+          </div>
+          <span className="hidden sm:inline text-stone-500">•</span>
+          <div className="flex items-center space-x-1.5 text-stone-200">
+            <Database className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>
+              {lang === 'bn' 
+                ? "কক্সবাজার ও স্থানীয় অঞ্চলের সংরক্ষিত আবহাওয়া ও আড়ৎ বাজারদর ক্যাশ থেকে সচল রয়েছে।"
+                : "Preserved Cox's Bazar weather advisory and mandi rates are active from offline cache."}
+            </span>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
+

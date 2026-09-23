@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, History, FileText, Award, Calendar, ChevronRight, UserCircle, TrendingUp, Database, Loader2, HelpCircle, Crown, Sprout, ShieldCheck, Sparkles } from 'lucide-react';
+import { User, History, FileText, Award, Calendar, ChevronRight, ChevronDown, UserCircle, TrendingUp, Database, Loader2, HelpCircle, Crown, Sprout, ShieldCheck, Sparkles } from 'lucide-react';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthProvider';
@@ -11,6 +11,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 import FarmerDossier from './FarmerDossier';
+import { DataStatusCard } from './DataStatusCard';
 
 interface Props {
   lang: Language;
@@ -57,6 +58,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
   const [plantingIntents, setPlantingIntents] = useState<PlantingIntentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [isSyncSettingsOpen, setIsSyncSettingsOpen] = useState(false);
   const t = translations[lang];
 
   const getTierName = () => {
@@ -524,6 +526,42 @@ export default function Profile({ lang, onUpgrade }: Props) {
               </div>
             )}
           </motion.div>
+
+          {/* Technical Data & Device Sync Function (Discreet, Non-intrusive) */}
+          <div className="pt-2">
+            <div className="bg-stone-50/70 dark:bg-stone-900/60 rounded-2xl border border-stone-200/80 dark:border-stone-800/80 overflow-hidden transition-all">
+              <button
+                type="button"
+                onClick={() => setIsSyncSettingsOpen(prev => !prev)}
+                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-stone-100/60 dark:hover:bg-stone-800/40 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 rounded-lg bg-stone-200/60 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
+                    <Database className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-stone-700 dark:text-stone-300 block">
+                      {lang === 'bn' ? 'সিস্টেম ক্যাশ ও অফলাইন মেমরি ফাংশন' : 'System Cache & Offline Storage'}
+                    </span>
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500 block">
+                      {lang === 'bn' ? 'প্রয়োজনে স্থানীয় মেমরি রিফ্রেশ বা ক্যাশ দেখতে ট্যাপ করুন' : 'Tap to view or manage local device storage'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] text-stone-400 font-bold">
+                    {isSyncSettingsOpen ? (lang === 'bn' ? 'বন্ধ করুন' : 'Hide') : (lang === 'bn' ? 'দেখুন' : 'Show')}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform ${isSyncSettingsOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              {isSyncSettingsOpen && (
+                <div className="p-3 pt-0 border-t border-stone-200/50 dark:border-stone-800/50">
+                  <DataStatusCard lang={lang} />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       )}

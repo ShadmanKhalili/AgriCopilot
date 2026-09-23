@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { translations, Language } from '../utils/translations';
-import { Satellite, MapPin, RefreshCw, AlertTriangle, CheckCircle2, Info, Leaf, Cloud, Activity, Navigation } from 'lucide-react';
+import { Satellite, MapPin, RefreshCw, AlertTriangle, CheckCircle2, Info, Leaf, Cloud, Activity, Navigation, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import LocationDisplay from './LocationDisplay';
@@ -23,6 +23,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
   const [ndvi, setNdvi] = useState<number | null>(null);
   const [ndmi, setNdmi] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showSpectralDetails, setShowSpectralDetails] = useState(false);
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
   const activeUpazila = activeDistrict?.upazilas.find(u => u.id === selectedUpazila);
@@ -38,10 +39,10 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
       setGlobalLocation(coords);
       setLoading(false);
     } catch (err: any) {
-      console.error("Location error:", err);
+      console.warn("Location detection notice in SatelliteHealth:", err?.message || err);
       let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (err.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (err.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      if (err?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
+      if (err?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
       setLocationError(msg);
       setError(msg);
       setLoading(false);
@@ -87,22 +88,23 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
     }
   };
 
+  // Disciplined Semantic Color Signals (Emerald, Amber, Rose, Sky)
   const getHealthStatus = (val: number) => {
-    if (val > 0.6) return { label: t.healthLevels.healthy, color: '#22c55e', icon: CheckCircle2, insight: t.insightHealthy };
-    if (val > 0.3) return { label: t.healthLevels.stressed, color: '#eab308', icon: AlertTriangle, insight: t.insightStressed };
-    if (val > 0.1) return { label: t.healthLevels.sparse, color: '#f97316', icon: Info, insight: t.insightSparse };
-    return { label: t.healthLevels.water, color: '#3b82f6', icon: Satellite, insight: t.insightWater };
+    if (val > 0.6) return { label: t.healthLevels.healthy, color: '#16a34a', bgClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2, insight: t.insightHealthy };
+    if (val > 0.3) return { label: t.healthLevels.stressed, color: '#d97706', bgClass: 'bg-amber-50 text-amber-700 border-amber-200', icon: AlertTriangle, insight: t.insightStressed };
+    if (val > 0.1) return { label: t.healthLevels.sparse, color: '#e11d48', bgClass: 'bg-rose-50 text-rose-700 border-rose-200', icon: Info, insight: t.insightSparse };
+    return { label: t.healthLevels.water, color: '#0284c7', bgClass: 'bg-sky-50 text-sky-700 border-sky-200', icon: Satellite, insight: t.insightWater };
   };
 
   const getMoistureStatus = (val: number) => {
-    if (val > 0.4) return { label: t.moistureLevels.high, color: '#3b82f6', insight: t.insightMoistureHigh };
-    if (val > 0.0) return { label: t.moistureLevels.good, color: '#22c55e', insight: t.insightMoistureGood };
-    if (val > -0.2) return { label: t.moistureLevels.low, color: '#eab308', insight: t.insightMoistureLow };
-    return { label: t.moistureLevels.drought, color: '#ef4444', insight: t.insightMoistureDrought };
+    if (val > 0.4) return { label: t.moistureLevels.high, color: '#0284c7', bgClass: 'bg-sky-50 text-sky-700 border-sky-200', insight: t.insightMoistureHigh };
+    if (val > 0.0) return { label: t.moistureLevels.good, color: '#16a34a', bgClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', insight: t.insightMoistureGood };
+    if (val > -0.2) return { label: t.moistureLevels.low, color: '#d97706', bgClass: 'bg-amber-50 text-amber-700 border-amber-200', insight: t.insightMoistureLow };
+    return { label: t.moistureLevels.drought, color: '#e11d48', bgClass: 'bg-rose-50 text-rose-700 border-rose-200', insight: t.insightMoistureDrought };
   };
 
   const chartData = ndvi !== null ? [
-    { value: (ndvi + 1) / 2 }, // Normalize -1..1 to 0..1
+    { value: (ndvi + 1) / 2 },
     { value: 1 - (ndvi + 1) / 2 }
   ] : [];
 
@@ -115,13 +117,13 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: { staggerChildren: 0.1 }
+      transition: { staggerChildren: 0.08 }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
+    hidden: { opacity: 0, y: 12 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.25 } }
   };
 
   return (
@@ -129,358 +131,431 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="space-y-4 md:space-y-6"
+      className="space-y-5"
     >
-      <motion.div variants={itemVariants} className="bg-white rounded-[24px] md:rounded-[32px] p-4 md:p-6 shadow-xl shadow-indigo-900/5 border border-indigo-100 mb-4 md:mb-6">
+      {/* Top Banner Header: Stone & Forest restrained palette */}
+      <motion.div variants={itemVariants} className="bg-white dark:bg-stone-900 rounded-2xl p-4 sm:p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-3 md:space-x-4">
-            <div className="bg-indigo-50 p-2 md:p-3 rounded-xl flex-shrink-0">
-              <Satellite className="w-6 h-6 md:w-7 h-7 text-indigo-600" />
+          <div className="flex items-center space-x-3">
+            <div className="bg-stone-100 dark:bg-stone-800 p-2.5 rounded-xl text-stone-700 dark:text-stone-300 shrink-0">
+              <Satellite className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
             </div>
             <div>
-              <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.cropHealth}</h2>
-              <p className="text-gray-500 text-[10px] md:text-sm font-medium leading-relaxed">{t.cropHealthDesc}</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight leading-tight">{t.cropHealth}</h2>
+              <p className="text-stone-500 dark:text-stone-400 text-xs sm:text-sm font-normal">{t.cropHealthDesc}</p>
             </div>
           </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/80 border border-indigo-200/60 rounded-xl text-indigo-700 text-xs font-semibold self-start sm:self-auto">
-            <Activity className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও কৃষি বিশ্লেষণ' : 'Live Satellite & Crop Analysis'}</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-semibold self-start sm:self-auto">
+            <span className="recording-dot shrink-0" />
+            <span>Sentinel-2 Multispectral (10m)</span>
           </div>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Location Card */}
-        <motion.div 
-          variants={itemVariants}
-          className="bg-white border border-indigo-100 shadow-xl shadow-indigo-50/50 rounded-2xl md:rounded-3xl p-4 sm:p-5 md:p-6 lg:col-span-1 h-fit relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50 group-hover:opacity-80 transition-opacity"></div>
-          
-          <div className="flex items-center justify-between mb-4 sm:mb-6 relative z-10">
-            <h3 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2.5">
-              <MapPin className="w-6 h-6 text-indigo-500" />
-              {t.location}
-            </h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setIsManualLocation(!isManualLocation)}
-                className={`p-2 sm:p-2.5 rounded-xl sm:rounded-2xl transition-colors border ${
-                  isManualLocation 
-                    ? 'bg-amber-50 border-amber-200 text-amber-700' 
-                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-                title={isManualLocation ? "Use GPS" : "Set Manually"}
-              >
-                <Navigation className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-              <button
-                onClick={detectLocation}
-                disabled={loading}
-                className="p-2 sm:p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl sm:rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
-              >
-                <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {isManualLocation && (
-            <div className="mb-4 sm:mb-6 relative z-10 flex flex-col gap-2.5">
-              <select
-                value={selectedDistrict}
-                onChange={(e) => {
-                  setSelectedDistrict(e.target.value);
-                  const newDistrict = geoData.find(d => d.id === e.target.value);
-                  if (newDistrict && newDistrict.upazilas.length > 0) {
-                    handleManualLocationChange(newDistrict.upazilas[0].id);
-                  } else {
-                    setSelectedUpazila('');
-                  }
-                }}
-                className="w-full bg-white border-2 border-indigo-100 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 text-sm sm:text-base font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/20 outline-none shadow-sm"
-              >
-                {geoData.map(d => (
-                  <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
-                ))}
-              </select>
-              <select
-                value={selectedUpazila}
-                onChange={(e) => handleManualLocationChange(e.target.value)}
-                className="w-full bg-white border-2 border-indigo-100 rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 text-sm sm:text-base font-bold text-gray-900 focus:ring-4 focus:ring-indigo-500/20 outline-none shadow-sm"
-                disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
-              >
-                {activeDistrict?.upazilas.map(u => (
-                  <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {globalLocation ? (
-            <div className="space-y-4 sm:space-y-5 relative z-10">
-              <LocationDisplay coords={{ latitude: globalLocation.latitude, longitude: globalLocation.longitude }} lang={lang} color="indigo" />
-              <button
-                onClick={fetchNdvi}
-                disabled={loading}
-                className="relative w-full py-3.5 sm:py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-xl sm:rounded-2xl font-black text-sm sm:text-base transition-all shadow-lg shadow-indigo-200 flex items-center justify-center gap-2.5 overflow-hidden group cursor-pointer"
-              >
-                {loading ? (
-                  <>
-                    <Activity className="w-5 h-5 animate-pulse" />
-                    <span className="animate-pulse">{t.tooltips.detecting}</span>
-                    <div className="absolute inset-0 bg-white/20 w-full h-full animate-[scan_2s_ease-in-out_infinite]" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 10%, 0 10%)' }} />
-                  </>
-                ) : (
-                  <>
-                    <Satellite className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    {t.fetchSatelliteData}
-                  </>
-                )}
-              </button>
-            </div>
-          ) : (
-            <div className="text-center py-8 sm:py-10 relative z-10">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
-                <MapPin className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-400" />
+      {/* Control / Location Trigger Card */}
+      <motion.div 
+        variants={itemVariants}
+        className="bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-2xl p-4 sm:p-5 shadow-xs"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">{t.location}</span>
               </div>
-              <p className="text-gray-500 font-bold text-sm sm:text-base mb-6 max-w-[200px] mx-auto">{t.detectPrompt}</p>
-              <button
-                onClick={detectLocation}
-                className="px-6 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-all font-black uppercase tracking-wider text-xs border border-indigo-100 shadow-sm cursor-pointer"
-              >
-                {t.tooltips.detectLocation}
-              </button>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Health Status Card */}
-        <motion.div 
-          variants={itemVariants}
-          className="bg-white border border-indigo-100 shadow-xl shadow-indigo-50/50 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 relative overflow-hidden lg:col-span-2 min-h-[300px]"
-        >
-          <h3 className="text-xl sm:text-2xl font-black text-gray-900 mb-4 sm:mb-6 flex items-center gap-2.5">
-            <CheckCircle2 className="w-6 h-6 text-green-500" />
-            {t.satelliteInsights}
-          </h3>
-
-          {loading ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm z-10 rounded-2xl md:rounded-3xl">
-              <div className="relative w-24 h-24 mb-4">
-                <div className="absolute inset-0 border-4 border-indigo-100 rounded-full animate-ping" />
-                <div className="absolute inset-2 border-4 border-indigo-500 rounded-full animate-spin" style={{ animationDuration: '3s', borderTopColor: 'transparent' }} />
-                <Satellite className="absolute inset-0 m-auto w-10 h-10 text-indigo-600 animate-pulse" />
-              </div>
-              <p className="text-indigo-600 font-black animate-pulse tracking-widest uppercase text-xs sm:text-sm">{t.tooltips.detecting}</p>
-            </div>
-          ) : ndvi !== null && ndmi !== null ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              {/* NDVI Section */}
-              <motion.div 
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="flex flex-col items-center justify-center bg-gray-50/80 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-inner"
-              >
-                <div className="w-full h-40 sm:h-44 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="100%"
-                        startAngle={180}
-                        endAngle={0}
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={0}
-                        dataKey="value"
-                        animationDuration={1500}
-                        animationBegin={200}
-                      >
-                        <Cell fill={getHealthStatus(ndvi).color} />
-                        <Cell fill="#e5e7eb" />
-                        <Label
-                          value={`${ndvi.toFixed(2)}`}
-                          position="centerBottom"
-                          className="fill-gray-900 text-3xl sm:text-4xl font-black"
-                          dy={-15}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                <div className="mt-4 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    {React.createElement(getHealthStatus(ndvi).icon, {
-                      className: `w-5 h-5`,
-                      style: { color: getHealthStatus(ndvi).color }
-                    })}
-                    <span className="text-lg sm:text-xl font-black text-gray-900">
-                      {getHealthStatus(ndvi).label}
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{t.ndviValue}</p>
-                </div>
-              </motion.div>
-
-              {/* NDMI Section */}
-              <motion.div 
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="flex flex-col items-center justify-center bg-gray-50/80 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-inner"
-              >
-                <div className="w-full h-40 sm:h-44 relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={moistureChartData}
-                        cx="50%"
-                        cy="100%"
-                        startAngle={180}
-                        endAngle={0}
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={0}
-                        dataKey="value"
-                        animationDuration={1500}
-                        animationBegin={400}
-                      >
-                        <Cell fill={getMoistureStatus(ndmi).color} />
-                        <Cell fill="#e5e7eb" />
-                        <Label
-                          value={`${ndmi.toFixed(2)}`}
-                          position="centerBottom"
-                          className="fill-gray-900 text-3xl sm:text-4xl font-black"
-                          dy={-15}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                
-                <div className="mt-4 text-center">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Cloud className="w-5 h-5" style={{ color: getMoistureStatus(ndmi).color }} />
-                    <span className="text-lg sm:text-xl font-black text-gray-900">
-                      {getMoistureStatus(ndmi).label}
-                    </span>
-                  </div>
-                  <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">Moisture Index (NDMI)</p>
-                </div>
-              </motion.div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-12 sm:py-16">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-4">
-                <Satellite className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-300" />
-              </div>
-              <p className="text-gray-400 text-base sm:text-lg font-bold">{t.noDataYet}</p>
-            </div>
-          )}
-
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="absolute inset-0 bg-white/95 backdrop-blur-md flex items-center justify-center p-6 text-center z-20 rounded-2xl md:rounded-3xl"
-            >
-              <div className="space-y-4 max-w-md">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
-                  <AlertTriangle className="w-8 h-8 text-red-500" />
-                </div>
-                <p className="text-gray-900 font-black text-lg sm:text-xl">{error}</p>
-                <button 
-                  onClick={() => setError(null)}
-                  className="px-6 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-colors font-bold text-sm"
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setIsManualLocation(!isManualLocation)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
+                    isManualLocation 
+                      ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
+                  }`}
+                  title={isManualLocation ? "Use GPS" : "Set Manually"}
                 >
-                  {t.dismiss}
+                  <span className="flex items-center gap-1">
+                    <Navigation className="w-3 h-3" />
+                    <span>{isManualLocation ? 'GPS' : (lang === 'bn' ? 'জেলা নির্বাচন' : 'Manual')}</span>
+                  </span>
+                </button>
+                <button
+                  onClick={detectLocation}
+                  disabled={loading}
+                  className="p-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 dark:text-stone-300 rounded-lg transition-colors disabled:opacity-50"
+                  title="Refresh GPS"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
-            </motion.div>
-          )}
-        </motion.div>
-      </div>
-
-      {/* Actionable Insights Section */}
-      <AnimatePresence>
-        {ndvi !== null && ndmi !== null && !loading && (
-          <motion.div
-            variants={itemVariants}
-            initial="hidden"
-            animate="show"
-            exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-            className="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-700 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 relative overflow-hidden shadow-xl shadow-indigo-200"
-          >
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-            
-            <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white mb-4 sm:mb-6 flex items-center gap-3 relative z-10 tracking-tight">
-              <div className="p-2 sm:p-2.5 bg-white/20 rounded-xl sm:rounded-2xl backdrop-blur-md">
-                <Leaf className="w-5 h-5 sm:w-6 sm:h-6 text-green-300" />
-              </div>
-              {t.actionableInsights}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 relative z-10">
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
-                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-300" /> 
-                  {t.cropHealthTitle || "Crop Health (NDVI)"}
-                </h4>
-                <p className="text-white leading-relaxed text-sm sm:text-base font-medium">
-                  {getHealthStatus(ndvi).insight}
-                </p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-white/20 hover:bg-white/20 transition-colors shadow-inner">
-                <h4 className="text-indigo-100 font-black uppercase tracking-widest text-[10px] flex items-center gap-2 mb-2">
-                  <Cloud className="w-4 h-4 text-blue-300" /> 
-                  {t.moistureTitle || "Soil & Canopy Moisture (NDMI)"}
-                </h4>
-                <p className="text-white leading-relaxed text-sm sm:text-base font-medium">
-                  {getMoistureStatus(ndmi).insight}
-                </p>
-              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Info Section */}
-      <motion.div
-        variants={itemVariants}
-        className="bg-white border border-gray-100 shadow-xl shadow-gray-100/50 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 flex flex-col lg:flex-row gap-6 lg:gap-8"
-      >
-        <div className="flex items-start gap-4 lg:w-1/2">
-          <div className="p-3 sm:p-4 bg-indigo-50 rounded-2xl shrink-0 shadow-inner">
-            <Info className="w-6 h-6 text-indigo-500" />
+            {isManualLocation && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => {
+                    setSelectedDistrict(e.target.value);
+                    const newDistrict = geoData.find(d => d.id === e.target.value);
+                    if (newDistrict && newDistrict.upazilas.length > 0) {
+                      handleManualLocationChange(newDistrict.upazilas[0].id);
+                    } else {
+                      setSelectedUpazila('');
+                    }
+                  }}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 outline-none focus:border-emerald-600"
+                >
+                  {geoData.map(d => (
+                    <option key={d.id} value={d.id}>{lang === 'bn' ? d.bn_name : d.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedUpazila}
+                  onChange={(e) => handleManualLocationChange(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 outline-none focus:border-emerald-600"
+                  disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+                >
+                  {activeDistrict?.upazilas.map(u => (
+                    <option key={u.id} value={u.id}>{lang === 'bn' ? u.bn_name : u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {globalLocation && (
+              <div className="mt-2">
+                <LocationDisplay coords={{ latitude: globalLocation.latitude, longitude: globalLocation.longitude }} lang={lang} color="emerald" />
+              </div>
+            )}
+          </div>
+
+          <div className="sm:w-64">
+            <button
+              onClick={fetchNdvi}
+              disabled={loading || !globalLocation}
+              className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>{t.tooltips.detecting}</span>
+                </>
+              ) : (
+                <>
+                  <Satellite className="w-4 h-4" />
+                  <span>{t.fetchSatelliteData}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Loading state: Calm spinner without animate-ping */}
+      {loading && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="bg-white dark:bg-stone-900 p-8 rounded-2xl border border-stone-200/80 dark:border-stone-800 text-center space-y-3"
+        >
+          <div className="w-10 h-10 mx-auto rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" />
+          <p className="text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+            {lang === 'bn' ? 'স্যাটেলাইট স্পেকট্রাল ব্যান্ড প্রসেস করা হচ্ছে...' : 'Ingesting Sentinel-2 MSI bands...'}
+          </p>
+          <p className="text-[11px] text-stone-400 font-normal">
+            {lang === 'bn' ? '১০ মিটার রেজোলিউশনে উদ্ভিদের ক্লোরোফিল ও ক্যানোপির আর্দ্রতা পরিমাপ' : 'Calculating surface reflectance (NIR / Red / SWIR) for selected coordinates'}
+          </p>
+        </motion.div>
+      )}
+
+      {/* Error Card */}
+      {error && !loading && (
+        <motion.div 
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-2"
+        >
+          <div className="flex items-center justify-center gap-2 text-rose-700 font-bold text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button 
+            onClick={() => setError(null)}
+            className="text-xs font-bold text-rose-600 hover:text-rose-800 underline"
+          >
+            {t.dismiss}
+          </button>
+        </motion.div>
+      )}
+
+      {/* Top 3 Actionable Farmer Outcomes (Vigor, Moisture, Field Scouting) */}
+      {ndvi !== null && ndmi !== null && !loading && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* 1. Canopy Vigor */}
+            <motion.div 
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs space-y-2.5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                  {lang === 'bn' ? '১. ক্যানোপি স্বাস্থ্য ও ঘনত্ব' : '1. Canopy Vigor'}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getHealthStatus(ndvi).bgClass}`}>
+                  {getHealthStatus(ndvi).label}
+                </span>
+              </div>
+              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-medium">
+                {getHealthStatus(ndvi).insight}
+              </p>
+              <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
+                <span className="text-[10px] font-medium">NDVI Index</span>
+                <span className="text-xs font-bold text-stone-900 dark:text-stone-100 tabular-nums">{ndvi.toFixed(2)}</span>
+              </div>
+            </motion.div>
+
+            {/* 2. Canopy Moisture */}
+            <motion.div 
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="p-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs space-y-2.5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                  {lang === 'bn' ? '২. আর্দ্রতা ও সেচ পরামর্শ' : '2. Canopy Moisture'}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getMoistureStatus(ndmi).bgClass}`}>
+                  {getMoistureStatus(ndmi).label}
+                </span>
+              </div>
+              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-medium">
+                {getMoistureStatus(ndmi).insight}
+              </p>
+              <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
+                <span className="text-[10px] font-medium">NDMI Index</span>
+                <span className="text-xs font-bold text-stone-900 dark:text-stone-100 tabular-nums">{ndmi.toFixed(2)}</span>
+              </div>
+            </motion.div>
+
+            {/* 3. Field Scouting Action */}
+            <motion.div 
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="p-4 bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs space-y-2.5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                  {lang === 'bn' ? '৩. তাত্ক্ষণিক মাঠ অ্যাকশন' : '3. Immediate Field Action'}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  {lang === 'bn' ? 'কার্যকর করণীয়' : 'Actionable'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-medium">
+                {ndvi > 0.6 
+                  ? (lang === 'bn' ? 'ফসল শীর্ষ ভেজিটেটিভ অবস্থায় আছে। আগামী ৭ দিন নাইট্রোজেন সারের অতিরিক্ত প্রয়োগ বন্ধ রেখে ছত্রাক রোগ প্রতিরোধে নজর দিন।' : 'Crop is in prime vegetative vigor. Avoid surplus nitrogen to prevent fungal susceptibility.')
+                  : (lang === 'bn' ? 'মাঠের নিম্ন-ঘনত্ব অংশে ইউরিয়া উপরিপ্রয়োগ বা আগাছা দমন নিশ্চিত করতে সরেজমিনে পরিদর্শন করুন।' : 'Conduct priority field scouting on low-biomass sections to verify root health or weed competition.')}
+              </p>
+              <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
+                <span className="text-[10px] font-medium">Scouting Priority</span>
+                <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
+                  {ndvi > 0.6 ? (lang === 'bn' ? 'স্বাভাবিক পর্যবেক্ষণ' : 'Routine') : (lang === 'bn' ? 'জরুরি পরিদর্শন' : 'High Priority')}
+                </span>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Progressive Disclosure Toggle for Deep Spectral Metrology */}
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setShowSpectralDetails(!showSpectralDetails)}
+              className="w-full flex items-center justify-between p-4 rounded-2xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50/80 transition-all cursor-pointer shadow-xs group text-left"
+            >
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                      {lang === 'bn' ? 'স্পেকট্রাল সূচক ও সেন্সর বিশ্লেষণ' : 'Field Metrology & Spectral Readings'}
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
+                      {lang === 'bn' ? 'এনডিভিআই ও এনডিএমআই ডায়াল' : 'NDVI / NDMI Gauges'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 font-normal truncate">
+                    {lang === 'bn' 
+                      ? '১০মি স্পেকট্রাল রিফ্লেক্ট্যান্স ব্যান্ড এবং বৈজ্ঞানিক শ্রেণীবিভাগ স্কেল' 
+                      : 'Band wavelengths (NIR 842nm, Red 665nm, SWIR 1610nm) & mathematical gauges'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1.5 text-stone-500 group-hover:text-stone-800 dark:group-hover:text-stone-200 shrink-0 ml-3">
+                <span className="text-xs font-semibold hidden sm:inline">
+                  {showSpectralDetails 
+                    ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Metrology') 
+                    : (lang === 'bn' ? 'বিশদ দেখুন' : 'Show Metrology')}
+                </span>
+                {showSpectralDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </div>
+            </button>
+
+            <AnimatePresence>
+              {showSpectralDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="overflow-hidden space-y-4 pt-1"
+                >
+                  {/* Half-doughnut dials */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* NDVI Dial */}
+                    <div className="flex flex-col items-center justify-center bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs">
+                      <div className="w-full h-36 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={chartData}
+                              cx="50%"
+                              cy="100%"
+                              startAngle={180}
+                              endAngle={0}
+                              innerRadius={55}
+                              outerRadius={75}
+                              paddingAngle={0}
+                              dataKey="value"
+                            >
+                              <Cell fill={getHealthStatus(ndvi).color} />
+                              <Cell fill="#e7e5e4" />
+                              <Label
+                                value={`${ndvi.toFixed(2)}`}
+                                position="centerBottom"
+                                className="fill-stone-900 dark:fill-stone-100 text-3xl font-bold tabular-nums"
+                                dy={-12}
+                              />
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                          {React.createElement(getHealthStatus(ndvi).icon, {
+                            className: `w-4 h-4`,
+                            style: { color: getHealthStatus(ndvi).color }
+                          })}
+                          <span className="text-base font-bold text-stone-900 dark:text-stone-100">
+                            {getHealthStatus(ndvi).label}
+                          </span>
+                        </div>
+                        <p className="text-stone-400 text-[10px] font-semibold uppercase tracking-wider">{t.ndviValue} (NIR - Red)/(NIR + Red)</p>
+                      </div>
+                    </div>
+
+                    {/* NDMI Dial */}
+                    <div className="flex flex-col items-center justify-center bg-white dark:bg-stone-900 rounded-2xl p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs">
+                      <div className="w-full h-36 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={moistureChartData}
+                              cx="50%"
+                              cy="100%"
+                              startAngle={180}
+                              endAngle={0}
+                              innerRadius={55}
+                              outerRadius={75}
+                              paddingAngle={0}
+                              dataKey="value"
+                            >
+                              <Cell fill={getMoistureStatus(ndmi).color} />
+                              <Cell fill="#e7e5e4" />
+                              <Label
+                                value={`${ndmi.toFixed(2)}`}
+                                position="centerBottom"
+                                className="fill-stone-900 dark:fill-stone-100 text-3xl font-bold tabular-nums"
+                                dy={-12}
+                              />
+                            </Pie>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+                          <Cloud className="w-4 h-4" style={{ color: getMoistureStatus(ndmi).color }} />
+                          <span className="text-base font-bold text-stone-900 dark:text-stone-100">
+                            {getMoistureStatus(ndmi).label}
+                          </span>
+                        </div>
+                        <p className="text-stone-400 text-[10px] font-semibold uppercase tracking-wider">Moisture Index (NIR - SWIR)/(NIR + SWIR)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scientific scale info */}
+                  <div className="bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row gap-5 shadow-xs">
+                    <div className="lg:w-1/2 flex items-start gap-3">
+                      <div className="p-2.5 bg-stone-100 dark:bg-stone-800 rounded-xl text-stone-700 shrink-0">
+                        <Info className="w-4 h-4 text-emerald-700" />
+                      </div>
+                      <div>
+                        <h4 className="text-stone-900 dark:text-stone-100 font-bold text-sm mb-1">{t.whatIsNdvi}</h4>
+                        <p className="text-xs text-stone-500 leading-relaxed font-normal">
+                          {t.ndviExplanation}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="lg:w-1/2 grid grid-cols-2 gap-2 border-t lg:border-t-0 lg:border-l border-stone-100 dark:border-stone-800 pt-3 lg:pt-0 lg:pl-5">
+                      <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/60 p-2 rounded-xl">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" /> 
+                        <span className="text-[11px] font-bold text-stone-800 dark:text-stone-200">0.6 - 1.0: <span className="text-stone-500 font-normal">{t.veryHealthy}</span></span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/60 p-2 rounded-xl">
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" /> 
+                        <span className="text-[11px] font-bold text-stone-800 dark:text-stone-200">0.3 - 0.6: <span className="text-stone-500 font-normal">{t.healthLevels.stressed.split(' ')[0]}</span></span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/60 p-2 rounded-xl">
+                        <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" /> 
+                        <span className="text-[11px] font-bold text-stone-800 dark:text-stone-200">0.1 - 0.3: <span className="text-stone-500 font-normal">{t.healthLevels.sparse.split(' ')[0]}</span></span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/60 p-2 rounded-xl">
+                        <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" /> 
+                        <span className="text-[11px] font-bold text-stone-800 dark:text-stone-200">&lt; 0.1: <span className="text-stone-500 font-normal">{t.nonVegetated}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State before fetching */}
+      {ndvi === null && !loading && (
+        <div className="bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-800 rounded-2xl p-8 text-center space-y-3 shadow-xs">
+          <div className="w-12 h-12 bg-stone-100 dark:bg-stone-800 rounded-2xl flex items-center justify-center mx-auto text-stone-500">
+            <Satellite className="w-6 h-6 text-emerald-700" />
           </div>
           <div>
-            <h4 className="text-gray-900 font-black text-lg sm:text-xl mb-1.5 tracking-tight">{t.whatIsNdvi}</h4>
-            <p className="text-xs sm:text-sm text-gray-500 leading-relaxed font-medium">
-              {t.ndviExplanation}
+            <h3 className="text-sm font-bold text-stone-800 dark:text-stone-200">
+              {lang === 'bn' ? 'স্যাটেলাইট মনিটরিং শুরু করতে ডেটা আনুন' : 'Ready to ingest Sentinel-2 Multispectral Feed'}
+            </h3>
+            <p className="text-xs text-stone-500 max-w-sm mx-auto mt-1">
+              {lang === 'bn' 
+                ? 'উপরের "স্যাটেলাইট ডেটা আনুন" বাটনে চাপ দিয়ে সরাসরি আপনার জমির ফসলের সতেজতা ও আর্দ্রতা বিশ্লেষণ দেখুন।'
+                : 'Tap "Fetch Satellite Data" above to receive instantaneous canopy vigor and soil moisture indices.'}
             </p>
           </div>
         </div>
-        
-        <div className="lg:w-1/2 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 border-t lg:border-t-0 lg:border-l border-gray-100 pt-4 lg:pt-0 lg:pl-8">
-          <div className="flex items-center gap-2.5 bg-gray-50 p-2.5 sm:p-3 rounded-xl">
-            <div className="w-3.5 h-3.5 rounded-full bg-green-500 shrink-0" /> 
-            <span className="text-xs sm:text-sm font-bold text-gray-900">0.6 - 1.0: <span className="text-gray-500 font-normal">{t.veryHealthy}</span></span>
-          </div>
-          <div className="flex items-center gap-2.5 bg-gray-50 p-2.5 sm:p-3 rounded-xl">
-            <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shrink-0" /> 
-            <span className="text-xs sm:text-sm font-bold text-gray-900">0.3 - 0.6: <span className="text-gray-500 font-normal">{t.healthLevels.stressed.split(' ')[0]}</span></span>
-          </div>
-          <div className="flex items-center gap-2.5 bg-gray-50 p-2.5 sm:p-3 rounded-xl">
-            <div className="w-3.5 h-3.5 rounded-full bg-orange-500 shrink-0" /> 
-            <span className="text-xs sm:text-sm font-bold text-gray-900">0.1 - 0.3: <span className="text-gray-500 font-normal">{t.healthLevels.sparse.split(' ')[0]}</span></span>
-          </div>
-          <div className="flex items-center gap-2.5 bg-gray-50 p-2.5 sm:p-3 rounded-xl">
-            <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shrink-0" /> 
-            <span className="text-xs sm:text-sm font-bold text-gray-900">&lt; 0.1: <span className="text-gray-500 font-normal">{t.nonVegetated}</span></span>
-          </div>
-        </div>
-      </motion.div>
+      )}
     </motion.div>
   );
 };

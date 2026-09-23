@@ -8,6 +8,8 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
+import { AgriCurrency } from '../utils/currency';
+import { TactileStepper } from './TactileStepper';
 
 interface CropBenchmark {
   nameBn: string;
@@ -290,56 +292,54 @@ ${tenureNote}
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
       {/* Top Banner */}
-      <div className="bg-gradient-to-br from-emerald-800 via-teal-900 to-green-950 rounded-[2.5rem] p-6 md:p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center space-x-2 bg-emerald-500/20 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-mono text-emerald-300">
+      <div className="bg-emerald-950 dark:bg-stone-900 rounded-2xl p-5 md:p-7 text-white relative overflow-hidden border border-emerald-900 dark:border-stone-800 shadow-xs">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center space-x-1.5 text-xs font-mono text-emerald-300">
               <Coins className="w-3.5 h-3.5" />
               <span>{lang === 'bn' ? 'অর্থনৈতিক হিসাব ও মধ্যস্বত্বভোগী সুরক্ষা' : 'Farm Financial Intelligence & Fair Pricing'}</span>
             </div>
-            <h1 className="text-2xl md:text-4xl font-black tracking-tight">
+            <h1 className="text-xl md:text-3xl font-black tracking-tight">
               {lang === 'bn' ? 'ফসল উৎপাদন খরচ ও লাভ ক্যালকুলেটর' : 'Krishi Profit & Break-Even Calculator'}
             </h1>
-            <p className="text-emerald-100/80 text-sm max-w-2xl leading-relaxed">
+            <p className="text-emerald-200/80 text-xs md:text-sm max-w-2xl leading-relaxed">
               {lang === 'bn' 
                 ? 'চাষ শুরুর আগেই জানুন প্রতি মণ ফসলে আপনার প্রকৃত খরচ কত হবে। মধ্যস্বত্বভোগী বা ফড়িয়াদের কাছে লোকসানে বিক্রি থেকে বাঁচুন।'
                 : 'Calculate exact per-maund production cost, projected revenue, and break-even price to negotiate profitably with traders.'}
             </p>
           </div>
 
-          <div className="flex items-center space-x-3 self-start md:self-auto">
+          <div className="flex items-center space-x-2.5 self-start md:self-auto shrink-0">
             <button
               onClick={copySummarySlip}
-              className="flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black px-4 py-2.5 rounded-2xl text-xs transition-all active:scale-95 shadow-lg shadow-emerald-500/20 cursor-pointer"
+              className="flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold px-3.5 py-2 rounded-xl text-xs transition-colors cursor-pointer"
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="w-3.5 h-3.5" />
               <span>{lang === 'bn' ? 'হিসাব বিবরণী কপি করুন' : 'Copy Statement'}</span>
             </button>
             <button
               onClick={resetToDefaults}
               title={lang === 'bn' ? 'আদর্শ খরচে পুনর্বহাল' : 'Reset to defaults'}
-              className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all cursor-pointer border border-white/10"
+              className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors cursor-pointer border border-white/10"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Control Panel: Crop & Land Size */}
-      <div className="bg-white rounded-[2rem] p-5 md:p-7 border border-emerald-100 shadow-xl shadow-emerald-900/5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="bg-white dark:bg-stone-900 rounded-2xl p-5 md:p-6 border border-stone-200/80 dark:border-stone-800 shadow-xs space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Crop Selector */}
-          <div className="space-y-2">
-            <label className="block text-xs font-black text-gray-700 uppercase tracking-wider">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-stone-700 dark:text-stone-300">
               {lang === 'bn' ? '১. ফসল নির্বাচন করুন' : '1. Select Crop'}
             </label>
             <select
               value={selectedCrop}
               onChange={(e) => handleCropChange(e.target.value)}
-              className="w-full bg-emerald-50/50 border-2 border-emerald-200/80 rounded-2xl px-4 py-3 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
+              className="w-full bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none cursor-pointer"
             >
               {Object.entries(CROP_BENCHMARKS).map(([key, crop]) => (
                 <option key={key} value={key}>
@@ -350,23 +350,29 @@ ${tenureNote}
           </div>
 
           {/* Land Size & Unit */}
-          <div className="space-y-2">
-            <label className="block text-xs font-black text-gray-700 uppercase tracking-wider">
-              {lang === 'bn' ? '২. জমির পরিমাণ ও একক' : '2. Land Area & Unit'}
-            </label>
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                min="0.1"
-                step="0.5"
-                value={landSize || ''}
-                onChange={(e) => setLandSize(Math.max(0.1, parseFloat(e.target.value) || 0))}
-                className="w-full bg-emerald-50/50 border-2 border-emerald-200/80 rounded-2xl px-4 py-3 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300">
+                {lang === 'bn' ? '২. জমির পরিমাণ ও একক' : '2. Land Area & Unit'}
+              </label>
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 tabular-nums">
+                ≈ {normalizedDecimals.toFixed(1)} {lang === 'bn' ? 'শতাংশ' : 'Dec'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <TactileStepper
+                value={landSize}
+                onChange={(val) => setLandSize(Math.max(0.1, val))}
+                min={0.1}
+                max={500}
+                step={landUnit === 'bigha' || landUnit === 'acre' ? 0.5 : 1}
+                precision={landUnit === 'bigha' || landUnit === 'acre' ? 1 : 0}
+                className="flex-1"
               />
               <select
                 value={landUnit}
                 onChange={(e: any) => setLandUnit(e.target.value)}
-                className="bg-emerald-100/70 border-2 border-emerald-300/80 rounded-2xl px-3 py-3 text-xs font-black text-emerald-950 outline-none cursor-pointer"
+                className="bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 dark:text-stone-200 outline-none cursor-pointer shrink-0"
               >
                 <option value="bigha">{lang === 'bn' ? 'বিঘা (৩৩ শ.)' : 'Bigha'}</option>
                 <option value="decimal">{lang === 'bn' ? 'শতাংশ' : 'Decimal'}</option>
@@ -374,63 +380,81 @@ ${tenureNote}
                 <option value="katha">{lang === 'bn' ? 'কাঠা' : 'Katha'}</option>
               </select>
             </div>
-            <div className="text-[11px] text-gray-500 font-bold">
-              ≈ {normalizedDecimals.toFixed(1)} {lang === 'bn' ? 'শতাংশ জমি' : 'Decimals'} ({landRatio.toFixed(2)} {lang === 'bn' ? 'বিঘা' : 'Bigha'})
+            {/* Inline Quick Presets (Rank 6) */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <span className="text-[10px] text-stone-400">{lang === 'bn' ? 'দ্রুত:' : 'Quick:'}</span>
+              {[
+                { label: lang === 'bn' ? '১ বিঘা' : '1 Bigha', val: 1, unit: 'bigha' },
+                { label: lang === 'bn' ? '৫০ শতক' : '50 Dec', val: 50, unit: 'decimal' },
+                { label: lang === 'bn' ? '১ একর' : '1 Acre', val: 1, unit: 'acre' },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => { setLandSize(preset.val); setLandUnit(preset.unit as any); }}
+                  className="text-[10px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Estimated Harvest Yield */}
-          <div className="space-y-2">
-            <label className="block text-xs font-black text-gray-700 uppercase tracking-wider flex items-center justify-between">
-              <span>{lang === 'bn' ? '৩. আনুমানিক মোট ফলন' : '3. Expected Harvest'}</span>
-              <span className="text-[10px] text-emerald-700 font-bold">{lang === 'bn' ? '১ মণ = ৪০ কেজি (১৪% আর্দ্রতা মান)' : '1 Mon = 40kg (14% Moisture)'}</span>
-            </label>
-            <div className="relative">
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={totalYieldMon}
-                onChange={(e) => setCustomYieldMon(parseFloat(e.target.value) || 0)}
-                className="w-full bg-emerald-50/50 border-2 border-emerald-200/80 rounded-2xl px-4 py-3 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-              <span className="absolute right-4 top-3.5 text-xs font-black text-gray-500">
-                {lang === 'bn' ? 'মণ' : 'Mon'} ({Math.round(totalYieldMon * 40)} kg)
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300">
+                {lang === 'bn' ? '৩. আনুমানিক মোট ফলন' : '3. Expected Harvest'}
+              </label>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
+                {lang === 'bn' ? '১ মণ = ৪০ কেজি' : '1 Mon = 40kg'}
               </span>
             </div>
-            <div className="text-[11px] text-gray-500 font-medium">
-              {lang === 'bn' ? 'আঞ্চলিক গড় অনুযায়ী প্রাক্কলিত' : 'Estimated by regional harvest baseline'}
+            <div className="flex items-center gap-2">
+              <TactileStepper
+                value={totalYieldMon}
+                onChange={(val) => setCustomYieldMon(Math.max(1, val))}
+                min={1}
+                max={5000}
+                step={5}
+                unit={lang === 'bn' ? 'মণ' : 'Mon'}
+                className="w-full"
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-stone-400">
+              <span>{lang === 'bn' ? 'আঞ্চলিক গড় অনুযায়ী প্রাক্কলিত' : 'Regional average projection'}</span>
+              <span className="font-mono tabular-nums font-medium text-stone-600 dark:text-stone-300">
+                ≈ {Math.round(totalYieldMon * 40).toLocaleString()} kg
+              </span>
             </div>
           </div>
         </div>
 
         {/* Selling Price per Mon */}
-        <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-stone-50/70 dark:bg-stone-800/40 p-4 rounded-xl border border-stone-200/80 dark:border-stone-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-emerald-600 rounded-xl text-white">
-              <DollarSign className="w-5 h-5" />
+            <div className="p-2 bg-emerald-600 rounded-lg text-white">
+              <DollarSign className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-sm font-black text-gray-900">
+              <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
                 {lang === 'bn' ? 'প্রত্যাশিত বাজারদর (প্রতি মণ ৪০ কেজি)' : 'Expected Market Price (per Mon / 40kg)'}
               </h4>
-              <p className="text-xs text-gray-500">
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
                 {lang === 'bn' ? 'আজকের বাজারদরে পরিবর্তন করতে পারেন' : 'Adjust according to current wholesale rate'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="text-base font-black text-emerald-800">৳</span>
-            <input
-              type="number"
-              min="100"
-              step="50"
+            <TactileStepper
               value={pricePerMon}
-              onChange={(e) => setCustomPricePerMon(parseFloat(e.target.value) || 0)}
-              className="w-36 bg-white border-2 border-emerald-300 rounded-xl px-3 py-2 text-base font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+              onChange={(val) => setCustomPricePerMon(Math.max(100, val))}
+              min={100}
+              max={20000}
+              step={50}
+              unit={lang === 'bn' ? '৳/মণ' : '৳/Mon'}
             />
-            <span className="text-xs font-bold text-gray-600">/ {lang === 'bn' ? 'মণ' : 'Mon'}</span>
           </div>
         </div>
       </div>
@@ -447,8 +471,8 @@ ${tenureNote}
             <span className="text-xs font-semibold">{lang === 'bn' ? 'মোট উৎপাদন ব্যয়' : 'Total Expense'}</span>
             <PieChart className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white tabular-nums">
-            ৳ {totalCost.toLocaleString()}
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <AgriCurrency amount={totalCost} />
           </div>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 tabular-nums">
             {lang === 'bn' ? `${normalizedDecimals.toFixed(1)} শতাংশ জমির মোট খরচ` : `For ${normalizedDecimals.toFixed(1)} decimals`}
@@ -465,11 +489,13 @@ ${tenureNote}
             <span className="text-xs font-semibold">{lang === 'bn' ? 'প্রতি মণ উৎপাদন খরচ' : 'Break-Even / Mon'}</span>
             <Scale className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950 dark:text-amber-200 tabular-nums">
-            ৳ {breakEvenCostPerMon.toLocaleString()}
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950 dark:text-amber-200">
+            <AgriCurrency amount={breakEvenCostPerMon} unit={lang === 'bn' ? 'মণ' : 'Mon'} />
           </div>
-          <p className="text-xs text-amber-800 dark:text-amber-300/80 font-medium mt-1 tabular-nums">
-            ≈ ৳{breakEvenCostPerKg} / {lang === 'bn' ? 'কেজি' : 'kg'} ({lang === 'bn' ? 'এর কমে বিক্রি করলে ক্ষতি' : 'Minimum selling price'})
+          <p className="text-xs text-amber-800 dark:text-amber-300/80 font-medium mt-1 tabular-nums flex items-baseline gap-1">
+            <span>≈</span>
+            <AgriCurrency amount={breakEvenCostPerKg} unit={lang === 'bn' ? 'কেজি' : 'kg'} />
+            <span className="text-[11px] opacity-75">({lang === 'bn' ? 'এর কমে বিক্রি করলে ক্ষতি' : 'Minimum selling price'})</span>
           </p>
         </motion.div>
 
@@ -481,13 +507,14 @@ ${tenureNote}
         >
           <div className="flex items-center justify-between text-stone-500 dark:text-stone-400 mb-2">
             <span className="text-xs font-semibold">{lang === 'bn' ? 'মোট বিক্রয়মূল্য' : 'Gross Revenue'}</span>
-            <Coins className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <Coins className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white tabular-nums">
-            ৳ {grossRevenue.toLocaleString()}
+          <div className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <AgriCurrency amount={grossRevenue} />
           </div>
-          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 tabular-nums">
-            {totalYieldMon} {lang === 'bn' ? 'মণ × ৳' : 'Mon × ৳'}{pricePerMon}
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 tabular-nums flex items-baseline gap-1">
+            <span>{totalYieldMon} {lang === 'bn' ? 'মণ' : 'Mon'} ×</span>
+            <AgriCurrency amount={pricePerMon} />
           </p>
         </motion.div>
 
@@ -507,8 +534,8 @@ ${tenureNote}
             </span>
             {isProfitable ? <TrendingUp className="w-4 h-4 text-white" /> : <TrendingDown className="w-4 h-4 text-white" />}
           </div>
-          <div className="text-2xl md:text-3xl font-bold tracking-tight tabular-nums">
-            ৳ {Math.abs(netProfit).toLocaleString()}
+          <div className="text-2xl md:text-3xl font-bold tracking-tight">
+            <AgriCurrency amount={Math.abs(netProfit)} />
           </div>
           <p className="text-xs text-white/90 font-medium mt-1 tabular-nums">
             ROI: {roiPercentage}% ({isProfitable ? (lang === 'bn' ? 'লাভজনক' : 'Profitable') : (lang === 'bn' ? 'ক্ষতিকর' : 'Loss')})
@@ -516,197 +543,121 @@ ${tenureNote}
         </motion.div>
       </div>
 
-      {/* Itemized Cost Breakdown (Granular & Editable) */}
-      <div className="bg-white rounded-[2rem] p-5 md:p-8 border border-gray-100 shadow-xl shadow-gray-900/5 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
+      {/* Itemized Cost Breakdown (Clean Tabular Financial Ledger - Rank 5 & Rank 2) */}
+      <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs overflow-hidden">
+        <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200/80 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50">
           <div>
-            <h3 className="text-lg font-black text-gray-900">
-              {lang === 'bn' ? 'উৎপাদন খরচের বিস্তারিত হিসাব (সম্পাদনাযোগ্য)' : 'Itemized Production Expense Breakdown (Editable)'}
+            <h3 className="text-sm sm:text-base font-bold text-stone-900 dark:text-stone-100">
+              {lang === 'bn' ? 'উৎপাদন খরচের খতিয়ান (সম্পাদনাযোগ্য)' : 'Production Expense Ledger (Editable)'}
             </h3>
-            <p className="text-xs text-gray-500">
-              {lang === 'bn' ? 'আপনার প্রকৃত খরচ অনুযায়ী প্রতিটি খাতের টাকা পরিবর্তন করতে পারেন।' : 'Values are pre-filled with regional averages; click and edit to match your receipts.'}
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              {lang === 'bn' ? 'আঞ্চলিক গড় খরচের খসড়া; আপনার ভাউচার অনুযায়ী টাকার পরিমাণ পরিবর্তন করুন।' : 'Pre-filled with regional averages; click to update based on your vouchers.'}
             </p>
           </div>
-          <span className="text-xs font-mono font-bold bg-gray-100 text-gray-700 px-3 py-1 rounded-xl">
-            {lang === 'bn' ? `মোট: ৳${totalCost.toLocaleString()} টাকা` : `Total: ৳${totalCost.toLocaleString()} BDT`}
-          </span>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 font-mono text-xs font-bold shrink-0">
+            <span>{lang === 'bn' ? 'মোট খরচ:' : 'Total Cost:'}</span>
+            <AgriCurrency amount={totalCost} unit="BDT" amountClassName="text-emerald-700 dark:text-emerald-400" />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* 1. Tillage */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '১. জমি চাষ ও মই (পাওয়ার টিলার)' : '1. Land Prep & Tillage'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.tillage}
-                onChange={(e) => updateCostItem('tillage', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
+        <div className="divide-y divide-stone-200/60 dark:divide-stone-800">
+          {[
+            { key: 'tillage', title: lang === 'bn' ? '১. জমি চাষ ও মই (পাওয়ার টিলার)' : '1. Land Prep & Tillage', desc: lang === 'bn' ? 'টিলারের ভাড়া ও ডিজেল' : 'Tractor/tiller rent & fuel' },
+            { key: 'seeds', title: lang === 'bn' ? '২. বীজ / চারার দাম' : '2. Seeds / Seedlings', desc: lang === 'bn' ? 'প্রত্যয়িত উন্নত বীজ বা চারা' : 'Certified high-yield seeds' },
+            { key: 'fertilizer', title: lang === 'bn' ? '৩. রাসায়নিক ও জৈব সার' : '3. Fertilizers & Manure', desc: lang === 'bn' ? 'ইউরিয়া, টিএসপি, ডিএপি, পটাশ' : 'Urea, TSP, DAP, MoP & compost' },
+            { key: 'irrigation', title: lang === 'bn' ? '৪. সেচ ও বিদ্যুৎ/ডিজেল খরচ' : '4. Irrigation & Fuel', desc: lang === 'bn' ? 'পাম্পের ঘণ্টা বা স্কিম বিল' : 'Tube well hours or scheme payment' },
+            { key: 'pesticide', title: lang === 'bn' ? '৫. বালাইনাশক ও ভিটামিন স্প্রে' : '5. Plant Protection', desc: lang === 'bn' ? 'কীটনাশক, ছত্রাকনাশক ও অনুখাদ্য' : 'Pesticides, fungicides & micronutrients' },
+            { key: 'labor', title: lang === 'bn' ? '৬. কৃষি শ্রমিক মজুরি' : '6. Labor Wages', desc: lang === 'bn' ? 'রোপণ, নিড়ানি, সার দেওয়া, কাটা ও মাড়াই' : 'Transplanting, weeding, spraying, harvest' },
+            { key: 'transport', title: lang === 'bn' ? '৭. পরিবহন ও বস্তাজাতকরণ' : '7. Packing & Transport', desc: lang === 'bn' ? 'চটের বস্তা, ভ্যান/নসিমন ভাড়া' : 'Sacks, loading & mandi cartage' },
+          ].map((item) => (
+            <div key={item.key} className="p-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-stone-50/50 dark:hover:bg-stone-800/40 transition-colors">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs sm:text-sm font-semibold text-stone-900 dark:text-stone-100">
+                  {item.title}
+                </div>
+                <div className="text-[11px] text-stone-500 dark:text-stone-400">
+                  {item.desc}
+                </div>
+              </div>
 
-          {/* 2. Seeds */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '২. বীজ / চারার দাম' : '2. Seeds / Seedlings'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.seeds}
-                onChange={(e) => updateCostItem('seeds', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 3. Fertilizers */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৩. রাসায়নিক ও জৈব সার (ইউরিয়া, টিএসপি, পটাশ)' : '3. Fertilizers & Manure'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.fertilizer}
-                onChange={(e) => updateCostItem('fertilizer', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 4. Irrigation */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৪. সেচ ও ডিজেল/বিদ্যুৎ খরচ' : '4. Irrigation & Fuel/Electricity'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.irrigation}
-                onChange={(e) => updateCostItem('irrigation', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 5. Pesticides */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৫. কীটনাশক ও ছত্রাকনাশক স্প্রে' : '5. Pesticides & Plant Protection'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.pesticide}
-                onChange={(e) => updateCostItem('pesticide', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 6. Labor */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৬. কৃষি শ্রমিক মজুরি (রোপণ, নিড়ানি, কাটা ও মাড়াই)' : '6. Labor Wages (Planting, Weeding, Harvest)'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="200"
-                value={costs.labor}
-                onChange={(e) => updateCostItem('labor', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 7. Transport & Packing */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5">
-            <label className="text-xs font-black text-gray-700 flex items-center justify-between">
-              <span>{lang === 'bn' ? '৭. হাট/বাজারে পরিবহন ও বস্তাজাতকরণ' : '7. Packaging & Transport to Market'}</span>
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="100"
-                value={costs.transport}
-                onChange={(e) => updateCostItem('transport', parseFloat(e.target.value) || 0)}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          {/* 8. Land Lease / Rent (for sharecroppers) */}
-          <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-200/60 space-y-1.5 md:col-span-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-black text-gray-700">
-                <span>{lang === 'bn' ? '৮. জমি বর্গা / ইজারা বা লিজ ফি (প্রযোজ্য ক্ষেত্রে)' : '8. Land Rent / Lease (Sharecroppers)'}</span>
-              </label>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => updateCostItem('lease' as any, 0)}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
-                    costs.lease === 0 ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-white border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {lang === 'bn' ? 'নিজ জমি (৳০)' : 'Own Land (৳0)'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateCostItem('lease' as any, Math.round(5000 * landRatio))}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors ${
-                    costs.lease > 0 ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-gray-200 text-gray-600'
-                  }`}
-                >
-                  {lang === 'bn' ? 'বর্গা/লিজ (~৳৫হাজার/বিঘা)' : 'Leased (~৳5k/bigha)'}
-                </button>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <span className="text-xs text-stone-400 font-mono">৳</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={costs[item.key as keyof typeof costs]}
+                  onChange={(e) => updateCostItem(item.key as any, parseFloat(e.target.value) || 0)}
+                  className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"
+                />
               </div>
             </div>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-xs font-bold text-gray-400">৳</span>
+          ))}
+
+          {/* Lease row */}
+          <div className="p-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-stone-50/30 dark:bg-stone-800/20">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs sm:text-sm font-semibold text-stone-900 dark:text-stone-100">
+                  {lang === 'bn' ? '৮. জমি বর্গা / লিজ ফি (প্রযোজ্য ক্ষেত্রে)' : '8. Land Lease / Rent (Optional)'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => updateCostItem('lease' as any, 0)}
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                      costs.lease === 0 ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300' : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
+                    }`}
+                  >
+                    {lang === 'bn' ? 'নিজ জমি (৳০)' : 'Own Land (৳0)'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateCostItem('lease' as any, Math.round(5000 * landRatio))}
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                      costs.lease > 0 ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300' : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
+                    }`}
+                  >
+                    {lang === 'bn' ? 'লিজ (~৳৫হাজার/বিঘা)' : 'Leased (~৳5k/bigha)'}
+                  </button>
+                </div>
+              </div>
+              <div className="text-[11px] text-stone-500 dark:text-stone-400">
+                {lang === 'bn' ? 'নিজস্ব জমিতে চাষ করলে শূন্য রাখুন' : 'Set to 0 if farming on owned land'}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <span className="text-xs text-stone-400 font-mono">৳</span>
               <input
                 type="number"
                 min="0"
                 step="500"
                 value={costs.lease}
                 onChange={(e) => updateCostItem('lease' as any, parseFloat(e.target.value) || 0)}
-                placeholder={lang === 'bn' ? 'নিজস্ব জমি হলে ০ রাখুন' : 'Enter 0 if owner-operated'}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"
               />
             </div>
           </div>
         </div>
+
+        {/* Ledger Bottom Summary */}
+        <div className="p-3.5 sm:px-5 bg-stone-100/70 dark:bg-stone-800/80 border-t border-stone-200/80 dark:border-stone-800 flex items-center justify-between text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
+          <span>{lang === 'bn' ? 'সর্বমোট উৎপাদন খরচ' : 'Net Production Cost'}</span>
+          <AgriCurrency
+            amount={totalCost}
+            unit="BDT"
+            className="text-base"
+            amountClassName="text-emerald-800 dark:text-emerald-300"
+          />
+        </div>
       </div>
 
       {/* Middleman Bargaining & Fair Trade Action Guide */}
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50/70 rounded-[2rem] p-6 border-2 border-amber-200 shadow-md space-y-3">
-        <div className="flex items-center space-x-3 text-amber-900">
-          <ShieldCheck className="w-6 h-6 text-amber-700 shrink-0" />
-          <h4 className="text-base md:text-lg font-black">
+      <div className="bg-amber-50/50 dark:bg-amber-950/30 rounded-2xl p-4 sm:p-5 border border-amber-200/80 dark:border-amber-900/50 shadow-xs space-y-2.5">
+        <div className="flex items-center space-x-2.5 text-amber-900 dark:text-amber-300">
+          <ShieldCheck className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0" />
+          <h4 className="text-sm sm:text-base font-bold">
             {lang === 'bn' ? 'ফরিয়া ও বেপারীদের সাথে দরদামের কৌশল (Fair Price Guide)' : 'Intermediary Bargaining Strategy'}
           </h4>
         </div>

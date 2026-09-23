@@ -59,27 +59,35 @@ export function calculateCreditScore(profile: {
   hasLandData: boolean;
   hasCertificates: boolean;
 }): { score: number; riskTier: 'Low' | 'Moderate' | 'High' } {
-  let score = 40; // Base onboarding baseline
+  const totalActivity = (profile.totalSessionsCompleted || 0) + (profile.totalDiagnoses || 0);
+  
+  // If zero activity and no farm data provided, score is strictly 0 (no hallucination)
+  if (totalActivity === 0 && !profile.hasLandData && (!profile.cropsCount || profile.cropsCount === 0) && !profile.hasCertificates) {
+    return { score: 0, riskTier: 'High' };
+  }
 
-  // Consistency & Activity (up to +25)
-  score += Math.min(25, profile.totalSessionsCompleted * 6);
+  let score = 0;
 
-  // Proactive Crop Health Surveillance (up to +20)
-  score += Math.min(20, profile.totalDiagnoses * 5);
-
-  // Farm Diversification & Land Transparency (up to +15)
+  // Real farm transparency & verified ownership
+  if (profile.hasLandData) score += 15;
+  if (profile.cropsCount > 0) score += 10;
   if (profile.cropsCount > 1) score += 8;
-  if (profile.hasLandData) score += 7;
 
-  // Commercial Verification (Smart Grade / Mandi)
-  if (profile.hasCertificates) score += 10;
+  // Real consultation activity (+8 per session, max +32)
+  score += Math.min(32, (profile.totalSessionsCompleted || 0) * 8);
 
-  score = Math.min(96, Math.max(35, score));
+  // Real disease diagnoses and surveillance (+6 per diagnosis, max +24)
+  score += Math.min(24, (profile.totalDiagnoses || 0) * 6);
+
+  // Verified quality inspection or grading (+11)
+  if (profile.hasCertificates) score += 11;
+
+  score = Math.min(98, Math.max(0, score));
 
   let riskTier: 'Low' | 'Moderate' | 'High' = 'High';
   if (score >= 75) {
     riskTier = 'Low';
-  } else if (score >= 55) {
+  } else if (score >= 50) {
     riskTier = 'Moderate';
   }
 
@@ -160,7 +168,9 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   event: FarmerTimelineEventData;
 }> {
   const cleanUserId = sanitizeString(params.userId, 128);
-  const cleanFullName = sanitizeString(params.fullName || 'কৃষক ভাই (Farmer)', 128);
+  const cleanFullName = params.fullName && params.fullName !== 'কৃষক ভাই (Farmer)' 
+    ? sanitizeString(params.fullName, 128) 
+    : '';
   const cleanTitle = sanitizeString(params.title, 256);
   const cleanSummary = sanitizeString(params.summary, 5000);
   const cleanKeyFacts = (Array.isArray(params.keyFacts) ? params.keyFacts : [])
@@ -185,53 +195,53 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     title: cleanTitle,
     summary: cleanSummary,
     keyFacts: cleanKeyFacts,
-    confidenceScore: 0.92,
+    confidenceScore: 0.95,
     createdAt: now
   };
 
-  // 2. Fetch existing profile or create initial baseline
+  // 2. Fetch existing profile or create initial completely blank/accurate baseline
   let existingProfile = await fetchFarmerProfile(cleanUserId);
 
   const initialProfile: FarmerProfileData = {
     userId: cleanUserId,
     fullName: cleanFullName,
-    creditReadinessScore: 45,
-    insuranceRiskTier: 'Moderate',
-    primaryCrop: cleanCrop || 'ধান (Rice / Paddy)',
-    cropsGrown: cleanCrop ? [cleanCrop] : ['ধান (Paddy)'],
-    totalLandDecimals: cleanLandDecimals || 66, // default ~2 bighas in BD
-    locationDistrict: cleanDistrict || 'কক্সবাজার (Cox\'s Bazar)',
-    locationUpazila: cleanUpazila || 'চকরিয়া (Chakaria)',
-    soilType: cleanSoilType || 'পলি দোআঁশ (Alluvial Loam)',
-    irrigationType: cleanIrrigationType || 'ভূগর্ভস্থ সেচ (Shallow Tubewell)',
+    creditReadinessScore: 0,
+    insuranceRiskTier: 'High',
+    primaryCrop: cleanCrop || '',
+    cropsGrown: cleanCrop ? [cleanCrop] : [],
+    totalLandDecimals: cleanLandDecimals || 0,
+    locationDistrict: cleanDistrict || '',
+    locationUpazila: cleanUpazila || '',
+    soilType: cleanSoilType || '',
+    irrigationType: cleanIrrigationType || '',
     totalSessionsCompleted: 0,
     totalDiagnoses: 0,
     lastInteractionSummary: cleanSummary,
     lastInteractionDate: now,
-    keyInsights: cleanInsight ? [cleanInsight] : ['নিয়মিত পরামর্শ নিচ্ছেন (Active consultation user)'],
+    keyInsights: cleanInsight ? [cleanInsight] : [],
     updatedAt: now,
     createdAt: now
   };
 
   const profile = existingProfile ? { ...existingProfile } : initialProfile;
 
-  // Progressive profile compounding
-  if (cleanFullName && cleanFullName !== 'কৃষক ভাই (Farmer)') {
+  // Progressive profile compounding without hallucinated overrides
+  if (cleanFullName && !profile.fullName) {
     profile.fullName = cleanFullName;
   }
   if (cleanCrop && !profile.cropsGrown.includes(cleanCrop)) {
     profile.cropsGrown.push(cleanCrop);
   }
-  if (cleanCrop && (!profile.primaryCrop || profile.primaryCrop === 'ধান (Rice / Paddy)')) {
+  if (cleanCrop && !profile.primaryCrop) {
     profile.primaryCrop = cleanCrop;
   }
-  if (cleanLandDecimals) {
+  if (cleanLandDecimals && (!profile.totalLandDecimals || profile.totalLandDecimals === 0)) {
     profile.totalLandDecimals = cleanLandDecimals;
   }
-  if (cleanDistrict) profile.locationDistrict = cleanDistrict;
-  if (cleanUpazila) profile.locationUpazila = cleanUpazila;
-  if (cleanSoilType) profile.soilType = cleanSoilType;
-  if (cleanIrrigationType) profile.irrigationType = cleanIrrigationType;
+  if (cleanDistrict && !profile.locationDistrict) profile.locationDistrict = cleanDistrict;
+  if (cleanUpazila && !profile.locationUpazila) profile.locationUpazila = cleanUpazila;
+  if (cleanSoilType && !profile.soilType) profile.soilType = cleanSoilType;
+  if (cleanIrrigationType && !profile.irrigationType) profile.irrigationType = cleanIrrigationType;
 
   if (params.eventType === 'voice_consultation') {
     profile.totalSessionsCompleted = (profile.totalSessionsCompleted || 0) + 1;
@@ -244,7 +254,7 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     profile.keyInsights = [cleanInsight, ...profile.keyInsights.slice(0, 5)];
   }
 
-  // Recalculate credit and insurance metrics
+  // Recalculate credit and insurance metrics based strictly on actual usage
   const { score, riskTier } = calculateCreditScore({
     totalSessionsCompleted: profile.totalSessionsCompleted,
     totalDiagnoses: profile.totalDiagnoses,
@@ -261,14 +271,12 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
 
   // 3. Save to Firestore
   try {
-    // Add timeline event
     await addDoc(collection(db, 'farmer_timeline_events'), newEvent);
   } catch (error) {
     console.warn("Firestore error saving timeline event, continuing locally:", error);
   }
 
   try {
-    // Upsert farmer profile
     const profileRef = doc(db, 'farmer_profiles', cleanUserId);
     await setDoc(profileRef, profile, { merge: true });
   } catch (error) {
@@ -284,6 +292,124 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   } catch (e) {}
 
   return { profile, event: newEvent };
+}
+
+/**
+ * Manually update farmer profile with real user-provided farm data
+ */
+export async function updateFarmerProfileManual(
+  userId: string,
+  updates: Partial<FarmerProfileData>
+): Promise<FarmerProfileData> {
+  const cleanUserId = sanitizeString(userId, 128);
+  const existing = await fetchFarmerProfile(cleanUserId);
+  const now = new Date().toISOString();
+
+  const profile: FarmerProfileData = existing ? { ...existing } : {
+    userId: cleanUserId,
+    fullName: '',
+    creditReadinessScore: 0,
+    insuranceRiskTier: 'High',
+    primaryCrop: '',
+    cropsGrown: [],
+    totalLandDecimals: 0,
+    locationDistrict: '',
+    locationUpazila: '',
+    soilType: '',
+    irrigationType: '',
+    totalSessionsCompleted: 0,
+    totalDiagnoses: 0,
+    lastInteractionSummary: '',
+    lastInteractionDate: now,
+    keyInsights: [],
+    updatedAt: now,
+    createdAt: now
+  };
+
+  if (updates.fullName !== undefined) profile.fullName = sanitizeString(updates.fullName, 128);
+  if (updates.locationDistrict !== undefined) profile.locationDistrict = sanitizeString(updates.locationDistrict, 100);
+  if (updates.locationUpazila !== undefined) profile.locationUpazila = sanitizeString(updates.locationUpazila, 100);
+  if (updates.primaryCrop !== undefined) {
+    const c = sanitizeString(updates.primaryCrop, 100);
+    profile.primaryCrop = c;
+    if (c && !profile.cropsGrown.includes(c)) {
+      profile.cropsGrown.push(c);
+    }
+  }
+  if (updates.totalLandDecimals !== undefined) {
+    profile.totalLandDecimals = typeof updates.totalLandDecimals === 'number' ? Math.max(0, updates.totalLandDecimals) : 0;
+  }
+  if (updates.soilType !== undefined) profile.soilType = sanitizeString(updates.soilType, 100);
+  if (updates.irrigationType !== undefined) profile.irrigationType = sanitizeString(updates.irrigationType, 100);
+
+  // Recalculate credit score with updated farm data
+  const { score, riskTier } = calculateCreditScore({
+    totalSessionsCompleted: profile.totalSessionsCompleted || 0,
+    totalDiagnoses: profile.totalDiagnoses || 0,
+    cropsCount: profile.cropsGrown.length,
+    hasLandData: profile.totalLandDecimals > 0,
+    hasCertificates: profile.creditReadinessScore > 65
+  });
+
+  profile.creditReadinessScore = score;
+  profile.insuranceRiskTier = riskTier;
+  profile.updatedAt = now;
+
+  try {
+    const profileRef = doc(db, 'farmer_profiles', cleanUserId);
+    await setDoc(profileRef, profile, { merge: true });
+  } catch (error) {
+    console.warn("Firestore save profile manual error:", error);
+  }
+
+  try {
+    safeStorage.setItem(LOCAL_PROFILE_KEY(cleanUserId), profile);
+  } catch (e) {}
+
+  return profile;
+}
+
+/**
+ * Reset farmer profile to a completely blank slate (removes all demo or test data)
+ */
+export async function resetFarmerProfile(userId: string): Promise<FarmerProfileData> {
+  const cleanUserId = sanitizeString(userId, 128);
+  const now = new Date().toISOString();
+
+  const emptyProfile: FarmerProfileData = {
+    userId: cleanUserId,
+    fullName: '',
+    creditReadinessScore: 0,
+    insuranceRiskTier: 'High',
+    primaryCrop: '',
+    cropsGrown: [],
+    totalLandDecimals: 0,
+    locationDistrict: '',
+    locationUpazila: '',
+    soilType: '',
+    irrigationType: '',
+    totalSessionsCompleted: 0,
+    totalDiagnoses: 0,
+    lastInteractionSummary: '',
+    lastInteractionDate: now,
+    keyInsights: [],
+    updatedAt: now,
+    createdAt: now
+  };
+
+  try {
+    const profileRef = doc(db, 'farmer_profiles', cleanUserId);
+    await setDoc(profileRef, emptyProfile);
+  } catch (error) {
+    console.warn("Firestore reset profile error:", error);
+  }
+
+  try {
+    localStorage.removeItem(LOCAL_PROFILE_KEY(cleanUserId));
+    localStorage.removeItem(LOCAL_EVENTS_KEY(cleanUserId));
+  } catch (e) {}
+
+  return emptyProfile;
 }
 
 /**
