@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Camera, Mic, MicOff, PhoneOff, Video, VideoOff, RefreshCw, Zap, ZapOff, 
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
-  Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User
+  Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
+  BrainCircuit, Cpu
 } from 'lucide-react';
-import { getAi, LIVE_API_MODEL } from '../services/ai';
-import { LiveServerMessage, Modality } from '@google/genai';
+import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
+import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
@@ -33,6 +34,7 @@ export default function LiveVideoCopilot({
   const { user } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isExtendedThinking, setIsExtendedThinking] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [isTorchSupported, setIsTorchSupported] = useState(false);
@@ -47,13 +49,13 @@ export default function LiveVideoCopilot({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
-  const [latestSubtitle, setLatestSubtitle] = useState<{ text: string; role: 'user' | 'model' } | null>(null);
+  const [latestSubtitle, setLatestSubtitle] = useState<{ id?: string; text: string; role: 'user' | 'model' } | null>(null);
   const [lastSavedSession, setLastSavedSession] = useState<{
     title: string;
     summary: string;
     crop?: string;
     keyFacts: string[];
-    transcriptsCount: number;
+    duration?: number;
   } | null>(null);
   const [isSavingSummary, setIsSavingSummary] = useState(false);
 
@@ -75,6 +77,175 @@ export default function LiveVideoCopilot({
   const speechRecognitionRef = useRef<any>(null);
   const transcriptsRef = useRef<TranscriptTurn[]>([]);
   const callDurationRef = useRef<number>(0);
+
+  // Subtitle Sentence Queue & Interval Management
+  const subtitleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const breakTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const subtitleQueueRef = useRef<Array<{ id: string; role: 'user' | 'model'; text: string; readingTimeMs: number }>>([]);
+  const isDisplayingSubtitleRef = useRef<boolean>(false);
+  const modelTextBufferRef = useRef<string>('');
+
+  // Clear all pending subtitles and reset buffer
+  const clearSubtitles = useCallback(() => {
+    if (subtitleTimeoutRef.current) {
+      clearTimeout(subtitleTimeoutRef.current);
+      subtitleTimeoutRef.current = null;
+    }
+    if (breakTimeoutRef.current) {
+      clearTimeout(breakTimeoutRef.current);
+      breakTimeoutRef.current = null;
+    }
+    subtitleQueueRef.current = [];
+    isDisplayingSubtitleRef.current = false;
+    modelTextBufferRef.current = '';
+    setLatestSubtitle(null);
+  }, []);
+
+  // Play next queued sentence after the previous one disappears with a distinct visual break
+  const playNextSubtitleInQueue = useCallback(() => {
+    if (subtitleQueueRef.current.length === 0) {
+      isDisplayingSubtitleRef.current = false;
+      return;
+    }
+
+    const nextItem = subtitleQueueRef.current.shift()!;
+    isDisplayingSubtitleRef.current = true;
+    setLatestSubtitle({
+      id: nextItem.id,
+      role: nextItem.role,
+      text: nextItem.text
+    });
+
+    subtitleTimeoutRef.current = setTimeout(() => {
+      // 1. Sentence finishes its reading duration -> disappears
+      setLatestSubtitle(null);
+      subtitleTimeoutRef.current = null;
+
+      // 2. Clear break before next sentence pops up
+      breakTimeoutRef.current = setTimeout(() => {
+        breakTimeoutRef.current = null;
+        playNextSubtitleInQueue();
+      }, 450);
+    }, nextItem.readingTimeMs);
+  }, []);
+
+  // Enqueue a sentence to show with clean lifecycle (appear -> reading duration -> disappear -> break -> next)
+  const enqueueSubtitleSentence = useCallback((sentence: string, role: 'user' | 'model') => {
+    const clean = sentence.trim();
+    if (!clean) return;
+
+    const id = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    // Adaptive reading duration: ~65ms per character, min 2200ms, max 4200ms
+    const readingTimeMs = Math.min(4200, Math.max(2200, clean.length * 65));
+    const item = { id, role, text: clean, readingTimeMs };
+
+    if (role === 'user') {
+      // Farmer query takes immediate stage
+      if (subtitleTimeoutRef.current) clearTimeout(subtitleTimeoutRef.current);
+      if (breakTimeoutRef.current) clearTimeout(breakTimeoutRef.current);
+      subtitleQueueRef.current = [];
+      isDisplayingSubtitleRef.current = true;
+      setLatestSubtitle({ id, role, text: clean });
+
+      subtitleTimeoutRef.current = setTimeout(() => {
+        // Disappear farmer subtitle after reading duration
+        setLatestSubtitle(null);
+        subtitleTimeoutRef.current = null;
+        isDisplayingSubtitleRef.current = false;
+      }, readingTimeMs);
+      return;
+    }
+
+    // Model sentence
+    if (!isDisplayingSubtitleRef.current && !latestSubtitle) {
+      isDisplayingSubtitleRef.current = true;
+      setLatestSubtitle({ id, role, text: clean });
+
+      subtitleTimeoutRef.current = setTimeout(() => {
+        // Disappear sentence
+        setLatestSubtitle(null);
+        subtitleTimeoutRef.current = null;
+
+        // Distinct visual break (450ms) before next sentence
+        breakTimeoutRef.current = setTimeout(() => {
+          breakTimeoutRef.current = null;
+          playNextSubtitleInQueue();
+        }, 450);
+      }, readingTimeMs);
+    } else {
+      subtitleQueueRef.current.push(item);
+    }
+  }, [latestSubtitle, playNextSubtitleInQueue]);
+
+  // Process incoming streaming tokens into clean grammatical sentences
+  const processIncomingModelText = useCallback((text: string) => {
+    modelTextBufferRef.current += text;
+    let buffer = modelTextBufferRef.current;
+
+    // Delimiters: Bengali dāri (।), period (.), question mark (?), exclamation mark (!), double newline
+    const delimiterRegex = /([।?!.\n]+)/;
+    let match: RegExpExecArray | null;
+
+    while ((match = delimiterRegex.exec(buffer)) !== null) {
+      const boundaryIndex = match.index + match[0].length;
+      const sentence = buffer.slice(0, boundaryIndex).trim();
+      buffer = buffer.slice(boundaryIndex);
+
+      if (sentence.length > 0) {
+        const turn: TranscriptTurn = {
+          id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          role: 'model',
+          text: sentence,
+          timestamp: new Date().toISOString()
+        };
+        transcriptsRef.current.push(turn);
+        setTranscripts(prev => [...prev, turn]);
+        enqueueSubtitleSentence(sentence, 'model');
+      }
+    }
+
+    // Secondary safety: If streaming a very long clause (> 80 chars) without standard punctuation
+    if (buffer.length > 80) {
+      const lastComma = buffer.lastIndexOf(',', 80);
+      const lastSpace = buffer.lastIndexOf(' ', 80);
+      const splitIdx = lastComma > 30 ? lastComma + 1 : (lastSpace > 30 ? lastSpace : -1);
+
+      if (splitIdx > 0) {
+        const sentence = buffer.slice(0, splitIdx).trim();
+        buffer = buffer.slice(splitIdx);
+        if (sentence.length > 0) {
+          const turn: TranscriptTurn = {
+            id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+            role: 'model',
+            text: sentence,
+            timestamp: new Date().toISOString()
+          };
+          transcriptsRef.current.push(turn);
+          setTranscripts(prev => [...prev, turn]);
+          enqueueSubtitleSentence(sentence, 'model');
+        }
+      }
+    }
+
+    modelTextBufferRef.current = buffer;
+  }, [enqueueSubtitleSentence]);
+
+  // Flush remaining buffer at the end of model response
+  const flushRemainingModelText = useCallback(() => {
+    const remaining = modelTextBufferRef.current.trim();
+    if (remaining.length > 0) {
+      modelTextBufferRef.current = '';
+      const turn: TranscriptTurn = {
+        id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        role: 'model',
+        text: remaining,
+        timestamp: new Date().toISOString()
+      };
+      transcriptsRef.current.push(turn);
+      setTranscripts(prev => [...prev, turn]);
+      enqueueSubtitleSentence(remaining, 'model');
+    }
+  }, [enqueueSubtitleSentence]);
 
   // Sync ref
   useEffect(() => {
@@ -358,29 +529,46 @@ export default function LiveVideoCopilot({
         throw new Error("Gemini AI instance unavailable");
       }
 
+      const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
+
       const systemInstruction = `You are an elite Agronomist and Senior Plant Pathologist in Bangladesh observing a LIVE MULTIMODAL VIDEO STREAM from a farmer's phone in ${locationContext}.
+      ${isExtendedThinking ? 'MODE: DEEP AGパRONOMIC ANALYSIS ACTIVATED. Engage deep differential reasoning, symptom comparison, and advanced treatment planning.' : 'MODE: STANDARD REAL-TIME MULTIMODAL STREAM.'}
       
+CRITICAL SPOKEN LANGUAGE DIRECTIVE:
+1. ALWAYS talk and reply in natural, clear, spoken Bangla (বাংলা) by default.
+2. Even if the farmer greets or speaks to you in English (such as "Hello", "Hi", "Good morning", "Can you see this?", or asks questions in English), YOU MUST STILL GREET AND REPLY IN BANGLA (e.g. "হ্যালো! আসসালামু আলাইকুম। আমি আপনার ফসল পর্যবেক্ষণ করছি, কী সমস্যা দেখতে পাচ্ছেন বলুন?").
+3. ONLY switch away from standard Bangla if the user EXPLICITLY and directly requests a different language (e.g., "Speak in English", "ইংরেজিতে কথা বলুন") or requests a specific regional accent/dialect (such as Cox's Bazar / Chittagonian dialect / "চাটগাঁইয়া ভাষায় বলুন").
+4. Never switch to English just because of English greetings or English loanwords.
+
 YOUR CORE CAPABILITIES IN THIS LIVE MODE:
 1. Continuous Visual Crop Inspection: You receive 1 JPEG video frame every second from the farmer's camera. Continuously examine plant leaves, stems, pods, soil moisture, discoloration, wilting, lesions, and pest activity.
-2. Real-Time Verbal Interaction: The farmer speaks to you in ${lang === 'bn' ? 'Bangla' : 'English'}. Respond immediately with natural spoken ${lang === 'bn' ? 'Bangla' : 'English'}.
-3. Proactive Observation: If you notice a visible agricultural problem (e.g. leaf curl, blast lesions, yellowing, stem borer hole, fungal spots) in the video frames even before the farmer asks, politely alert them in simple, clear language.
+2. Real-Time Spoken Interaction: Speak back immediately in warm, friendly, clear Bangla.
+3. Proactive Observation: If you notice a visible agricultural problem (e.g. leaf curl, blast lesions, yellowing, stem borer hole, fungal spots) in the video frames even before the farmer asks, politely alert them in simple Bangla.
 4. Chemical Safety & Legal Compliance:
    - Prioritize cultural, biological, and Integrated Pest Management (IPM) techniques.
    - STRICTLY FORBIDDEN: NEVER recommend banned or restricted chemicals in Bangladesh (Paraquat/গ্রামোক্সন, Carbofuran/ফুরাডান, Endosulfan/থিয়োডান, Monocrotophos).
    - Always state Pre-Harvest Intervals (PHI / অপেক্ষমাণ সময়) if advising any pesticide.
-5. Tone & Structure: Speak warmly, concisely, and empathetically like a friendly mentor and agricultural extension officer. Keep spoken responses under 2-3 sentences at a time for natural conversation.`;
+5. Tone & Structure: Speak warmly, concisely, and empathetically like a friendly mentor and agricultural extension officer (উপসহকারী কৃষি কর্মকর্তা). Keep spoken responses under 2-3 sentences at a time for natural conversation.`;
+
+      const liveConfig: any = {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" }
+          }
+        },
+        systemInstruction,
+      };
+
+      if (isExtendedThinking) {
+        liveConfig.thinkingConfig = {
+          thinkingLevel: ThinkingLevel.HIGH
+        };
+      }
 
       const sessionPromise = ai.live.connect({
-        model: LIVE_API_MODEL,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" }
-            }
-          },
-          systemInstruction,
-        },
+        model: selectedLiveModel,
+        config: liveConfig,
         callbacks: {
           onopen: async () => {
             setIsConnecting(false);
@@ -458,9 +646,16 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
                         };
                         transcriptsRef.current.push(turn);
                         setTranscripts(prev => [...prev, turn]);
-                        setLatestSubtitle({ text: spoken, role: 'user' });
+                        enqueueSubtitleSentence(spoken, 'user');
                       } else if (spoken) {
-                        setLatestSubtitle({ text: spoken, role: 'user' });
+                        // Show active interim preview
+                        if (!isDisplayingSubtitleRef.current || latestSubtitle?.role === 'user') {
+                          setLatestSubtitle({
+                            id: 'interim_farmer',
+                            text: spoken,
+                            role: 'user'
+                          });
+                        }
                       }
                     }
                   };
@@ -492,27 +687,25 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
               playAudioChunk(base64Audio);
             }
 
-            // Extract any textual advice returned by Gemini Live
+            // Extract textual advice returned by Gemini Live and parse into clean sentences
             if (message.serverContent?.modelTurn?.parts) {
               const textParts = message.serverContent.modelTurn.parts
                 .map((p: any) => p.text)
                 .filter((t: any): t is string => typeof t === 'string' && t.trim().length > 0);
               if (textParts.length > 0) {
-                const aiText = textParts.join(' ').trim();
-                const turn: TranscriptTurn = {
-                  id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                  role: 'model',
-                  text: aiText,
-                  timestamp: new Date().toISOString()
-                };
-                transcriptsRef.current.push(turn);
-                setTranscripts(prev => [...prev, turn]);
-                setLatestSubtitle({ text: aiText, role: 'model' });
+                const incomingText = textParts.join(' ');
+                processIncomingModelText(incomingText);
               }
+            }
+
+            // Flush remaining buffer at end of model response turn
+            if (message.serverContent?.turnComplete) {
+              flushRemainingModelText();
             }
 
             // Interruption handling
             if (message.serverContent?.interrupted) {
+              clearSubtitles();
               sourceNodesRef.current.forEach(node => {
                 try { node.stop(); } catch (e) {}
               });
@@ -546,14 +739,13 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
     }
   };
 
-  // Comprehensive extraction of live session data into farmer profile & credit dossier
+  // Extraction of live session data into farmer profile & credit dossier (Summary Only - Never verbatim)
   const saveLiveSessionDossier = async (dialogueTurns: TranscriptTurn[], duration: number) => {
     const effectiveUid = user?.uid || 'guest_farmer_demo';
     const effectiveName = user?.displayName || '';
-    const ai = getAi();
 
-    // 1. If dialogue occurred, run deep AI distillation with zero hallucinations
-    if (dialogueTurns.length > 0 && ai) {
+    // 1. If dialogue occurred, distill an executive summary via server-side AI proxy
+    if (dialogueTurns.length > 0) {
       const dialogueText = dialogueTurns
         .map(t => `${t.role === 'user' ? 'কৃষক' : 'কৃষি বিশেষজ্ঞ'}: ${t.text}`)
         .join('\n');
@@ -564,80 +756,91 @@ Session Duration: ${Math.round(duration)} seconds.
 Location context: ${locationContext}.
 Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
 
-REAL CONVERSATION TRANSCRIPT:
+CONVERSATION CONTEXT:
 ${dialogueText}
 
-TASK:
-Deeply examine what was discussed during the live consultation.
-Extract factual agricultural insights without ANY hallucination. If a crop or disease was not mentioned or identifiable, leave it null.
+CRITICAL PRIVACY & SUMMARY REQUIREMENT:
+- DO NOT save or output verbatim dialogue or quotes. 
+- Distill ONLY a clean, professional, synthesized 2-3 sentence agricultural summary and key factual bullet points.
+- If a crop or disease was not mentioned, leave crop null.
 
 Return a JSON object with this exact structure:
 {
   "crop": "Detected crop (e.g., টমেটো, মরিচ, ধান, বেগুন, আলু) or null",
   "diseaseOrIssue": "Identified disease, pest, or problem or null",
-  "farmerQuestions": ["List of specific issues, questions, or symptoms mentioned by the farmer"],
-  "expertRecommendations": ["Key advice, organic IPM solutions, fertilizer tips, dosage, safety precautions given"],
   "sessionTitle": "Concise, descriptive title for this session (in ${lang === 'bn' ? 'Bangla' : 'English'})",
-  "comprehensiveSummary": "A clear, detailed 2-3 sentence summary of what was discussed, what symptoms were reported, and what advice was provided (in ${lang === 'bn' ? 'Bangla' : 'English'})",
+  "comprehensiveSummary": "A clear, professional synthesized 2-3 sentence summary of the crop condition and advice given. DO NOT include verbatim dialogue or farmer quotes.",
   "keyFacts": ["Array of 3-5 concise factual bullet points (e.g., 'ফসল: মরিচ', 'লক্ষণ: পাতা কুঁকড়ে যাওয়া', 'পরামর্শ: নিম তেল স্প্রে') in ${lang === 'bn' ? 'Bangla' : 'English'}"],
-  "insightForCreditProfile": "Credit & farm management observation (e.g. 'সরাসরি ভিডিওতে উদ্ভিদের বালাই শনাক্ত করে সময়মতো আইপিএম ব্যবস্থা গ্রহণ করেছেন') in ${lang === 'bn' ? 'Bangla' : 'English'}"
+  "insightForCreditProfile": "Credit & farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}"
 }`;
 
       try {
-        const resp = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json'
-          }
-        });
-        const parsed = JSON.parse(resp.text || '{}');
-        const title = parsed.sessionTitle || (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video & Voice Consultation Session');
-        const summary = parsed.comprehensiveSummary || dialogueText.substring(0, 500);
-        const keyFacts: string[] = Array.isArray(parsed.keyFacts) && parsed.keyFacts.length > 0 
-          ? parsed.keyFacts 
-          : [
-              `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
-              `পদ্ধতি: লাইভ মাল্টিমোডাল এআই পরামর্শ`,
-              ...(parsed.crop ? [`ফসল: ${parsed.crop}`] : [])
-            ];
-        const crop = parsed.crop || undefined;
-        const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় বিশেষজ্ঞ পরামর্শ নিয়েছেন' : 'Conducted live visual consultation');
-
-        await recordFarmerInteractionEvent({
-          userId: effectiveUid,
-          fullName: effectiveName,
-          eventType: 'voice_consultation',
-          title,
-          summary,
-          keyFacts,
-          crop,
-          insight
+        const proxyResp = await fetch('/api/ai-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gemini-3.5-flash-lite',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json'
+            }
+          })
         });
 
-        setLastSavedSession({
-          title,
-          summary,
-          crop,
-          keyFacts,
-          transcriptsCount: dialogueTurns.length
-        });
+        if (proxyResp.ok) {
+          const proxyData = await proxyResp.json();
+          const parsed = JSON.parse(proxyData.text || '{}');
+          const title = parsed.sessionTitle || (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video & Voice Consultation Session');
+          const summary = parsed.comprehensiveSummary || (lang === 'bn' 
+            ? 'সরাসরি ভিডিও ক্যামেরায় ফসলের স্বাস্থ্য পর্যবেক্ষণ করা হয়েছে এবং বালাই ব্যবস্থাপনার পরামর্শ প্রদান করা হয়েছে।'
+            : 'Visual crop health inspection completed with IPM management advisory provided.');
+          const keyFacts: string[] = Array.isArray(parsed.keyFacts) && parsed.keyFacts.length > 0 
+            ? parsed.keyFacts 
+            : [
+                `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
+                `পদ্ধতি: লাইভ ক্যামেরা ভিজ্যুয়াল মূল্যায়ন`,
+                ...(parsed.crop ? [`ফসল: ${parsed.crop}`] : [])
+              ];
+          const crop = parsed.crop || undefined;
+          const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় বিশেষজ্ঞ পরামর্শ নিয়েছেন' : 'Conducted live visual consultation');
 
-        toast.success(lang === 'bn' 
-          ? 'সেশনের বিস্তারিত কথপোকথন ও সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
-          : 'Consultation dialogue and summary saved to your Krishi Dossier!');
-        return;
+          await recordFarmerInteractionEvent({
+            userId: effectiveUid,
+            fullName: effectiveName,
+            eventType: 'voice_consultation',
+            title,
+            summary,
+            keyFacts,
+            crop,
+            insight
+          });
+
+          setLastSavedSession({
+            title,
+            summary,
+            crop,
+            keyFacts,
+            duration: Math.max(1, Math.round(duration))
+          });
+
+          toast.success(lang === 'bn' 
+            ? 'পরামর্শের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
+            : 'Consultation summary saved to your Krishi Dossier!');
+          return;
+        }
       } catch (aiErr) {
-        console.warn("AI extraction error, falling back to direct dialogue logging:", aiErr);
+        console.warn("AI summary generation error, falling back to clean synthesis:", aiErr);
       }
     }
 
-    // 2. Factual fallback when silent camera check or AI parse failed (NO hallucinated crops or locations)
+    // 2. Factual fallback summary (NO verbatim transcripts saved)
     const summaryText = dialogueTurns.length > 0
-      ? dialogueTurns.map(t => `${t.role === 'user' ? 'কৃষক' : 'বিশেষজ্ঞ'}: ${t.text}`).slice(-6).join(' | ')
+      ? (lang === 'bn' 
+          ? `কৃষক এবং এআই কৃষিবিদের মধ্যে ${Math.max(1, Math.round(duration))} সেকেন্ডের লাইভ ভিডিও পরামর্শ সম্পন্ন হয়েছে। সরাসরি ক্যামেরায় ফসলের দৃশ্যমান লক্ষণ পর্যবেক্ষণ করে আইপিএম ও সার ব্যবস্থাপনার প্রয়োজনীয় নির্দেশনা প্রদান করা হয়েছে।`
+          : `Live video and voice agronomic consultation completed (${Math.max(1, Math.round(duration))}s). Real-time visual crop assessment was conducted and tailored IPM guidance was provided.`)
       : (lang === 'bn' 
-          ? `কৃষক ${Math.max(1, Math.round(duration))} সেকেন্ডের জন্য লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন। কোনো নির্দিষ্ট রোগের কথপোকথন রেকর্ড করা হয়নি।` 
-          : `Farmer conducted a ${Math.max(1, Math.round(duration))}s visual crop check. No specific dialogue recorded.`);
+          ? `কৃষক ${Math.max(1, Math.round(duration))} সেকেন্ডের জন্য লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন। কোনো নির্দিষ্ট রোগের বিবরণ রেকর্ড করা হয়নি।` 
+          : `Farmer conducted a ${Math.max(1, Math.round(duration))}s visual crop inspection.`);
 
     const title = lang === 'bn' ? 'লাইভ ক্যামেরা পরিদর্শন সেশন' : 'Live Camera Field Inspection';
     const keyFacts = [
@@ -650,7 +853,7 @@ Return a JSON object with this exact structure:
       fullName: effectiveName,
       eventType: 'voice_consultation',
       title,
-      summary: summaryText.substring(0, 500),
+      summary: summaryText,
       keyFacts,
       insight: lang === 'bn' ? 'নিয়মিত লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন' : 'Conducted live camera inspection'
     });
@@ -659,10 +862,12 @@ Return a JSON object with this exact structure:
       title,
       summary: summaryText,
       keyFacts,
-      transcriptsCount: dialogueTurns.length
+      duration: Math.max(1, Math.round(duration))
     });
 
-    toast.success(lang === 'bn' ? 'সেশনের রেকর্ড আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Inspection logged to your Krishi Dossier!');
+    toast.success(lang === 'bn' 
+      ? 'পরামর্শের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
+      : 'Consultation summary logged to your Krishi Dossier!');
   };
 
   // Stop all media & connections
@@ -733,6 +938,7 @@ Return a JSON object with this exact structure:
     setCallDuration(0);
     callDurationRef.current = 0;
     setLiveState('idle');
+    clearSubtitles();
   };
 
   // Handle tap-to-focus
@@ -852,12 +1058,57 @@ Return a JSON object with this exact structure:
               </p>
             </div>
 
+            {/* Simplified Analysis Depth Toggle */}
+            <div className="bg-gray-900/80 p-3 rounded-2xl border border-gray-800 backdrop-blur-md text-left">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`p-2 rounded-xl shrink-0 transition-colors ${
+                    isExtendedThinking ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}>
+                    {isExtendedThinking ? <BrainCircuit className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white block">
+                      {isExtendedThinking 
+                        ? (lang === 'bn' ? 'গভীর রোগ বিশ্লেষণ' : 'Deep Diagnosis Mode')
+                        : (lang === 'bn' ? 'দ্রুত পরামর্শ মোড' : 'Fast Advisory Mode')}
+                    </span>
+                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
+                      {isExtendedThinking
+                        ? (lang === 'bn' ? 'জটিল রোগের বিশদ কারণ ও উন্নত সমাধান' : 'In-depth cause analysis and detailed solutions')
+                        : (lang === 'bn' ? 'সহজ প্রশ্নে তাৎক্ষণিক দ্রুত উত্তর ও পরামর্শ' : 'Instant quick answers for general questions')}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsExtendedThinking(!isExtendedThinking)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    isExtendedThinking ? 'bg-purple-600' : 'bg-gray-700'
+                  }`}
+                  role="switch"
+                  aria-checked={isExtendedThinking}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      isExtendedThinking ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={startLiveSession}
               disabled={isConnecting}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-gray-950 font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all flex items-center justify-center gap-2.5 mx-auto cursor-pointer"
+              className={`w-full sm:w-auto px-8 py-3.5 rounded-2xl text-gray-950 font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2.5 mx-auto cursor-pointer ${
+                isExtendedThinking
+                  ? 'bg-gradient-to-r from-purple-400 via-teal-400 to-emerald-400 shadow-purple-500/30 hover:shadow-purple-500/50'
+                  : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 shadow-emerald-500/30 hover:shadow-emerald-500/50'
+              }`}
             >
               <Video className="w-4 h-4" />
               <span>{lang === 'bn' ? 'লাইভ স্ট্রিম শুরু করুন' : 'Start Live Stream'}</span>
@@ -921,6 +1172,14 @@ Return a JSON object with this exact structure:
                 <div className="bg-gray-900/80 backdrop-blur-md text-emerald-400 text-[10px] font-mono font-bold px-3 py-1 rounded-full border border-emerald-500/30">
                   ⏱️ {formatDuration(callDuration)}
                 </div>
+                <div className={`hidden sm:flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md ${
+                  isExtendedThinking 
+                    ? 'bg-purple-900/70 border-purple-500/40 text-purple-200'
+                    : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                }`}>
+                  {isExtendedThinking ? <BrainCircuit className="w-3 h-3 text-purple-300" /> : <Zap className="w-3 h-3 text-emerald-300" />}
+                  <span>{isExtendedThinking ? (lang === 'bn' ? 'গভীর বিশ্লেষণ' : 'Extended Thinking') : (lang === 'bn' ? 'ফাস্ট লাইভ' : 'Fast Live')}</span>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -948,26 +1207,35 @@ Return a JSON object with this exact structure:
               </div>
             </div>
 
-            {/* Live Realtime Subtitles Overlay */}
-            {latestSubtitle && latestSubtitle.text && (
-              <div className={`absolute left-4 right-4 flex justify-center z-25 pointer-events-none ${
-                isFullscreen ? 'bottom-36 sm:bottom-40' : 'bottom-24 sm:bottom-28'
-              }`}>
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="max-w-md sm:max-w-lg px-4 py-2 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 text-center shadow-2xl"
-                >
-                  <span className="text-[10px] uppercase font-black text-emerald-400 mr-2">
-                    {latestSubtitle.role === 'user' ? (lang === 'bn' ? '🗣️ কৃষক' : '🗣️ Farmer') : (lang === 'bn' ? '🤖 এআই কৃষিবিদ' : '🤖 AI Agronomist')}:
-                  </span>
-                  <span className="text-xs sm:text-sm font-semibold text-white leading-relaxed">
-                    {latestSubtitle.text}
-                  </span>
-                </motion.div>
-              </div>
-            )}
+            {/* Live Realtime Subtitles Overlay with sentence-by-sentence animation and distinct pauses */}
+            <div className={`absolute left-4 right-4 flex justify-center z-25 pointer-events-none ${
+              isFullscreen ? 'bottom-36 sm:bottom-40' : 'bottom-24 sm:bottom-28'
+            }`}>
+              <AnimatePresence mode="wait">
+                {latestSubtitle && latestSubtitle.text && (
+                  <motion.div
+                    key={latestSubtitle.id || latestSubtitle.text}
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96, transition: { duration: 0.22 } }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                    className="max-w-md sm:max-w-xl px-4 py-2.5 rounded-2xl bg-black/85 backdrop-blur-md border border-white/20 text-center shadow-2xl"
+                  >
+                    <div className="flex items-center justify-center gap-1.5 mb-1">
+                      <span className={`inline-block w-2 h-2 rounded-full ${latestSubtitle.role === 'user' ? 'bg-sky-400 animate-pulse' : 'bg-emerald-400 animate-pulse'}`} />
+                      <span className={`text-[10px] uppercase tracking-wider font-black ${latestSubtitle.role === 'user' ? 'text-sky-300' : 'text-emerald-400'}`}>
+                        {latestSubtitle.role === 'user' 
+                          ? (lang === 'bn' ? '🗣️ কৃষক' : '🗣️ Farmer') 
+                          : (lang === 'bn' ? '🤖 এআই কৃষিবিদ' : '🤖 AI Agronomist')}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-semibold text-white leading-relaxed tracking-wide drop-shadow-md">
+                      {latestSubtitle.text}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* Bottom Audio Waveform Overlay */}
             <div className={`absolute left-4 right-4 flex items-center justify-center gap-1 z-20 pointer-events-none ${
@@ -1154,31 +1422,14 @@ Return a JSON object with this exact structure:
             </div>
           )}
 
-          {transcripts.length > 0 && (
-            <details className="text-xs group border-t border-gray-100 dark:border-gray-700/50 pt-2.5">
-              <summary className="font-bold text-emerald-600 dark:text-emerald-400 cursor-pointer list-none flex items-center justify-between">
-                <span>{lang === 'bn' ? `কথোপকথন রেকর্ড (${transcripts.length}টি উক্তি)` : `Full Conversation Record (${transcripts.length} turns)`}</span>
-                <span className="text-[10px] text-gray-400 group-open:rotate-180 transition-transform">▼</span>
-              </summary>
-              <div className="mt-2.5 space-y-2 max-h-48 overflow-y-auto pr-1">
-                {transcripts.map((t) => (
-                  <div 
-                    key={t.id} 
-                    className={`p-2 rounded-xl text-xs ${
-                      t.role === 'user' 
-                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 border border-emerald-200/50' 
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                    }`}
-                  >
-                    <span className="font-bold mr-1.5">
-                      {t.role === 'user' ? (lang === 'bn' ? 'কৃষক:' : 'Farmer:') : (lang === 'bn' ? 'বিশেষজ্ঞ:' : 'AI Agronomist:')}
-                    </span>
-                    <span>{t.text}</span>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50 text-[11px] text-gray-500 dark:text-gray-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span>
+              {lang === 'bn' 
+                ? 'গোপনীয়তা সুরক্ষা: কথপোকথনের হুবহু উক্তি সংরক্ষণ না করে শুধুমাত্র অনুমোদিত সারসংক্ষেপ সংরক্ষণ করা হয়েছে।' 
+                : 'Privacy Protected: Verbatim dialogue is not saved; only the distilled agronomic summary is stored.'}
+            </span>
+          </div>
         </div>
       )}
     </div>

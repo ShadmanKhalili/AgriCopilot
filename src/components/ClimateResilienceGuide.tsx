@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  Waves, Sun, Droplets, Sparkles, Sprout, 
+  Waves, Sun, Droplets, Sprout, 
   PhoneCall, CheckCircle2, AlertCircle, ArrowRight,
-  Compass, ThermometerSnowflake, ChevronRight,
-  Calculator, Cloud, LayoutGrid, Columns2, TableProperties,
-  BookOpen, Scale, X, Layers, Check, ArrowUpDown
+  ThermometerSnowflake, Scale, X, Activity, Gauge
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../utils/translations';
@@ -259,14 +257,8 @@ interface Props {
   onNavigateTab?: (tab: any, payload?: any) => void;
 }
 
-type DesignMode = 'botanical-editorial' | 'master-detail' | 'atmospheric-gauges' | 'comparison-matrix';
-
 export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
   const [selectedStress, setSelectedStress] = useState<'all' | 'flood' | 'salinity' | 'drought' | 'cold'>('all');
-  const [designMode, setDesignMode] = useState<DesignMode>('botanical-editorial');
-  
-  // Master-Detail active selection
-  const [selectedVarietyId, setSelectedVarietyId] = useState<string>('brri-51');
 
   // Multi-variety comparison selection
   const [comparisonIds, setComparisonIds] = useState<string[]>(['brri-51', 'bina-11']);
@@ -275,8 +267,6 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
   const filteredVarieties = selectedStress === 'all'
     ? STRESS_VARIETIES
     : STRESS_VARIETIES.filter(v => v.stressType === selectedStress);
-
-  const activeVariety = STRESS_VARIETIES.find(v => v.id === selectedVarietyId) || STRESS_VARIETIES[0];
 
   const toggleComparison = (id: string) => {
     if (comparisonIds.includes(id)) {
@@ -296,58 +286,70 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
     switch (stress) {
       case 'flood':
         return {
-          labelBn: 'জলমগ্নতা ও বন্যা',
+          labelBn: 'বন্যা ও জলমগ্নতা',
           labelEn: 'Flood Submergence',
+          metricTitleBn: 'পানির স্তর ও জলমগ্নতা সহনশীলতা',
+          metricTitleEn: 'Water Depth & Submergence Gauge',
           icon: Waves,
           colorText: 'text-sky-800',
           colorBg: 'bg-sky-50',
           colorBorder: 'border-sky-200',
           colorAccent: 'from-sky-600 to-blue-700',
           colorBadge: 'bg-sky-100 text-sky-900 border-sky-300',
-          barColor: 'bg-sky-500'
+          barColor: 'bg-sky-500',
+          subBarColor: 'bg-sky-100'
         };
       case 'salinity':
         return {
           labelBn: 'উপকূলীয় লবণাক্ততা',
           labelEn: 'Coastal Salinity',
+          metricTitleBn: 'লবণাক্ততা সহনশীলতা সূচক (EC Meter)',
+          metricTitleEn: 'Salinity Tolerance Metric (EC Meter)',
           icon: Droplets,
           colorText: 'text-teal-800',
           colorBg: 'bg-teal-50',
           colorBorder: 'border-teal-200',
           colorAccent: 'from-teal-600 to-emerald-800',
           colorBadge: 'bg-teal-100 text-teal-900 border-teal-300',
-          barColor: 'bg-teal-500'
+          barColor: 'bg-teal-500',
+          subBarColor: 'bg-teal-100'
         };
       case 'drought':
         return {
           labelBn: 'খরা ও তাপপ্রবাহ',
           labelEn: 'Drought & Heat',
+          metricTitleBn: 'অনাবৃষ্টি ও মাটি আর্দ্রতা ধারণ ক্ষমতা',
+          metricTitleEn: 'Drought Resistance & Moisture Index',
           icon: Sun,
           colorText: 'text-amber-800',
           colorBg: 'bg-amber-50',
           colorBorder: 'border-amber-200',
           colorAccent: 'from-amber-600 to-orange-700',
           colorBadge: 'bg-amber-100 text-amber-900 border-amber-300',
-          barColor: 'bg-amber-500'
+          barColor: 'bg-amber-500',
+          subBarColor: 'bg-amber-100'
         };
       default:
         return {
           labelBn: 'শৈত্যপ্রবাহ',
           labelEn: 'Cold Wave',
+          metricTitleBn: 'শৈত্য সহনশীলতা ও চারা সুরক্ষার সীমা',
+          metricTitleEn: 'Cold Shock Tolerance Index',
           icon: ThermometerSnowflake,
           colorText: 'text-indigo-800',
           colorBg: 'bg-indigo-50',
           colorBorder: 'border-indigo-200',
           colorAccent: 'from-indigo-600 to-slate-800',
           colorBadge: 'bg-indigo-100 text-indigo-900 border-indigo-300',
-          barColor: 'bg-indigo-500'
+          barColor: 'bg-indigo-500',
+          subBarColor: 'bg-indigo-100'
         };
     }
   };
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 pb-12">
-      {/* Header Banner with Clean Identity */}
+      {/* Header Banner */}
       <div className="bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-xl border border-emerald-800/40">
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -362,8 +364,8 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl leading-relaxed">
               {lang === 'bn'
-                ? 'বন্যা, উপকূলের লবণাক্ততা ও বরেন্দ্রের খরার ঝুঁকি মোকাবিলার জন্য বৈজ্ঞানিকভাবে প্রমাণিত ফসলের জাত। নিচে চারটি ভিন্ন ভিজ্যুয়াল শৈলীতে ব্রাউজ করুন।'
-                : 'Scientifically validated cultivars engineered for submerged floodplains, coastal saline belts, and drought zones. Explore across 4 distinctive design philosophies.'}
+                ? 'বন্যা, উপকূলের লবণাক্ততা ও বরেন্দ্রের খরার ঝুঁকি মোকাবিলার জন্য বৈজ্ঞানিকভাবে প্রমাণিত ফসলের জাত এবং পানির স্তর ও লবণাক্ততার পরিমাপক।'
+                : 'Scientifically validated cultivars engineered for submerged floodplains, coastal saline belts, and drought zones with dynamic environmental metrics.'}
             </p>
           </div>
 
@@ -383,123 +385,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
         </div>
       </div>
 
-      {/* 4 DESIGN PHILOSOPHIES SELECTOR (Direct Answer to User Request) */}
-      <div className="bg-white rounded-2xl p-4 border border-stone-200 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center space-x-2">
-            <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-black text-stone-900">
-                {lang === 'bn' ? 'ডিজাইন শৈলী নির্বাচন করুন (Choose UI/UX Philosophy)' : 'Choose UI/UX Design Philosophy'}
-              </h2>
-              <p className="text-xs text-stone-500">
-                {lang === 'bn' 
-                  ? 'বক্স ও কার্ডের একঘেয়েমি দূর করতে ৪টি অনন্য ডিজাইন বিকল্প তৈরি করা হয়েছে'
-                  : 'Compare 4 distinctive non-generic layouts to determine your ideal user experience'}
-              </p>
-            </div>
-          </div>
-
-          <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-semibold self-start sm:self-auto">
-            {lang === 'bn' ? '💡 টিপ: সবগুলো ট্যাব ঘুরে দেখে পছন্দের শৈলী বেছে নিন' : '💡 Tip: Click each tab to preview the interaction feel'}
-          </div>
-        </div>
-
-        {/* 4 Style Tabs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setDesignMode('botanical-editorial')}
-            className={`flex items-center space-x-2 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              designMode === 'botanical-editorial'
-                ? 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/10'
-                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-            }`}
-          >
-            <BookOpen className={`w-4 h-4 shrink-0 ${designMode === 'botanical-editorial' ? 'text-emerald-400' : 'text-stone-500'}`} />
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">
-                {lang === 'bn' ? '১. বোটানিক্যাল ডসিয়ার' : '1. Botanical Dossier'}
-              </div>
-              <div className={`text-[10px] truncate ${designMode === 'botanical-editorial' ? 'text-stone-300' : 'text-stone-500'}`}>
-                {lang === 'bn' ? 'বক্সবিহীন এডিটোরিয়াল স্পেক' : 'Clean unboxed spec sheet'}
-              </div>
-            </div>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setDesignMode('master-detail')}
-            className={`flex items-center space-x-2 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              designMode === 'master-detail'
-                ? 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/10'
-                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-            }`}
-          >
-            <Columns2 className={`w-4 h-4 shrink-0 ${designMode === 'master-detail' ? 'text-teal-400' : 'text-stone-500'}`} />
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">
-                {lang === 'bn' ? '২. ইন্টারেক্টিভ ইনডেক্স' : '2. Split Master-Detail'}
-              </div>
-              <div className={`text-[10px] truncate ${designMode === 'master-detail' ? 'text-stone-300' : 'text-stone-500'}`}>
-                {lang === 'bn' ? 'বামপাশে তালিকা, ডানে বিস্তারিত' : 'Quick navigation + deep view'}
-              </div>
-            </div>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setDesignMode('atmospheric-gauges')}
-            className={`flex items-center space-x-2 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              designMode === 'atmospheric-gauges'
-                ? 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/10'
-                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-            }`}
-          >
-            <LayoutGrid className={`w-4 h-4 shrink-0 ${designMode === 'atmospheric-gauges' ? 'text-sky-400' : 'text-stone-500'}`} />
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">
-                {lang === 'bn' ? '৩. পরিবেশগত গেজ' : '3. Environmental Gauges'}
-              </div>
-              <div className={`text-[10px] truncate ${designMode === 'atmospheric-gauges' ? 'text-stone-300' : 'text-stone-500'}`}>
-                {lang === 'bn' ? 'পানির স্তর ও লবণাক্ততা মিটার' : 'Water & salinity metric bars'}
-              </div>
-            </div>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setDesignMode('comparison-matrix')}
-            className={`flex items-center space-x-2 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-              designMode === 'comparison-matrix'
-                ? 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/10'
-                : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-            }`}
-          >
-            <TableProperties className={`w-4 h-4 shrink-0 ${designMode === 'comparison-matrix' ? 'text-amber-400' : 'text-stone-500'}`} />
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">
-                {lang === 'bn' ? '৪. জাতের তুলনামূলক তালিকা' : '4. Variety Comparison Table'}
-              </div>
-              <div className={`text-[10px] truncate ${designMode === 'comparison-matrix' ? 'text-stone-300' : 'text-stone-500'}`}>
-                {lang === 'bn' ? 'পাশাপাশি জাতের তুলনা টেবিল' : 'Side-by-side data table'}
-              </div>
-            </div>
-          </motion.button>
-        </div>
-      </div>
-
-      {/* Stress Category Filter Bar (Shared across all views) */}
+      {/* Stress Category Filter Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-stone-200 shadow-xs">
         <div className="flex flex-wrap items-center gap-1.5">
           <motion.button
@@ -525,7 +411,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            <Waves className="w-3.5 h-3.5 text-sky-400" />
+            <Waves className="w-3.5 h-3.5 text-sky-300" />
             <span>{lang === 'bn' ? 'বন্যা ও জলমগ্নতা' : 'Flood'}</span>
           </motion.button>
 
@@ -540,7 +426,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
             }`}
           >
             <Droplets className="w-3.5 h-3.5 text-teal-300" />
-            <span>{lang === 'bn' ? 'উপকূলীয় লবণাক্ততা' : 'Salinity'}</span>
+            <span>{lang === 'bn' ? 'উপকূলীয় লবণাক্ততা' : 'Salinity'}</span>
           </motion.button>
 
           <motion.button
@@ -587,665 +473,156 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
         </motion.button>
       </div>
 
-      {/* =========================================================================
-          DESIGN 1: THE BOTANICAL FIELD DOSSIER (Unboxed, Editorial & High-Craft)
-          ========================================================================= */}
-      {designMode === 'botanical-editorial' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="space-y-6"
-        >
-          <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200 flex items-center justify-between">
-            <div className="text-xs text-stone-600 leading-relaxed">
-              <strong className="text-stone-900 font-bold">{lang === 'bn' ? 'ডিজাইন বৈশিষ্ট্য:' : 'Design Philosophy:'}</strong>{' '}
-              {lang === 'bn'
-                ? 'কোনো কার্ডের ভিতর কার্ড বা নেস্টেড বাক্স নেই। কাগজের মত পরিচ্ছন্ন এডিটোরিয়াল স্পেক শীট, স্পষ্ট টাইপোগ্রাফি এবং উচ্চ-কনট্রাস্ট ডেটা স্ট্রিপ।'
-                : 'Zero nested cards or box clutter. Editorial botanical layout with distinct typographic hierarchy, fine hairline rules, and generous whitespace.'}
-            </div>
-            <span className="text-[11px] font-mono font-bold text-stone-500 bg-white px-2.5 py-1 rounded-lg border border-stone-200 shrink-0 ml-3">
-              Editorial Spec Sheet
-            </span>
-          </div>
+      {/* Environmental Gauges Cards Grid (Dedicated Layout) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredVarieties.map((variety) => {
+          const theme = getStressTheme(variety.stressType);
+          const Icon = theme.icon;
+          const isSelected = comparisonIds.includes(variety.id);
+          const percent = Math.min(100, Math.round((variety.toleranceGauge.value / variety.toleranceGauge.max) * 100));
 
-          <div className="bg-white rounded-3xl border border-stone-200/90 shadow-sm divide-y divide-stone-100 overflow-hidden">
-            {filteredVarieties.map((variety, idx) => {
-              const theme = getStressTheme(variety.stressType);
-              const Icon = theme.icon;
-              const isSelected = comparisonIds.includes(variety.id);
-
-              return (
-                <motion.div 
-                  key={variety.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18, delay: Math.min(idx * 0.03, 0.3) }}
-                  className="p-6 md:p-8 hover:bg-stone-50/60 transition-colors group"
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-                    {/* Left: Identity & Core Trait */}
-                    <div className="lg:w-5/12 space-y-3">
-                      <div className="flex items-center space-x-2.5">
-                        <span className={`inline-flex items-center space-x-1 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${theme.colorBadge}`}>
-                          <Icon className="w-3 h-3" />
-                          <span>{lang === 'bn' ? theme.labelBn : theme.labelEn}</span>
-                        </span>
-                        <span className="text-xs font-mono font-bold text-stone-400">
-                          {variety.breeder} • {variety.season}
-                        </span>
-                      </div>
-
-                      <div>
-                        <h3 className="text-2xl font-black text-stone-900 tracking-tight group-hover:text-emerald-950 transition-colors">
-                          {variety.name}
-                        </h3>
-                        <p className="text-xs text-stone-500 font-medium mt-1">
-                          {lang === 'bn' ? variety.specialTraitBn : variety.specialTraitEn}
-                        </p>
-                      </div>
-
-                      {/* Primary Tolerance Capacity Statement (Unboxed) */}
-                      <div className="pt-2">
-                        <div className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
-                          {lang === 'bn' ? 'সহনশীলতার সর্বোচ্চ মাত্রা' : 'Stress Tolerance Threshold'}
-                        </div>
-                        <p className="text-sm font-bold text-stone-900 mt-1 leading-snug">
-                          {lang === 'bn' ? variety.toleranceLevelBn : variety.toleranceLevelEn}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Middle: Airy Horizontal Metric Strip */}
-                    <div className="lg:w-4/12 grid grid-cols-2 sm:grid-cols-3 gap-4 py-3 lg:py-0 border-y lg:border-y-0 lg:border-x border-stone-200/80 lg:px-6">
-                      <div>
-                        <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-                          {lang === 'bn' ? 'জীবনকাল' : 'Duration'}
-                        </div>
-                        <div className="text-2xl font-black text-stone-900 font-mono mt-0.5">
-                          {variety.durationDays}
-                          <span className="text-xs font-sans font-medium text-stone-500 ml-1">
-                            {lang === 'bn' ? 'দিন' : 'd'}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-stone-500">
-                          {variety.durationDays < 130 
-                            ? (lang === 'bn' ? 'স্বল্পমেয়াদী' : 'Short cycle') 
-                            : (lang === 'bn' ? 'মাঝারি মেয়াদী' : 'Medium cycle')}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-                          {lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield Potential'}
-                        </div>
-                        <div className="text-lg font-black text-emerald-800 font-mono mt-0.5">
-                          {variety.yieldPotentialBn.split('/')[0]}
-                        </div>
-                        <div className="text-[10px] text-stone-500">
-                          {lang === 'bn' ? 'অনুকূল পরিচর্যায়' : 'Under optimal care'}
-                        </div>
-                      </div>
-
-                      <div className="col-span-2 sm:col-span-1">
-                        <div className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">
-                          {lang === 'bn' ? 'সহনশীল সীমা' : 'Threshold'}
-                        </div>
-                        <div className="text-lg font-black text-sky-800 font-mono mt-0.5">
-                          {variety.toleranceGauge.value}{' '}
-                          <span className="text-[10px] font-sans font-medium text-stone-500">
-                            {lang === 'bn' ? variety.toleranceGauge.unitBn.split(' ')[0] : variety.toleranceGauge.unitEn.split(' ')[0]}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-stone-500">
-                          {variety.breeder} সার্টিফাইড
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Geographical Suitability & Smart Actions */}
-                    <div className="lg:w-3/12 space-y-3 flex flex-col justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-1.5 text-stone-400 text-xs font-bold uppercase tracking-wider">
-                          <Compass className="w-3.5 h-3.5 text-stone-500" />
-                          <span>{lang === 'bn' ? 'অনুকূল এলাকা' : 'Target Region'}</span>
-                        </div>
-                        <p className="text-xs text-stone-700 leading-relaxed font-medium">
-                          {lang === 'bn' ? variety.suitableRegionsBn : variety.suitableRegionsEn}
-                        </p>
-                      </div>
-
-                      {/* Management Note */}
-                      <div className="text-[11px] text-stone-600 bg-stone-50 p-2.5 rounded-xl border border-stone-200/60">
-                        <strong className="text-stone-800 font-bold">{lang === 'bn' ? 'মাঠ পরামর্শ: ' : 'Field Tip: '}</strong>
-                        {lang === 'bn' ? variety.managementTipsBn : variety.managementTipsEn}
-                      </div>
-
-                      {/* Clean Actions */}
-                      <div className="pt-1 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleComparison(variety.id)}
-                          className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                          }`}
-                        >
-                          <Check className={`w-3.5 h-3.5 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
-                          <span>{isSelected ? (lang === 'bn' ? 'যুক্ত আছে' : 'Selected') : (lang === 'bn' ? '+ তুলনা করুন' : '+ Compare')}</span>
-                        </button>
-
-                        {onNavigateTab && (
-                          <button
-                            type="button"
-                            onClick={() => onNavigateTab('krishi-profit', { crop: 'paddy_aman' })}
-                            className="flex items-center space-x-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 transition-colors cursor-pointer"
-                          >
-                            <span>{lang === 'bn' ? 'লাভ হিসাব' : 'Calculator'}</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
-
-      {/* =========================================================================
-          DESIGN 2: THE INTERACTIVE BOTANICAL INDEX (Split Master-Detail)
-          ========================================================================= */}
-      {designMode === 'master-detail' && (
-        <div className="space-y-6">
-          <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200 flex items-center justify-between">
-            <div className="text-xs text-stone-600 leading-relaxed">
-              <strong className="text-stone-900 font-bold">{lang === 'bn' ? 'ডিজাইন বৈশিষ্ট্য:' : 'Design Philosophy:'}</strong>{' '}
-              {lang === 'bn'
-                ? 'স্ক্রল করে লম্বা পেজে হারিয়ে না গিয়ে বামপাশে জাতের কমপ্যাক্ট ইনডেক্স থেকে ক্লিক করুন, আর ডানপাশে বড় পূর্ণাঙ্গ বোটানিক্যাল ডসিয়ার শিট স্বয়ংক্রিয়ভাবে আপডেট হবে।'
-                : 'Zero vertical scroll fatigue. A compact catalog on the left paired with an authoritative, expansive field dossier on the right.'}
-            </div>
-            <span className="text-[11px] font-mono font-bold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200 shrink-0 ml-3">
-              Master-Detail Layout
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Cultivar Catalog List */}
-            <div className="lg:col-span-4 bg-white rounded-3xl border border-stone-200 shadow-sm p-3 space-y-2">
-              <div className="px-3 py-2 border-b border-stone-100 flex items-center justify-between">
-                <span className="text-xs font-black text-stone-900 uppercase tracking-wider">
-                  {lang === 'bn' ? 'জাতের তালিকা' : 'Cultivar Index'} ({filteredVarieties.length})
-                </span>
-                <span className="text-[11px] text-stone-400 font-medium">
-                  {lang === 'bn' ? 'ক্লিক করে বিস্তারিত দেখুন' : 'Click to inspect'}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 max-h-[640px] overflow-y-auto pr-1">
-                {filteredVarieties.map((variety) => {
-                  const theme = getStressTheme(variety.stressType);
-                  const Icon = theme.icon;
-                  const isActive = activeVariety.id === variety.id;
-
-                  return (
-                    <button
-                      key={variety.id}
-                      type="button"
-                      onClick={() => setSelectedVarietyId(variety.id)}
-                      className={`w-full text-left p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isActive
-                          ? 'bg-stone-900 text-white border-stone-900 shadow-md ring-2 ring-stone-900/10'
-                          : 'bg-white text-stone-800 border-stone-100 hover:bg-stone-50 hover:border-stone-200'
-                      }`}
-                    >
-                      <div className="space-y-1 min-w-0 pr-2">
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                            isActive ? 'bg-white/20 text-white' : theme.colorBadge
-                          }`}>
-                            {variety.breeder}
-                          </span>
-                          <span className={`text-[10px] font-bold ${isActive ? 'text-stone-300' : 'text-stone-500'}`}>
-                            {variety.season.split(' ')[0]}
-                          </span>
-                        </div>
-                        <div className="text-sm font-black truncate">
-                          {variety.name}
-                        </div>
-                        <div className={`text-[11px] truncate ${isActive ? 'text-stone-300' : 'text-stone-500'}`}>
-                          {variety.durationDays} {lang === 'bn' ? 'দিন' : 'days'} • {variety.toleranceGauge.labelBn.split(' ')[0]}
-                        </div>
-                      </div>
-
-                      <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${
-                        isActive ? 'text-emerald-400 translate-x-0.5' : 'text-stone-300'
-                      }`} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right Column: Expansive Field Dossier */}
-            <div className="lg:col-span-8 bg-white rounded-3xl border border-stone-200 shadow-sm p-6 md:p-8 space-y-6">
-              {/* Active Variety Header */}
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-stone-200">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2.5">
-                    {(() => {
-                      const theme = getStressTheme(activeVariety.stressType);
-                      const Icon = theme.icon;
-                      return (
-                        <span className={`inline-flex items-center space-x-1.5 text-xs font-black px-3 py-1 rounded-full border ${theme.colorBadge}`}>
-                          <Icon className="w-3.5 h-3.5" />
-                          <span>{lang === 'bn' ? theme.labelBn : theme.labelEn}</span>
-                        </span>
-                      );
-                    })()}
-                    <span className="text-xs font-bold text-stone-500 bg-stone-100 px-2.5 py-1 rounded-lg">
-                      {activeVariety.breeder} • {activeVariety.season}
+          return (
+            <motion.div
+              key={variety.id}
+              whileHover={{ y: -4 }}
+              className="bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
+            >
+              {/* Atmospheric Header Bar */}
+              <div>
+                <div className={`p-4 bg-gradient-to-r ${theme.colorAccent} text-white flex items-center justify-between`}>
+                  <div className="flex items-center space-x-2">
+                    <Icon className="w-4 h-4 text-white" />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      {lang === 'bn' ? theme.labelBn : theme.labelEn}
                     </span>
                   </div>
-
-                  <h2 className="text-2xl md:text-3xl font-black text-stone-900 tracking-tight">
-                    {activeVariety.name}
-                  </h2>
-                  <p className="text-sm font-medium text-emerald-800">
-                    {lang === 'bn' ? activeVariety.specialTraitBn : activeVariety.specialTraitEn}
-                  </p>
+                  <span className="text-[11px] font-mono font-bold bg-black/25 px-2.5 py-0.5 rounded-md border border-white/20">
+                    {variety.breeder}
+                  </span>
                 </div>
 
-                <div className="flex items-center space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleComparison(activeVariety.id)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      comparisonIds.includes(activeVariety.id)
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-stone-50 text-stone-800 border-stone-200 hover:bg-stone-100'
-                    }`}
-                  >
-                    {comparisonIds.includes(activeVariety.id)
-                      ? (lang === 'bn' ? '✓ তালিকায় যুক্ত' : '✓ In Comparison')
-                      : (lang === 'bn' ? '+ তুলনায় যোগ করুন' : '+ Add to Compare')}
-                  </button>
-                </div>
-              </div>
-
-              {/* Graphical Stress Resistance Gauge */}
-              <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-                    {lang === 'bn' ? 'সহনশীলতার পরিমাপক (Stress Gauge)' : 'Stress Resistance Gauge'}
-                  </div>
-                  <div className="text-sm font-black font-mono text-stone-900">
-                    {activeVariety.toleranceGauge.value} / {activeVariety.toleranceGauge.max}{' '}
-                    <span className="text-xs font-sans text-stone-500">
-                      {lang === 'bn' ? activeVariety.toleranceGauge.unitBn : activeVariety.toleranceGauge.unitEn}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Visual Bar */}
-                <div className="w-full bg-stone-200 h-3 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(activeVariety.toleranceGauge.value / activeVariety.toleranceGauge.max) * 100}%` }}
-                    transition={{ duration: 0.55, ease: "easeOut" }}
-                    className={`h-full rounded-full ${getStressTheme(activeVariety.stressType).barColor}`}
-                  />
-                </div>
-
-                <div className="text-xs text-stone-600 font-medium">
-                  {lang === 'bn' ? activeVariety.toleranceLevelBn : activeVariety.toleranceLevelEn}
-                </div>
-              </div>
-
-              {/* 3 Metric Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl border border-stone-200 bg-white space-y-1">
-                  <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                    {lang === 'bn' ? 'মোট জীবনকাল' : 'Maturity Days'}
-                  </div>
-                  <div className="text-2xl font-black text-stone-900 font-mono">
-                    {activeVariety.durationDays}{' '}
-                    <span className="text-xs font-sans text-stone-500 font-medium">
-                      {lang === 'bn' ? 'দিন' : 'Days'}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-stone-500">
-                    {lang === 'bn' ? 'বীজ থেকে পরিপক্বতা' : 'Seed to harvest'}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-stone-200 bg-white space-y-1">
-                  <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                    {lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield Capacity'}
-                  </div>
-                  <div className="text-2xl font-black text-emerald-700 font-mono">
-                    {activeVariety.yieldPotentialBn.split('/')[0]}
-                  </div>
-                  <div className="text-[11px] text-stone-500">
-                    {activeVariety.yieldPotentialBn.split('(')[1]?.replace(')', '') || 'উচ্চফলনশীল'}
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-2xl border border-stone-200 bg-white space-y-1">
-                  <div className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
-                    {lang === 'bn' ? 'উদ্ভাবন সংস্থা' : 'Research Institute'}
-                  </div>
-                  <div className="text-2xl font-black text-stone-900 font-mono">
-                    {activeVariety.breeder}
-                  </div>
-                  <div className="text-[11px] text-stone-500">
-                    {activeVariety.breeder === 'BRRI' 
-                      ? (lang === 'bn' ? 'বাংলাদেশ ধান গবেষণা' : 'Rice Research Inst.') 
-                      : (lang === 'bn' ? 'পরমাণু কৃষি গবেষণা' : 'Nuclear Agri Inst.')}
-                  </div>
-                </div>
-              </div>
-
-              {/* Agronomic Lifecycle Guidance */}
-              <div className="space-y-3 pt-2">
-                <h4 className="text-sm font-black text-stone-900 uppercase tracking-wider flex items-center space-x-2">
-                  <Compass className="w-4 h-4 text-emerald-700" />
-                  <span>{lang === 'bn' ? 'অনুকূল এলাকা ও ভৌগোলিক বিন্যাস' : 'Suitable Regions & Geography'}</span>
-                </h4>
-                <p className="text-sm text-stone-700 leading-relaxed font-medium bg-stone-50/70 p-3.5 rounded-2xl border border-stone-200/80">
-                  {lang === 'bn' ? activeVariety.suitableRegionsBn : activeVariety.suitableRegionsEn}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-sm font-black text-stone-900 uppercase tracking-wider flex items-center space-x-2">
-                  <Sprout className="w-4 h-4 text-emerald-700" />
-                  <span>{lang === 'bn' ? 'বিশেষ মাঠ পরিচর্যা ও সার প্রয়োগ' : 'Agronomic Protocol & Fertilizer Guide'}</span>
-                </h4>
-                <p className="text-sm text-stone-700 leading-relaxed font-medium bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-100">
-                  {lang === 'bn' ? activeVariety.managementTipsBn : activeVariety.managementTipsEn}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              {onNavigateTab && (
-                <div className="pt-4 border-t border-stone-100 flex flex-wrap items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => onNavigateTab('weather-advisory')}
-                    className="flex items-center space-x-2 px-4 py-2.5 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-50 font-bold text-xs transition-all cursor-pointer"
-                  >
-                    <Cloud className="w-4 h-4 text-sky-600" />
-                    <span>{lang === 'bn' ? 'আবহাওয়া ঝুঁকি চেক' : 'Weather Risk'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateTab('krishi-profit', { crop: 'paddy_aman' })}
-                    className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-emerald-800 text-white font-bold text-xs hover:bg-emerald-900 transition-all cursor-pointer shadow-sm"
-                  >
-                    <Calculator className="w-4 h-4 text-emerald-300" />
-                    <span>{lang === 'bn' ? 'উৎপাদন ব্যয় ও লাভ হিসাব' : 'Cost & Profit'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
-          DESIGN 3: ATMOSPHERIC CARDS WITH ENVIRONMENTAL GAUGES
-          ========================================================================= */}
-      {designMode === 'atmospheric-gauges' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="space-y-6"
-        >
-          <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200 flex items-center justify-between">
-            <div className="text-xs text-stone-600 leading-relaxed">
-              <strong className="text-stone-900 font-bold">{lang === 'bn' ? 'ডিজাইন বৈশিষ্ট্য:' : 'Design Philosophy:'}</strong>{' '}
-              {lang === 'bn'
-                ? 'জেনেরিক সাদাকালো কার্ডের পরিবর্তে প্রতিটি জলবায়ু সংকটের (বন্যা, লবণাক্ততা, খরা) জন্য প্রাকৃতিক থিম ও গ্রাফিক্যাল গেজ বার, যা এক পলকেই সহনশীলতা প্রকাশ করে।'
-                : 'Visually differentiated by environmental condition. Water-level depth bars and salinity EC meters turn numbers into visual cues.'}
-            </div>
-            <span className="text-[11px] font-mono font-bold text-sky-800 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200 shrink-0 ml-3">
-              Atmospheric Gauges
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredVarieties.map((variety) => {
-              const theme = getStressTheme(variety.stressType);
-              const Icon = theme.icon;
-              const isSelected = comparisonIds.includes(variety.id);
-
-              return (
-                <motion.div
-                  key={variety.id}
-                  whileHover={{ y: -4 }}
-                  className="bg-white rounded-3xl border border-stone-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between"
-                >
-                  {/* Atmospheric Top Accent Bar */}
+                <div className="p-5 space-y-4">
+                  {/* Name & Season */}
                   <div>
-                    <div className={`p-4 bg-gradient-to-r ${theme.colorAccent} text-white flex items-center justify-between`}>
-                      <div className="flex items-center space-x-2">
-                        <Icon className="w-4 h-4 text-white" />
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {lang === 'bn' ? theme.labelBn : theme.labelEn}
-                        </span>
+                    <h3 className="text-xl font-black text-stone-900 tracking-tight">
+                      {variety.name}
+                    </h3>
+                    <div className="text-xs font-bold text-stone-500 mt-1 flex items-center space-x-2">
+                      <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded-md">{variety.season}</span>
+                      <span>•</span>
+                      <span className="text-emerald-700 font-semibold">{variety.durationDays} {lang === 'bn' ? 'দিন জীবনকাল' : 'Days Duration'}</span>
+                    </div>
+                  </div>
+
+                  {/* Water & Salinity Metric Bar (Environmental Gauge) */}
+                  <div className={`p-4 rounded-2xl ${theme.colorBg} border ${theme.colorBorder} space-y-2.5`}>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-1.5 font-bold text-stone-800">
+                        <Gauge className="w-3.5 h-3.5 text-stone-600" />
+                        <span>{lang === 'bn' ? theme.metricTitleBn : theme.metricTitleEn}</span>
                       </div>
-                      <span className="text-[11px] font-mono font-bold bg-black/20 px-2 py-0.5 rounded-md">
-                        {variety.breeder}
+                      <span className="font-mono font-black text-stone-900 bg-white/80 px-2 py-0.5 rounded-md border border-stone-200">
+                        {variety.toleranceGauge.value} / {variety.toleranceGauge.max}
                       </span>
                     </div>
 
-                    <div className="p-5 space-y-4">
-                      {/* Name & Season */}
-                      <div>
-                        <h3 className="text-xl font-black text-stone-900 tracking-tight">
-                          {variety.name}
-                        </h3>
-                        <div className="text-xs font-bold text-stone-500 mt-0.5 flex items-center space-x-2">
-                          <span>{variety.season}</span>
-                          <span>•</span>
-                          <span className="text-emerald-700">{variety.durationDays} {lang === 'bn' ? 'দিন জীবনকাল' : 'Days'}</span>
-                        </div>
+                    {/* Dynamic Gauge Meter Bar */}
+                    <div className="space-y-1">
+                      <div className="w-full bg-stone-200/90 h-3 rounded-full overflow-hidden p-0.5 shadow-inner">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                          className={`h-full rounded-full ${theme.barColor} shadow-sm relative overflow-hidden`}
+                        >
+                          {/* Animated Shimmer Effect */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent w-full animate-pulse" />
+                        </motion.div>
                       </div>
-
-                      {/* Environmental Gauge Widget */}
-                      <div className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-stone-600">
-                            {lang === 'bn' ? 'সহনশীলতার সর্বোচ্চ সীমা:' : 'Tolerance Capacity:'}
-                          </span>
-                          <span className="font-mono font-black text-stone-900">
-                            {variety.toleranceGauge.value} / {variety.toleranceGauge.max}
-                          </span>
-                        </div>
-
-                        <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${(variety.toleranceGauge.value / variety.toleranceGauge.max) * 100}%` }}
-                            transition={{ duration: 0.5, ease: "easeOut" }}
-                            className={`h-full rounded-full ${theme.barColor}`}
-                          />
-                        </div>
-
-                        <div className="text-[11px] font-medium text-stone-700">
-                          {lang === 'bn' ? variety.toleranceGauge.labelBn : variety.toleranceGauge.labelEn}
-                        </div>
+                      
+                      <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                        <span>0</span>
+                        <span>{percent}% {lang === 'bn' ? 'সহনশীলতা ধারণক্ষমতা' : 'Capacity'}</span>
+                        <span>{variety.toleranceGauge.max} {lang === 'bn' ? variety.toleranceGauge.unitBn.split(' ')[0] : variety.toleranceGauge.unitEn.split(' ')[0]}</span>
                       </div>
+                    </div>
 
-                      {/* Yield & Regions */}
-                      <div className="space-y-2 text-xs text-stone-600">
-                        <div>
-                          <strong className="text-stone-900">{lang === 'bn' ? 'সম্ভাব্য ফলন:' : 'Yield:'}</strong>{' '}
-                          {lang === 'bn' ? variety.yieldPotentialBn : variety.yieldPotentialEn}
-                        </div>
-                        <div>
-                          <strong className="text-stone-900">{lang === 'bn' ? 'উপযুক্ত এলাকা:' : 'Zones:'}</strong>{' '}
-                          {lang === 'bn' ? variety.suitableRegionsBn : variety.suitableRegionsEn}
-                        </div>
-                      </div>
-
-                      {/* Special Trait Highlight */}
-                      <div className="text-[11px] text-stone-600 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
-                        <strong className="text-emerald-900">{lang === 'bn' ? 'বিশেষত্ব: ' : 'Trait: '}</strong>
-                        {lang === 'bn' ? variety.specialTraitBn : variety.specialTraitEn}
-                      </div>
+                    <div className="text-xs font-semibold text-stone-800 bg-white/70 p-2 rounded-xl border border-stone-200/60 flex items-center space-x-1.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>{lang === 'bn' ? variety.toleranceGauge.labelBn : variety.toleranceGauge.labelEn}</span>
                     </div>
                   </div>
 
-                  {/* Clean Footer Controls */}
-                  <div className="p-4 bg-stone-50/60 border-t border-stone-100 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => toggleComparison(variety.id)}
-                      className={`text-xs font-bold transition-colors cursor-pointer ${
-                        isSelected ? 'text-emerald-700' : 'text-stone-500 hover:text-stone-800'
-                      }`}
-                    >
-                      {isSelected ? (lang === 'bn' ? '✓ তুলনায় আছে' : '✓ Compared') : (lang === 'bn' ? '+ তুলনায় যোগ' : '+ Compare')}
-                    </button>
-
-                    {onNavigateTab && (
-                      <button
-                        type="button"
-                        onClick={() => onNavigateTab('krishi-profit', { crop: 'paddy_aman' })}
-                        className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center space-x-1 cursor-pointer"
-                      >
-                        <span>{lang === 'bn' ? 'লাভের হিসাব' : 'Profit Calc'}</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    )}
+                  {/* Yield & Regions */}
+                  <div className="space-y-2 text-xs text-stone-600">
+                    <div className="flex items-start space-x-1.5">
+                      <strong className="text-stone-900 shrink-0">{lang === 'bn' ? 'সম্ভাব্য ফলন:' : 'Yield:'}</strong>{' '}
+                      <span className="text-stone-800">{lang === 'bn' ? variety.yieldPotentialBn : variety.yieldPotentialEn}</span>
+                    </div>
+                    <div className="flex items-start space-x-1.5">
+                      <strong className="text-stone-900 shrink-0">{lang === 'bn' ? 'উপযুক্ত এলাকা:' : 'Zones:'}</strong>{' '}
+                      <span className="text-stone-700">{lang === 'bn' ? variety.suitableRegionsBn : variety.suitableRegionsEn}</span>
+                    </div>
+                    <div className="flex items-start space-x-1.5">
+                      <strong className="text-stone-900 shrink-0">{lang === 'bn' ? 'মাঠের পরিচর্যা:' : 'Field Tip:'}</strong>{' '}
+                      <span className="text-stone-700">{lang === 'bn' ? variety.managementTipsBn : variety.managementTipsEn}</span>
+                    </div>
                   </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
 
-      {/* =========================================================================
-          DESIGN 4: MULTI-CULTIVAR COMPARISON MATRIX (Analytical Table)
-          ========================================================================= */}
-      {designMode === 'comparison-matrix' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="space-y-6"
-        >
-          <div className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200 flex items-center justify-between">
-            <div className="text-xs text-stone-600 leading-relaxed">
-              <strong className="text-stone-900 font-bold">{lang === 'bn' ? 'ডিজাইন বৈশিষ্ট্য:' : 'Design Philosophy:'}</strong>{' '}
-              {lang === 'bn'
-                ? 'কৃষি গবেষক ও সিদ্ধান্ত গ্রহণকারী কৃষকদের জন্য তথ্যবহুল ডেটা টেবিল। ফলন, মেয়াদ ও সহনশীলতার তুলনা এক নজরে পাওয়া যায়।'
-                : 'Dense, structured comparison matrix favored by agronomists. Side-by-side metric comparison across duration, yield, and tolerance.'}
-            </div>
-            <span className="text-[11px] font-semibold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200 shrink-0 ml-3">
-              {lang === 'bn' ? 'তুলনামূলক টেবিল' : 'Comparison Table'}
-            </span>
-          </div>
+                  {/* Special Trait Highlight */}
+                  <div className="text-[11px] text-stone-700 bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 leading-relaxed">
+                    <strong className="text-emerald-950 font-bold">{lang === 'bn' ? 'উদ্ভাবনী বৈশিষ্ট্য: ' : 'Key Trait: '}</strong>
+                    {lang === 'bn' ? variety.specialTraitBn : variety.specialTraitEn}
+                  </div>
+                </div>
+              </div>
 
-          <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-stone-900 text-white font-bold uppercase tracking-wider text-[11px]">
-                  <th className="p-4">{lang === 'bn' ? 'তুলনা' : 'Select'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'জাত ও উদ্ভাবক' : 'Cultivar & Breeder'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'সহনশীলতার ধরন' : 'Stress Trait'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'সহনশীল সীমা' : 'Tolerance'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'জীবনকাল' : 'Duration'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield Potential'}</th>
-                  <th className="p-4">{lang === 'bn' ? 'উপযুক্ত এলাকা' : 'Target Region'}</th>
-                  <th className="p-4 text-right">{lang === 'bn' ? 'কার্যক্রম' : 'Action'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100 font-medium text-stone-800">
-                {filteredVarieties.map((variety) => {
-                  const theme = getStressTheme(variety.stressType);
-                  const isSelected = comparisonIds.includes(variety.id);
+              {/* Clean Footer Controls */}
+              <div className="p-4 bg-stone-50/80 border-t border-stone-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => toggleComparison(variety.id)}
+                  className={`text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 ${
+                    isSelected ? 'text-emerald-700' : 'text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  <Scale className="w-3.5 h-3.5" />
+                  <span>
+                    {isSelected ? (lang === 'bn' ? '✓ তুলনায় আছে' : '✓ In Comparison') : (lang === 'bn' ? '+ তুলনায় যোগ' : '+ Add to Compare')}
+                  </span>
+                </button>
 
-                  return (
-                    <tr key={variety.id} className="hover:bg-stone-50/80 transition-colors">
-                      <td className="p-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleComparison(variety.id)}
-                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="font-black text-stone-900 text-sm">{variety.name}</div>
-                        <div className="text-[10px] text-stone-400 font-mono">{variety.breeder} • {variety.season}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${theme.colorBadge}`}>
-                          {lang === 'bn' ? theme.labelBn : theme.labelEn}
-                        </span>
-                      </td>
-                      <td className="p-4 max-w-[200px]">
-                        <div className="font-bold text-stone-900 font-mono">
-                          {variety.toleranceGauge.value} {variety.toleranceGauge.unitBn.split(' ')[0]}
-                        </div>
-                        <div className="text-[11px] text-stone-500 truncate" title={variety.toleranceLevelBn}>
-                          {variety.toleranceLevelBn}
-                        </div>
-                      </td>
-                      <td className="p-4 font-mono font-black text-stone-900">
-                        {variety.durationDays} {lang === 'bn' ? 'দিন' : 'd'}
-                      </td>
-                      <td className="p-4 font-bold text-emerald-800">
-                        {variety.yieldPotentialBn.split('(')[0]}
-                      </td>
-                      <td className="p-4 text-[11px] text-stone-600 max-w-[180px] truncate" title={variety.suitableRegionsBn}>
-                        {variety.suitableRegionsBn}
-                      </td>
-                      <td className="p-4 text-right">
-                        {onNavigateTab && (
-                          <button
-                            type="button"
-                            onClick={() => onNavigateTab('krishi-profit', { crop: 'paddy_aman' })}
-                            className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold transition-all cursor-pointer"
-                          >
-                            {lang === 'bn' ? 'হিসাব' : 'Calc'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
+                {onNavigateTab && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('krishi-profit', { crop: 'paddy_aman' })}
+                    className="text-xs font-bold text-emerald-800 hover:text-emerald-950 flex items-center space-x-1 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-stone-200 hover:border-emerald-300"
+                  >
+                    <span>{lang === 'bn' ? 'লাভের হিসাব' : 'Profit Calc'}</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
 
-      {/* =========================================================================
-          INTERACTIVE SIDE-BY-SIDE COMPARISON MODAL (Power Tool for Farmers)
-          ========================================================================= */}
+      {/* Comparison Drawer / Modal */}
       <AnimatePresence>
         {showComparisonModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-stone-200 shadow-2xl p-6 md:p-8 space-y-6"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto space-y-6"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-stone-200">
+              <div className="flex items-center justify-between pb-4 border-b border-stone-100">
                 <div className="flex items-center space-x-2">
                   <Scale className="w-5 h-5 text-emerald-700" />
                   <h3 className="text-xl font-black text-stone-900">
-                    {lang === 'bn' ? 'জাতের পাশাপাশি তুলনামূলক বিশ্লেষণ' : 'Side-by-Side Cultivar Comparison'}
+                    {lang === 'bn' ? 'জাতের সরাসরি তুলনা (Comparison Matrix)' : 'Side-by-Side Variety Comparison'}
                   </h3>
                 </div>
                 <button
@@ -1263,6 +640,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                   const variety = STRESS_VARIETIES.find(v => v.id === id);
                   if (!variety) return null;
                   const theme = getStressTheme(variety.stressType);
+                  const percent = Math.min(100, Math.round((variety.toleranceGauge.value / variety.toleranceGauge.max) * 100));
 
                   return (
                     <div key={variety.id} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 space-y-4">
@@ -1274,10 +652,24 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                         <p className="text-xs text-stone-500">{variety.breeder} • {variety.season}</p>
                       </div>
 
+                      {/* Mini Gauge in Comparison */}
+                      <div className="p-3 bg-white rounded-xl border border-stone-200 space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold text-stone-700">
+                          <span>{lang === 'bn' ? 'সহনশীলতার পরিমাপ' : 'Gauge Level'}</span>
+                          <span>{variety.toleranceGauge.value} / {variety.toleranceGauge.max}</span>
+                        </div>
+                        <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
+                          <div className={`h-full ${theme.barColor} rounded-full`} style={{ width: `${percent}%` }} />
+                        </div>
+                        <div className="text-[10px] text-stone-600 font-medium">
+                          {lang === 'bn' ? variety.toleranceGauge.labelBn : variety.toleranceGauge.labelEn}
+                        </div>
+                      </div>
+
                       <div className="space-y-2 pt-2 border-t border-stone-200 text-xs">
                         <div>
                           <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'সহনশীলতা' : 'Tolerance'}</div>
-                          <div className="font-bold text-stone-900">{variety.toleranceLevelBn}</div>
+                          <div className="font-bold text-stone-900">{lang === 'bn' ? variety.toleranceLevelBn : variety.toleranceLevelEn}</div>
                         </div>
 
                         <div>
@@ -1287,12 +679,12 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
 
                         <div>
                           <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield'}</div>
-                          <div className="font-black text-emerald-800 font-mono text-base">{variety.yieldPotentialBn}</div>
+                          <div className="font-black text-emerald-800 font-mono text-base">{lang === 'bn' ? variety.yieldPotentialBn : variety.yieldPotentialEn}</div>
                         </div>
 
                         <div>
                           <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'মাঠ পরামর্শ' : 'Tips'}</div>
-                          <div className="text-stone-700">{variety.managementTipsBn}</div>
+                          <div className="text-stone-700">{lang === 'bn' ? variety.managementTipsBn : variety.managementTipsEn}</div>
                         </div>
                       </div>
                     </div>
@@ -1314,7 +706,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
         )}
       </AnimatePresence>
 
-      {/* Post-Disaster Emergency Field Protocols (Clean, Non-Boxy Layout) */}
+      {/* Post-Disaster Emergency Field Protocols */}
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-sm space-y-6">
         <div className="flex items-center space-x-3 pb-4 border-b border-stone-100">
           <div className="p-2.5 bg-amber-600 text-white rounded-2xl">

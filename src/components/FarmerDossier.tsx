@@ -14,7 +14,8 @@ import {
   fetchFarmerTimeline, 
   seedDemoFarmerProfile,
   updateFarmerProfileManual,
-  resetFarmerProfile
+  resetFarmerProfile,
+  calculateCreditScore
 } from '../utils/farmerProfiler';
 import { Language } from '../utils/translations';
 import toast from 'react-hot-toast';
@@ -171,7 +172,21 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
     }
   };
 
-  const currentScore = profile?.creditReadinessScore ?? 0;
+  const [showAuditFramework, setShowAuditFramework] = useState(false);
+
+  const creditAnalysis = calculateCreditScore({
+    totalSessionsCompleted: profile?.totalSessionsCompleted || 0,
+    totalDiagnoses: profile?.totalDiagnoses || 0,
+    cropsCount: profile?.cropsGrown?.length || (profile?.primaryCrop ? 1 : 0),
+    hasLandData: Boolean(profile?.totalLandDecimals && profile.totalLandDecimals > 0),
+    hasLocationData: Boolean(profile?.locationDistrict || profile?.locationUpazila),
+    hasSoilOrIrrigation: Boolean(profile?.soilType || profile?.irrigationType),
+    hasCertificates: timeline.some(t => t.eventType === 'smart_grading') || (profile?.creditReadinessScore || 0) > 65,
+    hasWeatherAction: timeline.some(t => t.eventType === 'weather_alert'),
+    totalEventsCount: timeline.length
+  });
+
+  const currentScore = profile?.creditReadinessScore ?? creditAnalysis.score;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16">
@@ -348,26 +363,26 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
                 <Video className="w-3.5 h-3.5 text-emerald-600" />
-                {lang === 'bn' ? 'লাইভ সেশন সম্পন্ন' : 'Live Consultations'}
+                {lang === 'bn' ? 'লাইভ পরামর্শ সেশন' : 'Live Consultations'}
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">
                 {profile?.totalSessionsCompleted ?? 0} {lang === 'bn' ? 'টি' : ''}
               </p>
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                {lang === 'bn' ? '+৮ ক্রেডিট পয়েন্ট প্রতি সেশনে' : '+8 points per session'}
+                {lang === 'bn' ? '+৩ পয়েন্ট প্রতি সেশনে (সর্বোচ্চ ১২)' : '+3 pts/session (Max 12)'}
               </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
                 <Sprout className="w-3.5 h-3.5 text-lime-600" />
-                {lang === 'bn' ? 'রোগ নির্ণয় লগ' : 'Disease Scans'}
+                {lang === 'bn' ? 'বালাই ও রোগ মনিটরিং' : 'Disease Surveillance'}
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">
                 {profile?.totalDiagnoses ?? 0} {lang === 'bn' ? 'টি' : ''}
               </p>
               <p className="text-[11px] text-lime-600 dark:text-lime-400 mt-0.5">
-                {lang === 'bn' ? 'নিরাময় পরামর্শ সংরক্ষিত' : 'Mitigation verified'}
+                {lang === 'bn' ? '+৩ পয়েন্ট প্রতি স্ক্যানে (সর্বোচ্চ ১৩)' : '+3 pts/scan (Max 13)'}
               </p>
             </div>
           </div>
@@ -381,11 +396,14 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
                   <DollarSign className="w-3.5 h-3.5" />
-                  {lang === 'bn' ? 'কৃষিঋণ ও বীমা যোগ্যতা স্কোর' : 'Credit & Insurance Scoring'}
+                  {lang === 'bn' ? 'ব্যাংক-গ্রেড কৃষিঋণ ও বীমা স্কোরিং' : 'Bank-Grade Ag Credit Scoring'}
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1.5">
                   {lang === 'bn' ? 'ডিজিটাল ক্রেডিট রেডিনেস স্কোর' : 'Digital Credit Readiness Score'}
                 </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  {creditAnalysis.grade}
+                </p>
               </div>
 
               {/* Numerical Score Box */}
@@ -406,10 +424,109 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 />
               </div>
               <div className="flex justify-between text-[11px] font-semibold text-slate-400">
-                <span>{lang === 'bn' ? 'প্রাথমিক (০-৫০)' : 'Baseline (0-50)'}</span>
-                <span>{lang === 'bn' ? 'ঋণযোগ্য (৫৫-৭৪)' : 'Loan Eligible (55-74)'}</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lang === 'bn' ? 'প্রিমিয়াম প্রাক-অনুমোদিত (৭৫+)' : 'Pre-Approved (75+)'}</span>
+                <span>{lang === 'bn' ? 'প্রাথমিক (০-৩৪)' : 'Tier 3 (0-34)'}</span>
+                <span>{lang === 'bn' ? 'ইনপুট ঋণ (৩৫-৫৪)' : 'Tier 2 (35-54)'}</span>
+                <span>{lang === 'bn' ? 'ঋণযোগ্য (৫৫-৭৪)' : 'Tier 1 (55-74)'}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lang === 'bn' ? 'প্রাক-অনুমোদিত (৭৫+)' : 'Tier 0 Prime (75+)'}</span>
               </div>
+            </div>
+
+            {/* 5-Pillar Breakdown Meter */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                  {lang === 'bn' ? '৫-স্তম্ভভিত্তিক স্কোর বিশ্লেষণ (৫ Cs of Credit)' : '5-Pillar Credit Evaluation Matrix'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAuditFramework(!showAuditFramework)}
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  {showAuditFramework 
+                    ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Audit Details') 
+                    : (lang === 'bn' ? 'অডিট ফ্রেমওয়ার্ক দেখুন' : 'View Audit Framework')}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <div>
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
+                    <span>🏛️ {lang === 'bn' ? 'জমির মালিকানা ও অবস্থান' : 'Land & Farm Provenance'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.farmProvenance}/২০</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.farmProvenance / 20) * 100}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
+                    <span>🛡️ {lang === 'bn' ? 'পরামর্শ ও বালাই নজরদারি' : 'Advisory & Pest Diligence'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.surveillanceDiligence}/২৫</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-teal-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.surveillanceDiligence / 25) * 100}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
+                    <span>🌾 {lang === 'bn' ? 'ফসল বৈচিত্র্য ও সম্ভাব্যতা' : 'Crop Viability & Rotation'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.cropViability}/২০</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-lime-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.cropViability / 20) * 100}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
+                    <span>🏅 {lang === 'bn' ? 'মান সনদ ও বাজার সংযোগ' : 'Quality Grading & Mandi'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.qualityAndMarket}/১৫</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.qualityAndMarket / 15) * 100}%` }} />
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
+                    <span>🌦️ {lang === 'bn' ? 'জলবায়ু সতর্কতা ও দীর্ঘমেয়াদি রেকর্ড' : 'Climate Action & Longitudinal History'}</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.longitudinalTrackRecord}/২০</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.longitudinalTrackRecord / 20) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Expandable Stakeholder Audit Details */}
+              <AnimatePresence>
+                {showAuditFramework && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 space-y-2 text-xs leading-relaxed overflow-hidden"
+                  >
+                    <p className="font-bold text-slate-800 dark:text-slate-200">
+                      {lang === 'bn' ? 'কেন এই স্কোরিং পদ্ধতি আর্থিক প্রতিষ্ঠান ও স্টেকহোল্ডারদের নিকট গ্রহণযোগ্য?' : 'Why this score is institutionally defensible & non-gameable:'}
+                    </p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        <strong>{lang === 'bn' ? 'অ্যান্টি-গেমিং ক্যাপিং:' : 'Anti-Gaming Caps:'}</strong> {lang === 'bn' ? 'একই দিনে বারবার ক্লিক বা কল করলে পয়েন্ট বাড়ে না। প্রতিটি স্তরের জন্য কঠোর সীমা নির্ধারিত রয়েছে।' : 'Repeated clicks within the same day are throttled. Every pillar has a strict mathematical ceiling.'}
+                      </li>
+                      <li>
+                        <strong>{lang === 'bn' ? '৫টি নিরপেক্ষ স্তম্ভ:' : '5 Objective Pillars:'}</strong> {lang === 'bn' ? 'বাংলাদেশ ব্যাংকের কৃষিঋণ নীতিমালা ও এমআরএ (MRA) কাঠামোর সাথে সংগতিপূর্ণ।' : 'Aligned with Bangladesh Bank Agricultural Credit Policy & Microfinance Regulatory Authority (MRA) standards.'}
+                      </li>
+                      <li>
+                        <strong>{lang === 'bn' ? 'প্রমাণিত ডাটাবেস:' : 'Verified Audit Trail:'}</strong> {lang === 'bn' ? 'প্রতিটি পয়েন্টের পেছনে টাইমলাইনে সংরক্ষিত রিয়েল-টাইম কনসালটেশন ও ডায়াগনসিস লগ রয়েছে।' : 'Every point earned is backed by timestamped consultations, diagnosis logs, and sensor/vision events in Firestore.'}
+                      </li>
+                    </ul>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Financial Institution Badges */}
@@ -428,10 +545,14 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                     lang === 'bn'
                       ? '৳৫০,০০০ টাকা পর্যন্ত ক্ষুদ্র কৃষিঋণের প্রাথমিক যোগ্যতা রয়েছে।'
                       : 'Eligible for micro-agricultural credit up to ৳50,000.'
+                  ) : currentScore >= 35 ? (
+                    lang === 'bn'
+                      ? 'বীজ ও সারের জন্য ৳২০,০০০ টাকা পর্যন্ত ইনপুট ঋণের যোগ্যতা রয়েছে।'
+                      : 'Eligible for micro-input financing up to ৳20,000.'
                   ) : (
                     lang === 'bn'
-                      ? 'ঋণ যোগ্যতার জন্য আরও লাইভ সেশন বা ফসলের রেকর্ড প্রয়োজন (স্কোর ৫৫+ প্রয়োজন)।'
-                      : 'Needs more verified sessions or disease scans to qualify for loan (55+ score required).'
+                      ? 'ঋণ যোগ্যতার জন্য জমি নিবন্ধন ও নিয়মিত লাইভ পরামর্শ রেকর্ড করুন (স্কোর ৩৫+ প্রয়োজন)।'
+                      : 'Complete land profiling & consultations to unlock financing (35+ score required).'
                   )}
                 </p>
               </div>

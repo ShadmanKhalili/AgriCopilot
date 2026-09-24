@@ -6,10 +6,9 @@ import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
-import CropLifecycleCalendar from './CropLifecycleCalendar';
-import FarmActionTrafficLight from './FarmActionTrafficLight';
 import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
 import { saveCachedWeather, getCachedWeather, formatCacheAge } from '../utils/offlineCache';
+import toast from 'react-hot-toast';
 
 interface Props {
   lang: Language;
@@ -76,6 +75,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [showSensorMetrology, setShowSensorMetrology] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [cacheInfo, setCacheInfo] = useState<{ isCached: boolean; timestamp?: number; isFallback?: boolean } | null>(null);
+  const [isRefreshingLive, setIsRefreshingLive] = useState(false);
+  const prevCoordsRef = React.useRef<string | null>(null);
   const t = translations[lang];
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
@@ -112,19 +113,35 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     }
   };
 
-  const fetchWeatherAndAdvisory = async (overrideModel?: 'weathernext3' | 'standard') => {
+  const fetchWeatherAndAdvisory = async (overrideModel?: 'weathernext3' | 'standard', forceFresh: boolean = false) => {
     if (!globalLocation) return;
     const activeModel = overrideModel || forecastModel;
     setIsLoading(true);
+    if (forceFresh) {
+      setIsRefreshingLive(true);
+    }
     
     try {
       let newWeather: WeatherData;
       let safeSprayingWindow = "No safe window in the next 24 hours";
       let currentIndex = 0;
 
+      // Real-time request headers with strict cache-busting to guarantee live data
+      const cacheBustParam = `&_t=${Date.now()}`;
+      const liveFetchOptions: RequestInit = {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      };
+
       // 1. Fetch Forecast Data based on activeModel
       if (activeModel === 'weathernext3') {
-        const wnRes = await fetch(`/api/weathernext-3?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&timezone=auto`);
+        const wnRes = await fetch(
+          `/api/weathernext-3?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&timezone=auto${cacheBustParam}`,
+          liveFetchOptions
+        );
         if (!wnRes.ok) {
           const errJson = await wnRes.json().catch(() => ({}));
           console.error("WeatherNext 3 API Error Response:", wnRes.status, errJson);
@@ -208,7 +225,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         };
       } else {
         // Standard Multi-Model Open-Meteo
-        const weatherRes = await fetch(`/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto`);
+        const weatherRes = await fetch(
+          `/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto${cacheBustParam}`,
+          liveFetchOptions
+        );
         
         if (!weatherRes.ok) {
           const errJson = await weatherRes.json().catch(() => ({}));
@@ -404,31 +424,62 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       
       setWeather(newWeather);
       setCacheInfo(null);
-      saveCachedWeather(`${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`, newWeather);
+      const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
+      saveCachedWeather(locKey, newWeather, activeModel);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+      if (forceFresh) {
+        toast.success(
+          lang === 'bn' ? 'সরাসরি আবহাওয়া তথ্য আপডেট হয়েছে' : 'Live weather forecast updated',
+          { id: 'live-weather-updated', duration: 2500 }
+        );
+      }
     } catch (error: any) {
       console.error("Weather data fetch error, retrieving offline cache:", error);
       const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
-      const cached = getCachedWeather(locKey);
+      const cached = getCachedWeather(locKey, activeModel, true);
       if (cached) {
         setWeather(cached.data);
         setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
         setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        if (forceFresh) {
+          toast(
+            lang === 'bn' ? 'অফলাইন মোড: সংরক্ষিত ক্যাশ ডেটা দেখানো হচ্ছে' : 'Offline mode: displaying saved cache',
+            { icon: '💾', id: 'weather-cache-notice' }
+          );
+        }
+      } else {
+        toast.error(
+          lang === 'bn' ? 'আবহাওয়া তথ্য লোড করা যায়নি' : 'Unable to load weather forecast',
+          { id: 'weather-fetch-error' }
+        );
       }
     } finally {
       setIsLoading(false);
+      setIsRefreshingLive(false);
     }
   };
 
   useEffect(() => {
     if (globalLocation) {
       const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
-      const cached = getCachedWeather(locKey);
+      
+      // If coordinates changed, clear old weather data to avoid flashing the wrong region
+      if (prevCoordsRef.current && prevCoordsRef.current !== locKey) {
+        setWeather(null);
+        setCacheInfo(null);
+      }
+      prevCoordsRef.current = locKey;
+
+      // Only display cache if it is fresh (< 20 mins)
+      const cached = getCachedWeather(locKey, forecastModel, false);
       if (cached && !weather) {
         setWeather(cached.data);
-        setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
+        setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: false });
         setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
+      
+      // Always immediately query live API in the background
       fetchWeatherAndAdvisory();
     } else {
       // Seamlessly fall back to default location rather than blocking the tab
@@ -436,13 +487,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     }
 
     const handleForceRefresh = () => {
-      fetchWeatherAndAdvisory();
+      fetchWeatherAndAdvisory(undefined, true);
     };
     window.addEventListener('agri:force-refresh-cache', handleForceRefresh);
     return () => {
       window.removeEventListener('agri:force-refresh-cache', handleForceRefresh);
     };
-  }, [globalLocation]);
+  }, [globalLocation?.latitude, globalLocation?.longitude]);
 
   const getHumidityTooltip = (val: number) => {
     if (val < 30) return t.weatherTooltips?.humidityLow;
@@ -570,116 +621,494 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
         </motion.div>
       ) : (
-        <div className="space-y-5">
-          {/* Core Weather Header: Location & High-level Status */}
+        <div className="space-y-3 sm:space-y-4 w-full">
+          {/* Weather Dashboard Card - TOP (Squeezed & Reduced Whitespace) */}
           <motion.div 
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-stone-900 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs"
+            className="bg-white dark:bg-stone-900 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs relative overflow-hidden"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* Header: Title, Live Status, Location Display & Refresh */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5 pb-2.5 border-b border-stone-100 dark:border-stone-800">
               <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-xl sm:text-2xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-stone-900 dark:text-stone-100 text-lg sm:text-xl tracking-tight">
                     {t.weatherForecast}
-                  </h2>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-200/60 dark:border-emerald-800">
+                  </h3>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[10px] sm:text-[11px] font-semibold border border-emerald-200/60 dark:border-emerald-800">
                     <span className="recording-dot shrink-0" />
-                    <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ডেটা' : 'Live Ingest'}</span>
+                    <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ডেটা' : 'Live Data'}</span>
                   </span>
+                  {cacheInfo?.isCached && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-medium border border-amber-200 dark:border-amber-800">
+                      <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        {cacheInfo.isFallback 
+                          ? (lang === 'bn' ? "কক্সবাজার অফলাইন ক্যাশ" : "Offline Cache")
+                          : (lang === 'bn' 
+                              ? `ক্যাশ • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'bn')}`
+                              : `Cached • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'en')}`)}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 {globalLocation && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-1.5">
                     <LocationDisplay coords={globalLocation} lang={lang} color="emerald" />
-                    {cacheInfo?.isCached && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-200 dark:border-amber-800">
-                        <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                        <span>
-                          {cacheInfo.isFallback 
-                            ? (lang === 'bn' ? "কক্সবাজার অফলাইন ক্যাশ সক্রিয়" : "Cox's Bazar Offline Cache")
-                            : (lang === 'bn' 
-                                ? `অফলাইন ক্যাশ • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'bn')}`
-                                : `Offline Cache • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'en')}`)}
-                        </span>
-                      </span>
-                    )}
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center space-x-3 self-start sm:self-auto">
-                {weather && (
-                  <div className="flex items-center space-x-3 bg-stone-50 dark:bg-stone-800/60 px-3.5 py-2 rounded-xl border border-stone-200/80 dark:border-stone-700">
-                    <div>
-                      {weather.condition === 'Sunny' ? (
-                        <Sun className="w-7 h-7 text-amber-500" />
-                      ) : (
-                        <CloudRain className="w-7 h-7 text-sky-500" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-baseline">
-                        <span className="text-xl font-bold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {weather.temp.toFixed(1)}
-                        </span>
-                        <span className="text-xs font-semibold text-stone-400 ml-0.5">°C</span>
-                      </div>
-                      <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider block">
-                        {weather.condition}
-                      </span>
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                <button 
+                  onClick={() => fetchWeatherAndAdvisory(forecastModel, true)} 
+                  disabled={isLoading || isRefreshingLive}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
+                  title={lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather & Satellite Data'}
+                  aria-label="Refresh Live Weather"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${isLoading || isRefreshingLive ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
+                  <span>{isLoading || isRefreshingLive ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating...') : (lang === 'bn' ? 'লাইভ রিফ্রেশ' : 'Live Refresh')}</span>
+                </button>
+
                 <button 
                   onClick={handleDetectLocation} 
-                  className="p-2.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer shadow-xs"
+                  disabled={isDetecting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
                   title={lang === 'bn' ? 'জিপিএস অবস্থান রিফ্রেশ করুন' : 'Refresh GPS Location'}
                   aria-label="Refresh GPS Location"
                 >
-                  <Navigation className="w-4 h-4" />
+                  <Navigation className={`w-3.5 h-3.5 ${isDetecting ? 'animate-spin' : ''}`} />
+                  <span>{isDetecting ? (lang === 'bn' ? 'শনাক্ত হচ্ছে...' : 'Detecting...') : (lang === 'bn' ? 'জিপিএস রিফ্রেশ' : 'Refresh GPS')}</span>
                 </button>
               </div>
             </div>
+
+            {weather ? (
+              <div className="space-y-3 sm:space-y-3.5">
+                {/* WeatherNext 3 Advanced Weather AI banner (Squeezed) */}
+                {weather.isWeatherNext3 && (
+                  <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-3 rounded-xl border border-blue-400/25 shadow-xs relative overflow-hidden">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30 shrink-0">
+                          <Satellite className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-black tracking-widest uppercase text-blue-300">Google AI</span>
+                            <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
+                              5km AI
+                            </span>
+                          </div>
+                          <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                            {lang === 'bn' ? 'উন্নত এআই আবহাওয়া মডেল' : 'Advanced Weather AI'}
+                          </h4>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wider block">
+                          {lang === 'bn' ? 'মডেল নির্ভুলতা' : 'Accuracy'}
+                        </span>
+                        <span className="text-xs font-black text-emerald-400">
+                          {weather.ensembleConfidence || 96}% {lang === 'bn' ? 'সঠিক' : 'Confidence'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary Temp & Condition Display (Squeezed) */}
+                <div className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl bg-stone-50/70 dark:bg-stone-800/50 border border-stone-200/70 dark:border-stone-800">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
+                    <motion.div 
+                      animate={{ 
+                        y: [0, -3, 0],
+                        rotate: [0, 2, 0]
+                      }}
+                      transition={{ 
+                        duration: 4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="shrink-0"
+                    >
+                      {weather.condition === 'Sunny' ? (
+                        <Sun className="w-12 h-12 sm:w-14 sm:h-14 text-amber-500 drop-shadow-sm" />
+                      ) : (
+                        <CloudRain className="w-12 h-12 sm:w-14 sm:h-14 text-sky-500 drop-shadow-sm" />
+                      )}
+                    </motion.div>
+                    <div>
+                      <div className="flex items-baseline">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-stone-100 tabular-nums">
+                          {weather.temp.toFixed(1)}
+                        </span>
+                        <span className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 ml-1">°C</span>
+                      </div>
+                      <p className="text-xs sm:text-sm font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wide mt-0.5">
+                        {weather.condition}
+                      </p>
+                    </div>
+                  </div>
+
+                  {weather.rainfall > 0 && (
+                    <div className="text-right hidden sm:block">
+                      <span className="text-[11px] text-stone-500 dark:text-stone-400 block font-medium">
+                        {lang === 'bn' ? 'বৃষ্টিপাত' : 'Precipitation'}
+                      </span>
+                      <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
+                        {weather.rainfall.toFixed(1)} mm
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4 Primary Weather Metrics Grid (Squeezed) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+                  <Tooltip content={getHumidityTooltip(weather.humidity) || ""}>
+                    <motion.div 
+                      whileHover={{ y: -1 }}
+                      className="bg-stone-50/70 dark:bg-stone-800/60 p-2.5 sm:p-3 rounded-xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
+                    >
+                      <div className="flex items-center text-blue-600 dark:text-blue-400 mb-1">
+                        <div className="p-1 bg-white dark:bg-stone-700 rounded-lg shadow-xs mr-1.5 shrink-0">
+                          <Droplets className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.humidity}</span>
+                      </div>
+                      <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                        {weather.humidity.toFixed(1)}%
+                      </span>
+                    </motion.div>
+                  </Tooltip>
+                
+                  <Tooltip content={getWindTooltip(weather.windSpeed) || ""}>
+                    <motion.div 
+                      whileHover={{ y: -1 }}
+                      className="bg-stone-50/70 dark:bg-stone-800/60 p-2.5 sm:p-3 rounded-xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
+                    >
+                      <div className="flex items-center text-indigo-600 dark:text-indigo-400 mb-1">
+                        <div className="p-1 bg-white dark:bg-stone-700 rounded-lg shadow-xs mr-1.5 shrink-0">
+                          <Wind className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.windSpeed}</span>
+                      </div>
+                      <div className="flex items-baseline">
+                        <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                          {weather.windSpeed.toFixed(1)}
+                        </span>
+                        <span className="text-[10px] font-medium text-stone-400 ml-1">km/h</span>
+                      </div>
+                    </motion.div>
+                  </Tooltip>
+
+                  <Tooltip content={getRainTooltip(weather.rainChance) || ""}>
+                    <motion.div 
+                      whileHover={{ y: -1 }}
+                      className="bg-stone-50/70 dark:bg-stone-800/60 p-2.5 sm:p-3 rounded-xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
+                    >
+                      <div className="flex items-center text-cyan-600 dark:text-cyan-400 mb-1">
+                        <div className="p-1 bg-white dark:bg-stone-700 rounded-lg shadow-xs mr-1.5 shrink-0">
+                          <CloudRain className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.rainChance}</span>
+                      </div>
+                      <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                        {weather.rainChance}%
+                      </span>
+                    </motion.div>
+                  </Tooltip>
+
+                  <Tooltip content={getUvTooltip(weather.uvIndex) || ""}>
+                    <motion.div 
+                      whileHover={{ y: -1 }}
+                      className="bg-stone-50/70 dark:bg-stone-800/60 p-2.5 sm:p-3 rounded-xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
+                    >
+                      <div className="flex items-center text-amber-600 dark:text-amber-400 mb-1">
+                        <div className="p-1 bg-white dark:bg-stone-700 rounded-lg shadow-xs mr-1.5 shrink-0">
+                          <Sun className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.uvIndex}</span>
+                      </div>
+                      <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                        {weather.uvIndex}
+                      </span>
+                    </motion.div>
+                  </Tooltip>
+                </div>
+
+                {/* WeatherNext 3 Agro-Meteorology Cards (Squeezed) */}
+                {weather.isWeatherNext3 && (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
+                      </h4>
+                      <span className="text-[9px] bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">
+                        {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+                      {/* 100m Canopy Wind */}
+                      <div className="bg-sky-50/60 dark:bg-sky-950/30 p-2.5 rounded-xl border border-sky-100 dark:border-sky-900/40">
+                        <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
+                          <Wind className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                            {lang === 'bn' ? '১০০মি বাতাস' : 'Canopy Wind'}
+                          </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                          {weather.boundaryWind100m !== undefined ? weather.boundaryWind100m.toFixed(1) : (weather.windSpeed * 1.35).toFixed(1)}
+                          <span className="text-[10px] text-gray-500 ml-0.5 font-normal">km/h</span>
+                        </div>
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                          {lang === 'bn' ? 'স্প্রে ড্রিফট ঝুঁকি' : 'Spray drift risk'}
+                        </p>
+                      </div>
+
+                      {/* Solar Irradiance DNI */}
+                      <div className="bg-amber-50/60 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-100 dark:border-amber-900/40">
+                        <div className="flex items-center gap-1 text-amber-700 dark:text-amber-300 mb-1">
+                          <Sun className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                            {lang === 'bn' ? 'সৌর বিকিরণ' : 'Solar DNI'}
+                          </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                          {weather.solarRadiationDNI !== undefined ? Math.round(weather.solarRadiationDNI) : 480}
+                          <span className="text-[10px] text-gray-500 ml-0.5 font-normal">W/m²</span>
+                        </div>
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                          {lang === 'bn' ? 'সোলার পাম্প/সালোকসংশ্লেষণ' : 'Solar pump/photosynthesis'}
+                        </p>
+                      </div>
+
+                      {/* Dew Point & Blight Risk */}
+                      <div className="bg-emerald-50/60 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                            <ShieldAlert className="w-3 h-3" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                              {lang === 'bn' ? 'ছত্রাক ঝুঁকি' : 'Blight Risk'}
+                            </span>
+                          </div>
+                          <span className={`text-[8px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
+                            weather.fungalBlightRisk === 'high'
+                              ? 'bg-red-100 text-red-700'
+                              : weather.fungalBlightRisk === 'moderate'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}>
+                            {weather.fungalBlightRisk || 'low'}
+                          </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                          {weather.dewPoint !== undefined ? weather.dewPoint.toFixed(1) : 21.0}°C
+                        </div>
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                          {lang === 'bn' 
+                            ? `শিশিরাঙ্ক ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`
+                            : `Depr: ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`}
+                        </p>
+                      </div>
+
+                      {/* Rain Range */}
+                      <div className="bg-sky-50/60 dark:bg-sky-950/30 p-2.5 rounded-xl border border-sky-100 dark:border-sky-900/40">
+                        <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
+                          <CloudRain className="w-3 h-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                            {lang === 'bn' ? 'বৃষ্টির পরিধি' : 'Rain Range'}
+                          </span>
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 tabular-nums">
+                          {weather.precipitationSpread?.p10 ?? 0} - {weather.precipitationSpread?.p90 ?? (weather.rainfall > 0 ? (weather.rainfall * 1.5).toFixed(1) : '2.0')}
+                          <span className="text-[10px] text-stone-500 ml-0.5 font-normal">mm</span>
+                        </div>
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                          {lang === 'bn' 
+                            ? `ভারী বৃষ্টি ঝুঁকি: ${weather.heavyRainRisk ?? 10}%`
+                            : `Heavy Risk: ${weather.heavyRainRisk ?? 10}%`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 24-Hour AI Hourly Timeline (Squeezed) */}
+                {weather.hourlyForecast && weather.hourlyForecast.length > 0 && (
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        <span>{t.hourlyForecastTrend || '24-Hour AI Weather Trend'}</span>
+                      </h4>
+                      <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wider">
+                        {lang === 'bn' ? 'প্রতি ঘণ্টা' : 'Hourly'}
+                      </span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 pt-0.5 scrollbar-thin">
+                      {weather.hourlyForecast.map((hour, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`shrink-0 flex flex-col items-center justify-between p-2 rounded-xl border text-center min-w-[62px] transition-all ${
+                            idx === 0 
+                              ? 'bg-blue-600 text-white border-blue-700 shadow-sm' 
+                              : 'bg-stone-50 dark:bg-stone-800/60 text-stone-800 dark:text-stone-200 border-stone-200/70 dark:border-stone-700/70'
+                          }`}
+                        >
+                          <span className={`text-[10px] font-semibold ${idx === 0 ? 'text-blue-100' : 'text-stone-500 dark:text-stone-400'}`}>
+                            {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : hour.time}
+                          </span>
+                          <div className="my-1">
+                            {hour.condition === 'Sunny' ? (
+                              <Sun className={`w-4 h-4 ${idx === 0 ? 'text-yellow-300' : 'text-yellow-500'}`} />
+                            ) : hour.condition === 'Rainy' || hour.condition === 'Showers' ? (
+                              <CloudRain className={`w-4 h-4 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
+                            ) : (
+                              <Cloud className={`w-4 h-4 ${idx === 0 ? 'text-blue-200' : 'text-blue-400'}`} />
+                            )}
+                          </div>
+                          <span className="text-xs font-bold tabular-nums">{Math.round(hour.temp)}°C</span>
+                          <div className="mt-0.5 flex items-center gap-0.5 text-[9px]">
+                            <Droplets className={`w-2 h-2 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
+                            <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
+                              {hour.rainProb}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Soil & Hydrology Insights Section (Squeezed) */}
+                {(weather.soilMoisture !== undefined || weather.soilPH !== undefined || weather.safeSprayingWindow) && (
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-800">
+                    <h4 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300 mb-2 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                      {lang === 'bn' ? 'মাটি ও সেচ সংক্রান্ত অন্তর্দৃষ্টি' : 'Soil & Hydrology Insights'}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {weather.soilMoisture !== undefined && (
+                        <div className="flex items-start gap-2 bg-stone-50 dark:bg-stone-800/50 p-2.5 rounded-xl border border-stone-200/60 dark:border-stone-700/60">
+                          <Droplets className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-stone-800 dark:text-stone-200">
+                              {lang === 'bn' ? 'মাটির আর্দ্রতা (০-৭ সেমি)' : 'Soil Moisture (0-7cm)'}
+                            </p>
+                            <p className="text-stone-600 dark:text-stone-400 mt-0.5">
+                              <span className="font-bold">{weather.soilMoisture} m³/m³</span>
+                              {weather.evapotranspiration !== undefined && ` • বাষ্পীভবন: ${weather.evapotranspiration} mm/দিন`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {weather.soilPH !== undefined && (
+                        <div className="flex items-start gap-2 bg-stone-50 dark:bg-stone-800/50 p-2.5 rounded-xl border border-stone-200/60 dark:border-stone-700/60">
+                          <Thermometer className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-stone-800 dark:text-stone-200">
+                              {lang === 'bn' ? 'মাটির গুণমান' : 'Soil Properties'}
+                            </p>
+                            <p className="text-stone-600 dark:text-stone-400 mt-0.5">
+                              pH: <span className="font-bold">{weather.soilPH}</span> | 
+                              নাইট্রোজেন: <span className="font-bold">{weather.soilNitrogen} g/kg</span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {weather.safeSprayingWindow && (
+                        <div className="sm:col-span-2 flex items-start gap-2 bg-emerald-50/60 dark:bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                          <TestTube className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                              {lang === 'bn' ? 'নিরাপদ স্প্রে উইন্ডো' : 'Safe Spraying Window'}
+                            </p>
+                            <p className="text-stone-600 dark:text-stone-300 mt-0.5 font-medium">
+                              {weather.safeSprayingWindow}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Historical Climate Comparison (Squeezed) */}
+                {(weather.historicalAvgTemp !== undefined || weather.historicalToday !== undefined) && (
+                  <div className="bg-blue-50/40 dark:bg-blue-950/20 p-2.5 sm:p-3 rounded-xl border border-blue-100/70 dark:border-blue-900/40 text-xs">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <History className="w-3.5 h-3.5 text-blue-600" />
+                      <h4 className="font-bold text-stone-800 dark:text-stone-200">
+                        {lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}
+                      </h4>
+                    </div>
+                    {weather.historicalToday && (
+                      <div className="flex flex-wrap gap-3 text-stone-700 dark:text-stone-300 mb-1.5 font-medium">
+                        <span className="flex items-center gap-1">
+                          <Thermometer className="w-3 h-3 text-red-500" /> Max: {weather.historicalToday.maxTemp}°C
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Thermometer className="w-3 h-3 text-blue-500" /> Min: {weather.historicalToday.minTemp}°C
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CloudRain className="w-3 h-3 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm
+                        </span>
+                      </div>
+                    )}
+                    {weather.historicalAvgTemp !== undefined && (
+                      <p className="text-stone-600 dark:text-stone-400 leading-relaxed">
+                        {lang === 'bn' 
+                          ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
+                          : `The 5-year average temperature for this month was ${weather.historicalAvgTemp.toFixed(1)}°C. Today (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {lastUpdated && (
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-[10px] text-stone-400">
+                    <span className="font-medium uppercase tracking-wider">{lang === 'bn' ? 'সর্বশেষ আপডেট' : 'Last Updated'}</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">{lastUpdated}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                <p className="text-stone-400 font-semibold text-xs tracking-wider">
+                  {lang === 'bn' ? 'আবহাওয়া ডেটা লোড হচ্ছে...' : 'Fetching Weather...'}
+                </p>
+              </div>
+            )}
           </motion.div>
 
-          {/* 1. Practical Farmer Traffic Light: 1-Tap Daily Decisions (Spray, Irrigate, Harvest) */}
-          {weather && (
-            <FarmActionTrafficLight lang={lang} weather={weather} />
-          )}
-
-          {/* 2. Progressive Disclosure Toggle: Field Metrology & Sensor Readings */}
-          {weather && (
-            <div className="space-y-4">
+          {/* Microclimate Radar & Simulation in clean toggle below the top card */}
+          {globalLocation && weather && (
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => setShowSensorMetrology(!showSensorMetrology)}
-                className="w-full flex items-center justify-between p-4 rounded-2xl border border-stone-200/90 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50/80 transition-all cursor-pointer shadow-xs group text-left"
+                className="w-full flex items-center justify-between p-3 rounded-xl border border-stone-200/80 dark:border-stone-800 bg-white dark:bg-stone-900 hover:bg-stone-50 dark:hover:bg-stone-800/60 transition-all cursor-pointer shadow-xs text-left"
               >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <div className="p-2 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
-                    <Sliders className="w-4 h-4" />
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 shrink-0">
+                    <Sliders className="w-3.5 h-3.5" />
                   </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
-                        {lang === 'bn' ? 'ফিল্ড সেন্সর ও আবহাওয়া ডেটা' : 'Field Metrology & Sensor Readings'}
-                      </span>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
-                        {lang === 'bn' ? 'গভীর বৈজ্ঞানিক বিশ্লেষণ' : 'Technical Telemetry'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 font-normal truncate">
-                      {lang === 'bn' 
-                        ? 'ক্যানোপি উইন্ড, সৌর বিকিরণ (DNI), মাটির পিএইচ, আর্দ্রতা ও ২৪ ঘণ্টার বিশদ চার্ট' 
-                        : 'Canopy wind, solar DNI, soil health indices, and microclimate simulation'}
-                    </p>
+                  <div>
+                    <span className="font-semibold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                      {lang === 'bn' ? '৪৮ ঘণ্টার মাইক্রোক্লাইমেট রাডার সিমুলেশন' : '48-Hour Microclimate Radar Simulator'}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center space-x-1.5 text-stone-500 group-hover:text-stone-800 dark:group-hover:text-stone-200 shrink-0 ml-3">
-                  <span className="text-xs font-semibold hidden sm:inline">
+                <div className="flex items-center space-x-1 text-stone-500">
+                  <span className="text-xs font-medium hidden sm:inline">
                     {showSensorMetrology 
-                      ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Metrology') 
-                      : (lang === 'bn' ? 'বিশদ দেখুন' : 'Show Metrology')}
+                      ? (lang === 'bn' ? 'লুকান' : 'Hide') 
+                      : (lang === 'bn' ? 'দেখুন' : 'Show')}
                   </span>
                   {showSensorMetrology ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </div>
@@ -691,443 +1120,24 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.25 }}
-                    className="overflow-hidden space-y-5 pt-1"
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden pt-3"
                   >
-                    {/* 48-Hour Microclimate Radar & Simulation */}
-                    {globalLocation && (
-                      <MicroclimateRadarSimulator
-                        lang={lang}
-                        coords={globalLocation}
-                        hourlyForecast={weather?.hourlyForecast}
-                        currentTemp={weather?.temp}
-                        currentWind={weather?.windSpeed}
-                        currentRainProb={weather?.rainChance}
-                      />
-                    )}
-
-                    <div className="space-y-6 w-full">
-            {/* Weather Dashboard Card */}
-            <motion.div 
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-stone-900 p-6 sm:p-8 rounded-2xl border border-stone-200/80 dark:border-stone-800 shadow-xs relative overflow-hidden"
-            >
-              <div className="flex items-center justify-between mb-8 sm:mb-10">
-                <div>
-                  <h3 className="font-black text-gray-900 text-2xl tracking-tight">{t.weatherForecast}</h3>
-                  <div className="flex items-center mt-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Data</span>
-                  </div>
-                </div>
-                <button 
-                  onClick={handleDetectLocation} 
-                  className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                >
-                  <Navigation className="w-5 h-5" />
-                </button>
-              </div>
-
-              {globalLocation && (
-                <div className="mb-8">
-                  <LocationDisplay coords={globalLocation} lang={lang} color="blue" />
-                </div>
-              )}
-
-              {weather ? (
-                <div className="space-y-8">
-                  {weather.isWeatherNext3 && (
-                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-4 md:p-5 rounded-3xl border border-blue-400/30 shadow-lg relative overflow-hidden">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-400/30">
-                            <Satellite className="w-5 h-5 text-blue-300 animate-pulse" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-black tracking-widest uppercase text-blue-300">Google AI</span>
-                            <h4 className="text-base font-black text-white flex items-center gap-2">
-                              {lang === 'bn' ? 'উন্নত এআই আবহাওয়া মডেল' : 'Advanced Weather AI'}
-                              <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-400/30">
-                                5km AI
-                              </span>
-                            </h4>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider block">
-                            {lang === 'bn' ? 'মডেলের নির্ভুলতা' : 'Model Accuracy'}
-                          </span>
-                          <span className="text-xs font-black text-emerald-400">
-                            {weather.ensembleConfidence || 96}% {lang === 'bn' ? 'নির্ভুল' : 'Confidence'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-blue-100 pt-2.5 border-t border-white/10 font-medium">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="recording-dot shrink-0" />
-                          {lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও রাডার সংযুক্ত পূর্বাভাস' : 'Live Satellite & Radar Assimilated Forecast'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-6">
-                      <motion.div 
-                        animate={{ 
-                          y: [0, -10, 0],
-                          rotate: [0, 5, 0]
-                        }}
-                        transition={{ 
-                          duration: 4,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                      >
-                        {weather.condition === 'Sunny' ? (
-                          <Sun className="w-20 h-20 text-yellow-500 drop-shadow-lg" />
-                        ) : (
-                          <Cloud className="w-20 h-20 text-blue-400 drop-shadow-lg" />
-                        )}
-                      </motion.div>
-                      <div>
-                        <div className="flex items-baseline">
-                          <span className="text-6xl font-black text-gray-900 tracking-tighter">{weather.temp.toFixed(1)}</span>
-                          <span className="text-3xl font-bold text-blue-500 ml-1">°C</span>
-                        </div>
-                        <p className="text-gray-400 font-bold uppercase tracking-widest text-sm mt-1">{weather.condition}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                      <Tooltip content={getHumidityTooltip(weather.humidity) || ""}>
-                        <motion.div 
-                          whileHover={{ y: -2 }}
-                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
-                        >
-                          <div className="flex items-center text-blue-600 dark:text-blue-400 mb-2.5">
-                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
-                              <Droplets className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.humidity}</span>
-                          </div>
-                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.humidity.toFixed(1)}%</span>
-                        </motion.div>
-                      </Tooltip>
-                    
-                      <Tooltip content={getWindTooltip(weather.windSpeed) || ""}>
-                        <motion.div 
-                          whileHover={{ y: -2 }}
-                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
-                        >
-                          <div className="flex items-center text-indigo-600 dark:text-indigo-400 mb-2.5">
-                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
-                              <Wind className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.windSpeed}</span>
-                          </div>
-                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.windSpeed.toFixed(1)}</span>
-                          <span className="text-xs font-medium text-stone-400 ml-1">km/h</span>
-                        </motion.div>
-                      </Tooltip>
-
-                      <Tooltip content={getRainTooltip(weather.rainChance) || ""}>
-                        <motion.div 
-                          whileHover={{ y: -2 }}
-                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
-                        >
-                          <div className="flex items-center text-cyan-600 dark:text-cyan-400 mb-2.5">
-                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
-                              <CloudRain className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.rainChance}</span>
-                          </div>
-                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.rainChance}%</span>
-                        </motion.div>
-                      </Tooltip>
-
-                      <Tooltip content={getUvTooltip(weather.uvIndex) || ""}>
-                        <motion.div 
-                          whileHover={{ y: -2 }}
-                          className="bg-stone-50/70 dark:bg-stone-800/60 p-4 sm:p-5 rounded-2xl border border-stone-200/80 dark:border-stone-700/70 shadow-xs h-full"
-                        >
-                          <div className="flex items-center text-amber-600 dark:text-amber-400 mb-2.5">
-                            <div className="p-2 bg-white dark:bg-stone-700 rounded-xl shadow-xs mr-2">
-                              <Sun className="w-4 h-4" />
-                            </div>
-                            <span className="text-xs font-semibold text-stone-600 dark:text-stone-300">{t.uvIndex}</span>
-                          </div>
-                          <span className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tabular-nums">{weather.uvIndex}</span>
-                        </motion.div>
-                      </Tooltip>
-                  </div>
-
-                  {/* WeatherNext 3 Specialized Agro-Meteorology Cards */}
-                  {weather.isWeatherNext3 && (
-                    <div className="space-y-4 pt-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-indigo-900 flex items-center gap-1.5">
-                          <Zap className="w-4 h-4 text-amber-500" />
-                          {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
-                        </h4>
-                        <span className="text-[10px] bg-blue-100/80 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                          {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        {/* 100m Canopy Wind */}
-                        <div className="bg-gradient-to-br from-sky-50 to-white p-4 rounded-3xl border border-sky-100 shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-sky-700">
-                              <Wind className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">
-                                {lang === 'bn' ? '১০০মি বাউন্ডারি বাতাস' : '100m Canopy Wind'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-2xl font-black text-gray-900">
-                            {weather.boundaryWind100m !== undefined ? weather.boundaryWind100m.toFixed(1) : (weather.windSpeed * 1.35).toFixed(1)}
-                            <span className="text-xs text-gray-500 ml-1 font-semibold">km/h</span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-1 font-medium">
-                            {lang === 'bn' ? 'স্প্রে ড্রিফট ও পরাগায়ন পূর্বাভাস' : 'Spray drift & wind shear risk'}
-                          </p>
-                        </div>
-
-                        {/* Solar Irradiance DNI */}
-                        <div className="bg-gradient-to-br from-amber-50 to-white p-4 rounded-3xl border border-amber-100 shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-amber-700">
-                              <Sun className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">
-                                {lang === 'bn' ? 'সরাসরি সৌর বিকিরণ' : 'Solar DNI Beam'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-2xl font-black text-gray-900">
-                            {weather.solarRadiationDNI !== undefined ? Math.round(weather.solarRadiationDNI) : 480}
-                            <span className="text-xs text-gray-500 ml-1 font-semibold">W/m²</span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-1 font-medium">
-                            {lang === 'bn' ? 'সালোকসংশ্লেষণ ও সোলার পাম্প' : 'Solar pump & photosynthesis'}
-                          </p>
-                        </div>
-
-                        {/* Dew Point & Blight Risk */}
-                        <div className="bg-gradient-to-br from-emerald-50 to-white p-4 rounded-3xl border border-emerald-100 shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-emerald-700">
-                              <ShieldAlert className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">
-                                {lang === 'bn' ? 'ব্লাইট ছত্রাক ঝুঁকি' : 'Fungal Blight Risk'}
-                              </span>
-                            </div>
-                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
-                              weather.fungalBlightRisk === 'high'
-                                ? 'bg-red-100 text-red-700'
-                                : weather.fungalBlightRisk === 'moderate'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {weather.fungalBlightRisk || 'low'}
-                            </span>
-                          </div>
-                          <div className="text-2xl font-black text-gray-900">
-                            {weather.dewPoint !== undefined ? weather.dewPoint.toFixed(1) : 21.0}°C
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-1 font-medium">
-                            {lang === 'bn' 
-                              ? `শিশিরাঙ্ক ব্যবধান ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`
-                              : `Dew Point Depr: ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`}
-                          </p>
-                        </div>
-
-                        {/* Rain Range */}
-                        <div className="bg-sky-50/70 dark:bg-sky-950/40 p-4 rounded-2xl border border-sky-100 dark:border-sky-900/40 shadow-xs">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-1.5 text-sky-700 dark:text-sky-300">
-                              <CloudRain className="w-4 h-4" />
-                              <span className="text-[10px] font-bold uppercase tracking-wider">
-                                {lang === 'bn' ? 'সম্ভাব্য বৃষ্টিপাতের পরিমাণ' : 'Expected Rain Range'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-xl font-bold text-stone-900 dark:text-stone-100">
-                            {weather.precipitationSpread?.p10 ?? 0} - {weather.precipitationSpread?.p90 ?? (weather.rainfall > 0 ? (weather.rainfall * 1.5).toFixed(1) : '2.0')}
-                            <span className="text-xs text-stone-500 ml-1 font-semibold">mm</span>
-                          </div>
-                          <p className="text-[10px] text-stone-500 mt-1 font-medium">
-                            {lang === 'bn' 
-                              ? `ভারী বৃষ্টির সম্ভাবনা: ${weather.heavyRainRisk ?? 10}%`
-                              : `Heavy Rain Risk: ${weather.heavyRainRisk ?? 10}%`}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 24-Hour AI Hourly Timeline */}
-                  {weather.hourlyForecast && weather.hourlyForecast.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-blue-50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-black uppercase tracking-widest text-gray-900 flex items-center gap-2">
-                          <Zap className="w-4 h-4 text-amber-500" />
-                          <span>{t.hourlyForecastTrend || '24-Hour AI Weather Trend'}</span>
-                        </h4>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          {lang === 'bn' ? 'প্রতি ঘণ্টার পূর্বাভাস' : 'Hourly AI Forecast'}
-                        </span>
-                      </div>
-                      <div className="flex gap-2.5 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-blue-200">
-                        {weather.hourlyForecast.map((hour, idx) => (
-                          <div 
-                            key={idx} 
-                            className={`flex-shrink-0 flex flex-col items-center justify-between p-3 rounded-2xl border text-center min-w-[70px] transition-all ${
-                              idx === 0 
-                                ? 'bg-blue-600 text-white border-blue-700 shadow-md shadow-blue-500/20' 
-                                : 'bg-blue-50/50 text-gray-800 border-blue-100 hover:bg-blue-50'
-                            }`}
-                          >
-                            <span className={`text-[10px] font-bold ${idx === 0 ? 'text-blue-100' : 'text-gray-500'}`}>
-                              {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : hour.time}
-                            </span>
-                            <div className="my-1.5">
-                              {hour.condition === 'Sunny' ? (
-                                <Sun className={`w-5 h-5 ${idx === 0 ? 'text-yellow-300' : 'text-yellow-500'}`} />
-                              ) : hour.condition === 'Rainy' || hour.condition === 'Showers' ? (
-                                <CloudRain className={`w-5 h-5 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
-                              ) : (
-                                <Cloud className={`w-5 h-5 ${idx === 0 ? 'text-blue-200' : 'text-blue-400'}`} />
-                              )}
-                            </div>
-                            <span className="text-xs font-black">{Math.round(hour.temp)}°C</span>
-                            <div className="mt-1 flex items-center gap-0.5 text-[9px]">
-                              <Droplets className={`w-2.5 h-2.5 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
-                              <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 font-bold'}>{hour.rainProb}%</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Soil & Hydrology Insights Section */}
-                  {(weather.soilMoisture !== undefined || weather.soilPH !== undefined) && (
-                    <div className="mt-8 pt-6 border-t border-blue-50">
-                      <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-green-500" />
-                        Soil & Hydrology Insights
-                      </h4>
-                      <div className="space-y-4">
-                        {weather.soilMoisture !== undefined && (
-                          <div className="flex gap-3">
-                            <Droplets className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-bold text-gray-700">Soil Moisture (0-7cm)</p>
-                              <p className="text-sm text-gray-600 mt-1">
-                                <span className="font-bold">{weather.soilMoisture} m³/m³</span>. 
-                                {weather.evapotranspiration !== undefined && ` Evapotranspiration is ${weather.evapotranspiration} mm/day.`}
-                              </p>
-                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Data: Open-Meteo Agronomic</p>
-                            </div>
-                          </div>
-                        )}
-                        {weather.soilPH !== undefined && (
-                          <div className="flex gap-3">
-                            <Thermometer className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-bold text-gray-700">Soil Health Properties</p>
-                              <p className="text-sm text-gray-600 mt-1">
-                                pH: <span className="font-bold">{weather.soilPH}</span> | 
-                                Nitrogen: <span className="font-bold">{weather.soilNitrogen} g/kg</span> | 
-                                Organic Carbon: <span className="font-bold">{weather.soilCarbon} g/kg</span>
-                              </p>
-                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Data: ISRIC SoilGrids</p>
-                            </div>
-                          </div>
-                        )}
-                        {weather.safeSprayingWindow && (
-                          <div className="flex gap-3 bg-green-50/50 p-3 rounded-2xl border border-green-100 mt-2">
-                            <TestTube className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-bold text-gray-700">Safe Spraying Window</p>
-                              <p className="text-sm text-gray-600 mt-1">
-                                <span className="font-bold text-green-700">{weather.safeSprayingWindow}</span>
-                              </p>
-                              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">Based on Wind & Rain Forecast</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Historical Climate Comparison */}
-                  {(weather.historicalAvgTemp !== undefined || weather.historicalToday !== undefined) && (
-                    <div className="bg-blue-50/40 p-5 rounded-3xl border border-blue-100/80 shadow-sm mt-4">
-                      <div className="flex items-center gap-2.5 mb-3">
-                        <History className="w-4 h-4 text-blue-600" />
-                        <h4 className="font-bold text-sm text-gray-900">{lang === 'bn' ? 'ঐতিহাসিক জলবায়ু তুলনা' : 'Historical Climate Comparison'}</h4>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        {weather.historicalToday && (
-                          <div className="bg-white p-3.5 rounded-2xl border border-blue-100/60 shadow-xs">
-                            <p className="text-xs font-bold text-blue-900 mb-2">
-                              {lang === 'bn' ? 'গত বছর আজকের দিনে' : 'Last Year on This Day'}
-                            </p>
-                            <div className="flex flex-wrap gap-4 text-xs text-gray-700">
-                              <span className="flex items-center gap-1"><Thermometer className="w-3.5 h-3.5 text-red-400" /> Max: {weather.historicalToday.maxTemp}°C</span>
-                              <span className="flex items-center gap-1"><Thermometer className="w-3.5 h-3.5 text-blue-400" /> Min: {weather.historicalToday.minTemp}°C</span>
-                              <span className="flex items-center gap-1"><CloudRain className="w-3.5 h-3.5 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {weather.historicalAvgTemp !== undefined && (
-                          <p className="text-xs text-gray-600 px-1 leading-relaxed">
-                            {lang === 'bn' 
-                              ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
-                              : `The average temperature for this month over the last 5 years was ${weather.historicalAvgTemp.toFixed(1)}°C. Today's temperature (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {lastUpdated && (
-                    <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Updated</span>
-                      <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{lastUpdated}</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                  <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-                  <p className="text-gray-400 font-bold animate-pulse uppercase tracking-widest text-xs">Fetching Weather...</p>
-                </div>
-              )}
-            </motion.div>
-          </div>
-
-          {/* Integrated Proactive Spray Schedule & Calendar */}
-          <div className="mt-4 w-full">
-            <CropLifecycleCalendar 
-              lang={lang} 
-              weatherForecastSummary={weather ? `${weather.condition}, Temp: ${weather.temp}°C, Rain Chance: ${weather.rainChance}%, Humidity: ${weather.humidity}%` : undefined}
-            />
-          </div>
-        </motion.div>
+                    <MicroclimateRadarSimulator
+                      lang={lang}
+                      coords={globalLocation}
+                      hourlyForecast={weather?.hourlyForecast}
+                      currentTemp={weather?.temp}
+                      currentWind={weather?.windSpeed}
+                      currentRainProb={weather?.rainChance}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
       )}
-    </AnimatePresence>
-  </div>
-)}
-</div>
-)}
     </motion.div>
   );
 }

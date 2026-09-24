@@ -13,12 +13,48 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.011em;
+    font-family: var(--font-sans);
+    letter-spacing: normal;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Universal tabular numerals for agricultural, financial and weather data */
-  table, .tabular-nums, input, select, textarea, .font-mono {
+  /* Universal font and standard spacing for form elements, preventing Bengali numeral collision */
+  select, option, input, textarea, button {
+    font-family: var(--font-sans);
+    letter-spacing: 0.02em;
+    font-variant-numeric: normal;
+  }
+
+  /* Bengali Typography & Numeral Legibility in Hind Siliguri */
+  html[lang="bn"],
+  html[lang="bn"] body,
+  :lang(bn) {
+    font-family: "Hind Siliguri", "Plus Jakarta Sans", system-ui, sans-serif;
+    letter-spacing: 0.015em;
+    font-feature-settings: "kern" 1, "liga" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  html[lang="bn"] select,
+  html[lang="bn"] option,
+  html[lang="bn"] input,
+  html[lang="bn"] textarea,
+  html[lang="bn"] button,
+  select,
+  option {
+    font-family: "Hind Siliguri", "Plus Jakarta Sans", system-ui, sans-serif;
+    letter-spacing: 0.025em;
+    font-variant-numeric: normal;
+  }
+
+  /* In Hind Siliguri, prevent tight tracking from squishing Bengali conjuncts & numerals like ১৮ */
+  html[lang="bn"] .tracking-tight,
+  html[lang="bn"] .tracking-tighter {
+    letter-spacing: 0.015em;
+  }
+
+  /* Tabular numerals strictly for financial and data tables with mono requirements */
+  table.tabular-data, .tabular-nums, .font-mono {
     font-variant-numeric: tabular-nums;
   }
 

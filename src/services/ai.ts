@@ -101,15 +101,16 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => 'gemini-3.8-flash';
-const BACKUP_MODEL = 'gemini-3.8-flash';
-const SEARCH_MODEL = 'gemini-3.8-flash';
-const TTS_PRIMARY_MODEL = 'gemini-3.1-flash-tts-preview';
-const TTS_BACKUP_MODEL = 'gemini-3.1-flash-tts-preview'; 
+const getModelName = (isAdvanced?: boolean) => 'gemini-3.5-flash-lite';
+const BACKUP_MODEL = 'gemini-3.1-flash-lite';
+const SEARCH_MODEL = 'gemini-3.5-flash-lite';
+const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
+const TTS_BACKUP_MODEL = 'gemini-3.8-flash-tts'; 
 export const LIVE_API_MODEL = 'gemini-3.8-live';
-const CHAT_MODEL = 'gemini-3.8-flash';
+export const LIVE_EXTENDED_THINKING_MODEL = 'gemini-3.8-live-extended-thinking';
+const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
-const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 2000) => {
+const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500) => {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
@@ -120,6 +121,13 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 2000
                           errorStr.includes('quota') || 
                           errorStr.includes('429');
       
+      const isHighDemand = error?.status === 503 ||
+                          error.message?.includes('503') ||
+                          error.message?.includes('UNAVAILABLE') ||
+                          error.message?.includes('high demand') ||
+                          errorStr.includes('high demand') ||
+                          errorStr.includes('spikes in demand');
+
       const isNotFoundError = error.message?.includes('404') || 
                               errorStr.includes('not_found');
 
@@ -138,10 +146,10 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 2000
       if (isNotFoundError && i === retries - 1) throw error;
       
       // Exponential backoff with jitter
-      const backoffFactor = isQuotaError ? 3 : 2;
-      const currentDelay = (delay * Math.pow(backoffFactor, i)) + (Math.random() * 500);
+      const backoffFactor = (isQuotaError || isHighDemand) ? 2.5 : 2;
+      const currentDelay = (delay * Math.pow(backoffFactor, i)) + (Math.random() * 400);
       
-      console.warn(`AI call failed (${isQuotaError ? 'Quota Exceeded' : (isNotFoundError ? 'Not Found' : 'Error')}), retrying in ${Math.round(currentDelay)}ms (${i + 1}/${retries})...`);
+      console.warn(`AI call failed (${isHighDemand ? 'High Demand (503)' : (isQuotaError ? 'Quota Exceeded' : (isNotFoundError ? 'Not Found' : 'Error'))}), retrying in ${Math.round(currentDelay)}ms (${i + 1}/${retries})...`);
       
       await new Promise(res => setTimeout(res, currentDelay));
     }
@@ -154,12 +162,14 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
                   params?.responseModalities?.includes?.('AUDIO');
 
   const fallbacks = isAudio
-    ? [primaryModel, customBackupModel || TTS_BACKUP_MODEL, 'gemini-3.1-flash-tts-preview']
+    ? [primaryModel, customBackupModel || TTS_BACKUP_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']
     : [
         primaryModel,
-        customBackupModel || BACKUP_MODEL,
         'gemini-3.5-flash-lite',
-        'gemini-3-flash-preview'
+        customBackupModel || BACKUP_MODEL,
+        'gemini-3.1-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-3.8-flash'
       ];
   
   // Try models in sequence until one works
@@ -372,7 +382,7 @@ export const deepDiagnoseCrop = async (
       const response = await generateContent({
         contents,
         config,
-        model: 'gemini-3.7-flash'
+        model: 'gemini-3.5-flash-lite'
       });
       
       if (!response.text) {

@@ -51,14 +51,20 @@ export default defineConfig(({mode}) => {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           runtimeCaching: [
             {
-              urlPattern: /^\/api\/(daily-forecast|weathernext-3|historical-data)/i,
+              // Real-time dynamic weather forecasts must NEVER be hijacked by stale Service Worker cache
+              urlPattern: /^\/api\/(daily-forecast|weathernext-3|weather-next)/i,
+              handler: 'NetworkOnly',
+            },
+            {
+              // Historical climate multi-year archives can be cached safely for 7 days
+              urlPattern: /^\/api\/historical-data/i,
               handler: 'NetworkFirst',
               options: {
-                cacheName: 'agri-weather-api-cache',
-                networkTimeoutSeconds: 4,
+                cacheName: 'agri-climate-archive-cache',
+                networkTimeoutSeconds: 6,
                 expiration: {
-                  maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 3, // 3 days for rural low connectivity
+                  maxEntries: 50,
+                  maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
                 },
                 cacheableResponse: {
                   statuses: [0, 200],

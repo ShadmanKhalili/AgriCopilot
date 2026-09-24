@@ -7,7 +7,15 @@
 const WEATHER_CACHE_PREFIX = 'agri_cached_weather_';
 const MARKET_CACHE_PREFIX = 'agri_cached_market_';
 const GLOBAL_SYNC_KEY = 'agri_last_sync_timestamp';
-const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 72; // 72 hours cache retention
+
+// Weather changes rapidly (e.g., fast storm fronts, showers, rapid shifts).
+// Weather cache retention is strictly capped at 20 minutes to prevent stale data interference.
+export const MAX_WEATHER_CACHE_AGE_MS = 1000 * 60 * 20; // 20 minutes max
+
+// Mandi market wholesale prices change 1-2 times daily after morning auctions.
+export const MAX_MARKET_CACHE_AGE_MS = 1000 * 60 * 60 * 12; // 12 hours max
+
+export const MAX_CACHE_AGE_MS = MAX_WEATHER_CACHE_AGE_MS;
 
 export interface CacheEntry<T> {
   data: T;
@@ -296,9 +304,9 @@ export function recordGlobalSync(timestamp: number = Date.now()): void {
 }
 
 /**
- * Save weather data into localStorage with timestamp and coordinates identifier
+ * Save weather data into localStorage with timestamp, model type, and coordinates identifier
  */
-export function saveCachedWeather(locationKey: string, data: any): void {
+export function saveCachedWeather(locationKey: string, data: any, model: string = 'weathernext3'): void {
   try {
     const now = Date.now();
     const entry: CacheEntry<any> = {
@@ -307,9 +315,9 @@ export function saveCachedWeather(locationKey: string, data: any): void {
       locationKey,
       isFallback: false
     };
+    // Save scoped to exact coordinates and model
+    localStorage.setItem(`${WEATHER_CACHE_PREFIX}${model}_${locationKey}`, JSON.stringify(entry));
     localStorage.setItem(WEATHER_CACHE_PREFIX + locationKey, JSON.stringify(entry));
-    // Also store as latest default cache
-    localStorage.setItem(WEATHER_CACHE_PREFIX + 'latest', JSON.stringify(entry));
     recordGlobalSync(now);
   } catch (err) {
     console.warn('Failed to cache weather to localStorage:', err);
@@ -317,35 +325,76 @@ export function saveCachedWeather(locationKey: string, data: any): void {
 }
 
 /**
- * Retrieve cached weather data. If key doesn't match or network is unavailable,
- * returns latest cache or the emergency Cox's Bazar offline model.
+ * Retrieve cached weather data.
+ * Will only return a valid cache if it is fresher than MAX_WEATHER_CACHE_AGE_MS (20 mins)
+ * and strictly matches the requested coordinates.
+ * Stale or mismatched caches are never returned when online to prevent overriding live changes.
  */
-export function getCachedWeather(locationKey: string): CacheEntry<any> | null {
+export function getCachedWeather(
+  locationKey: string, 
+  model: string = 'weathernext3', 
+  isEmergencyOffline: boolean = false
+): CacheEntry<any> | null {
   try {
-    const exact = localStorage.getItem(WEATHER_CACHE_PREFIX + locationKey);
-    if (exact) {
-      const parsed: CacheEntry<any> = JSON.parse(exact);
-      if (Date.now() - parsed.timestamp < MAX_CACHE_AGE_MS) {
-        return parsed;
+    const scopedKey = `${WEATHER_CACHE_PREFIX}${model}_${locationKey}`;
+    const raw = localStorage.getItem(scopedKey) || localStorage.getItem(WEATHER_CACHE_PREFIX + locationKey);
+    
+    if (raw) {
+      const parsed: CacheEntry<any> = JSON.parse(raw);
+      const age = Date.now() - parsed.timestamp;
+      
+      // If within 20 minutes freshness window, it is considered safe
+      if (age < MAX_WEATHER_CACHE_AGE_MS) {
+        return {
+          ...parsed,
+          isFallback: false
+        };
       }
-    }
-
-    const latest = localStorage.getItem(WEATHER_CACHE_PREFIX + 'latest');
-    if (latest) {
-      const parsed: CacheEntry<any> = JSON.parse(latest);
-      return parsed;
+      
+      // If older than 20 minutes:
+      // When online, do NOT return stale cache so live data isn't interfered with.
+      // Only when confirmed offline, return it marked explicitly as fallback.
+      if (isEmergencyOffline) {
+        return {
+          ...parsed,
+          isFallback: true
+        };
+      }
+      return null;
     }
   } catch (err) {
     console.warn('Failed to read cached weather:', err);
   }
 
-  // Emergency rural Cox's Bazar fallback
-  return {
-    data: COX_BAZAR_OFFLINE_WEATHER,
-    timestamp: Date.now() - (1000 * 60 * 35), // marked as 35 mins ago
-    locationKey: 'cox_bazar_default',
-    isFallback: true
-  };
+  // Emergency offline fallback ONLY when user has no connection and no local cache exists
+  if (isEmergencyOffline) {
+    return {
+      data: COX_BAZAR_OFFLINE_WEATHER,
+      timestamp: Date.now() - (1000 * 60 * 35),
+      locationKey: 'cox_bazar_default',
+      isFallback: true
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Wipe all cached weather data from localStorage
+ */
+export function clearWeatherCache(): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(WEATHER_CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('Failed to clear weather cache:', err);
+  }
 }
 
 /**
@@ -379,13 +428,17 @@ export function getCachedMarket(cropKey: string, locationKey: string): CacheEntr
     const exact = localStorage.getItem(exactKey);
     if (exact) {
       const parsed: CacheEntry<any> = JSON.parse(exact);
-      return parsed;
+      if (Date.now() - parsed.timestamp < MAX_MARKET_CACHE_AGE_MS) {
+        return parsed;
+      }
     }
 
     const latest = localStorage.getItem(`${MARKET_CACHE_PREFIX}${normCrop}_latest`);
     if (latest) {
       const parsed: CacheEntry<any> = JSON.parse(latest);
-      return parsed;
+      if (Date.now() - parsed.timestamp < MAX_MARKET_CACHE_AGE_MS) {
+        return parsed;
+      }
     }
   } catch (err) {
     console.warn('Failed to read cached market insights:', err);

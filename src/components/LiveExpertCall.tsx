@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2, Bot } from 'lucide-react';
-import { getAi, LIVE_API_MODEL } from '../services/ai';
-import { LiveServerMessage, Modality } from '@google/genai';
+import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2, Bot, BrainCircuit, Zap } from 'lucide-react';
+import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
+import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,7 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const [isCalling, setIsCalling] = useState(false);
   const [isRinging, setIsRinging] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isExtendedThinking, setIsExtendedThinking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
@@ -195,27 +196,42 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       updateVisualizer();
       nextPlayTimeRef.current = audioCtx.currentTime;
 
-      const systemInstruction = `You are a Master Agronomist and a leading agricultural scientist in Bangladesh.
-      CONTEXT: The user has just received the following smart planting recommendations:
+      const systemInstruction = `You are a Master Agronomist and a leading agricultural scientist in Bangladesh conducting a live voice phone consultation.
+      CONTEXT: The user has received recommendations regarding:
       "${diagnosisContext}".
       
-      TASK: Answer follow-up questions from the user via voice.
-      - DO NOT just repeat what is in the text. Add DEPTH, NUANCE, and EXPERT SCIENTIFIC EXPLANATIONS.
-      - Explain the 'why' and 'how'. For instance, if a crop is recommended, talk about specific soil treatments, micro-nutrients, precise planting dates, or advanced climate-smart techniques to maximize margin.
-      - If asked about risks, provide nuanced mitigation strategies (e.g., biological pest control, specific irrigation intervals).
-      - Use local context for ${locationContext}.
-      - Respond fluently in ${lang === 'bn' ? 'Bangla' : 'English'}. If Bangla, ensure it uses accurate agricultural terminology while remaining natural and understandable for farmers.
-      - Strike a balance: be thorough and insightful, but keep individual spoken responses concise enough for a comfortable phone conversation. Speak like an experienced, highly educated professor of agronomy.`;
+CRITICAL SPOKEN LANGUAGE DIRECTIVE:
+1. ALWAYS speak and reply in natural, clear, spoken Bangla (বাংলা) by default.
+2. Even if the caller greets or asks questions in English (e.g. "Hello", "Hi", "Can you help me?"), YOU MUST STILL GREET AND REPLY IN BANGLA (e.g. "হ্যালো! আসসালামু আলাইকুম। আপনার ফসলের বিষয়ে কী জানতে চান বলুন।").
+3. ONLY switch to another language or a specific regional accent/dialect (like Chittagonian dialect / চাটগাঁইয়া) if the user EXPLICITLY requests it (e.g., "Speak in English", "ইংরেজিতে কথা বলুন", or "চাটগাঁইয়া ভাষায় বলুন").
+4. Never switch to English just because of English greetings or English loanwords.
+
+TASK: Answer follow-up questions from the user via voice.
+- DO NOT just repeat what is in the text. Add DEPTH, NUANCE, and EXPERT SCIENTIFIC EXPLANATIONS in natural Bangla.
+- Explain the 'why' and 'how': specific soil treatments, micro-nutrients, precise planting dates, and climate-smart techniques.
+- If asked about risks, provide nuanced mitigation strategies (e.g., biological pest control, specific irrigation intervals).
+- Use local context for ${locationContext}.
+- Keep individual spoken responses concise (2-3 sentences) so the conversation flows comfortably like a real phone call. Speak warmly like a respected agricultural mentor and extension officer.`;
+
+      const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
+
+      const liveConfig: any = {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" } },
+        },
+        systemInstruction,
+      };
+
+      if (isExtendedThinking) {
+        liveConfig.thinkingConfig = {
+          thinkingLevel: ThinkingLevel.HIGH
+        };
+      }
 
       const sessionPromise = ai.live.connect({
-        model: LIVE_API_MODEL,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" } },
-          },
-          systemInstruction,
-        },
+        model: selectedLiveModel,
+        config: liveConfig,
         callbacks: {
           onopen: async () => {
             setIsConnected(true);
@@ -410,32 +426,77 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   };
 
   return (
-    <div className="w-full mt-6 mb-4" role="region" aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞ কল সার্ভিস' : 'AI Expert Call Service'}>
+    <div className="w-full mt-6 mb-4 space-y-3" role="region" aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞ কল সার্ভিস' : 'AI Expert Call Service'}>
       {!isConnected && !isCalling ? (
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={startCall}
-          aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Expert'}
-          className="w-full flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-green-600 to-emerald-800 text-white p-6 rounded-3xl shadow-xl shadow-green-900/20 border border-green-500/30 transition-all cursor-pointer relative overflow-hidden group focus:ring-4 focus:ring-green-400 outline-none"
-        >
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner relative" aria-hidden="true">
-            <motion.span 
-              className="absolute -inset-1 rounded-full border border-white/30 pointer-events-none"
-              animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
-            />
-            <Phone className="w-8 h-8 text-white relative z-10" />
+        <div className="space-y-3">
+          {/* Simplified Consultation Mode Switch */}
+          <div className="bg-slate-900/90 dark:bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3 flex items-center justify-between gap-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`p-2 rounded-xl shrink-0 transition-colors ${
+                isExtendedThinking ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              }`}>
+                {isExtendedThinking ? <BrainCircuit className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white block">
+                  {isExtendedThinking 
+                    ? (lang === 'bn' ? 'গভীর পরামর্শ মোড' : 'In-Depth Consultation')
+                    : (lang === 'bn' ? 'দ্রুত ভয়েস কল' : 'Fast Voice Call')}
+                </span>
+                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                  {isExtendedThinking 
+                    ? (lang === 'bn' ? 'জটিল সমস্যার বিশদ ব্যাখ্যা ও নিখুঁত বৈজ্ঞানিক সমাধান' : 'Detailed scientific explanations & precision solutions')
+                    : (lang === 'bn' ? 'সাধারণ প্রশ্নের তাত্ক্ষণিক উত্তর ও সরাসরি আলোচনা' : 'Instant quick answers for general agronomic questions')}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsExtendedThinking(!isExtendedThinking)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isExtendedThinking ? 'bg-purple-600' : 'bg-gray-700'
+              }`}
+              role="switch"
+              aria-checked={isExtendedThinking}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  isExtendedThinking ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
-          <span className="font-black uppercase tracking-widest text-lg lg:text-xl drop-shadow-sm">
-            {lang === 'bn' ? 'ভয়েস কল শুরু করুন' : 'Start Voice Chat'}
-          </span>
-          <span className="text-green-100 text-xs font-medium">
-            {lang === 'bn' ? 'এগিয়ে যান এবং এআই বিশেষজ্ঞের সাথে কথা বলুন' : 'Tap to speak with your AI Agronomist'}
-          </span>
-        </motion.button>
+
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={startCall}
+            aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Expert'}
+            className={`w-full flex flex-col items-center justify-center space-y-2 p-6 rounded-3xl shadow-xl transition-all cursor-pointer relative overflow-hidden group focus:ring-4 outline-none ${
+              isExtendedThinking
+                ? 'bg-gradient-to-br from-purple-700 via-indigo-800 to-emerald-900 text-white shadow-purple-950/30 border border-purple-500/40 focus:ring-purple-400'
+                : 'bg-gradient-to-br from-green-600 to-emerald-800 text-white shadow-green-900/20 border border-green-500/30 focus:ring-green-400'
+            }`}
+          >
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="bg-white/20 p-4 rounded-full group-hover:scale-110 transition-transform shadow-inner relative" aria-hidden="true">
+              <motion.span 
+                className="absolute -inset-1 rounded-full border border-white/30 pointer-events-none"
+                animate={{ scale: [1, 1.35], opacity: [0.6, 0] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+              />
+              <Phone className="w-8 h-8 text-white relative z-10" />
+            </div>
+            <span className="font-black uppercase tracking-widest text-lg lg:text-xl drop-shadow-sm">
+              {lang === 'bn' ? 'ভয়েস কল শুরু করুন' : 'Start Voice Chat'}
+            </span>
+            <span className="text-green-100 text-xs font-medium">
+              {lang === 'bn' ? 'এগিয়ে যান এবং এআই বিশেষজ্ঞের সাথে কথা বলুন' : 'Tap to speak with your AI Agronomist'}
+            </span>
+          </motion.button>
+        </div>
       ) : (
         <motion.div 
           initial={{ opacity: 0, y: 10, scale: 0.98 }}

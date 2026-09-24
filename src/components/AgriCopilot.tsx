@@ -3186,10 +3186,10 @@ export default function AgriCopilot({
                   setCopilotMode('static_upload');
                 }
               }}
-              className="w-full text-xs font-medium bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2 text-stone-800 dark:text-stone-200 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer shadow-xs"
+              className="w-full text-sm sm:text-base font-semibold tracking-wide bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-stone-800 dark:text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-xs"
             >
-              <option value="" disabled>
-                {lang === 'bn' ? 'নমুনা নির্বাচন করুন (১৮টি আঞ্চলিক রোগ)...' : 'Select sample scenario (18 regional cases)...'}
+              <option value="" disabled className="text-sm font-semibold tracking-wider">
+                {lang === 'bn' ? 'নমুনা নির্বাচন করুন ( ১৮ টি আঞ্চলিক রোগ )...' : 'Select sample scenario (18 regional cases)...'}
               </option>
               {Array.from(new Set(SAMPLE_DIAGNOSIS_CASES.map(s => lang === 'bn' ? s.categoryBn : s.categoryEn))).map(cat => (
                 <optgroup key={cat} label={`— ${cat} —`}>

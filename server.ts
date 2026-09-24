@@ -138,9 +138,31 @@ async function startServer() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return null;
     if (!serverAiClient) {
-      serverAiClient = new GoogleGenAI({ apiKey });
+      serverAiClient = new GoogleGenAI({ 
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
     }
     return serverAiClient;
+  };
+
+  const getCandidateModels = (requestedModel: string): string[] => {
+    // If audio/TTS model requested
+    if (requestedModel.includes("-tts")) {
+      return Array.from(new Set([requestedModel, "gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"]));
+    }
+    // High-availability cascade with gemini-3.5-flash-lite as primary
+    return Array.from(new Set([
+      requestedModel,
+      "gemini-3.5-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-3.8-flash"
+    ]));
   };
 
   app.post("/api/ai-proxy", aiLimiter, async (req, res) => {
@@ -158,7 +180,7 @@ async function startServer() {
       }
 
       const {
-        model = "gemini-3.8-flash",
+        model: requestedModel = "gemini-3.5-flash-lite",
         contents,
         config,
         tools,
@@ -189,26 +211,74 @@ async function startServer() {
         ...(generationConfig ? { generationConfig } : {})
       };
 
-      const aiResponse = await client.models.generateContent({
-        model,
-        contents,
-        config: mergedConfig
-      });
+      const candidateModels = getCandidateModels(requestedModel);
+      let lastError: any = null;
 
-      return res.json({
-        text: aiResponse.text || "",
-        candidates: aiResponse.candidates || [],
-        promptFeedback: aiResponse.promptFeedback || null
-      });
+      for (let i = 0; i < candidateModels.length; i++) {
+        const currentModel = candidateModels[i];
+        try {
+          const aiResponse = await client.models.generateContent({
+            model: currentModel,
+            contents,
+            config: mergedConfig
+          });
+
+          return res.json({
+            text: aiResponse.text || "",
+            candidates: aiResponse.candidates || [],
+            promptFeedback: aiResponse.promptFeedback || null,
+            modelUsed: currentModel
+          });
+        } catch (err: any) {
+          lastError = err;
+          const errStr = String(err?.message || err || '');
+          const isHighDemandOrUnavailable = err?.status === 503 || 
+                                            errStr.includes("503") || 
+                                            errStr.includes("UNAVAILABLE") || 
+                                            errStr.includes("high demand") ||
+                                            errStr.includes("overloaded");
+          const isRateLimit = err?.status === 429 || 
+                              errStr.includes("429") || 
+                              errStr.includes("RESOURCE_EXHAUSTED");
+
+          // If it's a 503 high demand or 429 rate limit, attempt fallback model
+          if ((isHighDemandOrUnavailable || isRateLimit) && i < candidateModels.length - 1) {
+            const nextModel = candidateModels[i + 1];
+            console.warn(`[AI Proxy Failover] Model '${currentModel}' unavailable (${isHighDemandOrUnavailable ? '503 High Demand' : '429 Rate Limit'}). Seamlessly failing over to '${nextModel}'...`);
+            // Brief 250ms backoff before next model attempt
+            await new Promise(r => setTimeout(r, 250));
+            continue;
+          }
+
+          // If permission/referrer error, fallbacks won't help
+          const isReferrer = errStr.includes("REFERRER") || errStr.includes("referer") || errStr.includes("API_KEY_HTTP_REFERRER_BLOCKED");
+          if (isReferrer) {
+            break;
+          }
+        }
+      }
+
+      // If all candidate models failed, throw last error to catch block
+      throw lastError;
     } catch (error: any) {
       console.error("[Server AI Proxy Error]:", error?.message || error);
-      const is403 = error?.status === 403 || error?.message?.includes("403") || error?.message?.includes("PERMISSION_DENIED");
-      const isReferrer = error?.message?.includes("REFERRER") || error?.message?.includes("referer");
+      const errStr = String(error?.message || error || '');
+      const isReferrer = errStr.includes("REFERRER") || errStr.includes("referer") || errStr.includes("API_KEY_HTTP_REFERRER_BLOCKED");
+      const is403 = error?.status === 403 || errStr.includes("403") || errStr.includes("PERMISSION_DENIED");
+      const isHighDemand = error?.status === 503 || errStr.includes("503") || errStr.includes("UNAVAILABLE") || errStr.includes("high demand");
       
+      let friendlyError = error?.message || "Internal AI Proxy error";
+      if (isReferrer) {
+        friendlyError = "Gemini API key has an HTTP Referrer restriction in Google Cloud Console ('Requests from referer are blocked'). To resolve this, open Google Cloud Console > APIs & Services > Credentials, edit the API key, and set 'Application restrictions' to 'None'.";
+      } else if (isHighDemand) {
+        friendlyError = "The AI service is currently experiencing exceptionally high demand across model clusters. Please retry in a few moments.";
+      }
+
       return res.status(error?.status && typeof error.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : 500).json({
-        error: error?.message || "Internal AI Proxy error",
+        error: friendlyError,
         isReferrerBlocked: isReferrer,
-        isPermissionDenied: is403
+        isPermissionDenied: is403,
+        isHighDemand
       });
     }
   });
@@ -664,6 +734,11 @@ async function startServer() {
         },
         timeout: 10000 // 10s timeout
       });
+      // Enforce strict no-cache for live weather data so browsers & proxies never serve stale forecasts
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("Surrogate-Control", "no-store");
       res.json(response.data);
     } catch (error: any) {
       const fullUrl = error.config?.url + '?' + new URLSearchParams(error.config?.params).toString();
@@ -899,6 +974,11 @@ async function startServer() {
         daily: daily
       };
 
+      // Real-time AI forecast must never be cached by proxy or browser
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("Surrogate-Control", "no-store");
       return res.json(payload);
     } catch (error: any) {
       console.error("[WeatherNext 3] Error generating AI weather forecast:", error.message);

@@ -94,10 +94,16 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
     setResults(null);
 
     try {
-      // Fetch Weather Data
+      // Fetch Weather Data (strictly fresh, bypass cache)
       let weatherData = null;
       try {
-        const weatherRes = await fetch(`/api/daily-forecast?latitude=${activeLocation.latitude}&longitude=${activeLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto`);
+        const weatherRes = await fetch(
+          `/api/daily-forecast?latitude=${activeLocation.latitude}&longitude=${activeLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto&_t=${Date.now()}`,
+          {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' }
+          }
+        );
         weatherData = await weatherRes.json();
       } catch (e) {
         console.warn("Failed to fetch weather data", e);
