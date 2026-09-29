@@ -33,8 +33,8 @@ const callAiProxy = async (params: any) => {
 let aiInstance: GoogleGenAI | null = null;
 let directSdkBlocked = false; // Flag if direct client SDK is blocked by referrer or 403
 
-export const getAi = () => {
-  if (directSdkBlocked) {
+export const getAi = (ignoreBlocked: boolean = false) => {
+  if (directSdkBlocked && !ignoreBlocked) {
     return null;
   }
   const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2, Bot, BrainCircuit, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Mic, MicOff, PhoneOff, Phone, Loader2, Volume2, Bot, BrainCircuit, Zap, Sparkles, ChevronDown, ChevronUp, Square } from 'lucide-react';
 import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 
 interface LiveExpertCallProps {
@@ -15,16 +15,21 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const [isCalling, setIsCalling] = useState(false);
   const [isRinging, setIsRinging] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [isExtendedThinking, setIsExtendedThinking] = useState(false);
+  const [isExtendedThinking, setIsExtendedThinking] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [audioLevel, setAudioLevel] = useState<number[]>(new Array(32).fill(0));
   const [callDuration, setCallDuration] = useState(0);
+  const [liveThinkingText, setLiveThinkingText] = useState<string>('');
+  const [showThinkingDetails, setShowThinkingDetails] = useState(false);
+  const [userSpeechTranscript, setUserSpeechTranscript] = useState<string>('');
+  const [liveTranscription, setLiveTranscription] = useState<string>('');
   
   const isMutedRef = useRef(false);
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const userAnalyserRef = useRef<AnalyserNode | null>(null);
   const silenceStartRef = useRef<number>(Date.now());
@@ -33,12 +38,17 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
   const sourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
+  const lastAiSpeechEndTimeRef = useRef<number>(0);
+  const userSpeakingHangoverRef = useRef<number>(0);
+  const sessionIdRef = useRef<number>(0);
+  const isStartingCallRef = useRef<boolean>(false);
+  const isAiTurnInProgressRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sound effects generator
   const playSystemSound = (type: 'ring' | 'connect' | 'end' | 'hangup') => {
-    if (!audioContextRef.current) return;
-    const ctx = audioContextRef.current;
+    const ctx = outputAudioContextRef.current || audioContextRef.current;
+    if (!ctx) return;
     
     const playTone = (freq: number, duration: number, volume: number = 0.1, ramp: boolean = true) => {
       try {
@@ -159,15 +169,39 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   };
 
   const startCall = async () => {
+    if (isConnected || isCalling || isRinging || isStartingCallRef.current) {
+      console.warn("Live call already in progress or ringing. Ignoring duplicate call request.");
+      return;
+    }
+    isStartingCallRef.current = true;
+    sessionIdRef.current += 1;
+    const currentSessionId = sessionIdRef.current;
+
+    // Clean up any previous call artifacts first
+    endCall();
     setIsCalling(true);
     setIsRinging(true);
     
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ 
+      // Output AudioContext (24kHz for crystal-clear model speech playback)
+      const outputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ 
+        sampleRate: 24000,
+        latencyHint: 'interactive'
+      });
+      if (outputAudioCtx.state === 'suspended') {
+        await outputAudioCtx.resume();
+      }
+      outputAudioContextRef.current = outputAudioCtx;
+
+      // Input AudioContext (16kHz for microphone capture)
+      const inputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ 
         sampleRate: 16000,
         latencyHint: 'interactive'
       });
-      audioContextRef.current = audioCtx;
+      if (inputAudioCtx.state === 'suspended') {
+        await inputAudioCtx.resume();
+      }
+      audioContextRef.current = inputAudioCtx;
       
       // Start Ringing Loop (3-4 seconds delay)
       playSystemSound('ring');
@@ -186,32 +220,78 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
         return;
       }
       
-      const ai = getAi();
+      const ai = getAi(true);
+      if (!ai) {
+        throw new Error("Gemini AI instance unavailable");
+      }
       
-      const analyser = audioCtx.createAnalyser();
+      const analyser = outputAudioCtx.createAnalyser();
       analyser.fftSize = 64;
       analyserRef.current = analyser;
-      analyser.connect(audioCtx.destination);
+      analyser.connect(outputAudioCtx.destination);
       
       updateVisualizer();
-      nextPlayTimeRef.current = audioCtx.currentTime;
+      nextPlayTimeRef.current = outputAudioCtx.currentTime;
 
-      const systemInstruction = `You are a Master Agronomist and a leading agricultural scientist in Bangladesh conducting a live voice phone consultation.
-      CONTEXT: The user has received recommendations regarding:
-      "${diagnosisContext}".
-      
-CRITICAL SPOKEN LANGUAGE DIRECTIVE:
-1. ALWAYS speak and reply in natural, clear, spoken Bangla (বাংলা) by default.
-2. Even if the caller greets or asks questions in English (e.g. "Hello", "Hi", "Can you help me?"), YOU MUST STILL GREET AND REPLY IN BANGLA (e.g. "হ্যালো! আসসালামু আলাইকুম। আপনার ফসলের বিষয়ে কী জানতে চান বলুন।").
-3. ONLY switch to another language or a specific regional accent/dialect (like Chittagonian dialect / চাটগাঁইয়া) if the user EXPLICITLY requests it (e.g., "Speak in English", "ইংরেজিতে কথা বলুন", or "চাটগাঁইয়া ভাষায় বলুন").
-4. Never switch to English just because of English greetings or English loanwords.
+      // Model-specialized system prompt
+      const systemInstruction = isExtendedThinking
+        ? `You are a Chief Agronomic Scientist and Senior Plant Pathologist at Bangladesh Agricultural Research Institute (BARI / BRRI) conducting an in-depth clinical voice consultation.
+CONTEXT: Deep diagnostic review regarding: "${diagnosisContext}".
+LOCATION: ${locationContext}, Bangladesh.
+MODE: GEMINI 3.8 LIVE EXTENDED THINKING (SUPER SPECIALIZED CLINICAL PATHOLOGY & DIFFERENTIAL DIAGNOSIS).
 
-TASK: Answer follow-up questions from the user via voice.
-- DO NOT just repeat what is in the text. Add DEPTH, NUANCE, and EXPERT SCIENTIFIC EXPLANATIONS in natural Bangla.
-- Explain the 'why' and 'how': specific soil treatments, micro-nutrients, precise planting dates, and climate-smart techniques.
-- If asked about risks, provide nuanced mitigation strategies (e.g., biological pest control, specific irrigation intervals).
-- Use local context for ${locationContext}.
-- Keep individual spoken responses concise (2-3 sentences) so the conversation flows comfortably like a real phone call. Speak warmly like a respected agricultural mentor and extension officer.`;
+CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
+1. DO NOT GREET OR SPEAK FIRST ON CALL CONNECT. Stay completely silent when the call connects.
+2. Start speaking ONLY after the caller speaks first. Listen attentively and reply directly in natural, authoritative spoken Bangla (বাংলা).
+3. STRICT BAN ON META-ANNOUNCEMENTS: NEVER say robotic phrases like "আমি গভীর বৈজ্ঞানিক পর্যবেক্ষণের জন্য শুনছি", "আমি এআই সহকারী", or announce technical capabilities. Jump straight into the consultation like an expert doctor.
+4. Switch to English ONLY if the user explicitly requests ("ইংরেজিতে বলুন" / "Speak in English").
+5. Understand Bangladeshi regional farming terms and accents (Chittagong, Sylhet, Rangpur, Barisal, Jessore, Noakhali) effortlessly.
+
+DEEP EXTENDED THINKING REASONING MANDATE (SUPER SPECIALIZED CLINICAL PATHOLOGY):
+Before formulating your spoken response, leverage your thinking budget to execute:
+1. Differential Diagnosis: Systematically evaluate symptoms against look-alike pathologies in Bangladesh:
+   - Rice: Blast vs Bacterial Leaf Blight (BLB) vs Brown Spot vs Sheath Blight.
+   - Vegetables (Eggplant/Tomato/Chili): Bacterial Wilt vs Fusarium Wilt vs Shoot & Fruit Borer damage.
+   - Potato: Late Blight vs Early Blight.
+   - Nutrient vs Environmental: Zinc deficiency (Khaira) vs Salinity tip scorch vs Moisture stress.
+2. Agro-Ecological Context: Correlate with current Bangladeshi crop season (Kharif-1, Kharif-2, Rabi, Boro), soil characteristics, and weather in ${locationContext}.
+3. Stepped IPM Hierarchy: Prioritize non-chemical cultural, biological, and physical remedies first (light traps, Trichoderma harzianum, neem oil extract, perching/ডাল পোতা, balanced Potash).
+4. Agrochemical Safety & Precision Math:
+   - ZERO TOLERANCE: NEVER suggest banned chemicals in Bangladesh (Paraquat/গ্রামোক্সন, Carbofuran/ফুরাডান, Monocrotophos, Endosulfan, Dichlorvos).
+   - For safe approved remedies, state:
+     a) Generic Active Ingredient + popular BD brand (e.g., ম্যানকোজেব যেমন ডাইথেন এম-৪৫, হেক্সাকোনাজল যেমন কন্টাফ ৫ ইসি, অ্যাজোক্সিস্ট্রবিন+ডাইফেনোকোনাজল যেমন এমিস্টার টপ).
+     b) Exact dilution (e.g., ১ মিলি বা ২ গ্রাম প্রতি লিটার পানি, বা ১০ লিটার স্প্রেয়ার ড্রামে ১০-২০ মিলি).
+     c) Pre-Harvest Interval (PHI / অপেক্ষমাণ সময়) and protective gear (মাস্ক ও গ্লাভস পরে স্প্রে করা).
+
+SPOKEN DELIVERY CADENCE:
+- Distill your clinical reasoning into 2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and immediate recovery action.`
+        : `You are a warm, highly knowledgeable Universal Green Companion & Agricultural Advisor (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh conducting a real-time live phone call.
+CONTEXT: General plant, gardening, or farming consultation: "${diagnosisContext}".
+LOCATION: ${locationContext}, Bangladesh.
+MODE: GEMINI 3.8 LIVE (FAST, BROAD & VERSATILE PLANT & GARDENING COMPANION).
+
+BROAD MULTI-DOMAIN SCOPE & CAPABILITIES:
+You naturally and warmly assist with ANY green-living, plant care, gardening, or agricultural question:
+1. Rooftop & Balcony Gardening (ছাদ বাগান ও বারান্দা বাগান): Practical setup, lightweight potting soil mix (মাটি + ভার্মিকম্পোস্ট + কোকোপিট + বালি), tub/pot drainage holes, rooftop intense sun and heat protection, and natural homemade liquid fertilizers (সরিষার খৈল পচা পানি, কলার খোসা ভেজানো পটাশ পানি, ডিমের খোসার ক্যালসিয়াম).
+2. Indoor Houseplants & Home Decor (ইনডোর গাছপালা): Helping users choose which plants to buy for apartments/offices (Money plant, Snake plant, ZZ plant, Peace lily, Spider plant, Aloe vera, Areca palm), light levels (low light vs bright indirect), simple watering rules (checking 1-inch dry soil before watering), air purifying benefits, and pet safety.
+3. Kitchen Herbs & Vegetables: Growing chilis, tomatoes, mint (পুদিনা), coriander (ধনেপাতা), ginger, lemons in small balcony pots.
+4. Farming, Crops & Orchards: Agricultural fields, seasonal planting, vegetative growth, and common garden pests (mealybugs, aphids, whiteflies, caterpillars).
+5. Safe & Organic Remedies: Neem oil spray, mild dishwashing liquid spray, wood ash, composting kitchen peelings.
+
+CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
+1. DO NOT GREET OR SPEAK FIRST ON CALL CONNECT. Stay completely silent when the call connects.
+2. Start speaking ONLY after the caller speaks first. Respond directly, warmly, and concisely in natural spoken Bangla (বাংলা).
+3. STRICT BAN ON META-ANNOUNCEMENTS: NEVER say robotic phrases like "আমি সরাসরি শুনছি", "আমি এআই", or announce call systems. Speak naturally like a friendly plant mentor on the line.
+4. Switch to English only if the caller explicitly says "Speak in English" or "ইংরেজিতে বলুন".
+
+LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
+- Ultra-low latency spoken turns: Keep responses short, punchy, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human expert on the phone.
+- Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু জানতে চান?", "গাছের বয়স কত?"). Never deliver long lectures.
+- IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or interrupts by speaking, immediately cease previous points and answer their new topic directly.
+- Active Listening: Acknowledge caller statements with brief conversational confirmations ("হ্যাঁ, বুঝতে পারছি", "অবশ্যই").
+- If you need details, ask ONE simple, clarifying question at a time (e.g., "আপনার বারান্দায় দিনে কয় ঘণ্টা রোদ আসে?", "টবের মাটিতে কি পানি জমে থাকে?").
+- Agrochemical Safety: For home gardens, indoor pots, and edible herbs, strongly prioritize safe organic remedies. Never recommend banned toxic chemicals (Paraquat, Carbofuran, Monocrotophos).
+- SINGLE RESPONSE MANDATE: Deliver exactly ONE clear, complete spoken answer per inquiry. Never provide duplicate answers.`;
 
       const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
@@ -225,18 +305,24 @@ TASK: Answer follow-up questions from the user via voice.
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.HIGH
+          thinkingLevel: ThinkingLevel.LOW,
+          includeThoughts: true
         };
       }
+
+      let activeLiveSession: any = null;
 
       const sessionPromise = ai.live.connect({
         model: selectedLiveModel,
         config: liveConfig,
         callbacks: {
           onopen: async () => {
+            if (sessionIdRef.current !== currentSessionId) return;
             setIsConnected(true);
             setIsCalling(false);
             setIsRinging(false);
+            isStartingCallRef.current = false;
+            setCallStatus('listening');
             playSystemSound('connect');
             
             try {
@@ -246,27 +332,71 @@ TASK: Answer follow-up questions from the user via voice.
                   sampleRate: 16000,
                   echoCancellation: true,
                   noiseSuppression: true,
+                  autoGainControl: true,
                 } 
               });
               streamRef.current = stream;
               
-              const source = audioCtx.createMediaStreamSource(stream);
+              const source = inputAudioCtx.createMediaStreamSource(stream);
               
-              const userAnalyser = audioCtx.createAnalyser();
+              const userAnalyser = inputAudioCtx.createAnalyser();
               userAnalyser.fftSize = 64;
               userAnalyserRef.current = userAnalyser;
               source.connect(userAnalyser);
 
-              const processor = audioCtx.createScriptProcessor(512, 1, 1);
+              const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
               processorRef.current = processor;
 
+              // Silent gain node keeps ScriptProcessor alive without echoing mic into speakers
+              const muteGain = inputAudioCtx.createGain();
+              muteGain.gain.value = 0;
+              processor.connect(muteGain);
+              muteGain.connect(inputAudioCtx.destination);
+
               processor.onaudioprocess = (e) => {
-                if (isMutedRef.current) return;
+                if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
                 
                 const inputData = e.inputBuffer.getChannelData(0);
+
+                // 1. Calculate microphone RMS volume
+                let sum = 0;
+                for (let i = 0; i < inputData.length; i++) {
+                  sum += inputData[i] * inputData[i];
+                }
+                const rms = Math.sqrt(sum / inputData.length);
+
+                const outCtx = outputAudioContextRef.current;
+                const isAiPlaying = sourceNodesRef.current.length > 0 || 
+                                   (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
+                const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
+
+                // 2. Active User Speech Detection
+                const isUserSpeaking = rms > 0.02;
+                if (isUserSpeaking) {
+                  userSpeakingHangoverRef.current = Date.now() + 800;
+                }
+
+                // 3. INSTANT BARGE-IN & INTERRUPTION
+                // If user speaks deliberately while AI is active -> immediately cut local audio playback!
+                if (isAiActive && rms > 0.035) {
+                  sourceNodesRef.current.forEach(node => {
+                    try { node.stop(); } catch (err) {}
+                  });
+                  sourceNodesRef.current = [];
+                  if (outCtx) {
+                    nextPlayTimeRef.current = outCtx.currentTime;
+                  }
+                  isAiTurnInProgressRef.current = false;
+                  setCallStatus('listening');
+                } else if (isAiPlaying && !isUserSpeaking) {
+                  // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
+                  return;
+                }
+
+                // 4. Standard PCM 16 conversion
                 const pcm16 = new Int16Array(inputData.length);
                 for (let i = 0; i < inputData.length; i++) {
-                  let s = Math.max(-1, Math.min(1, inputData[i]));
+                  const s = Math.max(-1, Math.min(1, inputData[i]));
                   pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
                 
@@ -277,55 +407,115 @@ TASK: Answer follow-up questions from the user via voice.
                 }
                 const base64 = btoa(binary);
                 
-                sessionPromise.then((session: any) => {
-                  session.sendRealtimeInput({
-                    audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
-                  });
-                });
+                const currentSession = activeLiveSession || sessionRef.current;
+                if (currentSession && sessionIdRef.current === currentSessionId) {
+                  try {
+                    currentSession.sendRealtimeInput({
+                      audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+                    });
+                  } catch (err) {
+                    console.warn("Realtime audio send error:", err);
+                  }
+                }
               };
 
               source.connect(processor);
-              processor.connect(audioCtx.destination);
             } catch (err) {
               console.error("Microphone access denied:", err);
               endCall();
             }
           },
           onmessage: (message: LiveServerMessage) => {
-            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
-              playAudioChunk(base64Audio);
+            if (sessionIdRef.current !== currentSessionId) return;
+
+            // 1. Audio stream playback
+            const parts = message.serverContent?.modelTurn?.parts;
+            if (parts && parts.length > 0) {
+              isAiTurnInProgressRef.current = true;
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  playAudioChunk(part.inlineData.data);
+                  setCallStatus('speaking');
+                }
+              }
+            }
+
+            // 2. Separate Thinking thoughts from spoken speech parts
+            if (parts && parts.length > 0) {
+              for (const part of parts) {
+                if ((part as any).thought && part.text) {
+                  isAiTurnInProgressRef.current = true;
+                  setCallStatus('thinking');
+                  setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
+                }
+              }
+            }
+
+            // 3. Spoken transcription from Live API
+            const outputTransText = (message.serverContent as any)?.outputTranscription?.text;
+            if (outputTransText && outputTransText.trim().length > 0) {
+              isAiTurnInProgressRef.current = true;
+              setLiveTranscription(prev => (prev ? prev + ' ' + outputTransText : outputTransText).slice(-300));
+              setCallStatus('speaking');
+            }
+
+            const inputTransText = (message.serverContent as any)?.inputTranscription?.text;
+            if (inputTransText) {
+              setUserSpeechTranscript(inputTransText);
+              setCallStatus('listening');
+            }
+
+            // 4. Turn Complete handling - naturally release lock
+            if (message.serverContent?.turnComplete) {
+              if (sourceNodesRef.current.length === 0) {
+                isAiTurnInProgressRef.current = false;
+                setCallStatus('listening');
+              }
             }
             
+            // 5. Interruption handling
             if (message.serverContent?.interrupted) {
-              // Stop current playback
+              isAiTurnInProgressRef.current = false;
               sourceNodesRef.current.forEach(node => {
                 try { node.stop(); } catch (e) {}
               });
               sourceNodesRef.current = [];
-              if (audioContextRef.current) {
-                nextPlayTimeRef.current = audioContextRef.current.currentTime;
+              if (outputAudioContextRef.current) {
+                nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
               }
+              setCallStatus('listening');
             }
           },
           onclose: () => {
-            endCall();
+            if (sessionIdRef.current === currentSessionId) {
+              endCall();
+            }
           },
           onerror: (err: any) => {
-            console.error("Live API Error:", err);
-            if (err?.message === 'Network error' || err instanceof Event) {
-               toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+            if (sessionIdRef.current === currentSessionId) {
+              console.error("Live API Error:", err);
+              if (err?.message === 'Network error' || err instanceof Event) {
+                 toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+              }
+              endCall();
             }
-            endCall();
           }
         }
       });
       
-      sessionRef.current = await sessionPromise;
+      const activeSession = await sessionPromise;
+      activeLiveSession = activeSession;
+      if (sessionIdRef.current !== currentSessionId) {
+        try { activeSession.close(); } catch (e) {}
+        return;
+      }
+      sessionRef.current = activeSession;
+      isStartingCallRef.current = false;
       
     } catch (error) {
       console.error("Failed to start live call:", error);
       setIsCalling(false);
+      isStartingCallRef.current = false;
       endCall();
     }
   };
@@ -334,40 +524,64 @@ TASK: Answer follow-up questions from the user via voice.
     const audioCtx = audioContextRef.current;
     if (!audioCtx) return;
 
-    const binary = atob(base64Audio);
-    const pcmData = new Int16Array(binary.length / 2);
-    for (let i = 0; i < pcmData.length; i++) {
-      const lsb = binary.charCodeAt(i * 2);
-      const msb = binary.charCodeAt(i * 2 + 1);
-      pcmData[i] = (msb << 8) | lsb;
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
     }
-    
-    const audioBuffer = audioCtx.createBuffer(1, pcmData.length, 24000);
-    const channelData = audioBuffer.getChannelData(0);
-    for (let i = 0; i < pcmData.length; i++) {
-      channelData[i] = pcmData[i] / 32768.0;
+
+    try {
+      const binary = atob(base64Audio);
+      const pcmData = new Int16Array(binary.length / 2);
+      for (let i = 0; i < pcmData.length; i++) {
+        const lsb = binary.charCodeAt(i * 2);
+        const msb = binary.charCodeAt(i * 2 + 1);
+        pcmData[i] = (msb << 8) | lsb;
+      }
+      
+      const audioBuffer = audioCtx.createBuffer(1, pcmData.length, 24000);
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < pcmData.length; i++) {
+        channelData[i] = pcmData[i] / 32768.0;
+      }
+      
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      
+      if (analyserRef.current) {
+        source.connect(analyserRef.current);
+      } else {
+        source.connect(audioCtx.destination);
+      }
+      
+      const now = audioCtx.currentTime;
+      // CRITICAL FIX: Schedule strictly sequentially for gapless audio.
+      // If queue fell behind current time, start at now.
+      // NEVER reset nextPlayTime to now when it is ahead, as doing so causes future chunks
+      // to play simultaneously over currently playing chunks!
+      if (nextPlayTimeRef.current < now) {
+        nextPlayTimeRef.current = now;
+      }
+
+      const startTime = nextPlayTimeRef.current;
+      source.start(startTime);
+      nextPlayTimeRef.current = startTime + audioBuffer.duration;
+      
+      sourceNodesRef.current.push(source);
+      source.onended = () => {
+        sourceNodesRef.current = sourceNodesRef.current.filter(n => n !== source);
+        const ctx = outputAudioContextRef.current || audioContextRef.current;
+        if (sourceNodesRef.current.length === 0 && ctx && ctx.currentTime >= nextPlayTimeRef.current - 0.05) {
+          isAiTurnInProgressRef.current = false;
+          setCallStatus('listening');
+        }
+      };
+    } catch (err) {
+      console.error("Audio chunk playback error:", err);
     }
-    
-    const source = audioCtx.createBufferSource();
-    source.buffer = audioBuffer;
-    
-    if (analyserRef.current) {
-      source.connect(analyserRef.current);
-    } else {
-      source.connect(audioCtx.destination);
-    }
-    
-    const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
-    source.start(startTime);
-    nextPlayTimeRef.current = startTime + audioBuffer.duration;
-    
-    sourceNodesRef.current.push(source);
-    source.onended = () => {
-      sourceNodesRef.current = sourceNodesRef.current.filter(n => n !== source);
-    };
   };
 
   const endCall = () => {
+    sessionIdRef.current += 1;
+    isStartingCallRef.current = false;
     if (isConnected) {
       playSystemSound('end');
       setTimeout(() => playSystemSound('hangup'), 200);
@@ -376,6 +590,11 @@ TASK: Answer follow-up questions from the user via voice.
     setIsCalling(false);
     setIsRinging(false);
     setIsConnected(false);
+    setCallStatus('idle');
+    setLiveThinkingText('');
+    setUserSpeechTranscript('');
+    setLiveTranscription('');
+    setShowThinkingDetails(false);
     
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -389,9 +608,17 @@ TASK: Answer follow-up questions from the user via voice.
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        audioContextRef.current.close();
+      } catch (e) {}
       audioContextRef.current = null;
+    }
+    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+      try {
+        outputAudioContextRef.current.close();
+      } catch (e) {}
+      outputAudioContextRef.current = null;
     }
     if (sessionRef.current) {
       try {
@@ -430,42 +657,60 @@ TASK: Answer follow-up questions from the user via voice.
       {!isConnected && !isCalling ? (
         <div className="space-y-3">
           {/* Simplified Consultation Mode Switch */}
-          <div className="bg-slate-900/90 dark:bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3 flex items-center justify-between gap-3 backdrop-blur-md">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className={`p-2 rounded-xl shrink-0 transition-colors ${
-                isExtendedThinking ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-              }`}>
-                {isExtendedThinking ? <BrainCircuit className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+          <div className="bg-slate-900/90 dark:bg-slate-900/90 border border-slate-700/60 rounded-2xl p-3 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`p-2 rounded-xl shrink-0 transition-colors ${
+                  isExtendedThinking ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {isExtendedThinking ? <BrainCircuit className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-white block">
+                    {isExtendedThinking 
+                      ? (lang === 'bn' ? 'গভীর রোগ ও প্যাথলজি মোড' : 'Deep Clinical Pathology Mode')
+                      : (lang === 'bn' ? 'দ্রুত ভয়েস কল (বাগান, ইনডোর ও সার্বিক উদ্ভিদ)' : 'Fast Voice Call (Gardens, Houseplants & Plants)')}
+                  </span>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                    {isExtendedThinking 
+                      ? (lang === 'bn' ? 'সুপার স্পেশালাইজড: জটিল ফসলি রোগের বিশদ বৈজ্ঞানিক ব্যবচ্ছেদ ও নিখুঁত সমাধান' : 'Super specialized: Clinical plant pathology & precision differential diagnosis')
+                      : (lang === 'bn' ? 'বিস্তৃত পরিধি: ছাদ বাগান, ইনডোর গাছ বাছাই, টবের মাটি ও তাৎক্ষণিক সহজ পরামর্শ' : 'Broad scope: Rooftop gardens, indoor plant buying, potting mix & instant tips')}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white block">
-                  {isExtendedThinking 
-                    ? (lang === 'bn' ? 'গভীর পরামর্শ মোড' : 'In-Depth Consultation')
-                    : (lang === 'bn' ? 'দ্রুত ভয়েস কল' : 'Fast Voice Call')}
-                </span>
-                <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                  {isExtendedThinking 
-                    ? (lang === 'bn' ? 'জটিল সমস্যার বিশদ ব্যাখ্যা ও নিখুঁত বৈজ্ঞানিক সমাধান' : 'Detailed scientific explanations & precision solutions')
-                    : (lang === 'bn' ? 'সাধারণ প্রশ্নের তাত্ক্ষণিক উত্তর ও সরাসরি আলোচনা' : 'Instant quick answers for general agronomic questions')}
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsExtendedThinking(!isExtendedThinking)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isExtendedThinking ? 'bg-purple-600' : 'bg-gray-700'
+                }`}
+                role="switch"
+                aria-checked={isExtendedThinking}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    isExtendedThinking ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsExtendedThinking(!isExtendedThinking)}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isExtendedThinking ? 'bg-purple-600' : 'bg-gray-700'
-              }`}
-              role="switch"
-              aria-checked={isExtendedThinking}
-            >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isExtendedThinking ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
+            {/* Quick Topic Guide Chips */}
+            <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-slate-800">
+              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+                {lang === 'bn' ? '🌱 ছাদ ও বারান্দা বাগান' : '🌱 Rooftop & Balcony'}
+              </span>
+              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+                {lang === 'bn' ? '🪴 ইনডোর গাছ বাছাই' : '🪴 Indoor Plants to Buy'}
+              </span>
+              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+                {lang === 'bn' ? '🌿 টবের মাটি ও সার' : '🌿 Potting Mix & Care'}
+              </span>
+              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+                {lang === 'bn' ? '🌾 ফসলি রোগবালাই' : '🌾 Crop Advisory'}
+              </span>
+            </div>
           </div>
 
           <motion.button
@@ -493,7 +738,9 @@ TASK: Answer follow-up questions from the user via voice.
               {lang === 'bn' ? 'ভয়েস কল শুরু করুন' : 'Start Voice Chat'}
             </span>
             <span className="text-green-100 text-xs font-medium">
-              {lang === 'bn' ? 'এগিয়ে যান এবং এআই বিশেষজ্ঞের সাথে কথা বলুন' : 'Tap to speak with your AI Agronomist'}
+              {lang === 'bn' 
+                ? (isExtendedThinking ? 'ক্লিনিক্যাল প্যাথলজিস্টের সাথে গভীর বৈজ্ঞানিক আলোচনা' : 'ছাদ বাগান, ইনডোর গাছ বা ফসল নিয়ে সরাসরি কথা বলুন') 
+                : (isExtendedThinking ? 'Deep scientific consultation with Clinical Pathologist' : 'Ask about rooftop gardens, indoor plants, or crops')}
             </span>
           </motion.button>
         </div>
@@ -567,6 +814,72 @@ TASK: Answer follow-up questions from the user via voice.
                   ? 'লাইভ এআই ভয়েস পরামর্শক • সরকারি কৃষি সহায়তার জন্য ১৬১২৩ ডায়াল করুন' 
                   : 'Live AI Voice Assistant • For Gov Krishi Hotline dial 16123'}
               </p>
+
+              {/* Active Model Indicator Badge */}
+              <div className="flex items-center justify-center gap-2 mt-2.5">
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border backdrop-blur-md shadow-sm ${
+                  isExtendedThinking
+                    ? 'bg-purple-950/70 border-purple-500/40 text-purple-200'
+                    : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                }`}>
+                  {isExtendedThinking ? <BrainCircuit className="w-3.5 h-3.5 text-purple-400" /> : <Zap className="w-3.5 h-3.5 text-emerald-400" />}
+                  <span>
+                    {isExtendedThinking 
+                      ? (lang === 'bn' ? 'মডেল: Gemini 3.8 Live Extended Thinking' : 'Model: Gemini 3.8 Live Extended Thinking')
+                      : (lang === 'bn' ? 'মডেল: Gemini 3.8 Live (ফাস্ট অডিও)' : 'Model: Gemini 3.8 Live (Fast Audio)')
+                    }
+                  </span>
+                </div>
+              </div>
+
+              {/* Real-time Extended Thinking Inspector */}
+              {isExtendedThinking && (liveThinkingText || callStatus === 'thinking') && (
+                <div className="w-full max-w-md mx-auto mt-3 bg-purple-950/50 border border-purple-500/40 rounded-2xl p-3 backdrop-blur-md text-left shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setShowThinkingDetails(!showThinkingDetails)}
+                    className="w-full flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping shrink-0" />
+                      <span className="text-[11px] font-bold text-purple-200 uppercase tracking-wider truncate">
+                        {lang === 'bn' ? '🧠 লাইভ এগ্রোনমিক যুক্তি ও রোগ বিশ্লেষণ...' : '🧠 Live Agronomic Reasoning & Pathology...'}
+                      </span>
+                    </div>
+                    {showThinkingDetails ? <ChevronUp className="w-4 h-4 text-purple-300 shrink-0" /> : <ChevronDown className="w-4 h-4 text-purple-300 shrink-0" />}
+                  </button>
+                  <AnimatePresence>
+                    {showThinkingDetails && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-2 text-[11px] text-purple-100/95 font-mono bg-purple-900/40 p-2.5 rounded-xl border border-purple-500/30 max-h-32 overflow-y-auto leading-relaxed"
+                      >
+                        {liveThinkingText || (lang === 'bn' ? 'লক্ষণ, মাটি ও আবহাওয়া ডাটা তুলনা করা হচ্ছে...' : 'Comparing symptoms, soil profile, and meteorological stress...')}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
+              {/* Real-time Spoken Subtitles Preview */}
+              {(userSpeechTranscript || liveTranscription) && (
+                <div className="w-full max-w-md mx-auto mt-2.5 space-y-1.5">
+                  {userSpeechTranscript && (
+                    <div className="text-left bg-sky-950/60 border border-sky-500/30 rounded-xl px-3 py-1.5 text-[11px] text-sky-200 flex items-start gap-1.5">
+                      <span className="font-bold shrink-0 text-sky-300">{lang === 'bn' ? '🗣️ আপনি:' : '🗣️ You:'}</span>
+                      <span className="italic">{userSpeechTranscript}</span>
+                    </div>
+                  )}
+                  {liveTranscription && (
+                    <div className="text-left bg-emerald-950/60 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-200 flex items-start gap-1.5">
+                      <span className="font-bold shrink-0 text-emerald-300">{lang === 'bn' ? '🤖 বিশেষজ্ঞ:' : '🤖 Expert:'}</span>
+                      <span>{liveTranscription}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -588,7 +901,40 @@ TASK: Answer follow-up questions from the user via voice.
 
           <div className="w-full flex flex-col items-center space-y-8 relative z-10 pb-6">
             <div className="flex flex-col items-center">
-               <p className={`text-xs uppercase tracking-[0.2em] font-black transition-colors duration-500 ${isCalling || callStatus === 'thinking' ? 'text-green-400 animate-pulse' : 'text-gray-400'}`}>
+              {/* Instant Stop / Interrupt Button during AI speaking or thinking */}
+              <AnimatePresence>
+                {(callStatus === 'speaking' || isAiTurnInProgressRef.current) && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.85, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.85, y: -6 }}
+                    className="mb-2"
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        isAiTurnInProgressRef.current = false;
+                        sourceNodesRef.current.forEach(node => {
+                          try { node.stop(); } catch (err) {}
+                        });
+                        sourceNodesRef.current = [];
+                        if (outputAudioContextRef.current) {
+                          nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+                        }
+                        setCallStatus('listening');
+                        toast(lang === 'bn' ? 'এআই থামানো হয়েছে' : 'AI speech stopped', { duration: 1200, icon: '✋' });
+                      }}
+                      className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-95 transition-all cursor-pointer animate-pulse"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span>{lang === 'bn' ? 'থামুন (ইন্টারাপ্ট)' : 'Stop / Interrupt'}</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <p className={`text-xs uppercase tracking-[0.2em] font-black transition-colors duration-500 ${isCalling || callStatus === 'thinking' ? 'text-green-400 animate-pulse' : 'text-gray-400'}`}>
                 {isRinging
                   ? (lang === 'bn' ? 'বিশেষজ্ঞকে কল করা হচ্ছে...' : 'Ringing Expert...')
                   : isCalling 

@@ -3,7 +3,7 @@ import {
   Camera, Mic, MicOff, PhoneOff, Video, VideoOff, RefreshCw, Zap, ZapOff, 
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
   Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
-  BrainCircuit, Cpu
+  BrainCircuit, Cpu, ChevronDown, ChevronUp, Square
 } from 'lucide-react';
 import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
@@ -34,7 +34,9 @@ export default function LiveVideoCopilot({
   const { user } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isExtendedThinking, setIsExtendedThinking] = useState(false);
+  const [isExtendedThinking, setIsExtendedThinking] = useState(true);
+  const [liveThinkingText, setLiveThinkingText] = useState<string>('');
+  const [showThinkingDetails, setShowThinkingDetails] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isTorchOn, setIsTorchOn] = useState(false);
   const [isTorchSupported, setIsTorchSupported] = useState(false);
@@ -65,11 +67,17 @@ export default function LiveVideoCopilot({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const userAnalyserRef = useRef<AnalyserNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
   const sourceNodesRef = useRef<AudioBufferSourceNode[]>([]);
+  const lastAiSpeechEndTimeRef = useRef<number>(0);
+  const userSpeakingHangoverRef = useRef<number>(0);
+  const sessionIdRef = useRef<number>(0);
+  const isStartingSessionRef = useRef<boolean>(false);
+  const isAiTurnInProgressRef = useRef<boolean>(false);
   const frameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const animFrameRef = useRef<number | null>(null);
@@ -298,6 +306,7 @@ export default function LiveVideoCopilot({
           sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         }
       };
 
@@ -402,8 +411,12 @@ export default function LiveVideoCopilot({
 
   // Play incoming 24kHz audio chunk from Gemini 3.8 Live
   const playAudioChunk = (base64Audio: string) => {
-    const audioCtx = audioContextRef.current;
-    if (!audioCtx) return;
+    const audioCtx = outputAudioContextRef.current || audioContextRef.current;
+    if (!audioCtx || audioCtx.state === 'closed') return;
+
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
 
     try {
       const binary = atob(base64Audio);
@@ -429,13 +442,27 @@ export default function LiveVideoCopilot({
         source.connect(audioCtx.destination);
       }
 
-      const startTime = Math.max(audioCtx.currentTime, nextPlayTimeRef.current);
+      const now = audioCtx.currentTime;
+      // CRITICAL FIX: Schedule strictly sequentially for gapless audio.
+      // If the queue fell behind the current audio clock (e.g., initial chunk or after a pause),
+      // catch up to 'now'. NEVER reset nextPlayTime to 'now' when it is in the future, as doing so
+      // causes future chunks to play simultaneously right over currently playing speech!
+      if (nextPlayTimeRef.current < now) {
+        nextPlayTimeRef.current = now;
+      }
+
+      const startTime = nextPlayTimeRef.current;
       source.start(startTime);
       nextPlayTimeRef.current = startTime + audioBuffer.duration;
 
       sourceNodesRef.current.push(source);
       source.onended = () => {
         sourceNodesRef.current = sourceNodesRef.current.filter(n => n !== source);
+        const ctx = outputAudioContextRef.current || audioContextRef.current;
+        if (sourceNodesRef.current.length === 0 && ctx && ctx.currentTime >= nextPlayTimeRef.current - 0.05) {
+          isAiTurnInProgressRef.current = false;
+          setLiveState('listening');
+        }
       };
     } catch (err) {
       console.error("Audio chunk playback error:", err);
@@ -444,10 +471,19 @@ export default function LiveVideoCopilot({
 
   // Send single video frame (1 FPS)
   const sendVideoFrame = (session: any) => {
-    if (!videoRef.current || !canvasRef.current || !session) return;
+    const activeSession = session || sessionRef.current;
+    if (!videoRef.current || !canvasRef.current || !activeSession) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (video.readyState < 2) return;
+
+    // Never stream video frames while AI is generating/speaking OR while farmer is speaking (prevents split/double turns)
+    const outAudio = outputAudioContextRef.current || audioContextRef.current;
+    const isAiSpeaking = isAiTurnInProgressRef.current || 
+                         sourceNodesRef.current.length > 0 || 
+                         (outAudio ? outAudio.currentTime < nextPlayTimeRef.current + 0.08 : false);
+    const isUserSpeaking = Date.now() < userSpeakingHangoverRef.current;
+    if (isAiSpeaking || isUserSpeaking) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -460,7 +496,7 @@ export default function LiveVideoCopilot({
     const base64Data = dataUrl.split(',')[1];
     if (base64Data) {
       try {
-        session.sendRealtimeInput({
+        activeSession.sendRealtimeInput({
           video: {
             data: base64Data,
             mimeType: 'image/jpeg'
@@ -486,8 +522,18 @@ export default function LiveVideoCopilot({
 
   // Start Gemini 3.8 Live Multimodal Stream
   const startLiveSession = async () => {
+    if (isSessionActive || isConnecting || isStartingSessionRef.current) {
+      console.warn("Live session already active or connecting. Ignoring duplicate start request.");
+      return;
+    }
+    // Ensure clean slate before opening new session
+    isStartingSessionRef.current = true;
+    stopAllMedia();
     setIsConnecting(true);
     setCameraError(null);
+
+    sessionIdRef.current += 1;
+    const currentSessionId = sessionIdRef.current;
 
     // Auto-enter fullscreen on mobile screens for native camera app feel
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -501,54 +547,112 @@ export default function LiveVideoCopilot({
           ? "লাইভ ভিডিও ফিচারের জন্য GEMINI_API_KEY কনফিগার থাকতে হবে।" 
           : "Live video assistant requires GEMINI_API_KEY.");
         setIsConnecting(false);
+        isStartingSessionRef.current = false;
         return;
       }
 
       const stream = await startCamera();
       if (!stream) {
         setIsConnecting(false);
+        isStartingSessionRef.current = false;
         return;
       }
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+      // Output AudioContext (24kHz for crystal-clear model speech playback)
+      const outputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+        sampleRate: 24000,
+        latencyHint: 'interactive'
+      });
+      if (outputAudioCtx.state === 'suspended') {
+        await outputAudioCtx.resume();
+      }
+      outputAudioContextRef.current = outputAudioCtx;
+
+      // Input AudioContext (16kHz for microphone capture)
+      const inputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 16000,
         latencyHint: 'interactive'
       });
-      audioContextRef.current = audioCtx;
+      if (inputAudioCtx.state === 'suspended') {
+        await inputAudioCtx.resume();
+      }
+      audioContextRef.current = inputAudioCtx;
 
-      const analyser = audioCtx.createAnalyser();
+      const analyser = outputAudioCtx.createAnalyser();
       analyser.fftSize = 64;
       analyserRef.current = analyser;
-      analyser.connect(audioCtx.destination);
+      analyser.connect(outputAudioCtx.destination);
 
-      nextPlayTimeRef.current = audioCtx.currentTime;
+      nextPlayTimeRef.current = outputAudioCtx.currentTime;
+      lastAiSpeechEndTimeRef.current = 0;
+      userSpeakingHangoverRef.current = 0;
+      isAiTurnInProgressRef.current = false;
       updateVisualizer();
 
-      const ai = getAi();
+      const ai = getAi(true);
       if (!ai) {
         throw new Error("Gemini AI instance unavailable");
       }
 
       const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
-      const systemInstruction = `You are an elite Agronomist and Senior Plant Pathologist in Bangladesh observing a LIVE MULTIMODAL VIDEO STREAM from a farmer's phone in ${locationContext}.
-      ${isExtendedThinking ? 'MODE: DEEP AGパRONOMIC ANALYSIS ACTIVATED. Engage deep differential reasoning, symptom comparison, and advanced treatment planning.' : 'MODE: STANDARD REAL-TIME MULTIMODAL STREAM.'}
-      
-CRITICAL SPOKEN LANGUAGE DIRECTIVE:
-1. ALWAYS talk and reply in natural, clear, spoken Bangla (বাংলা) by default.
-2. Even if the farmer greets or speaks to you in English (such as "Hello", "Hi", "Good morning", "Can you see this?", or asks questions in English), YOU MUST STILL GREET AND REPLY IN BANGLA (e.g. "হ্যালো! আসসালামু আলাইকুম। আমি আপনার ফসল পর্যবেক্ষণ করছি, কী সমস্যা দেখতে পাচ্ছেন বলুন?").
-3. ONLY switch away from standard Bangla if the user EXPLICITLY and directly requests a different language (e.g., "Speak in English", "ইংরেজিতে কথা বলুন") or requests a specific regional accent/dialect (such as Cox's Bazar / Chittagonian dialect / "চাটগাঁইয়া ভাষায় বলুন").
-4. Never switch to English just because of English greetings or English loanwords.
+      const systemInstruction = isExtendedThinking
+        ? `You are an elite Senior Plant Pathologist and Agronomic Scientist at BARI/BRRI in Bangladesh observing a LIVE MULTIMODAL VIDEO STREAM from a farmer's smartphone in ${locationContext}.
+MODE: GEMINI 3.8 LIVE EXTENDED THINKING (SUPER SPECIALIZED CLINICAL PATHOLOGY & DIFFERENTIAL DIAGNOSIS).
 
-YOUR CORE CAPABILITIES IN THIS LIVE MODE:
-1. Continuous Visual Crop Inspection: You receive 1 JPEG video frame every second from the farmer's camera. Continuously examine plant leaves, stems, pods, soil moisture, discoloration, wilting, lesions, and pest activity.
-2. Real-Time Spoken Interaction: Speak back immediately in warm, friendly, clear Bangla.
-3. Proactive Observation: If you notice a visible agricultural problem (e.g. leaf curl, blast lesions, yellowing, stem borer hole, fungal spots) in the video frames even before the farmer asks, politely alert them in simple Bangla.
-4. Chemical Safety & Legal Compliance:
-   - Prioritize cultural, biological, and Integrated Pest Management (IPM) techniques.
-   - STRICTLY FORBIDDEN: NEVER recommend banned or restricted chemicals in Bangladesh (Paraquat/গ্রামোক্সন, Carbofuran/ফুরাডান, Endosulfan/থিয়োডান, Monocrotophos).
-   - Always state Pre-Harvest Intervals (PHI / অপেক্ষমাণ সময়) if advising any pesticide.
-5. Tone & Structure: Speak warmly, concisely, and empathetically like a friendly mentor and agricultural extension officer (উপসহকারী কৃষি কর্মকর্তা). Keep spoken responses under 2-3 sentences at a time for natural conversation.`;
+CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
+1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
+2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the farmer actually speaks first or asks a question.
+3. Start speaking ONLY after the user talks to you. When the farmer speaks, respond directly and concisely in natural spoken Bangla (বাংলা).
+4. NEVER say robotic meta-announcements like "আমি আপনার ভিডিও দেখছি", "ক্যামেরা ফুটেজ দেখছি", or announce that you are an AI. Act as an expert agronomist in the field.
+5. Switch to English ONLY if the user explicitly requests ("ইংরেজিতে বলুন" / "Speak in English").
+6. Understand Bangladeshi regional farming terms and accents (Chittagong, Sylhet, Rangpur, Barisal, Jessore) effortlessly.
+
+CAMERA & VISUAL COACHING DIRECTIVE:
+- Actively coach the farmer for optimal diagnostic video:
+  * If too far or blurry: "ক্যামেরাটি আক্রান্ত পাতার আরেকটু কাছে (৫-৬ ইঞ্চি) নিয়ে ২ সেকেন্ড স্থির রাখুন।"
+  * If back-lit or dark: "সূর্যের আলো যাতে পাতার ওপর পড়ে সেভাবে দাঁড়ান, যাতে ছায়া না পড়ে।"
+  * For hidden pests: "পাতার উল্টো পিঠ উল্টে ক্যামেরায় দেখান, নিচে পোকা বা ডিম থাকতে পারে।"
+
+DEEP EXTENDED THINKING REASONING MANDATE (SUPER SPECIALIZED CLINICAL PATHOLOGY):
+Before formulating your spoken response, quickly evaluate:
+1. Visual Pathological Inspection: lesions, margins, curling, wilting, or insect damage.
+2. Differential Diagnosis: distinguish look-alikes (e.g. Blast vs BLB, Mites vs Thrips, Late vs Early Blight).
+3. Stepped IPM Hierarchy: Non-chemical cultural remedies first, followed by safe chemical dosages if necessary.
+4. Chemical Safety: NEVER suggest banned chemicals (Paraquat, Carbofuran, Monocrotophos). For approved remedies, state generic active ingredient + popular BD brand, exact water ratio, and safety precaution.
+
+SPOKEN DELIVERY CADENCE:
+- Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step.`
+        : `You are a warm, highly knowledgeable Universal Plant, Gardening & Agriculture Companion (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh observing a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from a user's smartphone in ${locationContext}.
+MODE: GEMINI 3.8 LIVE (FAST, BROAD & VERSATILE GREEN COMPANION).
+
+BROAD MULTI-DOMAIN SCOPE & CAPABILITIES:
+You naturally and enthusiastically help with ANY green space, gardening, or farming inquiry:
+1. Rooftop & Balcony Gardening (ছাদ বাগান ও বারান্দা বাগান): Pot/container selection, container drainage (ইটের খোয়া/খোলামকুচি), lightweight potting mix ratios (বেলে-দোআঁশ মাটি, ভার্মিকম্পোস্ট/গোবর সার, কোকোপিট, বালি), rooftop heat & wind protection, and organic liquid boosters (সরিষার খৈল পচা পানি, কলার খোসা ভেজানো পানি).
+2. Indoor Houseplants & Home Decor (ইনডোর গাছপালা): Suggesting best indoor plants for homes, bedrooms, and offices in Bangladesh (Money Plant/Pothos, Snake Plant/Sansevieria, ZZ Plant, Peace Lily, Spider Plant, Aloe Vera, Areca Palm), light suitability (low light, bright indirect sun), watering frequency (checking topsoil with finger), and air-purification qualities.
+3. Kitchen Gardens & Herbs: Chili (মরিচ), tomato, coriander (ধনেপাতা), mint (পুদিনা), lemon (কাগজি লেবু), ginger in pots or small verandas.
+4. Farming, Crops & Orchards: Agricultural fields, seasonal planting calendar, healthy leaf checks, and garden pests (mealybugs/ছাতরা পোকা, aphids/জাব পোকা, whiteflies, caterpillars).
+5. Eco-friendly & Kitchen Remedies: Neem oil + soap water spray, wood ash (ছাই), compost tea, natural insect repellents.
+
+CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
+1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
+2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the user actually speaks first or asks a question.
+3. Start speaking ONLY after the user speaks. Respond directly, warmly, and concisely in natural spoken Bangla (বাংলা).
+4. NEVER say robotic meta-announcements like "আমি আপনার ভিডিও দেখছি" or announce looking at camera footage. Jump straight into answering the user's question.
+5. Switch to English ONLY if the user explicitly says "Speak in English" or "ইংরেজিতে বলুন".
+
+LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
+1. Continuous Multimodal Observation: You receive 1 JPEG video frame every second from the camera. Continuously observe whatever the user shows—whether it is an indoor decorative pot, a rooftop planter, a balcony railing pot, kitchen garden herb, seedling, leaf, or farm crop.
+2. Ultra-low latency spoken turns: Keep responses short, natural, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human mentor in the garden with them.
+3. Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু দেখতে চান?", "জল দেওয়া হয়েছে?"). Never give long speeches.
+4. IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or speaks while you are talking, immediately stop your previous sentence and address their new question without repeating earlier words.
+5. Helpful Camera Guidance:
+   * "ক্যামেরাটি পাতা বা টবের আরেকটু কাছে আনুন।"
+   * "টবের মাটি বা পাতার নিচের দিকটা একটু দেখান।"
+   * "রোদের বিপরীতে ধরুন যাতে পাতা স্পষ্ট দেখা যায়।"
+6. If you need details, ask ONE simple, friendly question at a time (e.g., "টবে কি দিনে রোদ পায়?", "মাটি কি বেশি ভেজা নাকি শুকনা?").
+7. Plant & Chemical Safety: For home gardens, indoor pots, and edible herbs, strongly prioritize safe organic remedies. Never recommend banned toxic chemicals (Paraquat, Carbofuran, Monocrotophos).
+8. SINGLE RESPONSE MANDATE: Give exactly ONE concise, complete spoken answer per inquiry. Never repeat or restart your answer.`;
 
       const liveConfig: any = {
         responseModalities: [Modality.AUDIO],
@@ -557,38 +661,89 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
             prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" }
           }
         },
+        outputAudioTranscription: {},
         systemInstruction,
       };
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.HIGH
+          thinkingLevel: ThinkingLevel.LOW,
+          includeThoughts: true
         };
       }
+
+      let activeLiveSession: any = null;
 
       const sessionPromise = ai.live.connect({
         model: selectedLiveModel,
         config: liveConfig,
         callbacks: {
           onopen: async () => {
+            if (sessionIdRef.current !== currentSessionId) return;
             setIsConnecting(false);
+            isStartingSessionRef.current = false;
             setIsSessionActive(true);
+            setLiveState('listening');
             playTone(880, 0.15, 0.08);
 
             // Connect microphone stream
             try {
-              const audioSource = audioCtx.createMediaStreamSource(stream);
-              const userAnalyser = audioCtx.createAnalyser();
+              const audioSource = inputAudioCtx.createMediaStreamSource(stream);
+              const userAnalyser = inputAudioCtx.createAnalyser();
               userAnalyser.fftSize = 64;
               userAnalyserRef.current = userAnalyser;
               audioSource.connect(userAnalyser);
 
-              const processor = audioCtx.createScriptProcessor(512, 1, 1);
+              const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
               processorRef.current = processor;
 
+              // Silent gain node keeps ScriptProcessor active without routing mic to speakers
+              const muteGain = inputAudioCtx.createGain();
+              muteGain.gain.value = 0;
+              processor.connect(muteGain);
+              muteGain.connect(inputAudioCtx.destination);
+
               processor.onaudioprocess = (e) => {
-                if (isMutedRef.current) return;
+                if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
                 const inputData = e.inputBuffer.getChannelData(0);
+
+                // 1. Calculate microphone RMS volume
+                let sum = 0;
+                for (let i = 0; i < inputData.length; i++) {
+                  sum += inputData[i] * inputData[i];
+                }
+                const rms = Math.sqrt(sum / inputData.length);
+
+                const outCtx = outputAudioContextRef.current;
+                const isAiPlaying = sourceNodesRef.current.length > 0 || 
+                                   (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
+                const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
+
+                // 2. Active User Speech Detection
+                const isUserSpeaking = rms > 0.02;
+                if (isUserSpeaking) {
+                  userSpeakingHangoverRef.current = Date.now() + 800;
+                }
+
+                // 3. INSTANT BARGE-IN & INTERRUPTION
+                // If user speaks deliberately while AI is active -> immediately cut local audio playback!
+                if (isAiActive && rms > 0.035) {
+                  sourceNodesRef.current.forEach(node => {
+                    try { node.stop(); } catch (err) {}
+                  });
+                  sourceNodesRef.current = [];
+                  if (outCtx) {
+                    nextPlayTimeRef.current = outCtx.currentTime;
+                  }
+                  isAiTurnInProgressRef.current = false;
+                  clearSubtitles();
+                  setLiveState('listening');
+                } else if (isAiPlaying && !isUserSpeaking) {
+                  // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
+                  return;
+                }
+
+                // 4. Standard PCM 16 conversion & stream transmission
                 const pcm16 = new Int16Array(inputData.length);
                 for (let i = 0; i < inputData.length; i++) {
                   const s = Math.max(-1, Math.min(1, inputData[i]));
@@ -602,21 +757,26 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
                 }
                 const base64 = btoa(binary);
 
-                sessionPromise.then((sess: any) => {
-                  sess.sendRealtimeInput({
-                    audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
-                  });
-                });
+                const currentSession = activeLiveSession || sessionRef.current;
+                if (currentSession && sessionIdRef.current === currentSessionId) {
+                  try {
+                    currentSession.sendRealtimeInput({
+                      audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+                    });
+                  } catch (err) {
+                    console.warn("Realtime audio send error:", err);
+                  }
+                }
               };
 
               audioSource.connect(processor);
-              processor.connect(audioCtx.destination);
 
-              // Launch 1 FPS Video Frame Loop
+              // Launch 1 FPS Video Frame Loop (paused during active user or AI speaking)
               frameIntervalRef.current = setInterval(() => {
-                sessionPromise.then((sess: any) => {
-                  sendVideoFrame(sess);
-                });
+                const currentSession = activeLiveSession || sessionRef.current;
+                if (currentSession && sessionIdRef.current === currentSessionId) {
+                  sendVideoFrame(currentSession);
+                }
               }, 1000);
 
               // Duration Timer
@@ -624,52 +784,6 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
                 callDurationRef.current += 1;
                 setCallDuration(prev => prev + 1);
               }, 1000);
-
-              // Initialize Speech Recognition for continuous transcription of farmer queries
-              const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-              if (SpeechRecognitionClass) {
-                try {
-                  const recognition = new SpeechRecognitionClass();
-                  recognition.continuous = true;
-                  recognition.interimResults = true;
-                  recognition.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-                  
-                  recognition.onresult = (event: any) => {
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                      const spoken = event.results[i][0]?.transcript?.trim();
-                      if (event.results[i].isFinal && spoken) {
-                        const turn: TranscriptTurn = {
-                          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-                          role: 'user',
-                          text: spoken,
-                          timestamp: new Date().toISOString()
-                        };
-                        transcriptsRef.current.push(turn);
-                        setTranscripts(prev => [...prev, turn]);
-                        enqueueSubtitleSentence(spoken, 'user');
-                      } else if (spoken) {
-                        // Show active interim preview
-                        if (!isDisplayingSubtitleRef.current || latestSubtitle?.role === 'user') {
-                          setLatestSubtitle({
-                            id: 'interim_farmer',
-                            text: spoken,
-                            role: 'user'
-                          });
-                        }
-                      }
-                    }
-                  };
-
-                  recognition.onerror = (e: any) => {
-                    console.warn("Speech recognition notice:", e);
-                  };
-
-                  recognition.start();
-                  speechRecognitionRef.current = recognition;
-                } catch (srErr) {
-                  console.warn("Web Speech API unavailable:", srErr);
-                }
-              }
 
               toast.success(lang === 'bn' 
                 ? '🔴 লাইভ মাল্টিমোডাল এআই সেশন সংযুক্ত হয়েছে!' 
@@ -682,59 +796,93 @@ YOUR CORE CAPABILITIES IN THIS LIVE MODE:
           },
 
           onmessage: (message: LiveServerMessage) => {
-            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
-              playAudioChunk(base64Audio);
-            }
+            if (sessionIdRef.current !== currentSessionId) return;
 
-            // Extract textual advice returned by Gemini Live and parse into clean sentences
-            if (message.serverContent?.modelTurn?.parts) {
-              const textParts = message.serverContent.modelTurn.parts
-                .map((p: any) => p.text)
-                .filter((t: any): t is string => typeof t === 'string' && t.trim().length > 0);
-              if (textParts.length > 0) {
-                const incomingText = textParts.join(' ');
-                processIncomingModelText(incomingText);
+            // 1. Play all audio parts in this model turn
+            const parts = message.serverContent?.modelTurn?.parts;
+            if (parts && parts.length > 0) {
+              isAiTurnInProgressRef.current = true;
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  playAudioChunk(part.inlineData.data);
+                  setLiveState('speaking');
+                }
               }
             }
 
-            // Flush remaining buffer at end of model response turn
-            if (message.serverContent?.turnComplete) {
-              flushRemainingModelText();
+            // 2. Extract spoken transcription returned by Gemini Live
+            const spokenText = message.serverContent?.outputTranscription?.text;
+            if (spokenText && spokenText.trim().length > 0) {
+              isAiTurnInProgressRef.current = true;
+              processIncomingModelText(spokenText);
             }
 
-            // Interruption handling
+            // 3. Capture internal thoughts when Extended Thinking is active
+            if (message.serverContent?.modelTurn?.parts) {
+              for (const part of message.serverContent.modelTurn.parts) {
+                if ((part as any).thought && part.text) {
+                  isAiTurnInProgressRef.current = true;
+                  setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
+                  setLiveState('analyzing');
+                }
+              }
+            }
+
+            // 4. Flush remaining buffer and gracefully release acoustic lock after audio playback finishes
+            if (message.serverContent?.turnComplete) {
+              flushRemainingModelText();
+              if (sourceNodesRef.current.length === 0) {
+                isAiTurnInProgressRef.current = false;
+                setLiveState('listening');
+              }
+            }
+
+            // 5. Interruption handling
             if (message.serverContent?.interrupted) {
+              isAiTurnInProgressRef.current = false;
               clearSubtitles();
               sourceNodesRef.current.forEach(node => {
                 try { node.stop(); } catch (e) {}
               });
               sourceNodesRef.current = [];
-              if (audioContextRef.current) {
-                nextPlayTimeRef.current = audioContextRef.current.currentTime;
+              if (outputAudioContextRef.current) {
+                nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
               }
+              setLiveState('listening');
             }
           },
 
           onclose: () => {
-            stopAllMedia();
+            if (sessionIdRef.current === currentSessionId) {
+              stopAllMedia();
+            }
           },
 
           onerror: (err: any) => {
-            console.error("Gemini 3.8 Live Error:", err);
-            toast.error(lang === 'bn' 
-              ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
-              : "Live video stream error. Please try again.");
-            stopAllMedia();
+            if (sessionIdRef.current === currentSessionId) {
+              console.error("Gemini 3.8 Live Error:", err);
+              toast.error(lang === 'bn' 
+                ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
+                : "Live video stream error. Please try again.");
+              stopAllMedia();
+            }
           }
         }
       });
 
-      sessionRef.current = await sessionPromise;
+      const activeSession = await sessionPromise;
+      activeLiveSession = activeSession;
+      if (sessionIdRef.current !== currentSessionId) {
+        try { activeSession.close(); } catch (e) {}
+        return;
+      }
+      sessionRef.current = activeSession;
+      isStartingSessionRef.current = false;
 
     } catch (err: any) {
       console.error("Failed to start Live Video Copilot:", err);
       setIsConnecting(false);
+      isStartingSessionRef.current = false;
       stopAllMedia();
     }
   };
@@ -872,6 +1020,8 @@ Return a JSON object with this exact structure:
 
   // Stop all media & connections
   const stopAllMedia = () => {
+    sessionIdRef.current += 1;
+    isStartingSessionRef.current = false;
     if (frameIntervalRef.current) {
       clearInterval(frameIntervalRef.current);
       frameIntervalRef.current = null;
@@ -916,19 +1066,35 @@ Return a JSON object with this exact structure:
       audioContextRef.current = null;
     }
 
+    if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+      try {
+        outputAudioContextRef.current.close();
+      } catch (e) {}
+      outputAudioContextRef.current = null;
+    }
+
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(t => t.stop());
       mediaStreamRef.current = null;
     }
 
-    // Capture duration and transcripts for persistent dossier compounding
+    // Capture duration and transcripts for persistent dossier compounding (Strictly >= 90 seconds requirement)
     const currentTranscripts = [...transcriptsRef.current];
     const currentDuration = callDurationRef.current || callDuration;
 
-    if (currentTranscripts.length > 0 || currentDuration >= 4) {
+    if (currentDuration >= 90) {
       setIsSavingSummary(true);
       saveLiveSessionDossier(currentTranscripts, currentDuration)
         .finally(() => setIsSavingSummary(false));
+    } else {
+      if (currentDuration >= 5) {
+        toast(
+          lang === 'bn' 
+            ? `সেশনটি ${Math.round(currentDuration)} সেকেন্ড স্থায়ী ছিল। স্মার্ট কৃষক কার্ডে সংরক্ষণের জন্য ন্যূনতম ৯০ সেকেন্ড দীর্ঘ সেশন প্রয়োজন।` 
+            : `Session was ${Math.round(currentDuration)}s. Minimum 90s required to save to Smart Krishi Card.`,
+          { icon: 'ℹ️' }
+        );
+      }
     }
 
     setIsSessionActive(false);
@@ -938,6 +1104,8 @@ Return a JSON object with this exact structure:
     setCallDuration(0);
     callDurationRef.current = 0;
     setLiveState('idle');
+    setLiveThinkingText('');
+    setShowThinkingDetails(false);
     clearSubtitles();
   };
 
@@ -1052,13 +1220,17 @@ Return a JSON object with this exact structure:
                 {lang === 'bn' ? 'লাইভ ক্যামেরা ও ভয়েস সহকারী' : 'Live Camera & Voice Copilot'}
               </h3>
               <p className="text-xs sm:text-sm text-gray-300 mt-1.5 leading-relaxed">
-                {lang === 'bn' 
-                  ? 'আপনার ফোন ক্যামেরা ফসলের দিকে ধরুন এবং সরাসরি কথা বলুন। এআই সরাসরি ভিডিও দেখে তৎক্ষণাৎ রোগ নির্ণয় ও সমাধান জানাবে।' 
-                  : 'Point your camera at the crop and speak naturally. The AI inspects the video in real-time and speaks back.'}
+                {isExtendedThinking
+                  ? (lang === 'bn' 
+                      ? 'ক্যামেরা আক্রান্ত পাতার দিকে স্থির রাখুন। এআই গভীর প্যাথলজি বিশ্লেষণ ও সুনির্দিষ্ট প্রেসক্রিপশন দেবে।' 
+                      : 'Hold camera steady at diseased plant parts for deep clinical pathology & precision IPM solutions.')
+                  : (lang === 'bn' 
+                      ? 'ফোন ক্যামেরা ছাদ বাগান, বারান্দার টব, ইনডোর গাছ বা ফসলের দিকে ধরুন এবং সরাসরি কথা বলুন।' 
+                      : 'Point camera at rooftop pots, balcony gardens, indoor houseplants or crops and speak freely.')}
               </p>
             </div>
 
-            {/* Simplified Analysis Depth Toggle */}
+            {/* Analysis Depth & Scope Toggle */}
             <div className="bg-gray-900/80 p-3 rounded-2xl border border-gray-800 backdrop-blur-md text-left">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1070,13 +1242,13 @@ Return a JSON object with this exact structure:
                   <div className="min-w-0">
                     <span className="text-xs font-bold text-white block">
                       {isExtendedThinking 
-                        ? (lang === 'bn' ? 'গভীর রোগ বিশ্লেষণ' : 'Deep Diagnosis Mode')
-                        : (lang === 'bn' ? 'দ্রুত পরামর্শ মোড' : 'Fast Advisory Mode')}
+                        ? (lang === 'bn' ? 'গভীর রোগ ও প্যাথলজি মোড' : 'Deep Clinical Pathology Mode')
+                        : (lang === 'bn' ? 'দ্রুত পরামর্শ মোড (বাগান, ইনডোর ও ফসল)' : 'Fast Mode (Gardens, Houseplants & Crops)')}
                     </span>
                     <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
                       {isExtendedThinking
-                        ? (lang === 'bn' ? 'জটিল রোগের বিশদ কারণ ও উন্নত সমাধান' : 'In-depth cause analysis and detailed solutions')
-                        : (lang === 'bn' ? 'সহজ প্রশ্নে তাৎক্ষণিক দ্রুত উত্তর ও পরামর্শ' : 'Instant quick answers for general questions')}
+                        ? (lang === 'bn' ? 'সুপার স্পেশালাইজড: জটিল ফসলি রোগের বিশদ কারণ ও বৈজ্ঞানিক ব্যবচ্ছেদ' : 'Super specialized: In-depth clinical pathology & differential diagnosis')
+                        : (lang === 'bn' ? 'বিস্তৃত পরিধি: ছাদ বাগান, ইনডোর গাছ বাছাই, টবের মাটি ও তাৎক্ষণিক সমাধান' : 'Broad scope: Rooftop gardens, indoor plant buying, potting mix & quick tips')}
                     </p>
                   </div>
                 </div>
@@ -1096,6 +1268,22 @@ Return a JSON object with this exact structure:
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* Quick Topic Guide Chips */}
+              <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-gray-800/80">
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
+                  {lang === 'bn' ? '🌱 ছাদ ও বারান্দা বাগান' : '🌱 Rooftop & Balcony'}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
+                  {lang === 'bn' ? '🪴 ইনডোর গাছ বাছাই' : '🪴 Indoor Plants to Buy'}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
+                  {lang === 'bn' ? '🌿 টবের মাটি ও সার' : '🌿 Potting Mix & Care'}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
+                  {lang === 'bn' ? '🌾 ফসলি রোগবালাই' : '🌾 Crop Advisory'}
+                </span>
               </div>
             </div>
 
@@ -1183,11 +1371,44 @@ Return a JSON object with this exact structure:
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Instant Stop / Interrupt Button during AI speech */}
+                <AnimatePresence>
+                  {(liveState === 'speaking' || isAiTurnInProgressRef.current) && (
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        isAiTurnInProgressRef.current = false;
+                        sourceNodesRef.current.forEach(node => {
+                          try { node.stop(); } catch (err) {}
+                        });
+                        sourceNodesRef.current = [];
+                        if (outputAudioContextRef.current) {
+                          nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+                        }
+                        clearSubtitles();
+                        setLiveState('listening');
+                        toast(lang === 'bn' ? 'এআই থামানো হয়েছে' : 'AI speech stopped', { duration: 1200, icon: '✋' });
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse"
+                      title={lang === 'bn' ? 'এআই থামান' : 'Stop AI'}
+                    >
+                      <Square className="w-3 h-3 fill-current" />
+                      <span>{lang === 'bn' ? 'থামুন' : 'Stop'}</span>
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
                 <div className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg ${
                   liveState === 'speaking' ? 'bg-emerald-500 text-gray-950 animate-pulse' :
+                  liveState === 'analyzing' ? 'bg-purple-600 text-white animate-pulse' :
                   liveState === 'listening' ? 'bg-blue-500 text-white' : 'bg-gray-900/80 text-gray-300'
                 }`}>
                   {liveState === 'speaking' ? (lang === 'bn' ? '🎙️ এআই কথা বলছে' : '🎙️ AI Speaking') :
+                   liveState === 'analyzing' ? (lang === 'bn' ? '🧠 যুক্তি বিশ্লেষণ...' : '🧠 Reasoning...') :
                    liveState === 'listening' ? (lang === 'bn' ? '👂 শুনছে...' : '👂 Listening...') :
                    (lang === 'bn' ? '👀 পর্যবেক্ষণ করছে' : '👀 Inspecting')}
                 </div>
@@ -1206,6 +1427,39 @@ Return a JSON object with this exact structure:
                 </button>
               </div>
             </div>
+
+            {/* Real-time Extended Thinking Inspector for Live Video */}
+            {isExtendedThinking && (liveThinkingText || liveState === 'analyzing') && (
+              <div className="absolute top-16 left-4 right-4 z-30 flex justify-center pointer-events-auto">
+                <div className="w-full max-w-md bg-purple-950/85 border border-purple-500/40 rounded-2xl p-2.5 backdrop-blur-md shadow-2xl text-left">
+                  <button
+                    type="button"
+                    onClick={() => setShowThinkingDetails(!showThinkingDetails)}
+                    className="w-full flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-ping shrink-0" />
+                      <span className="text-[11px] font-bold text-purple-200 uppercase tracking-wider truncate">
+                        {lang === 'bn' ? '🧠 লাইভ রোগ ও কৃষিবিদ্যা বিশ্লেষণ...' : '🧠 Live Agronomic Reasoning...'}
+                      </span>
+                    </div>
+                    {showThinkingDetails ? <ChevronUp className="w-4 h-4 text-purple-300 shrink-0" /> : <ChevronDown className="w-4 h-4 text-purple-300 shrink-0" />}
+                  </button>
+                  <AnimatePresence>
+                    {showThinkingDetails && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-2 text-[11px] text-purple-100 font-mono bg-purple-900/40 p-2.5 rounded-xl border border-purple-500/30 max-h-32 overflow-y-auto leading-relaxed"
+                      >
+                        {liveThinkingText || (lang === 'bn' ? 'লক্ষণ, মাটি ও আবহাওয়া ডাটা তুলনা করা হচ্ছে...' : 'Inspecting visual frame markers and comparing pathology patterns...')}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
 
             {/* Live Realtime Subtitles Overlay with sentence-by-sentence animation and distinct pauses */}
             <div className={`absolute left-4 right-4 flex justify-center z-25 pointer-events-none ${
