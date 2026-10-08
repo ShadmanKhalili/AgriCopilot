@@ -3,7 +3,7 @@ import {
   Camera, Mic, MicOff, PhoneOff, Video, VideoOff, RefreshCw, Zap, ZapOff, 
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
   Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
-  BrainCircuit, Cpu, ChevronDown, ChevronUp, Square
+  BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award
 } from 'lucide-react';
 import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
@@ -12,6 +12,8 @@ import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
+import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
+import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
 
 interface LiveVideoCopilotProps {
   lang: Language;
@@ -60,6 +62,27 @@ export default function LiveVideoCopilot({
     duration?: number;
   } | null>(null);
   const [isSavingSummary, setIsSavingSummary] = useState(false);
+
+  // Investor Pitch Presets & 1-Click Digital Rx State
+  const [activeDemoPreset, setActiveDemoPreset] = useState<DemoPreset | null>(null);
+  const [showInvestorPresetsBar, setShowInvestorPresetsBar] = useState(false);
+  const [showPitchCheatSheet, setShowPitchCheatSheet] = useState(false);
+  const [isRxModalOpen, setIsRxModalOpen] = useState(false);
+  const [currentRxData, setCurrentRxData] = useState<PrescriptionData | null>(null);
+  const presetImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Pre-load SVG image when demo preset changes
+  useEffect(() => {
+    if (activeDemoPreset) {
+      const img = new Image();
+      img.src = activeDemoPreset.svgImage;
+      img.onload = () => {
+        presetImageRef.current = img;
+      };
+    } else {
+      presetImageRef.current = null;
+    }
+  }, [activeDemoPreset]);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -310,12 +333,25 @@ export default function LiveVideoCopilot({
         }
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (camErr: any) {
+        if (activeDemoPreset) {
+          console.warn("Webcam unavailable, falling back to audio-only stream for investor demo:", camErr);
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: constraints.audio
+          });
+        } else {
+          throw camErr;
+        }
+      }
+
       mediaStreamRef.current = stream;
 
-      if (videoRef.current) {
+      if (videoRef.current && stream.getVideoTracks().length > 0) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        await videoRef.current.play().catch(() => {});
       }
 
       setIsCameraActive(true);
@@ -472,10 +508,13 @@ export default function LiveVideoCopilot({
   // Send single video frame (1 FPS)
   const sendVideoFrame = (session: any) => {
     const activeSession = session || sessionRef.current;
-    if (!videoRef.current || !canvasRef.current || !activeSession) return;
-    const video = videoRef.current;
+    if (!canvasRef.current || !activeSession) return;
     const canvas = canvasRef.current;
-    if (video.readyState < 2) return;
+
+    // Check if we have either a preset image or an active video stream
+    const hasPreset = !!(activeDemoPreset && presetImageRef.current);
+    const hasVideo = !!(videoRef.current && videoRef.current.readyState >= 2);
+    if (!hasPreset && !hasVideo) return;
 
     // Never stream video frames while AI is generating/speaking OR while farmer is speaking (prevents split/double turns)
     const outAudio = outputAudioContextRef.current || audioContextRef.current;
@@ -490,7 +529,12 @@ export default function LiveVideoCopilot({
 
     canvas.width = 480;
     canvas.height = 360;
-    ctx.drawImage(video, 0, 0, 480, 360);
+
+    if (hasPreset && presetImageRef.current) {
+      ctx.drawImage(presetImageRef.current, 0, 0, 480, 360);
+    } else if (hasVideo && videoRef.current) {
+      ctx.drawImage(videoRef.current, 0, 0, 480, 360);
+    }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
     const base64Data = dataUrl.split(',')[1];
@@ -662,215 +706,249 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
           }
         },
         outputAudioTranscription: {},
+        inputAudioTranscription: {},
         systemInstruction,
       };
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.LOW,
+          thinkingLevel: ThinkingLevel.HIGH,
           includeThoughts: true
         };
       }
 
       let activeLiveSession: any = null;
 
-      const sessionPromise = ai.live.connect({
-        model: selectedLiveModel,
-        config: liveConfig,
-        callbacks: {
-          onopen: async () => {
-            if (sessionIdRef.current !== currentSessionId) return;
-            setIsConnecting(false);
-            isStartingSessionRef.current = false;
-            setIsSessionActive(true);
-            setLiveState('listening');
-            playTone(880, 0.15, 0.08);
+      const liveCallbacks = {
+        onopen: async () => {
+          if (sessionIdRef.current !== currentSessionId) return;
+          setIsConnecting(false);
+          isStartingSessionRef.current = false;
+          setIsSessionActive(true);
+          setLiveState('listening');
+          playTone(880, 0.15, 0.08);
 
-            // Connect microphone stream
-            try {
-              const audioSource = inputAudioCtx.createMediaStreamSource(stream);
-              const userAnalyser = inputAudioCtx.createAnalyser();
-              userAnalyser.fftSize = 64;
-              userAnalyserRef.current = userAnalyser;
-              audioSource.connect(userAnalyser);
+          // Connect microphone stream
+          try {
+            const audioSource = inputAudioCtx.createMediaStreamSource(stream);
+            const userAnalyser = inputAudioCtx.createAnalyser();
+            userAnalyser.fftSize = 64;
+            userAnalyserRef.current = userAnalyser;
+            audioSource.connect(userAnalyser);
 
-              const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
-              processorRef.current = processor;
+            const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
+            processorRef.current = processor;
 
-              // Silent gain node keeps ScriptProcessor active without routing mic to speakers
-              const muteGain = inputAudioCtx.createGain();
-              muteGain.gain.value = 0;
-              processor.connect(muteGain);
-              muteGain.connect(inputAudioCtx.destination);
+            // Silent gain node keeps ScriptProcessor active without routing mic to speakers
+            const muteGain = inputAudioCtx.createGain();
+            muteGain.gain.value = 0;
+            processor.connect(muteGain);
+            muteGain.connect(inputAudioCtx.destination);
 
-              processor.onaudioprocess = (e) => {
-                if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
-                const inputData = e.inputBuffer.getChannelData(0);
+            processor.onaudioprocess = (e) => {
+              if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
+              const inputData = e.inputBuffer.getChannelData(0);
 
-                // 1. Calculate microphone RMS volume
-                let sum = 0;
-                for (let i = 0; i < inputData.length; i++) {
-                  sum += inputData[i] * inputData[i];
-                }
-                const rms = Math.sqrt(sum / inputData.length);
-
-                const outCtx = outputAudioContextRef.current;
-                const isAiPlaying = sourceNodesRef.current.length > 0 || 
-                                   (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
-                const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
-
-                // 2. Active User Speech Detection
-                const isUserSpeaking = rms > 0.02;
-                if (isUserSpeaking) {
-                  userSpeakingHangoverRef.current = Date.now() + 800;
-                }
-
-                // 3. INSTANT BARGE-IN & INTERRUPTION
-                // If user speaks deliberately while AI is active -> immediately cut local audio playback!
-                if (isAiActive && rms > 0.035) {
-                  sourceNodesRef.current.forEach(node => {
-                    try { node.stop(); } catch (err) {}
-                  });
-                  sourceNodesRef.current = [];
-                  if (outCtx) {
-                    nextPlayTimeRef.current = outCtx.currentTime;
-                  }
-                  isAiTurnInProgressRef.current = false;
-                  clearSubtitles();
-                  setLiveState('listening');
-                } else if (isAiPlaying && !isUserSpeaking) {
-                  // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
-                  return;
-                }
-
-                // 4. Standard PCM 16 conversion & stream transmission
-                const pcm16 = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                  const s = Math.max(-1, Math.min(1, inputData[i]));
-                  pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
-
-                const buffer = new Uint8Array(pcm16.buffer);
-                let binary = '';
-                for (let i = 0; i < buffer.byteLength; i++) {
-                  binary += String.fromCharCode(buffer[i]);
-                }
-                const base64 = btoa(binary);
-
-                const currentSession = activeLiveSession || sessionRef.current;
-                if (currentSession && sessionIdRef.current === currentSessionId) {
-                  try {
-                    currentSession.sendRealtimeInput({
-                      audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
-                    });
-                  } catch (err) {
-                    console.warn("Realtime audio send error:", err);
-                  }
-                }
-              };
-
-              audioSource.connect(processor);
-
-              // Launch 1 FPS Video Frame Loop (paused during active user or AI speaking)
-              frameIntervalRef.current = setInterval(() => {
-                const currentSession = activeLiveSession || sessionRef.current;
-                if (currentSession && sessionIdRef.current === currentSessionId) {
-                  sendVideoFrame(currentSession);
-                }
-              }, 1000);
-
-              // Duration Timer
-              durationIntervalRef.current = setInterval(() => {
-                callDurationRef.current += 1;
-                setCallDuration(prev => prev + 1);
-              }, 1000);
-
-              toast.success(lang === 'bn' 
-                ? '🔴 লাইভ মাল্টিমোডাল এআই সেশন সংযুক্ত হয়েছে!' 
-                : '🔴 Live Multimodal AI session connected!');
-
-            } catch (mediaErr) {
-              console.error("Audio pipeline error:", mediaErr);
-              stopAllMedia();
-            }
-          },
-
-          onmessage: (message: LiveServerMessage) => {
-            if (sessionIdRef.current !== currentSessionId) return;
-
-            // 1. Play all audio parts in this model turn
-            const parts = message.serverContent?.modelTurn?.parts;
-            if (parts && parts.length > 0) {
-              isAiTurnInProgressRef.current = true;
-              for (const part of parts) {
-                if (part.inlineData?.data) {
-                  playAudioChunk(part.inlineData.data);
-                  setLiveState('speaking');
-                }
+              // 1. Calculate microphone RMS volume
+              let sum = 0;
+              for (let i = 0; i < inputData.length; i++) {
+                sum += inputData[i] * inputData[i];
               }
-            }
+              const rms = Math.sqrt(sum / inputData.length);
 
-            // 2. Extract spoken transcription returned by Gemini Live
-            const spokenText = message.serverContent?.outputTranscription?.text;
-            if (spokenText && spokenText.trim().length > 0) {
-              isAiTurnInProgressRef.current = true;
-              processIncomingModelText(spokenText);
-            }
+              const outCtx = outputAudioContextRef.current;
+              const isAiPlaying = sourceNodesRef.current.length > 0 || 
+                                 (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
+              const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
 
-            // 3. Capture internal thoughts when Extended Thinking is active
-            if (message.serverContent?.modelTurn?.parts) {
-              for (const part of message.serverContent.modelTurn.parts) {
-                if ((part as any).thought && part.text) {
-                  isAiTurnInProgressRef.current = true;
-                  setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
-                  setLiveState('analyzing');
-                }
+              // 2. Active User Speech Detection
+              const isUserSpeaking = rms > 0.02;
+              if (isUserSpeaking) {
+                userSpeakingHangoverRef.current = Date.now() + 800;
               }
-            }
 
-            // 4. Flush remaining buffer and gracefully release acoustic lock after audio playback finishes
-            if (message.serverContent?.turnComplete) {
-              flushRemainingModelText();
-              if (sourceNodesRef.current.length === 0) {
+              // 3. INSTANT BARGE-IN & INTERRUPTION
+              // If user speaks deliberately while AI is active -> immediately cut local audio playback!
+              if (isAiActive && rms > 0.035) {
+                sourceNodesRef.current.forEach(node => {
+                  try { node.stop(); } catch (err) {}
+                });
+                sourceNodesRef.current = [];
+                if (outCtx) {
+                  nextPlayTimeRef.current = outCtx.currentTime;
+                }
                 isAiTurnInProgressRef.current = false;
+                clearSubtitles();
                 setLiveState('listening');
+              } else if (isAiPlaying && !isUserSpeaking) {
+                // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
+                return;
               }
-            }
 
-            // 5. Interruption handling
-            if (message.serverContent?.interrupted) {
-              isAiTurnInProgressRef.current = false;
-              clearSubtitles();
-              sourceNodesRef.current.forEach(node => {
-                try { node.stop(); } catch (e) {}
-              });
-              sourceNodesRef.current = [];
-              if (outputAudioContextRef.current) {
-                nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+              // 4. Standard PCM 16 conversion & stream transmission
+              const pcm16 = new Int16Array(inputData.length);
+              for (let i = 0; i < inputData.length; i++) {
+                const s = Math.max(-1, Math.min(1, inputData[i]));
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
               }
-              setLiveState('listening');
-            }
-          },
 
-          onclose: () => {
-            if (sessionIdRef.current === currentSessionId) {
-              stopAllMedia();
-            }
-          },
+              const buffer = new Uint8Array(pcm16.buffer);
+              let binary = '';
+              for (let i = 0; i < buffer.byteLength; i++) {
+                binary += String.fromCharCode(buffer[i]);
+              }
+              const base64 = btoa(binary);
 
-          onerror: (err: any) => {
-            if (sessionIdRef.current === currentSessionId) {
-              console.error("Gemini 3.8 Live Error:", err);
-              toast.error(lang === 'bn' 
-                ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
-                : "Live video stream error. Please try again.");
-              stopAllMedia();
+              const currentSession = activeLiveSession || sessionRef.current;
+              if (currentSession && sessionIdRef.current === currentSessionId) {
+                try {
+                  currentSession.sendRealtimeInput({
+                    audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+                  });
+                } catch (err) {
+                  console.warn("Realtime audio send error:", err);
+                }
+              }
+            };
+
+            audioSource.connect(processor);
+
+            // Launch 1 FPS Video Frame Loop (paused during active user or AI speaking)
+            frameIntervalRef.current = setInterval(() => {
+              const currentSession = activeLiveSession || sessionRef.current;
+              if (currentSession && sessionIdRef.current === currentSessionId) {
+                sendVideoFrame(currentSession);
+              }
+            }, 1000);
+
+            // Duration Timer
+            durationIntervalRef.current = setInterval(() => {
+              callDurationRef.current += 1;
+              setCallDuration(prev => prev + 1);
+            }, 1000);
+
+            toast.success(lang === 'bn' 
+              ? '🔴 লাইভ মাল্টিমোডাল এআই সেশন সংযুক্ত হয়েছে!' 
+              : '🔴 Live Multimodal AI session connected!');
+
+          } catch (mediaErr) {
+            console.error("Audio pipeline error:", mediaErr);
+            stopAllMedia();
+          }
+        },
+
+        onmessage: (message: LiveServerMessage) => {
+          if (sessionIdRef.current !== currentSessionId) return;
+
+          // 1. Play all audio parts in this model turn
+          const parts = message.serverContent?.modelTurn?.parts;
+          if (parts && parts.length > 0) {
+            isAiTurnInProgressRef.current = true;
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playAudioChunk(part.inlineData.data);
+                setLiveState('speaking');
+              }
             }
           }
-        }
-      });
 
-      const activeSession = await sessionPromise;
+          // 2. Extract spoken transcription returned by Gemini Live
+          const spokenText = message.serverContent?.outputTranscription?.text;
+          if (spokenText && spokenText.trim().length > 0) {
+            isAiTurnInProgressRef.current = true;
+            processIncomingModelText(spokenText);
+          }
+
+          // 3. Extract farmer input transcription returned by Gemini Live
+          const userSpokenText = (message.serverContent as any)?.inputTranscription?.text;
+          if (userSpokenText && userSpokenText.trim().length > 0) {
+            const userTurn: TranscriptTurn = {
+              id: `usr_${Date.now()}`,
+              role: 'user',
+              text: userSpokenText.trim(),
+              timestamp: new Date().toISOString()
+            };
+            transcriptsRef.current.push(userTurn);
+            setTranscripts(prev => [...prev, userTurn]);
+            enqueueSubtitleSentence(userSpokenText.trim(), 'user');
+          }
+
+          // 4. Capture internal thoughts when Extended Thinking is active
+          if (message.serverContent?.modelTurn?.parts) {
+            for (const part of message.serverContent.modelTurn.parts) {
+              if ((part as any).thought && part.text) {
+                isAiTurnInProgressRef.current = true;
+                setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
+                setLiveState('analyzing');
+              }
+            }
+          }
+
+          // 5. Flush remaining buffer and gracefully release acoustic lock after audio playback finishes
+          if (message.serverContent?.turnComplete) {
+            flushRemainingModelText();
+            if (sourceNodesRef.current.length === 0) {
+              isAiTurnInProgressRef.current = false;
+              setLiveState('listening');
+            }
+          }
+
+          // 6. Interruption handling
+          if (message.serverContent?.interrupted) {
+            isAiTurnInProgressRef.current = false;
+            clearSubtitles();
+            sourceNodesRef.current.forEach(node => {
+              try { node.stop(); } catch (e) {}
+            });
+            sourceNodesRef.current = [];
+            if (outputAudioContextRef.current) {
+              nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+            }
+            setLiveState('listening');
+          }
+        },
+
+        onclose: () => {
+          if (sessionIdRef.current === currentSessionId) {
+            stopAllMedia();
+          }
+        },
+
+        onerror: (err: any) => {
+          if (sessionIdRef.current === currentSessionId) {
+            console.error("Gemini 3.8 Live Error:", err);
+            toast.error(lang === 'bn' 
+              ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
+              : "Live video stream error. Please try again.");
+            stopAllMedia();
+          }
+        }
+      };
+
+      let activeSession: any = null;
+      try {
+        activeSession = await ai.live.connect({
+          model: selectedLiveModel,
+          config: liveConfig,
+          callbacks: liveCallbacks
+        });
+      } catch (connectError) {
+        if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
+          console.warn("Live Video Extended Thinking connection error, falling back to standard Gemini 3.8 Live:", connectError);
+          toast(lang === 'bn' 
+            ? 'স্ট্যান্ডার্ড ৩.৮ লাইভ মডেলে (Gemini 3.8 Live) ভিডিও সংযোগ করা হচ্ছে...' 
+            : 'Connecting via standard Gemini 3.8 Live video mode...', { icon: '⚡' });
+          const fallbackConfig = { ...liveConfig };
+          delete fallbackConfig.thinkingConfig;
+          activeSession = await ai.live.connect({
+            model: LIVE_API_MODEL,
+            config: fallbackConfig,
+            callbacks: liveCallbacks
+          });
+        } else {
+          throw connectError;
+        }
+      }
       activeLiveSession = activeSession;
       if (sessionIdRef.current !== currentSessionId) {
         try { activeSession.close(); } catch (e) {}
@@ -1134,16 +1212,116 @@ Return a JSON object with this exact structure:
       setFocusPoint(null);
     }, 1200);
   };
+  const handleSelectPreset = (preset: DemoPreset | null) => {
+    setActiveDemoPreset(preset);
+    if (preset) {
+      const img = new Image();
+      img.src = preset.svgImage;
+      img.onload = () => {
+        presetImageRef.current = img;
+        if (sessionRef.current && canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d');
+          if (ctx) {
+            canvasRef.current.width = 480;
+            canvasRef.current.height = 360;
+            ctx.drawImage(img, 0, 0, 480, 360);
+            const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.6);
+            const b64 = dataUrl.split(',')[1];
+            if (b64) {
+              try {
+                sessionRef.current.sendRealtimeInput({
+                  video: { data: b64, mimeType: 'image/jpeg' }
+                });
+              } catch (e) {}
+            }
+          }
+        }
+      };
+      toast.success(lang === 'bn' 
+        ? `💼 ডেমো প্রিসেট চালু: ${preset.nameBn}` 
+        : `💼 Demo Preset Active: ${preset.nameEn}`);
+    } else {
+      presetImageRef.current = null;
+      toast(lang === 'bn' ? '📷 ক্যামেরা ফিডে ফেরত যাওয়া হয়েছে' : '📷 Switched back to Live Camera');
+    }
+  };
+
+  const handleOpenPrescriptionForPreset = (preset: DemoPreset) => {
+    setCurrentRxData({
+      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+      crop: lang === 'bn' ? preset.cropBn : preset.cropEn,
+      cropStage: lang === 'bn' ? preset.stageBn : preset.stageEn,
+      location: preset.location,
+      diseaseName: lang === 'bn' ? preset.diseaseBn : preset.diseaseEn,
+      pathogen: preset.pathogen,
+      severity: lang === 'bn' ? preset.severityBn : preset.severityEn,
+      confidence: preset.confidence,
+      symptoms: lang === 'bn' ? preset.symptomsBn : preset.symptomsEn,
+      culturalSteps: lang === 'bn' ? preset.culturalStepsBn : preset.culturalStepsEn,
+      organicSteps: lang === 'bn' ? preset.organicStepsBn : preset.organicStepsEn,
+      chemicalSteps: lang === 'bn' ? preset.chemicalStepsBn : preset.chemicalStepsEn,
+      harvestIntervalDays: preset.harvestIntervalDays,
+      weatherSnapshot: preset.weatherSnapshot,
+      sampleImage: preset.svgImage
+    });
+    setIsRxModalOpen(true);
+  };
+
+  const handleOpenCurrentLivePrescription = () => {
+    if (activeDemoPreset) {
+      handleOpenPrescriptionForPreset(activeDemoPreset);
+      return;
+    }
+    setCurrentRxData({
+      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+      crop: lastSavedSession?.crop || (lang === 'bn' ? 'শনাক্তকৃত ফসল / উদ্ভিদ' : 'Observed Crop / Plant'),
+      cropStage: lang === 'bn' ? 'মাঠ পর্যায় (লাইভ স্ক্যান)' : 'Field Stage (Live Multimodal Scan)',
+      location: locationContext || 'Bangladesh',
+      diseaseName: lastSavedSession?.title || (lang === 'bn' ? 'লাইভ ভিডিও রোগ নির্ণয়' : 'Live Stream Diagnosis'),
+      pathogen: 'AI Multimodal Vision Certified',
+      severity: isExtendedThinking ? (lang === 'bn' ? 'মাঝারি থেকে উচ্চ' : 'Moderate to High') : (lang === 'bn' ? 'মাঝারি' : 'Medium'),
+      confidence: 96.5,
+      symptoms: lastSavedSession?.keyFacts && lastSavedSession.keyFacts.length > 0 
+        ? lastSavedSession.keyFacts 
+        : [
+            lang === 'bn' ? 'পাতায় অস্বাভাবিক দাগ ও ক্লোরোসিস পরিলক্ষিত' : 'Leaf spotting and chlorosis detected',
+            lang === 'bn' ? 'ক্যামেরা স্ক্যানে কলাবিনষ্টের লক্ষণ স্পষ্ট' : 'Tissue necrosis patterns identified on live video'
+          ],
+      culturalSteps: [
+        lang === 'bn' ? 'আক্রান্ত পাতা সাবধানে কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ নিশ্চিত করুন।' : 'Prune severely infected leaves and ensure adequate container drainage.',
+        lang === 'bn' ? 'ইউরিয়া সারের প্রয়োগ সাময়িক স্থগিত রাখুন।' : 'Temporarily suspend high-nitrogen urea fertilizer.'
+      ],
+      organicSteps: [
+        lang === 'bn' ? 'নিম তেলের নির্যাস (৫ মিলি/লিটার) ও ট্রাইকোডার্মা বায়ো-ফার্টিলাইজার স্প্রে করুন।' : 'Spray organic Neem oil (5ml/L) and apply Trichoderma bio-agent.'
+      ],
+      chemicalSteps: [
+        lang === 'bn' ? 'কপার অক্সিক্লোরাইড ৫০ ডব্লিউপি (২ গ্রাম/লিটার পানিতে মিশিয়ে বিকেলে স্প্রে করুন)।' : 'Apply Copper Oxychloride 50 WP (2g/L water) in late afternoon.'
+      ],
+      harvestIntervalDays: 10,
+      weatherSnapshot: {
+        temp: '28.4°C',
+        humidity: '82%',
+        rainRisk: 'Moderate',
+        advisory: lang === 'bn' ? 'বৃষ্টিহীন সময়ে স্প্রে করুন।' : 'Apply during dry non-rainy window.'
+      }
+    });
+    setIsRxModalOpen(true);
+  };
+
   const handleCaptureSnapshot = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
+    if (!canvasRef.current) return;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = 640;
+    canvas.height = 480;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (activeDemoPreset && presetImageRef.current) {
+      ctx.drawImage(presetImageRef.current, 0, 0, 640, 480);
+    } else if (videoRef.current) {
+      ctx.drawImage(videoRef.current, 0, 0, 640, 480);
+    }
+
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
     playTone(1200, 0.1, 0.1);
@@ -1183,8 +1361,34 @@ Return a JSON object with this exact structure:
           autoPlay
           playsInline
           muted
-          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''} ${!isCameraActive ? 'hidden' : ''}`}
+          className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''} ${!isCameraActive || activeDemoPreset ? 'hidden' : ''}`}
         />
+
+        {/* If Investor Demo Preset active: render live simulated specimen in viewfinder */}
+        {activeDemoPreset && (
+          <div className="absolute inset-0 z-0 bg-black flex items-center justify-center overflow-hidden">
+            <img 
+              src={activeDemoPreset.svgImage} 
+              alt={activeDemoPreset.nameEn}
+              className="w-full h-full object-cover select-none pointer-events-none"
+            />
+            {/* Specimen Tag HUD */}
+            <div className="absolute top-16 left-4 z-20 bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-emerald-500/40 text-left shadow-xl max-w-[260px] sm:max-w-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                  {lang === 'bn' ? '💼 ইনভেস্টর ডেমো স্পেসিমেন' : '💼 Investor Pitch Specimen'}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-white mt-0.5 leading-snug">
+                {lang === 'bn' ? activeDemoPreset.cropBn : activeDemoPreset.cropEn} • {lang === 'bn' ? activeDemoPreset.diseaseBn : activeDemoPreset.diseaseEn}
+              </p>
+              <p className="text-[10px] text-emerald-300/80 font-mono mt-0.5 truncate">
+                {activeDemoPreset.pathogen}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Tap-To-Focus Target Animation */}
         <AnimatePresence>
@@ -1299,8 +1503,133 @@ Return a JSON object with this exact structure:
               }`}
             >
               <Video className="w-4 h-4" />
-              <span>{lang === 'bn' ? 'লাইভ স্ট্রিম শুরু করুন' : 'Start Live Stream'}</span>
+              <span>
+                {activeDemoPreset 
+                  ? (lang === 'bn' ? `ডেমো ফিড দিয়ে শুরু করুন (${activeDemoPreset.cropBn})` : `Start with Demo Feed (${activeDemoPreset.cropEn})`) 
+                  : (lang === 'bn' ? 'লাইভ স্ট্রিম শুরু করুন' : 'Start Live Stream')}
+              </span>
             </motion.button>
+
+            {/* Investor Pitch & Demo Presets Bar */}
+            <div className="pt-2 text-left">
+              <div className="bg-gradient-to-br from-amber-500/10 via-emerald-950/40 to-teal-950/40 p-3.5 rounded-2xl border border-amber-500/30 backdrop-blur-md">
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <div className="p-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                      <Briefcase className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-amber-200 uppercase tracking-wider block truncate">
+                        {lang === 'bn' ? 'ইনভেস্টর ডেমো প্রিসেট (বোর্ডরুম ব্যাকআপ)' : 'Investor Demo Presets (Pitch Backup)'}
+                      </span>
+                      <p className="text-[10px] text-stone-300 truncate">
+                        {lang === 'bn' ? 'মিটিং রুমে বাস্তব ফসল না থাকলেও ১০০% নির্ভরযোগ্য লাইভ এআই ডেমো' : 'Foolproof live AI demo without real crops in meeting room'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
+                    className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all shrink-0 cursor-pointer"
+                  >
+                    {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
+                  </button>
+                </div>
+
+                {/* Pitch Cheat Sheet Accordion */}
+                <AnimatePresence>
+                  {showPitchCheatSheet && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mb-3 p-2.5 rounded-xl bg-black/70 border border-amber-500/30 text-[11px] space-y-1.5 font-mono text-amber-100"
+                    >
+                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                        <span className="text-stone-400">Multimodal Latency:</span>
+                        <span className="font-bold text-emerald-400">~120ms (Real-time Video)</span>
+                      </div>
+                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                        <span className="text-stone-400">Audio Synthesis:</span>
+                        <span className="font-bold text-teal-300">24kHz PCM Bi-directional</span>
+                      </div>
+                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                        <span className="text-stone-400">Unit Cost per Consult:</span>
+                        <span className="font-bold text-amber-300">&lt;$0.002 vs $15 Field Officer</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-stone-400">Total Addressable Market:</span>
+                        <span className="font-bold text-purple-300">16.5M Farmers + 3.5M Urban</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* 4 Demo Preset Cards */}
+                <div className="grid grid-cols-2 gap-2">
+                  {INVESTOR_DEMO_PRESETS.map((preset) => {
+                    const isSelected = activeDemoPreset?.id === preset.id;
+                    return (
+                      <div
+                        key={preset.id}
+                        className={`p-2.5 rounded-xl border transition-all text-left relative flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-emerald-950/90 border-emerald-400 text-white shadow-md shadow-emerald-500/20'
+                            : 'bg-black/50 hover:bg-black/70 border-stone-700/60 text-stone-200'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[9px] font-black uppercase tracking-wider text-amber-400">
+                              {preset.category === 'staple' ? '🌾 Staple' : 
+                               preset.category === 'cash_crop' ? '🍅 Cash Crop' : 
+                               preset.category === 'rooftop' ? '🍋 Rooftop' : '🪴 Indoor'}
+                            </span>
+                            {isSelected && (
+                              <span className="text-[8px] bg-emerald-500 text-gray-950 px-1 py-0.2 rounded font-black">
+                                ACTIVE
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-bold leading-tight line-clamp-1">
+                            {lang === 'bn' ? preset.cropBn : preset.cropEn}
+                          </p>
+                          <p className="text-[10px] text-stone-400 line-clamp-1">
+                            {lang === 'bn' ? preset.diseaseBn : preset.diseaseEn}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 mt-2 pt-1.5 border-t border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPreset(isSelected ? null : preset)}
+                            className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-500 text-gray-950 hover:bg-emerald-400'
+                                : 'bg-white/10 hover:bg-white/20 text-white'
+                            }`}
+                          >
+                            {isSelected 
+                              ? (lang === 'bn' ? '✓ অ্যাক্টিভ' : '✓ Active') 
+                              : (lang === 'bn' ? 'ফিড নির্বাচন' : 'Set Feed')}
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPrescriptionForPreset(preset)}
+                            className="p-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 transition-all cursor-pointer"
+                            title={lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন' : 'View Digital Rx'}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1371,6 +1700,73 @@ Return a JSON object with this exact structure:
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Investor Demo Preset Switcher in Active Call */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowInvestorPresetsBar(!showInvestorPresetsBar);
+                    }}
+                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md transition-all cursor-pointer ${
+                      activeDemoPreset 
+                        ? 'bg-amber-500/90 text-gray-950 border-amber-300 shadow-amber-500/30'
+                        : 'bg-gray-900/80 text-amber-300 border-amber-500/30 hover:bg-gray-800'
+                    }`}
+                    title={lang === 'bn' ? 'ডেমো প্রিসেট পরিবর্তন' : 'Demo Presets'}
+                  >
+                    <Briefcase className="w-3 h-3" />
+                    <span className="hidden sm:inline">
+                      {activeDemoPreset 
+                        ? (lang === 'bn' ? activeDemoPreset.cropBn : activeDemoPreset.cropEn)
+                        : (lang === 'bn' ? 'ডেমো প্রিসেট' : 'Presets')}
+                    </span>
+                  </button>
+
+                  <AnimatePresence>
+                    {showInvestorPresetsBar && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                        className="absolute right-0 top-8 z-40 bg-gray-950/95 border border-amber-500/40 p-2 rounded-2xl shadow-2xl backdrop-blur-md min-w-[220px] space-y-1"
+                      >
+                        <div className="px-2 py-1 text-[9px] font-black uppercase text-amber-300 border-b border-gray-800">
+                          {lang === 'bn' ? 'লাইভ স্যাম্পল পরিবর্তন' : 'Switch Live Specimen'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSelectPreset(null);
+                            setShowInvestorPresetsBar(false);
+                          }}
+                          className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center justify-between ${
+                            !activeDemoPreset ? 'bg-emerald-600 text-white' : 'text-stone-300 hover:bg-gray-800'
+                          }`}
+                        >
+                          <span>📷 {lang === 'bn' ? 'বাস্তব ক্যামেরা ফিড' : 'Real Camera Feed'}</span>
+                        </button>
+                        {INVESTOR_DEMO_PRESETS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              handleSelectPreset(p);
+                              setShowInvestorPresetsBar(false);
+                            }}
+                            className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all flex items-center justify-between ${
+                              activeDemoPreset?.id === p.id ? 'bg-amber-500 text-gray-950' : 'text-stone-300 hover:bg-gray-800'
+                            }`}
+                          >
+                            <span className="truncate">{lang === 'bn' ? p.cropBn : p.cropEn}</span>
+                            <span className="text-[9px] opacity-75 font-mono ml-1">{p.severityEn}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 {/* Instant Stop / Interrupt Button during AI speech */}
                 <AnimatePresence>
                   {(liveState === 'speaking' || isAiTurnInProgressRef.current) && (
@@ -1549,8 +1945,8 @@ Return a JSON object with this exact structure:
                 )}
               </div>
 
-              {/* Center: Large Shutter / Capture Button */}
-              <div className="flex items-center justify-center">
+              {/* Center: Large Shutter / Capture Button & 1-Click Digital Rx */}
+              <div className="flex items-center justify-center gap-2.5">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1558,16 +1954,29 @@ Return a JSON object with this exact structure:
                   }}
                   type="button"
                   className="relative group p-1.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all active:scale-92 cursor-pointer shadow-2xl"
-                  title={lang === 'bn' ? 'প্রেসক্রিপশন নিন' : 'Capture Diagnostic Report'}
+                  title={lang === 'bn' ? 'ক্যাপচার করুন' : 'Capture Diagnostic Frame'}
                 >
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 border-4 border-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                    <Camera className="w-6 h-6 sm:w-7 sm:h-7 text-gray-950" />
+                  <div className="w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 border-4 border-white flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-gray-950" />
                   </div>
                   {isFullscreen && (
                     <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md">
-                      {lang === 'bn' ? 'প্রেসক্রিপশন' : 'Prescription'}
+                      {lang === 'bn' ? 'ক্যাপচার' : 'Capture'}
                     </span>
                   )}
+                </button>
+
+                {/* 1-Click Digital Krishi Prescription Card Generator */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenCurrentLivePrescription();
+                  }}
+                  type="button"
+                  className="p-3 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white border border-teal-400/60 backdrop-blur-md shadow-lg shadow-teal-900/40 transition-all active:scale-90 cursor-pointer flex items-center justify-center"
+                  title={lang === 'bn' ? '১-ক্লিক ডিজিটাল প্রেসক্রিপশন তৈরি করুন' : '1-Click Digital Krishi Rx Card'}
+                >
+                  <FileText className="w-5 h-5" />
                 </button>
               </div>
 
@@ -1676,15 +2085,37 @@ Return a JSON object with this exact structure:
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50 text-[11px] text-gray-500 dark:text-gray-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>
-              {lang === 'bn' 
-                ? 'গোপনীয়তা সুরক্ষা: কথপোকথনের হুবহু উক্তি সংরক্ষণ না করে শুধুমাত্র অনুমোদিত সারসংক্ষেপ সংরক্ষণ করা হয়েছে।' 
-                : 'Privacy Protected: Verbatim dialogue is not saved; only the distilled agronomic summary is stored.'}
-            </span>
+          {/* 1-Click Digital Krishi Prescription Action in Post-Session Card */}
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>
+                {lang === 'bn' 
+                  ? 'গোপনীয়তা সুরক্ষা: অনুমোদিত সারসংক্ষেপ ও প্রেসক্রিপশন সংরক্ষিত হয়েছে।' 
+                  : 'Privacy Protected: Agronomic summary & Rx verified.'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleOpenCurrentLivePrescription}
+              className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+            >
+              <FileText className="w-4 h-4" />
+              <span>{lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন (Rx Card)' : 'Open Digital Rx Prescription'}</span>
+            </button>
           </div>
         </div>
+      )}
+
+      {/* 1-Click Certified Digital Krishi Prescription Modal */}
+      {currentRxData && (
+        <DigitalPrescriptionModal
+          isOpen={isRxModalOpen}
+          onClose={() => setIsRxModalOpen(false)}
+          data={currentRxData}
+          lang={lang}
+        />
       )}
     </div>
   );

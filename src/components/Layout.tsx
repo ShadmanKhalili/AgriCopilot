@@ -3,9 +3,11 @@ import {
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
   ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown,
-  Search, Sun, Moon
+  Search, Sun, Moon, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import LiveMandiTicker from './LiveMandiTicker';
+import { audioFeedback } from '../utils/audioFeedback';
 
 // Lazy load components
 const AgriCopilot = lazy(() => import('./AgriCopilot'));
@@ -27,7 +29,6 @@ import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
-import GoogleAd from './GoogleAd';
 import OfflineBanner from './OfflineBanner';
 import { PWAInstallButton } from './PWAInstallButton';
 import { OfflineIndicator } from './OfflineIndicator';
@@ -90,6 +91,7 @@ export default function Layout() {
   }, [theme]);
 
   const toggleTheme = () => {
+    audioFeedback.playTactileClick();
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
@@ -308,15 +310,15 @@ export default function Layout() {
       pillar: 'support', 
       subcategory: t.subcatProfile || (lang === 'bn' ? 'খামারি প্রোফাইল ও জমি' : 'Farmer Profile') 
     },
-    ...( (userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') ? [{ 
+    { 
       id: 'admin-dashboard' as const, 
-      name: 'Admin Hub', 
+      name: lang === 'bn' ? 'অপারেশন ও এডমিন হাব' : 'Admin Operations Hub', 
       icon: BarChart3, 
-      description: 'Analytics & Management', 
+      description: lang === 'bn' ? 'জাতীয় নজরদারি, প্রেসক্রিপশন অডিট ও মেট্রিক্স' : 'Surveillance, Rx Audit & Investor KPI', 
       pillar: 'support' as const, 
-      subcategory: 'Overview',
-      badge: 'Admin'
-    }] : []),
+      subcategory: lang === 'bn' ? 'কমান্ড ও প্রশাসন' : 'Command & Governance',
+      badge: userRole === 'admin' ? 'Superadmin' : 'Admin'
+    },
   ];
 
   const pillarDefinitions: PillarMeta[] = [
@@ -373,6 +375,7 @@ export default function Layout() {
   });
 
   const toggleLanguage = () => {
+    audioFeedback.playTactileClick();
     setLang(prev => prev === 'en' ? 'bn' : 'en');
   };
 
@@ -704,18 +707,46 @@ export default function Layout() {
         {/* ======================= MAIN CONTENT AREA ======================= */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           
+          {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
+          <LiveMandiTicker 
+            lang={lang} 
+            onNavigateToMarket={() => handleNavigateTab('market-connect')} 
+          />
+
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
-            {/* Left: Mobile Menu Toggle */}
+            {/* Left: Mobile Menu Toggle & App Brand */}
             <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
               <button 
                 type="button"
-                onClick={() => setIsMobileMenuOpen(true)}
+                onClick={() => {
+                  audioFeedback.playTactileClick();
+                  setIsMobileMenuOpen(true);
+                }}
                 className="md:hidden p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:hover:bg-emerald-800 dark:text-emerald-200 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
                 aria-label={lang === 'bn' ? 'মেনু খুলুন' : 'Open Menu'}
               >
                 <Menu className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Center: Executive Impact Badge (FinTech / Investor Grade) */}
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-900 dark:text-emerald-300 font-mono text-[11px] shadow-2xs backdrop-blur-xs select-none">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                {lang === 'bn' ? '১৬.৫M কৃষক সুরক্ষিত' : '16.5M Farmers'}
+              </span>
+              <span className="text-stone-300 dark:text-emerald-800">•</span>
+              <span className="text-stone-700 dark:text-stone-300 font-medium">
+                {lang === 'bn' ? '$৪৫০M ফসল সাশ্রয়' : '$450M Loss Shield'}
+              </span>
+              <span className="text-stone-300 dark:text-emerald-800">•</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
+                BARI / DAE Certified
+              </span>
             </div>
 
             {/* Right: Universal Location Chip, Theme Toggle, Language Toggle & Actions */}
@@ -812,13 +843,18 @@ export default function Layout() {
           </header>
 
           {/* ================= SCROLLABLE MAIN CONTENT ================= */}
-          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#08120b] pb-28 md:pb-6 transition-colors duration-200">
+          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#090d16] pb-28 md:pb-6 transition-colors duration-200">
             
-            {/* Background Texture Grid */}
+            {/* FinTech Ambient Mesh Glow & Texture Grid */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+              {/* Subtle Ambient Mesh Glows */}
+              <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 dark:bg-emerald-500/15 rounded-full blur-[130px] pointer-events-none" />
+              <div className="absolute top-1/3 -right-32 w-96 h-96 bg-indigo-500/5 dark:bg-teal-500/10 rounded-full blur-[140px] pointer-events-none" />
+              <div className="absolute -bottom-32 left-1/3 w-96 h-96 bg-emerald-500/5 dark:bg-emerald-600/10 rounded-full blur-[130px] pointer-events-none" />
+
               <div 
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.025] dark:opacity-[0.05] pointer-events-none" 
-                style={{ backgroundImage: 'radial-gradient(#064e3b 0.6px, transparent 0.6px)', backgroundSize: '24px 24px' }}
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-[0.025] dark:opacity-[0.04] pointer-events-none" 
+                style={{ backgroundImage: 'radial-gradient(#10b981 0.8px, transparent 0.8px)', backgroundSize: '24px 24px' }}
               />
             </div>
 
@@ -950,8 +986,6 @@ export default function Layout() {
                   </Suspense>
                 </motion.div>
               </AnimatePresence>
-
-              <GoogleAd lang={lang} className="mt-10 mb-2" />
             </div>
           </main>
 

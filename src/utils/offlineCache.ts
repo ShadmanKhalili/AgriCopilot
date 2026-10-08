@@ -67,32 +67,32 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
 * **আগোরা (Agora) সুপারমার্কেট**: ৳৫৫ / কেজি
 * **চালডাল (Chaldal)**: ৳৪৮ / কেজি
 
-**বাজারের গতিপ্রকৃতি**: উত্তরাঞ্চল থেকে নিয়মিত ট্রাক সরবরাহ আসায় পাইকারি মোকামে দাম স্থিতিশীল। তবে সুপারমার্কেট ও রিটেইল চেইনে গ্রেডিং ও প্যাকেজিংয়ের কারণে প্রায় ৬৮% বেশি মূল্যে বিক্রি হচ্ছে।`,
-    priceRange: { min: 28, max: 33, avg: 31, unit: 'kg' },
+**বাজারের গতিপ্রকৃতি**: উত্তরাঞ্চল থেকে নিয়মিত ট্রাক সরবরাহ আসায় পাইকারি মোকামে দাম স্থিতিশীল। সরকারি কৃষি বিপণন অধিদপ্তরের (DAM) দৈনিক প্রতিবেদন অনুযায়ী খুচরা দর ২৫-৩০ টাকা ও পাইকারি ২৪-২৬ টাকা।`,
+    priceRange: { min: 24, max: 26, avg: 25, unit: 'kg' },
     trend: 'stable',
-    wholesaleRates: { minPriceBdt: 28, maxPriceBdt: 33, avgPriceBdt: 31, unit: 'kg', primaryMarket: 'কারওয়ান বাজার (ঢাকা)', trend: 'স্থিতিশীল' },
-    supermarketRates: { minPriceBdt: 48, maxPriceBdt: 55, avgPriceBdt: 51, unit: 'kg', trend: 'স্থিতিশীল' },
+    wholesaleRates: { minPriceBdt: 24, maxPriceBdt: 26, avgPriceBdt: 25, unit: 'kg', primaryMarket: 'কারওয়ান বাজার (ঢাকা)', trend: 'স্থিতিশীল' },
+    supermarketRates: { minPriceBdt: 28, maxPriceBdt: 35, avgPriceBdt: 30, unit: 'kg', trend: 'স্থিতিশীল' },
     supermarkets: [
-      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 50, packagingType: 'প্রিমিয়াম গ্রেডেড প্যাকেট', stockStatus: 'পর্যাপ্ত মজুদ', websiteUrl: 'shwapno.com' },
-      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 52, packagingType: 'নেট ব্যাগ প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
-      { name: 'আগোরা (Agora)', pricePerKgBdt: 55, packagingType: 'বাছাইকৃত খোলা', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
-      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 48, packagingType: 'রেগুলার ১ কেজি', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
+      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 32, packagingType: 'প্রিমিয়াম গ্রেডেড প্যাকেট', stockStatus: 'পর্যাপ্ত মজুদ', websiteUrl: 'shwapno.com' },
+      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 30, packagingType: 'নেট ব্যাগ প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
+      { name: 'আগোরা (Agora)', pricePerKgBdt: 34, packagingType: 'বাছাইকৃত খোলা', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
+      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 28, packagingType: 'রেগুলার ১ কেজি', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
     ],
     mandiHubs: [
-      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 31, arrivalVolume: 'পর্যাপ্ত (২৫+ ট্রাক)', trend: 'স্থিতিশীল' },
-      { mandiName: 'শ্যামবাজার (ঢাকা)', wholesalePriceBdt: 30, arrivalVolume: 'স্বাভাবিক', trend: 'স্থিতিশীল' },
-      { mandiName: 'খাতুনগঞ্জ (চট্টগ্রাম)', wholesalePriceBdt: 32, arrivalVolume: 'মাঝারি', trend: 'স্থিতিশীল' },
-      { mandiName: 'কস্তুরী ঘাট (কক্সবাজার সদর)', wholesalePriceBdt: 32, arrivalVolume: 'নিয়মিত চালান', trend: 'স্থিতিশীল' }
+      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 25, arrivalVolume: 'পর্যাপ্ত (২৫+ ট্রাক)', trend: 'স্থিতিশীল' },
+      { mandiName: 'শ্যামবাজার (ঢাকা)', wholesalePriceBdt: 24, arrivalVolume: 'স্বাভাবিক', trend: 'স্থিতিশীল' },
+      { mandiName: 'খাতুনগঞ্জ (চট্টগ্রাম)', wholesalePriceBdt: 25, arrivalVolume: 'মাঝারি', trend: 'স্থিতিশীল' },
+      { mandiName: 'কস্তুরী ঘাট (কক্সবাজার সদর)', wholesalePriceBdt: 26, arrivalVolume: 'নিয়মিত চালান', trend: 'স্থিতিশীল' }
     ],
     marginSpread: {
-      spreadPercentage: 65,
-      middlemanMarkupEstimate: 'পাইকারি মোকাম থেকে সুপারমার্কেটের শেলফ পর্যন্ত প্রায় ৬৫% মূল্যবৃদ্ধি ঘটে গ্রেডিং ও কোল্ড স্টোরেজের কারণে।',
-      farmerDirectOpportunity: 'গ্রেড-১ আলু সরাসরি সুপারমার্কেটের কন্ট্রাক্ট ফার্মিং ভেন্ডরকে দিলে কেজিতে ৳৮-৳১০ বেশি পাওয়া যায়।'
+      spreadPercentage: 25,
+      middlemanMarkupEstimate: 'পাইকারি মোকাম থেকে সুপারমার্কেটের শেলফ পর্যন্ত গ্রেডিং ও কোল্ড স্টোরেজের কারণে ২৫% মার্জিন থাকে।',
+      farmerDirectOpportunity: 'গ্রেড-১ আলু সরাসরি সুপারমার্কেটের কন্ট্রাক্ট ফার্মিং ভেন্ডরকে দিলে কেজিতে ৳৪-৳৫ বেশি পাওয়া যায়।'
     },
     priceDrivers: [
       'উত্তরাঞ্চলের হিমাগার থেকে নিয়মিত আলু সরবরাহ বহাল',
       'পরিবহন ভাড়া স্থিতিশীল থাকায় মোকামে সরবরাহ স্বাভাবিক',
-      'সুপারশপগুলোতে গ্রেডেড ও ধোয়া আলুর ধারাবাহিক চাহিদা'
+      'ডিএএম নির্ধারিত খুচরা মূল্য ২৫-৩০ টাকা কঠোরভাবে মনিটরড'
     ],
     farmerActionTips: [
       'মাঠেই গ্রেডিং করে বড় ও দাগমুক্ত আলু আলাদা করলে প্রিমিয়াম দর নিশ্চিত হবে।',
@@ -100,40 +100,40 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ]
   },
   tomato: {
-    insights: `### 🍅 টমেটোর বাজারদর ও সুপারমার্কেট ট্রেন্ড
-* **কারওয়ান বাজার পাইকারি আড়ৎ**: ৳৩৫ - ৳৪২ / কেজি
-* **চকরিয়া কাঁচাবাজার আড়ৎ**: ৳৩৫ - ৳৪০ / কেজি
-* **স্বপ্ন (Shwapno)**: ৳৬৫ / কেজি (সালাদ টমেটো)
-* **মীনা বাজার (Meena Bazar)**: ৳৬৮ / কেজি
-* **আগোরা (Agora)**: ৳৭০ / কেজি
-* **চালডাল (Chaldal)**: ৳৬২ / কেজি
+    insights: `### 🍅 টমেটোর বাজারদর ও সুপারমার্কেট ট্রেন্ড (ডিএএম ও লাইভ ওয়েব যাচাইকৃত)
+* **কারওয়ান বাজার পাইকারি আড়ৎ**: ৳৮০ - ৳৯০ / কেজি
+* **চট্টগ্রাম রিয়াজউদ্দিন ও কক্সবাজার চকরিয়া আড়ৎ**: ৳৮৫ - ৳৯৫ / কেজি
+* **স্বপ্ন (Shwapno)**: ৳১১০ / কেজি (সালাদ টমেটো)
+* **মীনা বাজার (Meena Bazar)**: ৳১১৫ / কেজি
+* **আগোরা (Agora)**: ৳১২০ / কেজি
+* **চালডাল (Chaldal)**: ৳১০৫ / কেজি
 
-**বাজারের গতিপ্রকৃতি**: স্থানীয় মাতামুহুরী নদী অববাহিকার নতুন শীতকালীন টমেটোর চাহিদা চাঙ্গা। সুপারমার্কেটে পাকা উজ্জ্বল লাল টমেটো আকর্ষণীয় মূল্যে বিক্রি হচ্ছে।`,
-    priceRange: { min: 35, max: 42, avg: 39, unit: 'kg' },
-    trend: 'up',
-    wholesaleRates: { minPriceBdt: 35, maxPriceBdt: 42, avgPriceBdt: 39, unit: 'kg', primaryMarket: 'কারওয়ান বাজার', trend: 'উর্ধ্বমুখী' },
-    supermarketRates: { minPriceBdt: 62, maxPriceBdt: 70, avgPriceBdt: 66, unit: 'kg', trend: 'উর্ধ্বমুখী' },
+**বাজারের গতিপ্রকৃতি**: স্থানীয় ও আগাম শীতকালীন জাতের চালান শুরু হওয়ায় আড়তে দর কিছুটা কমে ৮৫-৯৫ টাকায় নেমেছে। সুপারমার্কেটে পাকা লাল টমেটো ১১০-১২০ টাকায় বিক্রি হচ্ছে।`,
+    priceRange: { min: 80, max: 95, avg: 85, unit: 'kg' },
+    trend: 'down',
+    wholesaleRates: { minPriceBdt: 80, maxPriceBdt: 95, avgPriceBdt: 85, unit: 'kg', primaryMarket: 'কারওয়ান বাজার ও রিয়াজউদ্দিন বাজার', trend: 'নিম্নমুখী' },
+    supermarketRates: { minPriceBdt: 105, maxPriceBdt: 120, avgPriceBdt: 110, unit: 'kg', trend: 'নিম্নমুখী' },
     supermarkets: [
-      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 65, packagingType: 'সালাদ স্পেশাল প্যাকেট', stockStatus: 'ইন স্টক', websiteUrl: 'shwapno.com' },
-      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 68, packagingType: 'প্রিমিয়াম বাছাই', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
-      { name: 'আগোরা (Agora)', pricePerKgBdt: 70, packagingType: 'ট্রে প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
-      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 62, packagingType: 'ফ্রেশ ১ কেজি', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
+      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 110, packagingType: 'সালাদ স্পেশাল প্যাকেট', stockStatus: 'ইন স্টক', websiteUrl: 'shwapno.com' },
+      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 115, packagingType: 'প্রিমিয়াম বাছাই', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
+      { name: 'আগোরা (Agora)', pricePerKgBdt: 120, packagingType: 'ট্রে প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
+      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 105, packagingType: 'ফ্রেশ ১ কেজি', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
     ],
     mandiHubs: [
-      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 39, arrivalVolume: 'মাঝারি', trend: 'উর্ধ্বমুখী' },
-      { mandiName: 'শ্যামবাজার (ঢাকা)', wholesalePriceBdt: 38, arrivalVolume: 'মাঝারি', trend: 'উর্ধ্বমুখী' },
-      { mandiName: 'চকরিয়া কাঁচাবাজার', wholesalePriceBdt: 37, arrivalVolume: 'স্থানীয় ফলন', trend: 'স্থিতিশীল' },
-      { mandiName: 'খাতুনগঞ্জ (চট্টগ্রাম)', wholesalePriceBdt: 41, arrivalVolume: 'উচ্চ চাহিদা', trend: 'উর্ধ্বমুখী' }
+      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 85, arrivalVolume: 'মাঝারি', trend: 'নিম্নমুখী' },
+      { mandiName: 'শ্যামবাজার (ঢাকা)', wholesalePriceBdt: 82, arrivalVolume: 'মাঝারি', trend: 'নিম্নমুখী' },
+      { mandiName: 'চকরিয়া কাঁচাবাজার (কক্সবাজার)', wholesalePriceBdt: 85, arrivalVolume: 'আগাম ফলন', trend: 'স্থিতিশীল' },
+      { mandiName: 'খাতুনগঞ্জ ও রিয়াজউদ্দিন (চট্টগ্রাম)', wholesalePriceBdt: 88, arrivalVolume: 'উচ্চ চালান', trend: 'নিম্নমুখী' }
     ],
     marginSpread: {
-      spreadPercentage: 69,
-      middlemanMarkupEstimate: 'কাঁচামাল নষ্ট হওয়ার ঝুঁকি (পোস্ট-হারভেস্ট লস) ও কুলিং ভ্যানের ব্যয়ের কারণে রিটেইল চেইনে ৬৯% ব্যবধান।',
+      spreadPercentage: 30,
+      middlemanMarkupEstimate: 'কাঁচামাল নষ্ট হওয়ার ঝুঁকি (পোস্ট-হারভেস্ট লস) ও কুলিং ভ্যানের ব্যয়ের কারণে রিটেইল চেইনে ৩০% ব্যবধান।',
       farmerDirectOpportunity: 'প্লাস্টিক ক্রেটে গ্রেডিং করে সরাসরি সুপারমার্কেট সাপ্লাই চেইনে দিলে নষ্ট হওয়ার হার ৮০% কমে যায়।'
     },
     priceDrivers: [
-      'শীতকালীন শেষ প্রান্তের পাকা টমেটোর তীব্র খুচরা চাহিদা',
-      'সুপারমার্কেটে দাগহীন ফ্রেশ গ্রেড-১ টমেটোর জন্য প্রিমিয়াম বিড',
-      'দূরবর্তী জেলায় পরিবহনে কুলিং ক্রেটের সংকট'
+      'আগাম শীতকালীন পাকা টমেটোর নতুন চালান বাজারে প্রবেশ',
+      'সুপারমার্কেটে দাগহীন ফ্রেশ গ্রেড-১ টমেটোর ধারাবাহিক বিক্রি',
+      'পাইকারি আড়তে সরবরাহ বৃদ্ধি পাওয়ায় দাম নিম্নমুখী'
     ],
     farmerActionTips: [
       'আধাপাকা (টপ পিংক) অবস্থায় হারভেস্ট করুন যাতে পরিবহনে নষ্ট না হয়।',
@@ -218,38 +218,39 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ]
   },
   chili: {
-    insights: `### 🌶️ কাঁচা মরিচ বাজারদর ও সুপারমার্কেট বিশ্লেষণ
-* **কারওয়ান বাজার পাইকারি আড়ৎ**: ৳৯০ - ৳১১০ / কেজি
-* **খাতুনগঞ্জ আড়ৎ**: ৳৯৫ - ৳১১৫ / কেজি
-* **স্বপ্ন (Shwapno)**: ৳১৬০ / কেজি (প্যাকেট ২৫০ গ্রাম ৳৪০)
-* **মীনা বাজার (Meena Bazar)**: ৳১৬৫ / কেজি
-* **আগোরা (Agora)**: ৳১৭০ / কেজি
-* **চালডাল (Chaldal)**: ৳১৫০ / কেজি
+    insights: `### 🌶️ কাঁচা মরিচ বাজারদর ও সুপারমার্কেট বিশ্লেষণ (ডিএএম অফিসিয়াল বুলেটিন)
+* **কারওয়ান বাজার পাইকারি আড়ৎ**: ৳১৭৫ - ৳১৯০ / কেজি
+* **খাতুনগঞ্জ ও চকরিয়া মোকাম**: ৳১৮০ - ৳১৯৫ / কেজি
+* **সরকারি কৃষি বিপণন অধিদপ্তর (DAM) খুচরা দর**: ৳২১৮.০০ - ৳২৩৭.০০ / কেজি
+* **স্বপ্ন (Shwapno)**: ৳২৪০ / কেজি (প্যাকেট ২৫০ গ্রাম ৳৬০)
+* **মীনা বাজার (Meena Bazar)**: ৳২৪৫ / কেজি
+* **আগোরা (Agora)**: ৳২৫০ / কেজি
+* **চালডাল (Chaldal)**: ৳২২৫ / কেজি
 
-**বাজারের গতিপ্রকৃতি**: কাঁচা মরিচের দাম খুচরা ও সুপারমার্কেটে চড়া। বোঁটাযুক্ত তাজা সবুজ মরিচ সর্বোচ্চ মূল্যে বিক্রি হচ্ছে।`,
-    priceRange: { min: 90, max: 110, avg: 100, unit: 'kg' },
-    trend: 'up',
-    wholesaleRates: { minPriceBdt: 90, maxPriceBdt: 110, avgPriceBdt: 100, unit: 'kg', primaryMarket: 'কারওয়ান বাজার', trend: 'উর্ধ্বমুখী' },
-    supermarketRates: { minPriceBdt: 150, maxPriceBdt: 170, avgPriceBdt: 161, unit: 'kg', trend: 'উর্ধ্বমুখী' },
+**বাজারের গতিপ্রকৃতি**: বৃষ্টি পরবর্তী সময়ে রোদ ওঠায় স্থানীয় উত্তোলনে দাম ২০০ টাকা থেকে কমে ১৮০-১৯০ টাকায় এসেছে। সরকারি ডিএএম বুলেটিন অনুযায়ী খুচরা দর ২১৮-২৩৭ টাকা।`,
+    priceRange: { min: 175, max: 195, avg: 185, unit: 'kg' },
+    trend: 'down',
+    wholesaleRates: { minPriceBdt: 175, maxPriceBdt: 195, avgPriceBdt: 185, unit: 'kg', primaryMarket: 'কারওয়ান বাজার ও পাবনা চাটমোহর', trend: 'নিম্নমুখী' },
+    supermarketRates: { minPriceBdt: 218, maxPriceBdt: 245, avgPriceBdt: 228, unit: 'kg', trend: 'নিম্নমুখী' },
     supermarkets: [
-      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 160, packagingType: '২৫০ গ্রাম সিথ্রু পাউচ', stockStatus: 'ইন স্টক', websiteUrl: 'shwapno.com' },
-      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 165, packagingType: 'গ্রেড-১ এয়ার প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
-      { name: 'আগোরা (Agora)', pricePerKgBdt: 170, packagingType: 'সিলেক্টেড গ্রিন', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
-      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 150, packagingType: 'ফ্রেশ প্যাক ৫০০ গ্রাম', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
+      { name: 'স্বপ্ন (Shwapno)', pricePerKgBdt: 240, packagingType: '২৫০ গ্রাম সিথ্রু পাউচ', stockStatus: 'ইন স্টক', websiteUrl: 'shwapno.com' },
+      { name: 'মীনা বাজার (Meena Bazar)', pricePerKgBdt: 245, packagingType: 'গ্রেড-১ এয়ার প্যাক', stockStatus: 'ইন স্টক', websiteUrl: 'meenabazaronline.com' },
+      { name: 'আগোরা (Agora)', pricePerKgBdt: 250, packagingType: 'সিলেক্টেড গ্রিন', stockStatus: 'ইন স্টক', websiteUrl: 'agorasuperstores.com' },
+      { name: 'চালডাল (Chaldal)', pricePerKgBdt: 225, packagingType: 'ফ্রেশ প্যাক ৫০০ গ্রাম', stockStatus: 'দ্রুত ডেলিভারি', websiteUrl: 'chaldal.com' }
     ],
     mandiHubs: [
-      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 105, arrivalVolume: 'মাঝারি', trend: 'উর্ধ্বমুখী' },
-      { mandiName: 'খাতুনগঞ্জ (চট্টগ্রাম)', wholesalePriceBdt: 110, arrivalVolume: 'স্বল্প', trend: 'উর্ধ্বমুখী' },
-      { mandiName: 'চকরিয়া পাইকারি বাজার', wholesalePriceBdt: 98, arrivalVolume: 'নিয়মিত', trend: 'উর্ধ্বমুখী' }
+      { mandiName: 'কারওয়ান বাজার (ঢাকা)', wholesalePriceBdt: 185, arrivalVolume: 'মাঝারি', trend: 'নিম্নমুখী' },
+      { mandiName: 'খাতুনগঞ্জ (চট্টগ্রাম)', wholesalePriceBdt: 190, arrivalVolume: 'স্বাভাবিক', trend: 'নিম্নমুখী' },
+      { mandiName: 'চকরিয়া পাইকারি বাজার', wholesalePriceBdt: 180, arrivalVolume: 'স্থানীয় ফলন', trend: 'নিম্নমুখী' }
     ],
     marginSpread: {
-      spreadPercentage: 60,
-      middlemanMarkupEstimate: 'খুচরা সুপারশপে ২৫০ গ্রাম ছোট প্যাকে বিক্রি হওয়ায় প্রতি কেজিতে ৳৫০-৳৬০ মার্জিন যোগ হয়।',
+      spreadPercentage: 23,
+      middlemanMarkupEstimate: 'খুচরা সুপারশপে ২৫০ গ্রাম ছোট প্যাকে বিক্রি ও কোল্ড চেইনে ২৩% মার্জিন থাকে।',
       farmerDirectOpportunity: 'বোঁটা অক্ষত রেখে শুকনা প্যাকিং করলে সুপারশপ সরবরাহকারীরা ২০% বাড়তি দর অফার করে।'
     },
     priceDrivers: [
-      'উপকূলীয় অঞ্চলে স্থানীয় সরবরাহ সীমিত',
-      'বৃষ্টিপাত না থাকায় শুকনা ঝাল মরিচের চমৎকার সেলফ লাইফ'
+      'বৃষ্টিপাতের পর নতুন মরিচের উত্তোলন বৃদ্ধি',
+      'ডিএএম তালিকা অনুযায়ী খুচরা দর ২১৮-২৩৭ টাকায় স্থিতিশীল'
     ],
     farmerActionTips: [
       'ভেজা অবস্থায় মরিচ বস্তায় ভরবেন না; শুকনা অবস্থায় ছিদ্রযুক্ত প্লাস্টিক জুরিতে বাজারজাত করুন।'

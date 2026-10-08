@@ -300,210 +300,231 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: lang === 'bn' ? "Kore" : "Zephyr" } },
         },
+        outputAudioTranscription: {},
+        inputAudioTranscription: {},
         systemInstruction,
       };
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.LOW,
+          thinkingLevel: ThinkingLevel.HIGH,
           includeThoughts: true
         };
       }
 
       let activeLiveSession: any = null;
 
-      const sessionPromise = ai.live.connect({
-        model: selectedLiveModel,
-        config: liveConfig,
-        callbacks: {
-          onopen: async () => {
-            if (sessionIdRef.current !== currentSessionId) return;
-            setIsConnected(true);
-            setIsCalling(false);
-            setIsRinging(false);
-            isStartingCallRef.current = false;
-            setCallStatus('listening');
-            playSystemSound('connect');
+      const liveCallbacks = {
+        onopen: async () => {
+          if (sessionIdRef.current !== currentSessionId) return;
+          setIsConnected(true);
+          setIsCalling(false);
+          setIsRinging(false);
+          isStartingCallRef.current = false;
+          setCallStatus('listening');
+          playSystemSound('connect');
+          
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+              audio: {
+                channelCount: 1,
+                sampleRate: 16000,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              } 
+            });
+            streamRef.current = stream;
             
-            try {
-              const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                  channelCount: 1,
-                  sampleRate: 16000,
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                } 
-              });
-              streamRef.current = stream;
+            const source = inputAudioCtx.createMediaStreamSource(stream);
+            
+            const userAnalyser = inputAudioCtx.createAnalyser();
+            userAnalyser.fftSize = 64;
+            userAnalyserRef.current = userAnalyser;
+            source.connect(userAnalyser);
+
+            const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
+            processorRef.current = processor;
+
+            // Silent gain node keeps ScriptProcessor alive without echoing mic into speakers
+            const muteGain = inputAudioCtx.createGain();
+            muteGain.gain.value = 0;
+            processor.connect(muteGain);
+            muteGain.connect(inputAudioCtx.destination);
+
+            processor.onaudioprocess = (e) => {
+              if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
               
-              const source = inputAudioCtx.createMediaStreamSource(stream);
-              
-              const userAnalyser = inputAudioCtx.createAnalyser();
-              userAnalyser.fftSize = 64;
-              userAnalyserRef.current = userAnalyser;
-              source.connect(userAnalyser);
+              const inputData = e.inputBuffer.getChannelData(0);
 
-              const processor = inputAudioCtx.createScriptProcessor(2048, 1, 1);
-              processorRef.current = processor;
-
-              // Silent gain node keeps ScriptProcessor alive without echoing mic into speakers
-              const muteGain = inputAudioCtx.createGain();
-              muteGain.gain.value = 0;
-              processor.connect(muteGain);
-              muteGain.connect(inputAudioCtx.destination);
-
-              processor.onaudioprocess = (e) => {
-                if (isMutedRef.current || sessionIdRef.current !== currentSessionId) return;
-                
-                const inputData = e.inputBuffer.getChannelData(0);
-
-                // 1. Calculate microphone RMS volume
-                let sum = 0;
-                for (let i = 0; i < inputData.length; i++) {
-                  sum += inputData[i] * inputData[i];
-                }
-                const rms = Math.sqrt(sum / inputData.length);
-
-                const outCtx = outputAudioContextRef.current;
-                const isAiPlaying = sourceNodesRef.current.length > 0 || 
-                                   (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
-                const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
-
-                // 2. Active User Speech Detection
-                const isUserSpeaking = rms > 0.02;
-                if (isUserSpeaking) {
-                  userSpeakingHangoverRef.current = Date.now() + 800;
-                }
-
-                // 3. INSTANT BARGE-IN & INTERRUPTION
-                // If user speaks deliberately while AI is active -> immediately cut local audio playback!
-                if (isAiActive && rms > 0.035) {
-                  sourceNodesRef.current.forEach(node => {
-                    try { node.stop(); } catch (err) {}
-                  });
-                  sourceNodesRef.current = [];
-                  if (outCtx) {
-                    nextPlayTimeRef.current = outCtx.currentTime;
-                  }
-                  isAiTurnInProgressRef.current = false;
-                  setCallStatus('listening');
-                } else if (isAiPlaying && !isUserSpeaking) {
-                  // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
-                  return;
-                }
-
-                // 4. Standard PCM 16 conversion
-                const pcm16 = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                  const s = Math.max(-1, Math.min(1, inputData[i]));
-                  pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
-                
-                const buffer = new Uint8Array(pcm16.buffer);
-                let binary = '';
-                for (let i = 0; i < buffer.byteLength; i++) {
-                  binary += String.fromCharCode(buffer[i]);
-                }
-                const base64 = btoa(binary);
-                
-                const currentSession = activeLiveSession || sessionRef.current;
-                if (currentSession && sessionIdRef.current === currentSessionId) {
-                  try {
-                    currentSession.sendRealtimeInput({
-                      audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
-                    });
-                  } catch (err) {
-                    console.warn("Realtime audio send error:", err);
-                  }
-                }
-              };
-
-              source.connect(processor);
-            } catch (err) {
-              console.error("Microphone access denied:", err);
-              endCall();
-            }
-          },
-          onmessage: (message: LiveServerMessage) => {
-            if (sessionIdRef.current !== currentSessionId) return;
-
-            // 1. Audio stream playback
-            const parts = message.serverContent?.modelTurn?.parts;
-            if (parts && parts.length > 0) {
-              isAiTurnInProgressRef.current = true;
-              for (const part of parts) {
-                if (part.inlineData?.data) {
-                  playAudioChunk(part.inlineData.data);
-                  setCallStatus('speaking');
-                }
+              // 1. Calculate microphone RMS volume
+              let sum = 0;
+              for (let i = 0; i < inputData.length; i++) {
+                sum += inputData[i] * inputData[i];
               }
-            }
+              const rms = Math.sqrt(sum / inputData.length);
 
-            // 2. Separate Thinking thoughts from spoken speech parts
-            if (parts && parts.length > 0) {
-              for (const part of parts) {
-                if ((part as any).thought && part.text) {
-                  isAiTurnInProgressRef.current = true;
-                  setCallStatus('thinking');
-                  setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
-                }
+              const outCtx = outputAudioContextRef.current;
+              const isAiPlaying = sourceNodesRef.current.length > 0 || 
+                                 (outCtx ? outCtx.currentTime < nextPlayTimeRef.current : false);
+              const isAiActive = isAiTurnInProgressRef.current || isAiPlaying;
+
+              // 2. Active User Speech Detection
+              const isUserSpeaking = rms > 0.02;
+              if (isUserSpeaking) {
+                userSpeakingHangoverRef.current = Date.now() + 800;
               }
-            }
 
-            // 3. Spoken transcription from Live API
-            const outputTransText = (message.serverContent as any)?.outputTranscription?.text;
-            if (outputTransText && outputTransText.trim().length > 0) {
-              isAiTurnInProgressRef.current = true;
-              setLiveTranscription(prev => (prev ? prev + ' ' + outputTransText : outputTransText).slice(-300));
-              setCallStatus('speaking');
-            }
-
-            const inputTransText = (message.serverContent as any)?.inputTranscription?.text;
-            if (inputTransText) {
-              setUserSpeechTranscript(inputTransText);
-              setCallStatus('listening');
-            }
-
-            // 4. Turn Complete handling - naturally release lock
-            if (message.serverContent?.turnComplete) {
-              if (sourceNodesRef.current.length === 0) {
+              // 3. INSTANT BARGE-IN & INTERRUPTION
+              // If user speaks deliberately while AI is active -> immediately cut local audio playback!
+              if (isAiActive && rms > 0.035) {
+                sourceNodesRef.current.forEach(node => {
+                  try { node.stop(); } catch (err) {}
+                });
+                sourceNodesRef.current = [];
+                if (outCtx) {
+                  nextPlayTimeRef.current = outCtx.currentTime;
+                }
                 isAiTurnInProgressRef.current = false;
                 setCallStatus('listening');
+              } else if (isAiPlaying && !isUserSpeaking) {
+                // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
+                return;
               }
-            }
-            
-            // 5. Interruption handling
-            if (message.serverContent?.interrupted) {
-              isAiTurnInProgressRef.current = false;
-              sourceNodesRef.current.forEach(node => {
-                try { node.stop(); } catch (e) {}
-              });
-              sourceNodesRef.current = [];
-              if (outputAudioContextRef.current) {
-                nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+
+              // 4. Standard PCM 16 conversion
+              const pcm16 = new Int16Array(inputData.length);
+              for (let i = 0; i < inputData.length; i++) {
+                const s = Math.max(-1, Math.min(1, inputData[i]));
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
               }
-              setCallStatus('listening');
-            }
-          },
-          onclose: () => {
-            if (sessionIdRef.current === currentSessionId) {
-              endCall();
-            }
-          },
-          onerror: (err: any) => {
-            if (sessionIdRef.current === currentSessionId) {
-              console.error("Live API Error:", err);
-              if (err?.message === 'Network error' || err instanceof Event) {
-                 toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+              
+              const buffer = new Uint8Array(pcm16.buffer);
+              let binary = '';
+              for (let i = 0; i < buffer.byteLength; i++) {
+                binary += String.fromCharCode(buffer[i]);
               }
-              endCall();
+              const base64 = btoa(binary);
+              
+              const currentSession = activeLiveSession || sessionRef.current;
+              if (currentSession && sessionIdRef.current === currentSessionId) {
+                try {
+                  currentSession.sendRealtimeInput({
+                    audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+                  });
+                } catch (err) {
+                  console.warn("Realtime audio send error:", err);
+                }
+              }
+            };
+
+            source.connect(processor);
+          } catch (err) {
+            console.error("Microphone access denied:", err);
+            endCall();
+          }
+        },
+        onmessage: (message: LiveServerMessage) => {
+          if (sessionIdRef.current !== currentSessionId) return;
+
+          // 1. Audio stream playback
+          const parts = message.serverContent?.modelTurn?.parts;
+          if (parts && parts.length > 0) {
+            isAiTurnInProgressRef.current = true;
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playAudioChunk(part.inlineData.data);
+                setCallStatus('speaking');
+              }
             }
           }
+
+          // 2. Separate Thinking thoughts from spoken speech parts
+          if (parts && parts.length > 0) {
+            for (const part of parts) {
+              if ((part as any).thought && part.text) {
+                isAiTurnInProgressRef.current = true;
+                setCallStatus('thinking');
+                setLiveThinkingText(prev => (prev + ' ' + part.text).slice(-1200));
+              }
+            }
+          }
+
+          // 3. Spoken transcription from Live API
+          const outputTransText = (message.serverContent as any)?.outputTranscription?.text;
+          if (outputTransText && outputTransText.trim().length > 0) {
+            isAiTurnInProgressRef.current = true;
+            setLiveTranscription(prev => (prev ? prev + ' ' + outputTransText : outputTransText).slice(-300));
+            setCallStatus('speaking');
+          }
+
+          const inputTransText = (message.serverContent as any)?.inputTranscription?.text;
+          if (inputTransText) {
+            setUserSpeechTranscript(inputTransText);
+            setCallStatus('listening');
+          }
+
+          // 4. Turn Complete handling - naturally release lock
+          if (message.serverContent?.turnComplete) {
+            if (sourceNodesRef.current.length === 0) {
+              isAiTurnInProgressRef.current = false;
+              setCallStatus('listening');
+            }
+          }
+          
+          // 5. Interruption handling
+          if (message.serverContent?.interrupted) {
+            isAiTurnInProgressRef.current = false;
+            sourceNodesRef.current.forEach(node => {
+              try { node.stop(); } catch (e) {}
+            });
+            sourceNodesRef.current = [];
+            if (outputAudioContextRef.current) {
+              nextPlayTimeRef.current = outputAudioContextRef.current.currentTime;
+            }
+            setCallStatus('listening');
+          }
+        },
+        onclose: () => {
+          if (sessionIdRef.current === currentSessionId) {
+            endCall();
+          }
+        },
+        onerror: (err: any) => {
+          if (sessionIdRef.current === currentSessionId) {
+            console.error("Live API Error:", err);
+            if (err?.message === 'Network error' || err instanceof Event) {
+               toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
+            }
+            endCall();
+          }
         }
-      });
-      
-      const activeSession = await sessionPromise;
+      };
+
+      let activeSession: any = null;
+      try {
+        activeSession = await ai.live.connect({
+          model: selectedLiveModel,
+          config: liveConfig,
+          callbacks: liveCallbacks
+        });
+      } catch (connectError) {
+        if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
+          console.warn("Live Extended Thinking connection error, falling back to standard Gemini 3.8 Live:", connectError);
+          toast(lang === 'bn' 
+            ? 'স্ট্যান্ডার্ড ৩.৮ লাইভ মডেলে (Gemini 3.8 Live) কল সংযোগ করা হচ্ছে...' 
+            : 'Connecting via standard Gemini 3.8 Live mode...', { icon: '⚡' });
+          const fallbackConfig = { ...liveConfig };
+          delete fallbackConfig.thinkingConfig;
+          activeSession = await ai.live.connect({
+            model: LIVE_API_MODEL,
+            config: fallbackConfig,
+            callbacks: liveCallbacks
+          });
+        } else {
+          throw connectError;
+        }
+      }
       activeLiveSession = activeSession;
       if (sessionIdRef.current !== currentSessionId) {
         try { activeSession.close(); } catch (e) {}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
@@ -22,6 +22,9 @@ import DosageCalculator from './DosageCalculator';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
+import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
+import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
+import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
 
@@ -763,6 +766,94 @@ export default function AgriCopilot({
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
   const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
   const [customContextText, setCustomContextText] = useState('');
+  const [isRxModalOpen, setIsRxModalOpen] = useState(false);
+  const [rxModalData, setRxModalData] = useState<PrescriptionData | null>(null);
+
+  const handleOpenPrescriptionModal = () => {
+    if (!diagnosis) return;
+    
+    const chemSteps = diagnosis.chemicalRemedy 
+      ? [diagnosis.chemicalRemedy] 
+      : [
+          deepDiagnosis?.advancedTreatment || (lang === 'bn' ? 'কপার অক্সিক্লোরাইড ৫০ ডব্লিউপি (২ গ্রাম/লিটার পানিতে মিশিয়ে বিকেলে স্প্রে করুন)' : 'Copper Oxychloride 50 WP @ 2g/L')
+        ];
+        
+    const orgSteps = diagnosis.organicRemedy 
+      ? [diagnosis.organicRemedy] 
+      : [lang === 'bn' ? 'নিম তেল (৫ মিলি/লিটার) ও ট্রাইকোডার্মা বায়ো-এজেন্ট প্রয়োগ' : 'Neem oil @ 5ml/L and Trichoderma bio-agent'];
+
+    const cultSteps = diagnosis.verificationAdvice 
+      ? [diagnosis.verificationAdvice] 
+      : [lang === 'bn' ? 'আক্রান্ত পাতা কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ পরিষ্কার রাখুন' : 'Prune infected parts and maintain clean field drainage'];
+
+    const districtName = geoData.find(d => d.id === selectedDistrict)?.[lang === 'bn' ? 'bn' : 'name'] || 'Bangladesh';
+
+    setRxModalData({
+      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+      farmerName: user?.displayName || (lang === 'bn' ? 'নিবন্ধিত কৃষক' : 'Registered Farmer'),
+      location: `${districtName}, Bangladesh`,
+      crop: crop || (lang === 'bn' ? 'ফসলি জমি' : 'Field Crop'),
+      cropStage: cropStage || (lang === 'bn' ? 'মাঠ পর্যায়' : 'Field Stage'),
+      diseaseName: diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop Pathological Condition',
+      pathogen: diagnosis.pathogen || 'Agricultural Pathogen Analysis',
+      severity: diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium',
+      confidence: diagnosis.confidence || 95,
+      symptoms: diagnosis.symptomsBreakdown && diagnosis.symptomsBreakdown.length > 0 
+        ? diagnosis.symptomsBreakdown 
+        : [lang === 'bn' ? 'পাতায় দাগ ও সংক্রমণের স্পষ্ট লক্ষণ' : 'Leaf lesions and tissue necrosis identified'],
+      culturalSteps: cultSteps,
+      organicSteps: orgSteps,
+      chemicalSteps: chemSteps,
+      harvestIntervalDays: 14,
+      weatherSnapshot: {
+        temp: '28.5°C',
+        humidity: '84%',
+        rainRisk: 'Low to Moderate',
+        advisory: lang === 'bn' ? 'বৃষ্টিহীন পরিষ্কার বিকেলে স্প্রে করুন' : 'Apply during dry afternoon window'
+      }
+    });
+    setIsRxModalOpen(true);
+  };
+
+  const handleLoadInvestorPresetInAgri = (preset: DemoPreset) => {
+    const mime = 'image/svg+xml';
+    const svgCode = decodeURIComponent(preset.svgImage.replace('data:image/svg+xml;utf8,', ''));
+    const base64 = btoa(unescape(encodeURIComponent(svgCode)));
+
+    setImages([{ base64, mimeType: mime }]);
+    setCrop(preset.cropEn.split(' ')[0].toLowerCase());
+    setCropStage(lang === 'bn' ? preset.stageBn : preset.stageEn);
+    setDescription(lang === 'bn' ? preset.pitchNoteBn : preset.pitchNoteEn);
+
+    const sampleDiag = {
+      status: 'Valid',
+      disease: preset.diseaseEn,
+      diseaseBn: preset.diseaseBn,
+      diagnosis: `${preset.diseaseBn} (${preset.diseaseEn})\n\n**লক্ষণসমূহ:**\n${preset.symptomsBn.map(s => `- ${s}`).join('\n')}\n\n**ব্যবস্থাপনা ও চিকিৎসা:**\n${preset.chemicalStepsBn.join(' ')}`,
+      confidence: preset.confidence,
+      severity: preset.severityEn,
+      qualitativeSeverity: preset.severityEn,
+      cause: preset.pathogen,
+      organicRemedy: preset.organicStepsBn.join(' '),
+      chemicalRemedy: preset.chemicalStepsBn.join(' '),
+      verificationAdvice: preset.culturalStepsBn.join(' '),
+      symptomsBreakdown: lang === 'bn' ? preset.symptomsBn : preset.symptomsEn
+    };
+
+    setDiagnosis(sampleDiag);
+    setDeepDiagnosis({
+      severityScore: preset.severityScore,
+      hypothesesEvaluation: preset.culturalStepsBn.join(' '),
+      differentialReasoning: preset.symptomsBn.join('. '),
+      possibleAlternatives: [preset.diseaseEn, 'Physiological Blight'],
+      detailedDiagnosis: `${preset.diseaseBn} (${preset.pathogen})`,
+      advancedTreatment: preset.chemicalStepsBn.join('\n\n')
+    });
+
+    toast.success(lang === 'bn' 
+      ? `💼 ডেমো লোড হয়েছে: ${preset.nameBn}` 
+      : `💼 Demo loaded: ${preset.nameEn}`);
+  };
 
   const scrollToContextSection = () => {
     const el = document.getElementById('agri-additional-context-section');
@@ -1584,6 +1675,34 @@ export default function AgriCopilot({
                   )}
                 </div>
               </div>
+
+              {/* Quick Investor Pitch Sample Injector */}
+              <div className="mb-4 p-3 rounded-2xl bg-amber-50/80 border border-amber-200/90 shadow-2xs">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center space-x-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-amber-700" />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
+                      {lang === 'bn' ? '💼 ইনভেস্টর ডেমো প্রিসেট (১-ক্লিক লোড)' : '💼 Investor Pitch Demo Presets (1-Click)'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-amber-800 font-bold bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300/60">
+                    {lang === 'bn' ? 'বোর্ডরুম ব্যাকআপ' : 'Pitch Backup'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {INVESTOR_DEMO_PRESETS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleLoadInvestorPresetInAgri(p)}
+                      className="px-2.5 py-1 text-[11px] font-semibold bg-white hover:bg-amber-100 text-stone-800 rounded-xl border border-amber-300/80 shadow-2xs transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>{p.category === 'staple' ? '🌾' : p.category === 'cash_crop' ? '🍅' : p.category === 'rooftop' ? '🍋' : '🪴'}</span>
+                      <span>{lang === 'bn' ? p.nameBn.split(' ')[0] : p.nameEn.split(' ')[0]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               
               {images.length > 0 && (
                 <div 
@@ -1946,7 +2065,16 @@ export default function AgriCopilot({
                                 <span className="font-display font-black text-sm uppercase tracking-wider text-green-800">
                                   {lang === 'bn' ? 'রোগ নির্ণয় ও সমাধান' : 'Crop Diagnosis & Treatment'}
                                 </span>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleOpenPrescriptionModal}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 active:scale-95 transition-all cursor-pointer"
+                                    title={lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন ডাউনলোড বা প্রিন্ট করুন' : 'Generate & Download Digital Krishi Rx Card'}
+                                  >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    <span>{lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন (Rx)' : 'Digital Krishi Rx'}</span>
+                                  </button>
                                   <button
                                     onClick={() => {
                                       navigator.clipboard.writeText(diagnosis.diagnosis);
@@ -2191,6 +2319,18 @@ export default function AgriCopilot({
                               )}
                             </motion.div>
                           )}
+
+                          {/* 7-Day Plant Health Recovery Tracker (Like Apple Health for Crops) */}
+                          <div className="mt-6 relative z-10">
+                            <PlantHealthRecoveryTracker
+                              lang={lang}
+                              cropName={crop || 'Crop'}
+                              diseaseName={diagnosis.disease || diagnosis.diagnosis?.split('\n')[0] || 'Pathology Finding'}
+                              severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Critical'}
+                              harvestIntervalDays={14}
+                              initialPathway="organic"
+                            />
+                          </div>
 
                           {/* Deep Analysis Result or Button */}
                           {deepDiagnosis ? (
@@ -3207,6 +3347,16 @@ export default function AgriCopilot({
           </div>
         </div>
       </div>
+
+      {/* 1-Click Certified Digital Krishi Prescription Modal */}
+      {rxModalData && (
+        <DigitalPrescriptionModal
+          isOpen={isRxModalOpen}
+          onClose={() => setIsRxModalOpen(false)}
+          data={rxModalData}
+          lang={lang}
+        />
+      )}
     </motion.div>
   );
 }
