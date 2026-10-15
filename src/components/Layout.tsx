@@ -6,10 +6,10 @@ import {
   Search, Sun, Moon, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import LiveMandiTicker from './LiveMandiTicker';
 import { audioFeedback } from '../utils/audioFeedback';
 
 // Lazy load components
+const LiveMandiTicker = lazy(() => import('./LiveMandiTicker'));
 const AgriCopilot = lazy(() => import('./AgriCopilot'));
 const SmartGrade = lazy(() => import('./SmartGrade'));
 const SmartPlanting = lazy(() => import('./SmartPlanting'));
@@ -460,7 +460,7 @@ export default function Layout() {
                   {lang === 'bn' ? 'স্মার্ট কৃষি-সেবা' : 'Smart Agri-Tools'}
                 </span>
                 <div className="flex items-center space-x-2 mt-1">
-                  <span className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400">
+                  <span className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
                     Smart Krishi Platform
                   </span>
                   {(userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
@@ -495,8 +495,8 @@ export default function Layout() {
                     }}
                     className={`py-1.5 px-0.5 text-[10px] font-black rounded-xl transition-all truncate text-center cursor-pointer ${
                       isCatActive
-                        ? 'bg-emerald-600 text-white shadow-xs dark:bg-emerald-400 dark:text-emerald-950'
-                        : 'text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/70 dark:text-emerald-300/80 dark:hover:text-white dark:hover:bg-white/5'
+                        ? 'bg-emerald-700 text-white shadow-xs dark:bg-emerald-300 dark:text-emerald-950'
+                        : 'text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/70 dark:text-emerald-300 dark:hover:text-white dark:hover:bg-white/5'
                     }`}
                   >
                     {cat.label}
@@ -577,7 +577,7 @@ export default function Layout() {
                         {pillarTabs.length}
                       </span>
                     </div>
-                    <div className="text-[10.5px] text-emerald-700/80 dark:text-emerald-400/70 pl-7 leading-tight mb-1 truncate">
+                    <div className="text-[10.5px] text-emerald-800 dark:text-emerald-300 pl-7 leading-tight mb-1 truncate">
                       {pillar.subtitle}
                     </div>
 
@@ -639,7 +639,7 @@ export default function Layout() {
                                   }`}>
                                     {tab.subcategory}
                                   </span>
-                                  <span className={`text-[10px] truncate ${isActive ? 'text-emerald-100/90 dark:text-emerald-800' : 'text-slate-500 dark:text-emerald-300/70'}`}>
+                                  <span className={`text-[10px] truncate ${isActive ? 'text-emerald-50 dark:text-emerald-900' : 'text-slate-600 dark:text-emerald-200'}`}>
                                     {tab.description}
                                   </span>
                                 </div>
@@ -698,7 +698,7 @@ export default function Layout() {
             ) : (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="w-full flex items-center justify-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-white dark:text-emerald-950 dark:hover:bg-emerald-50 font-black py-2.5 px-4 rounded-xl active:scale-95 transition-all shadow-md text-xs uppercase tracking-wider cursor-pointer"
+                className="w-full flex items-center justify-center space-x-2 bg-emerald-800 hover:bg-emerald-900 text-white dark:bg-white dark:text-emerald-950 dark:hover:bg-emerald-50 font-black py-2.5 px-4 rounded-xl active:scale-95 transition-all shadow-md text-xs uppercase tracking-wider cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
                 <span>{t.signIn}</span>
@@ -711,10 +711,15 @@ export default function Layout() {
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           
           {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
-          <LiveMandiTicker 
-            lang={lang} 
-            onNavigateToMarket={() => handleNavigateTab('market-connect')} 
-          />
+          {/* Lazy-loaded so recharts is not pulled into the initial bundle. */}
+          <Suspense fallback={
+            <div className="h-10 shrink-0 border-b border-emerald-900/40 bg-emerald-950/60 animate-pulse" aria-hidden="true" />
+          }>
+            <LiveMandiTicker 
+              lang={lang} 
+              onNavigateToMarket={() => handleNavigateTab('market-connect')} 
+            />
+          </Suspense>
 
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
@@ -793,7 +798,9 @@ export default function Layout() {
                 onClick={toggleTheme} 
                 className="flex items-center space-x-1 font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 px-2 py-1.5 sm:px-2.5 rounded-xl border border-gray-200 dark:border-emerald-800/60 transition-all active:scale-95 shrink-0 cursor-pointer"
                 title={theme === 'light' ? t.darkMode : t.lightMode}
-                aria-label={t.themeToggle}
+                // Accessible name must contain the visible label ("Dark"/"Light") to satisfy
+                // WCAG 2.5.3 Label in Name.
+                aria-label={`${t.themeToggle} (${lang === 'bn' ? (theme === 'light' ? 'ডার্ক' : 'লাইট') : (theme === 'light' ? 'Dark' : 'Light')})`}
               >
                 {theme === 'light' ? (
                   <>
@@ -879,7 +886,7 @@ export default function Layout() {
                       </div>
                     </div>
                   }>
-                    <div className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-agri-copilot" role="tabpanel" aria-labelledby="tab-agri-copilot" className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('agri-copilot') && (
                         <AgriCopilot 
                           lang={lang} 
@@ -905,7 +912,7 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-weather-advisory" role="tabpanel" aria-labelledby="tab-weather-advisory" className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('weather-advisory') && (
                         <WeatherAdvisory 
                           lang={lang} 
@@ -914,7 +921,7 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'krishi-profit' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-krishi-profit" role="tabpanel" aria-labelledby="tab-krishi-profit" className={activeTab === 'krishi-profit' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('krishi-profit') && (
                         <KrishiProfitCalculator 
                           lang={lang} 
@@ -924,7 +931,7 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'climate-resilience' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-climate-resilience" role="tabpanel" aria-labelledby="tab-climate-resilience" className={activeTab === 'climate-resilience' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('climate-resilience') && (
                         <ClimateResilienceGuide 
                           lang={lang} 
@@ -932,7 +939,7 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-crop-health" role="tabpanel" aria-labelledby="tab-crop-health" className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('crop-health') && (
                         <SatelliteHealth 
                           lang={lang} 
@@ -941,10 +948,10 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-smart-grade" role="tabpanel" aria-labelledby="tab-smart-grade" className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
                     </div>
-                    <div className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-smart-planting" role="tabpanel" aria-labelledby="tab-smart-planting" className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('smart-planting') && (
                         <SmartPlanting 
                           lang={lang} 
@@ -954,7 +961,7 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-market-connect" role="tabpanel" aria-labelledby="tab-market-connect" className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('market-connect') && (
                         <MarketConnect 
                           lang={lang} 
@@ -968,22 +975,22 @@ export default function Layout() {
                         />
                       )}
                     </div>
-                    <div className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-community-radar" role="tabpanel" aria-labelledby="tab-community-radar" className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
                     </div>
-                    <div className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-gov-schemes" role="tabpanel" aria-labelledby="tab-gov-schemes" className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
                     </div>
-                    <div className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-user-guide" role="tabpanel" aria-labelledby="tab-user-guide" className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
                     </div>
-                    <div className={activeTab === 'farmer-dossier' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-farmer-dossier" role="tabpanel" aria-labelledby="tab-farmer-dossier" className={activeTab === 'farmer-dossier' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('farmer-dossier') && <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} />}
                     </div>
-                    <div className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
                     </div>
-                    <div className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
+                    <div id="panel-admin-dashboard" role="tabpanel" aria-labelledby="tab-admin-dashboard" className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
                       {visitedTabs.has('admin-dashboard') && userRole === 'admin' && <AdminDashboard lang={lang} />}
                     </div>
                   </Suspense>

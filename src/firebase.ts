@@ -1,12 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
 
+// NOTE: Firestore is deliberately NOT imported in this module. Keeping it auth-only
+// lets Vite code-split the Firestore SDK (~94 KB gzip) so it is only downloaded when
+// a feature actually needs it, instead of blocking first paint for every visitor.
+// The Firestore instance lives in `src/firestore.ts`.
 const app = initializeApp(firebaseConfig);
+
+export { app };
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
 let isSigningIn = false;
@@ -65,9 +69,13 @@ export const logout = async () => {
   }
 };
 
-// Test connection
+// Connectivity self-test. Firestore is dynamically imported so this check never
+// pulls the Firestore SDK into the initial bundle for guests.
 async function testConnection() {
+  if (!import.meta.env.DEV) return;
   try {
+    const { getFirestore, doc, getDocFromServer } = await import('firebase/firestore');
+    const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {

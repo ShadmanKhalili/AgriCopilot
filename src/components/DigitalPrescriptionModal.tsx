@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 import { audioFeedback } from '../utils/audioFeedback';
 

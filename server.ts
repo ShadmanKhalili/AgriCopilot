@@ -18,6 +18,26 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = 3000;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // In dev, Vite's HMR client + React Refresh connect over a WebSocket. The app's
+  // production CSP intentionally blocks unknown origins, so allow the local dev
+  // socket only when not in production.
+  const devCspExtras = isProduction ? [] : [
+    "ws://localhost:*",
+    "ws://127.0.0.1:*",
+    "http://localhost:*",
+  ];
+
+  // AdSense telemetry endpoints used by adsbygoogle.js.
+  const adsCspExtras = [
+    "https://googleads.g.doubleclick.net",
+    "https://pagead2.googlesyndication.com",
+    "https://tpc.googlesyndication.com",
+    "https://ep1.adtrafficquality.google",
+    "https://ep2.adtrafficquality.google",
+    "https://www.googletagmanager.com",
+  ];
 
   // 0. Enable Gzip Compression
   app.use(compression());
@@ -91,7 +111,9 @@ async function startServer() {
           "wss://*.googleapis.com",
           "wss://*.google.com",
           "wss://*.firebaseio.com",
-          "blob:"
+          "blob:",
+          ...adsCspExtras,
+          ...devCspExtras
         ],
         "frame-src": [
           "'self'", 

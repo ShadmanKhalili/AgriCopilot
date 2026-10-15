@@ -7,7 +7,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { addDoc, collection } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';

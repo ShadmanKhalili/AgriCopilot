@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { User, History, FileText, Award, Calendar, ChevronRight, ChevronDown, UserCircle, TrendingUp, Database, Loader2, HelpCircle, Crown, Sprout, ShieldCheck, Sparkles } from 'lucide-react';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
 import { translations, Language } from '../utils/translations';
 import { motion } from 'motion/react';

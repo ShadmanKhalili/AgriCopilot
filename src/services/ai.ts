@@ -1,5 +1,5 @@
 import { Type, GoogleGenAI, Modality } from '@google/genai';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 
 // Helper to call AI via backend proxy

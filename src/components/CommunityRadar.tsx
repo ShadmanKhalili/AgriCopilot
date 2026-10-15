@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Radar, AlertTriangle, MapPin, Calendar, Loader2, ShieldAlert } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { translations, Language } from '../utils/translations';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useAuth } from './AuthProvider';

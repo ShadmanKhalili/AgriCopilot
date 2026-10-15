@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { auth, db, signInWithGoogle, logout, signUpWithEmail, loginWithEmail } from '../firebase';
+import { auth, signInWithGoogle, logout, signUpWithEmail, loginWithEmail } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 export interface UserProfile {
@@ -60,6 +59,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
       if (currentUser) {
         try {
+          // Firestore is loaded on demand: guests never download the Firestore SDK.
+          const [{ doc, getDoc, setDoc, onSnapshot, updateDoc }, { db }] = await Promise.all([
+            import('firebase/firestore'),
+            import('../firestore'),
+          ]);
           const userDocRef = doc(db, 'users', currentUser.uid);
           
           // Initial check for profile
@@ -173,6 +177,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const upgradeToPremium = async () => {
     if (user) {
       try {
+        const [{ doc, updateDoc }, { db }] = await Promise.all([
+          import('firebase/firestore'),
+          import('../firestore'),
+        ]);
         const userDocRef = doc(db, 'users', user.uid);
         await updateDoc(userDocRef, { tier: 'premium' });
       } catch (error) {

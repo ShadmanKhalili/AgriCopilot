@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Landmark, Loader2, Search, MapPin, ExternalLink, CheckCircle2, AlertCircle, RefreshCcw, UserCheck, HelpCircle, Globe, ShieldCheck, LayoutDashboard, Database, Clock, Bot, X, Send } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
 import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';

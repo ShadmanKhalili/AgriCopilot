@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../components/AuthProvider';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 export function useUsageTracking(tabId: string = 'global') {

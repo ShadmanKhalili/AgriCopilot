@@ -1,4 +1,4 @@
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { collection, doc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
 
 export const CURRENT_PDF_SCHEMES = [

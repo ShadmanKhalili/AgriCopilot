@@ -1434,9 +1434,10 @@ Return a JSON object with this exact structure:
                 <Sparkles className="w-3.5 h-3.5" />
                 {lang === 'bn' ? 'লাইভ মাল্টিমোডাল এআই' : 'Live Multimodal AI'}
               </div>
-              <h3 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white">
+              {/* H2 (not H3) keeps the document outline sequential after the page H1 */}
+              <h2 className="text-xl sm:text-2xl font-black font-display tracking-tight text-white">
                 {lang === 'bn' ? 'লাইভ ক্যামেরা ও ভয়েস সহকারী' : 'Live Camera & Voice Copilot'}
-              </h3>
+              </h2>
               <p className="text-xs sm:text-sm text-gray-300 mt-1.5 leading-relaxed">
                 {isExtendedThinking
                   ? (lang === 'bn' 
@@ -1479,6 +1480,9 @@ Return a JSON object with this exact structure:
                   }`}
                   role="switch"
                   aria-checked={isExtendedThinking}
+                  aria-label={lang === 'bn'
+                    ? (isExtendedThinking ? 'গভীর রোগ ও প্যাথলজি মোড বন্ধ করুন' : 'গভীর রোগ ও প্যাথলজি মোড চালু করুন')
+                    : (isExtendedThinking ? 'Turn off Deep Clinical Pathology Mode' : 'Turn on Deep Clinical Pathology Mode')}
                 >
                   <span
                     className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${

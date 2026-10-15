@@ -3,7 +3,7 @@ import { Camera, Loader2, Award, FileCheck, DollarSign, Sparkles, HelpCircle, Ca
 import ReactMarkdown from 'react-markdown';
 import { gradeProduce } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';

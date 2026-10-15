@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc, collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { sanitizeString, safeStorage } from './security';
 
 export interface FarmerProfileData {

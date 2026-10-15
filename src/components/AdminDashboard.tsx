@@ -61,7 +61,7 @@ import {
   doc,
   addDoc
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { 
   LineChart, 
   Line, 

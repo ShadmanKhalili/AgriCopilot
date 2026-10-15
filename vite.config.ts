@@ -48,8 +48,33 @@ export default defineConfig(({mode}) => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          // Only precache the app shell. Precaching every vendor chunk previously
+          // made the service worker download ~2.8 MB before the app was usable,
+          // which is a serious problem for farmers on slow rural connections.
+          // Everything else is fetched on demand and cached at runtime instead.
+          globPatterns: ['**/*.{css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: ['**/node_modules/**'],
+          maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
+          navigateFallback: 'index.html',
+          cleanupOutdatedCaches: true,
           runtimeCaching: [
+            {
+              // Hashed build assets (index-f1fMjefh.js) are immutable, so cache them
+              // on first use. This keeps the app offline-capable without making the
+              // service worker precache megabytes of vendor JS up front.
+              urlPattern: /\/assets\/.*\.[0-9a-f]{8}\.(js|css)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'agri-build-assets',
+                expiration: {
+                  maxEntries: 60,
+                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               // Real-time dynamic weather forecasts must NEVER be hijacked by stale Service Worker cache
               urlPattern: /^\/api\/(daily-forecast|weathernext-3|weather-next)/i,
@@ -118,10 +143,16 @@ export default defineConfig(({mode}) => {
           manualChunks: {
             'vendor-react': ['react', 'react-dom'],
             'vendor-motion': ['motion/react'],
-            'vendor-charts': ['recharts'],
+            // NOTE: recharts is deliberately NOT pinned to a manual chunk. Pinning it
+            // made the entry statically import it, pulling ~109 KB gzip of charting
+            // library into the initial load even though only lazy tool screens draw
+            // charts. Rollup now emits a shared chunk that lazy screens load on demand.
             'vendor-icons': ['lucide-react'],
             'vendor-markdown': ['react-markdown'],
-            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore']
+            // Auth only. `firebase/firestore` is intentionally NOT pinned here:
+            // pinning it forced the Firestore SDK into the eagerly-loaded chunk even
+            // after all its consumers became dynamic imports.
+            'vendor-firebase': ['firebase/app', 'firebase/auth']
           }
         }
       }

@@ -3,7 +3,7 @@ import { TrendingUp, Loader2, MapPin, Sparkles, Store, BarChart, HelpCircle, Nav
 import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { getMarketInsights } from '../services/ai';
 import { detectUserLocation } from '../utils/geolocation';
 import { useAuth } from './AuthProvider';

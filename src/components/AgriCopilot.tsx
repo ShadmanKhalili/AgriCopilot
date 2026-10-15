@@ -5,7 +5,7 @@ import { toPng } from 'html-to-image';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
 import toast from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
