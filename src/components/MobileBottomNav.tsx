@@ -59,7 +59,9 @@ export default function MobileBottomNav({
     {
       id: 'support',
       targetTab: 'user-guide',
-      tabs: ['user-guide', 'profile', 'admin-dashboard', 'farmer-dossier'],
+      // 'admin-dashboard' intentionally excluded: the privileged Admin Operations Hub
+      // is only offered through the admin-gated sidebar menu (see Layout.tsx).
+      tabs: ['user-guide', 'profile', 'farmer-dossier'],
       label: t.quickSupport || (lang === 'bn' ? 'সহায়তা' : 'Support'),
       icon: BookOpen,
     }

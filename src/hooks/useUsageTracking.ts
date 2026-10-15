@@ -46,6 +46,12 @@ export function useUsageTracking(tabId: string = 'global') {
   const getCurrentUsage = () => {
     if (!user) return anonUsage;
     const today = new Date().toISOString().split('T')[0];
+    if (!userProfile) {
+      // Profile hasn't loaded yet: fall back to the local safety counter so the
+      // quota gate is never a silent no-op during that window.
+      const stored = localStorage.getItem(`fallbackUsage_${user.uid}_${tabId}`);
+      return stored ? parseInt(stored, 10) : 0;
+    }
     if (userProfile?.lastUsedDate !== today) {
       return 0;
     }
@@ -85,6 +91,13 @@ export function useUsageTracking(tabId: string = 'global') {
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
       }
+    } else if (user) {
+      // Profile hasn't loaded yet: track locally so the quota gate still degrades
+      // safely during this window (otherwise calls are invisible to the limiter).
+      const stored = localStorage.getItem(`fallbackUsage_${user.uid}_${tabId}`);
+      const newUsage = (stored ? parseInt(stored, 10) : 0) + 1;
+      localStorage.setItem(`fallbackUsage_${user.uid}_${tabId}`, newUsage.toString());
+      console.warn("Usage tracked locally - user profile not yet loaded.");
     }
   };
 

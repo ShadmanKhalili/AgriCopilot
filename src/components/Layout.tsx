@@ -198,7 +198,7 @@ export default function Layout() {
   const { user, userRole, isAuthReady, signOut } = useAuth();
   const t = translations[lang];
 
-  const tabs: TabItem[] = [
+  const allTabs: TabItem[] = [
     // Pillar 1: Crop Health & Protection (শস্য স্বাস্থ্য ও সুরক্ষা)
     { 
       id: 'agri-copilot', 
@@ -319,7 +319,10 @@ export default function Layout() {
       subcategory: lang === 'bn' ? 'কমান্ড ও প্রশাসন' : 'Command & Governance',
       badge: userRole === 'admin' ? 'Superadmin' : 'Admin'
     },
+    // The Admin Operations Hub is privileged: only expose the tab to verified admins.
   ];
+
+  const tabs = allTabs.filter(tab => tab.id !== 'admin-dashboard' || userRole === 'admin');
 
   const pillarDefinitions: PillarMeta[] = [
     {
@@ -981,7 +984,7 @@ export default function Layout() {
                       {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
                     </div>
                     <div className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
-                      {visitedTabs.has('admin-dashboard') && <AdminDashboard lang={lang} />}
+                      {visitedTabs.has('admin-dashboard') && userRole === 'admin' && <AdminDashboard lang={lang} />}
                     </div>
                   </Suspense>
                 </motion.div>

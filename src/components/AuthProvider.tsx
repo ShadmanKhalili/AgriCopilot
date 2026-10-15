@@ -50,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const handleAuthStateChanged = async (currentUser: User | null) => {
       // Cleanup previous snapshot if it exists
       if (unsubSnapshot) {
         unsubSnapshot();
@@ -76,17 +76,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 userDoc = await getDoc(userDocRef);
               } catch (retryError: any) {
                 console.error("Retry failed:", retryError.message);
-                if (!retryError.message?.includes('client is offline')) {
-                  handleFirestoreError(retryError, OperationType.GET, userDocRef.path);
-                }
+                throw retryError; // Outer catch performs the single formal error report
               }
             } else {
-              handleFirestoreError(error, OperationType.GET, userDocRef.path);
+              throw error; // Outer catch performs the single formal error report
             }
           }
           
           if (userDoc && !userDoc.exists()) {
-            const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com';
+            // Must match firestore.rules isAdmin(): owner email AND verified email
+            const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com' && currentUser.emailVerified === true;
             const newProfile: UserProfile = {
               uid: currentUser.uid,
               email: currentUser.email || '',
@@ -100,8 +99,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(userDocRef, newProfile);
           } else if (userDoc && userDoc.exists()) {
             // Force administrative privileges for the owner email if not already set
+            // (mirrors firestore.rules isAdmin(): email must also be verified)
             const data = userDoc.data() as UserProfile;
-            if (currentUser.email === 'sadmankhalili@gmail.com' && data.role !== 'admin') {
+            if (currentUser.email === 'sadmankhalili@gmail.com' && currentUser.emailVerified === true && data.role !== 'admin') {
               console.log("Promoting established user to admin...");
               await updateDoc(userDocRef, { role: 'admin', tier: 'premium' });
             }
@@ -137,6 +137,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserProfile(null);
         setIsAuthReady(true);
       }
+    };
+
+    // onAuthStateChanged ignores the promise returned by an async listener, so any
+    // rejection would surface as an unhandled promise rejection. Route it through
+    // a guarded invocation instead.
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      void handleAuthStateChanged(currentUser).catch((error) => {
+        console.warn("Auth state listener error (handled):", error);
+      });
     });
 
     return () => {

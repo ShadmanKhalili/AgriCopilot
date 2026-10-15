@@ -144,25 +144,56 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       allow create: if isSignedIn() && isValidUser(incoming()) && 
                     incoming().uid == request.auth.uid &&
                     userId == request.auth.uid &&
                     isValidId(userId) &&
                     (incoming().role != 'admin' || isAdmin()); // Prevent Privilege Escalation
       allow update: if isSignedIn() && isValidUser(incoming()) &&
-                    isOwner(userId) &&
-                    incoming().uid == existing().uid &&
-                    incoming().email == existing().email &&
-                    incoming().createdAt == existing().createdAt &&
                     (
-                      isAdmin() || 
-                      (
-                        // Tier upgrade or Usage Count sync without privilege escalation
-                        incoming().diff(existing()).affectedKeys().hasAny(['tier', 'usageCount', 'lastUsedDate', 'name']) &&
-                        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name']) &&
-                        incoming().role == existing().role
-                      )
+                      // Admins may manage any profile (role/tier included)
+                      (isAdmin() && incoming().uid == existing().uid) ||
+                      // Users may update only their own non-privileged fields
+                      (isOwner(userId) &&
+                       incoming().uid == existing().uid &&
+                       incoming().email == existing().email &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().role == existing().role &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name', 'updatedAt']))
                     );
+      allow delete: if isAdmin();
+    }
+
+    // Digital Krishi Prescriptions (Rx) issued from the AI Crop Doctor.
+    // Previously missing from this file, so every write fell through to the
+    // global default-deny and silently fell back to localStorage.
+    match /prescriptions/{prescriptionId} {
+      function isValidPrescription(data) {
+        return data.keys().hasAll(['rxId', 'userId', 'farmerName', 'crop', 'diseaseName', 'severity', 'confidence', 'location', 'createdAt', 'verified']) &&
+               isStr(data.rxId, 1, 64) &&
+               isStr(data.userId, 1, 128) &&
+               isStr(data.farmerName, 1, 128) &&
+               isStr(data.crop, 1, 128) &&
+               isStr(data.diseaseName, 1, 256) &&
+               isStr(data.severity, 1, 64) &&
+               data.confidence is number && data.confidence >= 0 && data.confidence <= 100 &&
+               isStr(data.location, 1, 256) &&
+               isTimestamp(data.createdAt) &&
+               data.verified is bool &&
+               isValidId(prescriptionId);
+      }
+
+      // Farmers read their own Rx history; admins read the national audit registry.
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(prescriptionId);
+      // Signed-in users write prescriptions owned by themselves; guests may write anonymous ones.
+      allow create: if isValidPrescription(incoming()) &&
+                    (
+                      (isSignedIn() && incoming().userId == request.auth.uid) ||
+                      (incoming().userId == 'anonymous')
+                    );
+      allow update: if isAdmin() && isValidPrescription(incoming());
       allow delete: if isAdmin();
     }
 

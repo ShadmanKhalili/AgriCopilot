@@ -84,6 +84,7 @@ import { geoData } from '../utils/geoData';
 import { Language } from '../utils/translations';
 import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
 import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
+import { useAuth } from './AuthProvider';
 
 interface Stats {
   totalUsers: number;
@@ -187,6 +188,8 @@ const DEFAULT_OUTBREAK_HOTSPOTS: OutbreakHotspot[] = [
 ];
 
 export default function AdminDashboard({ lang }: { lang: Language }) {
+  const { userRole, isAuthReady } = useAuth();
+  const isAdmin = userRole === 'admin';
   const [activeTab, setActiveTab] = useState<AdminTab>('command');
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
@@ -202,11 +205,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [diagnoses, setDiagnoses] = useState<any[]>([]);
   const [allPrescriptions, setAllPrescriptions] = useState<any[]>([]);
+  // Tracks whether any Firestore read failed and the view is showing synthesized
+  // fallback rows, so the UI can label it instead of silently implying live data.
+  const [usingFallbackData, setUsingFallbackData] = useState(false);
   const [userGrowth, setUserGrowth] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [outbreaks, setOutbreaks] = useState<OutbreakHotspot[]>(DEFAULT_OUTBREAK_HOTSPOTS);
   const [searchUserQuery, setSearchUserQuery] = useState('');
-  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'farmer' | 'saao' | 'admin'>('all');
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'agri-preneur' | 'hub-manager' | 'admin'>('all');
   const [userTierFilter, setUserTierFilter] = useState<'all' | 'free' | 'premium'>('all');
   
   // Prescription Audit & Inspection
@@ -232,7 +238,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
     name: '',
     phone: '',
     email: '',
-    role: 'saao',
+    role: 'hub-manager',
     district: 'Bogura'
   });
 
@@ -243,30 +249,40 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   const dashboardContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Wait for auth to resolve before deciding whether this user may fetch privileged data
+    if (!isAuthReady) return;
+    if (!isAdmin) {
+      // Non-admins never fetch privileged collections; skip straight to the restricted view
+      setLoading(false);
+      return;
+    }
     fetchDashboardData();
-  }, []);
+  }, [isAuthReady, isAdmin]);
 
   const fetchDashboardData = async () => {
     setIsRefreshing(true);
+    let usedFallback = false;
     try {
-      // 1. Fetch Users
+      // 1. Fetch Users (admin-only list per firestore.rules)
       let users: any[] = [];
       try {
         const usersSnap = await getDocs(collection(db, 'users'));
         users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
         console.warn("Could not fetch users collection, using base:", err);
+        usedFallback = true;
       }
 
       // If empty in dev, synthesize a few realistic users so table is rich
       if (users.length === 0) {
+        usedFallback = true;
         users = [
-          { id: 'usr_001', name: 'Md. Rafiqul Islam', email: 'rafiqul.farmer@gmail.com', phone: '+8801711234567', role: 'farmer', tier: 'premium', district: 'Bogura', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_002', name: 'Dr. Shahinur Alam', email: 'shahinur.dae@gov.bd', phone: '+8801819876543', role: 'saao', tier: 'premium', district: 'Rajshahi', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_003', name: 'Nazmul Hossain', email: 'nazmul.krishi@gmail.com', phone: '+8801912348899', role: 'farmer', tier: 'free', district: 'Mymensingh', lastUsedDate: new Date().toISOString().split('T')[0] },
+          { id: 'usr_001', name: 'Md. Rafiqul Islam', email: 'rafiqul.farmer@gmail.com', phone: '+8801711234567', role: 'agri-preneur', tier: 'premium', district: 'Bogura', lastUsedDate: new Date().toISOString().split('T')[0] },
+          { id: 'usr_002', name: 'Dr. Shahinur Alam', email: 'shahinur.dae@gov.bd', phone: '+8801819876543', role: 'hub-manager', tier: 'premium', district: 'Rajshahi', lastUsedDate: new Date().toISOString().split('T')[0] },
+          { id: 'usr_003', name: 'Nazmul Hossain', email: 'nazmul.krishi@gmail.com', phone: '+8801912348899', role: 'agri-preneur', tier: 'free', district: 'Mymensingh', lastUsedDate: new Date().toISOString().split('T')[0] },
           { id: 'usr_004', name: 'Sadman Khalili (Superadmin)', email: 'sadmankhalili@gmail.com', phone: '+8801552000000', role: 'admin', tier: 'premium', district: 'Dhaka', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_005', name: 'Tanvir Ahmed (Rooftop Gardener)', email: 'tanvir.green@yahoo.com', phone: '+8801678112233', role: 'farmer', tier: 'free', district: 'Dhaka', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_006', name: 'Abdul Matin', email: 'matin.grower@gmail.com', phone: '+8801722334455', role: 'farmer', tier: 'free', district: 'Jessore', lastUsedDate: new Date().toISOString().split('T')[0] }
+          { id: 'usr_005', name: 'Tanvir Ahmed (Rooftop Gardener)', email: 'tanvir.green@yahoo.com', phone: '+8801678112233', role: 'agri-preneur', tier: 'free', district: 'Dhaka', lastUsedDate: new Date().toISOString().split('T')[0] },
+          { id: 'usr_006', name: 'Abdul Matin', email: 'matin.grower@gmail.com', phone: '+8801722334455', role: 'agri-preneur', tier: 'free', district: 'Jessore', lastUsedDate: new Date().toISOString().split('T')[0] }
         ];
       }
       setAllUsers(users);
@@ -278,9 +294,11 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
         diagnosesData = diagnosesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
         console.warn("Could not fetch diagnoses from firestore, using synthesized logs:", err);
+        usedFallback = true;
       }
 
       if (diagnosesData.length === 0) {
+        usedFallback = true;
         diagnosesData = [
           { id: 'diag_101', crop: 'Paddy', diagnosisText: 'Bacterial Leaf Blight (Xanthomonas oryzae) with wavy chlorosis', qualitativeSeverity: 'Critical', confidence: 98.4, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(), district: 'Bogura' },
           { id: 'diag_102', crop: 'Tomato', diagnosisText: 'Tomato Late Blight (Phytophthora infestans) with water-soaked lesion', qualitativeSeverity: 'Critical', confidence: 97.2, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), district: 'Rajshahi' },
@@ -298,9 +316,11 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
         rxList = rxSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
         console.warn("Could not fetch prescriptions:", err);
+        usedFallback = true;
       }
 
       if (rxList.length === 0) {
+        usedFallback = true;
         rxList = INVESTOR_DEMO_PRESETS.map((preset, idx) => ({
           id: `rx_mock_${idx + 1}`,
           rxId: `RX-BD-2026-89${idx}42`,
@@ -318,7 +338,9 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
           chemicalSteps: preset.chemicalStepsEn,
           harvestIntervalDays: preset.harvestIntervalDays,
           weatherSnapshot: preset.weatherSnapshot,
-          verified: true
+          verified: true,
+          // Explicit marker so the registry never presents synthesized rows as certified records
+          isDemoData: true
         }));
       }
       setAllPrescriptions(rxList);
@@ -364,37 +386,59 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
         avgConfidence: 96.8
       });
       setUserGrowth(growth);
+      setUsingFallbackData(usedFallback);
     } catch (error) {
       console.error("Error fetching admin stats:", error);
+      setUsingFallbackData(true);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   };
 
+  // Roles accepted by firestore.rules (isValidUser). Keep in sync with the rules file.
+  const ALLOWED_USER_ROLES = ['agri-preneur', 'hub-manager', 'admin'];
+
   // Promote / Change User Role in Firestore
   const handleUpdateUserRole = async (userId: string, newRole: string) => {
+    if (!isAdmin) {
+      toast.error(lang === 'bn' ? 'শুধুমাত্র অ্যাডমিন এই পরিবর্তন করতে পারবেন' : 'Only administrators can change roles');
+      return;
+    }
+    if (!ALLOWED_USER_ROLES.includes(newRole)) {
+      toast.error(lang === 'bn' ? 'অবৈধ পদবী' : `Invalid role: ${newRole}`);
+      return;
+    }
     try {
       await updateDoc(doc(db, 'users', userId), { role: newRole });
       setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
       toast.success(lang === 'bn' ? 'ব্যবহারকারীর পদবী হালনাগাদ হয়েছে' : `Role updated to ${newRole}`);
-    } catch (e) {
-      // In offline / fallback mode, update local state
-      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      toast.success(lang === 'bn' ? 'পদবী পরিবর্তন সফল' : `Role changed to ${newRole}`);
+    } catch (e: any) {
+      // Never report success on a failed write — the change did not persist.
+      console.error("Role update failed:", e);
+      toast.error(lang === 'bn'
+        ? 'পদবী হালনাগাদ ব্যর্থ হয়েছে। অনুমতি নেই অথবা সংযোগ সমস্যা।'
+        : `Role update failed: ${e?.message || 'permission denied or offline'}`);
     }
   };
 
   // Toggle User Tier (Free vs Premium)
   const handleToggleUserTier = async (userId: string, currentTier: string) => {
+    if (!isAdmin) {
+      toast.error(lang === 'bn' ? 'শুধুমাত্র অ্যাডমিন প্যাকেজ পরিবর্তন করতে পারবেন' : 'Only administrators can change tiers');
+      return;
+    }
     const nextTier = currentTier === 'premium' ? 'free' : 'premium';
     try {
       await updateDoc(doc(db, 'users', userId), { tier: nextTier });
       setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, tier: nextTier } : u));
       toast.success(lang === 'bn' ? `প্যাকেজ পরিবর্তন: ${nextTier.toUpperCase()}` : `Tier updated to ${nextTier.toUpperCase()}`);
-    } catch (e) {
-      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, tier: nextTier } : u));
-      toast.success(`Tier set to ${nextTier.toUpperCase()}`);
+    } catch (e: any) {
+      // Never report success on a failed write — the change did not persist.
+      console.error("Tier update failed:", e);
+      toast.error(lang === 'bn'
+        ? 'প্যাকেজ পরিবর্তন ব্যর্থ হয়েছে। অনুমতি নেই অথবা সংযোগ সমস্যা।'
+        : `Tier update failed: ${e?.message || 'permission denied or offline'}`);
     }
   };
 
@@ -452,6 +496,15 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
 
   // Verify Prescription (Official SAAO Certification)
   const handleVerifyPrescription = (rxId: string) => {
+    if (!isAdmin) {
+      toast.error('Only authorized agronomists can certify prescriptions');
+      return;
+    }
+    const target = allPrescriptions.find(rx => rx.id === rxId || rx.rxId === rxId);
+    if (target?.isDemoData) {
+      toast.error(lang === 'bn' ? 'ডেমো রেকর্ড অনুমোদন করা যাবে না' : 'Demo records cannot be certified');
+      return;
+    }
     setAllPrescriptions(prev => prev.map(rx => {
       if (rx.id === rxId || rx.rxId === rxId) {
         return {
@@ -467,34 +520,41 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   };
 
   // Export Prescriptions to CSV
+  const csvEscape = (value: unknown): string => {
+    // Wrap in quotes and escape embedded quotes/newlines so fields can't corrupt columns
+    return `"${String(value ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+  };
+
   const handleExportPrescriptionsCSV = () => {
     if (allPrescriptions.length === 0) {
       toast.error('No prescriptions to export');
       return;
     }
-    const headers = ['Rx ID', 'Farmer Name', 'Crop', 'Disease', 'Pathogen', 'Severity', 'Location', 'Confidence', 'Issued Date', 'Verified'];
+    const headers = ['Rx ID', 'Farmer Name', 'Crop', 'Disease', 'Pathogen', 'Severity', 'Location', 'Confidence', 'Issued Date', 'Verified', 'Source'];
     const rows = allPrescriptions.map(rx => [
-      `"${rx.rxId || ''}"`,
-      `"${rx.farmerName || ''}"`,
-      `"${rx.crop || ''}"`,
-      `"${rx.diseaseName || ''}"`,
-      `"${rx.pathogen || ''}"`,
-      `"${rx.severity || ''}"`,
-      `"${rx.location || ''}"`,
-      `"${rx.confidence || ''}%"`,
-      `"${rx.createdAt ? new Date(rx.createdAt).toISOString() : ''}"`,
-      `"${rx.verified ? 'YES' : 'PENDING'}"`
+      csvEscape(rx.rxId || ''),
+      csvEscape(rx.farmerName || ''),
+      csvEscape(rx.crop || ''),
+      csvEscape(rx.diseaseName || ''),
+      csvEscape(rx.pathogen || ''),
+      csvEscape(rx.severity || ''),
+      csvEscape(rx.location || ''),
+      csvEscape(rx.confidence ? `${rx.confidence}%` : ''),
+      csvEscape(rx.createdAt ? new Date(rx.createdAt).toISOString() : ''),
+      csvEscape(rx.verified ? 'YES' : 'PENDING'),
+      csvEscape(rx.isDemoData ? 'DEMO' : 'LIVE')
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    // BOM + encodeURIComponent keeps Bangla text and '#'-containing fields intact
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', `Smart-Krishi-Prescription-Registry-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(lang === 'bn' ? 'প্রেসক্রিপশন রেজিস্ট্রি CSV ডাউনলোড হয়েছে' : 'Rx Registry exported to CSV');
+    toast.success(lang === 'bn' ? 'প্রেস্ক্রিপশন রেজিস্ট্রি CSV ডাউনলোড হয়েছে' : 'Rx Registry exported to CSV');
   };
 
   // Add / Invite Agronomist or Extension Personnel
@@ -516,8 +576,8 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
     };
     setAllUsers(prev => [newUser, ...prev]);
     setIsInviteModalOpen(false);
-    setInviteForm({ name: '', phone: '', email: '', role: 'saao', district: 'Bogura' });
-    toast.success(lang === 'bn' ? `কর্মকর্তা ${newUser.name} সফলভাবে যুক্ত হয়েছেন!` : `Official ${newUser.name} invited successfully!`);
+    setInviteForm({ name: '', phone: '', email: '', role: 'hub-manager', district: 'Bogura' });
+    toast.success(`${newUser.name} added to local directory (demo only — not persisted to Firestore)`);
   };
 
   // Filtered Prescriptions List
@@ -559,9 +619,46 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
     );
   }
 
+  // Client-side gate: privileged actions must never be exposed to non-admins.
+  // (Firestore rules enforce the same restriction server-side.)
+  if (isAuthReady && !isAdmin) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-10 text-center space-y-4">
+        <div className="p-4 rounded-3xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900">
+          <ShieldCheck className="w-10 h-10 text-rose-600 mx-auto" />
+        </div>
+        <h2 className="text-lg font-black text-stone-900 dark:text-stone-100">
+          {lang === 'bn' ? 'প্রবেশাধিকার সীমিত' : 'Access Restricted'}
+        </h2>
+        <p className="text-sm text-stone-500 dark:text-stone-400 max-w-sm">
+          {lang === 'bn'
+            ? 'এই প্রশাসনিক ড্যাশবোর্ড শুধুমাত্র অনুমোদিত অ্যাডমিনিস্ট্রেটরদের জন্য।'
+            : 'This administrative dashboard is restricted to authorized administrators only.'}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div ref={dashboardContainerRef} className="space-y-6 pb-16 text-stone-900 dark:text-stone-100">
-      
+
+      {/* Data provenance banner — shown whenever Firestore reads failed and synthesized rows are displayed */}
+      {usingFallbackData && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-4 py-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+            <span className="font-black uppercase tracking-wider">
+              {lang === 'bn' ? 'ডেমো ডেটা প্রদর্শিত' : 'Demo data displayed'}
+            </span>
+            <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/80">
+              {lang === 'bn'
+                ? 'ফায়ারস্টোর থেকে সরাসরি ডেটা পড়া গেল না (অনুমতি বা সংযোগ সমস্যা)। নিচের তালিকায় কৃত্রিম নমুনারেকর্ড দেখানো হচ্ছে, যা সার্টিফাইড রেকর্ড নয়।'
+                : 'Live Firestore data could not be read (permissions or connectivity). Rows below are synthesized demo records, not certified registry entries.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Institutional Executive Header */}
       <div className="bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-900 p-6 sm:p-8 rounded-[36px] shadow-2xl text-white relative overflow-hidden border border-emerald-500/20">
         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500 rounded-full blur-[130px] -mr-40 -mt-40 opacity-20 pointer-events-none" />
@@ -1345,7 +1442,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {rx.verified ? (
+                        {rx.isDemoData ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded-full border border-stone-300 dark:border-stone-700"
+                            title="Synthesized demo record — not certified"
+                          >
+                            DEMO
+                          </span>
+                        ) : rx.verified ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                             <Check className="w-3 h-3 text-emerald-600" />
                             SAAO Certified
@@ -1452,8 +1556,8 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   className="bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 dark:text-stone-100 outline-none"
                 >
                   <option value="all">{lang === 'bn' ? 'সব পদবী (All Roles)' : 'All Roles'}</option>
-                  <option value="farmer">{lang === 'bn' ? 'কৃষক (Farmer)' : 'Farmer'}</option>
-                  <option value="saao">{lang === 'bn' ? 'SAAO কর্মকর্তা' : 'SAAO Agronomist'}</option>
+                  <option value="agri-preneur">{lang === 'bn' ? 'কৃষক (Farmer)' : 'Farmer'}</option>
+                  <option value="hub-manager">{lang === 'bn' ? 'SAAO কর্মকর্তা' : 'SAAO Agronomist'}</option>
                   <option value="admin">{lang === 'bn' ? 'এডমিন (Admin)' : 'Admin'}</option>
                 </select>
 
@@ -1515,7 +1619,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
                           u.role === 'admin' 
                             ? 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300' 
-                            : u.role === 'saao'
+                            : u.role === 'hub-manager'
                             ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300'
                             : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
                         }`}>
@@ -1550,14 +1654,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleUpdateUserRole(u.id, 'saao')}
+                            onClick={() => handleUpdateUserRole(u.id, 'hub-manager')}
                             className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-blue-50 text-stone-700 hover:text-blue-700 text-[10px] font-bold border border-stone-200 transition-all cursor-pointer"
                           >
                             + SAAO
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleUpdateUserRole(u.id, 'farmer')}
+                            onClick={() => handleUpdateUserRole(u.id, 'agri-preneur')}
                             className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-stone-700 hover:text-emerald-700 text-[10px] font-bold border border-stone-200 transition-all cursor-pointer"
                           >
                             Farmer
@@ -1834,8 +1938,8 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
                     className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-white outline-none"
                   >
-                    <option value="saao">SAAO Officer</option>
-                    <option value="farmer">Lead Farmer</option>
+                    <option value="hub-manager">SAAO Officer</option>
+                    <option value="agri-preneur">Lead Farmer</option>
                     <option value="admin">Administrator</option>
                   </select>
                 </div>

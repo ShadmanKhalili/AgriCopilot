@@ -1006,7 +1006,7 @@ export const geoData: District[] = [
   {
     "id": "54",
     "name": "Dinajpur",
-    "bn_name": "দিনা���পুর",
+            "bn_name": "দিনাজপুর",
     "lat": 25.6217061,
     "lng": 88.6354504,
     "upazilas": [
@@ -1440,7 +1440,7 @@ export const geoData: District[] = [
   {
     "id": "63",
     "name": "Jamalpur",
-    "bn_name": "জাম��লপুর",
+            "bn_name": "জামালপুর",
     "lat": 24.937533,
     "lng": 89.937775,
     "upazilas": [
@@ -3310,7 +3310,7 @@ export const geoData: District[] = [
       {
         "id": "135",
         "name": "Durgapur",
-        "bn_name": "দু���্গাপুর",
+            "bn_name": "দুর্গাপুর",
         "lat": 24.37230298,
         "lng": 88.56307623
       },
@@ -4097,7 +4097,18 @@ export function findNearestLocation(lat: number, lng: number, lang: string = 'bn
 
   const isBn = lang.toLowerCase().startsWith('bn');
   const distName = isBn ? closestDistrict.bn_name : closestDistrict.name;
-  const upazilaName = closestUpazila ? (isBn ? closestUpazila.bn_name : closestUpazila.name) : undefined;
+
+  // Upazila entries in this dataset mirror their district centroid coordinates, so
+  // the "nearest" upazila only reflects list order — not the user's actual
+  // position. Only trust an upazila match when it is independently geocoded,
+  // otherwise show the district (which is always accurate).
+  const upazilaIsGeoDistinct = closestUpazila
+    ? Math.abs(closestUpazila.lat - closestDistrict.lat) > 0.001 ||
+      Math.abs(closestUpazila.lng - closestDistrict.lng) > 0.001
+    : false;
+  const upazilaName = upazilaIsGeoDistinct && closestUpazila
+    ? (isBn ? closestUpazila.bn_name : closestUpazila.name)
+    : undefined;
 
   let shortName = upazilaName && upazilaName !== distName 
     ? `${upazilaName}, ${distName}` 

@@ -1,7 +1,6 @@
 import { doc, getDoc, setDoc, collection, addDoc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { sanitizeString, safeStorage } from './security';
-import { handleFirestoreError, OperationType } from './firestoreErrorHandler';
 
 export interface FarmerProfileData {
   userId: string;
@@ -183,6 +182,16 @@ export function calculateCreditScore(profile: {
 const LOCAL_PROFILE_KEY = (uid: string) => `krishi_farmer_profile_${uid}`;
 const LOCAL_EVENTS_KEY = (uid: string) => `krishi_farmer_events_${uid}`;
 
+// Firestore rules (isValidFarmerProfile) require fullName to be a non-empty string (1-128 chars).
+// Every write path therefore falls back to this placeholder when no real name is available.
+const DEFAULT_FARMER_NAME = 'কৃষক ভাই (Farmer)';
+
+const cleanFullName = (fullName?: string): string => {
+  if (!fullName || fullName === DEFAULT_FARMER_NAME) return DEFAULT_FARMER_NAME;
+  const sanitized = sanitizeString(fullName, 128).trim();
+  return sanitized || DEFAULT_FARMER_NAME;
+};
+
 export async function fetchFarmerProfile(userId: string): Promise<FarmerProfileData | null> {
   if (!userId) return null;
 
@@ -253,9 +262,7 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   event: FarmerTimelineEventData;
 }> {
   const cleanUserId = sanitizeString(params.userId, 128);
-  const cleanFullName = params.fullName && params.fullName !== 'কৃষক ভাই (Farmer)' 
-    ? sanitizeString(params.fullName, 128) 
-    : '';
+  const cleanFarmerName = cleanFullName(params.fullName);
   const cleanTitle = sanitizeString(params.title, 256);
   const cleanSummary = sanitizeString(params.summary, 5000);
   const cleanKeyFacts = (Array.isArray(params.keyFacts) ? params.keyFacts : [])
@@ -289,7 +296,7 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
 
   const initialProfile: FarmerProfileData = {
     userId: cleanUserId,
-    fullName: cleanFullName,
+    fullName: cleanFarmerName,
     creditReadinessScore: 0,
     insuranceRiskTier: 'High',
     primaryCrop: cleanCrop || '',
@@ -311,8 +318,8 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   const profile = existingProfile ? { ...existingProfile } : initialProfile;
 
   // Progressive profile compounding without hallucinated overrides
-  if (cleanFullName && !profile.fullName) {
-    profile.fullName = cleanFullName;
+  if (cleanFarmerName && !profile.fullName) {
+    profile.fullName = cleanFarmerName;
   }
   if (cleanCrop && !profile.cropsGrown.includes(cleanCrop)) {
     profile.cropsGrown.push(cleanCrop);
@@ -343,7 +350,6 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   const totalEventsCount = existingEvents.length + 1;
   const hasWeatherAction = params.eventType === 'weather_alert' || existingEvents.some(e => e.eventType === 'weather_alert');
   const hasSmartGrading = params.eventType === 'smart_grading' || existingEvents.some(e => e.eventType === 'smart_grading');
-
   // Recalculate credit and insurance metrics based strictly on actual usage
   const creditResult = calculateCreditScore({
     totalSessionsCompleted: profile.totalSessionsCompleted,
@@ -352,7 +358,7 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     hasLandData: profile.totalLandDecimals > 0,
     hasLocationData: Boolean(profile.locationDistrict || profile.locationUpazila),
     hasSoilOrIrrigation: Boolean(profile.soilType || profile.irrigationType),
-    hasCertificates: hasSmartGrading || profile.creditReadinessScore > 65,
+    hasCertificates: hasSmartGrading,
     hasWeatherAction,
     totalEventsCount
   });
@@ -401,7 +407,7 @@ export async function updateFarmerProfileManual(
 
   const profile: FarmerProfileData = existing ? { ...existing } : {
     userId: cleanUserId,
-    fullName: '',
+    fullName: DEFAULT_FARMER_NAME,
     creditReadinessScore: 0,
     insuranceRiskTier: 'High',
     primaryCrop: '',
@@ -420,7 +426,7 @@ export async function updateFarmerProfileManual(
     createdAt: now
   };
 
-  if (updates.fullName !== undefined) profile.fullName = sanitizeString(updates.fullName, 128);
+  if (updates.fullName !== undefined) profile.fullName = cleanFullName(updates.fullName);
   if (updates.locationDistrict !== undefined) profile.locationDistrict = sanitizeString(updates.locationDistrict, 100);
   if (updates.locationUpazila !== undefined) profile.locationUpazila = sanitizeString(updates.locationUpazila, 100);
   if (updates.primaryCrop !== undefined) {
@@ -436,6 +442,9 @@ export async function updateFarmerProfileManual(
   if (updates.soilType !== undefined) profile.soilType = sanitizeString(updates.soilType, 100);
   if (updates.irrigationType !== undefined) profile.irrigationType = sanitizeString(updates.irrigationType, 100);
 
+  // Guard against legacy profiles or blank submissions: firestore.rules requires 1..128 chars
+  profile.fullName = cleanFullName(profile.fullName);
+
   const existingEvents = await fetchFarmerTimeline(cleanUserId);
   const totalEventsCount = existingEvents.length;
   const hasWeatherAction = existingEvents.some(e => e.eventType === 'weather_alert');
@@ -449,7 +458,7 @@ export async function updateFarmerProfileManual(
     hasLandData: profile.totalLandDecimals > 0,
     hasLocationData: Boolean(profile.locationDistrict || profile.locationUpazila),
     hasSoilOrIrrigation: Boolean(profile.soilType || profile.irrigationType),
-    hasCertificates: hasSmartGrading || profile.creditReadinessScore > 65,
+    hasCertificates: hasSmartGrading,
     hasWeatherAction,
     totalEventsCount
   });
@@ -481,7 +490,8 @@ export async function resetFarmerProfile(userId: string): Promise<FarmerProfileD
 
   const emptyProfile: FarmerProfileData = {
     userId: cleanUserId,
-    fullName: '',
+    // Must remain non-empty to satisfy firestore.rules isValidFarmerProfile (isStr 1..128)
+    fullName: DEFAULT_FARMER_NAME,
     creditReadinessScore: 0,
     insuranceRiskTier: 'High',
     primaryCrop: '',

@@ -786,7 +786,8 @@ export default function AgriCopilot({
       ? [diagnosis.verificationAdvice] 
       : [lang === 'bn' ? 'আক্রান্ত পাতা কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ পরিষ্কার রাখুন' : 'Prune infected parts and maintain clean field drainage'];
 
-    const districtName = geoData.find(d => d.id === selectedDistrict)?.[lang === 'bn' ? 'bn' : 'name'] || 'Bangladesh';
+    // NOTE: district objects expose `bn_name` (not `bn`), so Bangla must read that key.
+    const districtName = geoData.find(d => d.id === selectedDistrict)?.[lang === 'bn' ? 'bn_name' : 'name'] || 'Bangladesh';
 
     setRxModalData({
       rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,

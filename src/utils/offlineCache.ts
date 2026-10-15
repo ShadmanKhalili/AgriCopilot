@@ -11,6 +11,9 @@ const GLOBAL_SYNC_KEY = 'agri_last_sync_timestamp';
 // Weather changes rapidly (e.g., fast storm fronts, showers, rapid shifts).
 // Weather cache retention is strictly capped at 20 minutes to prevent stale data interference.
 export const MAX_WEATHER_CACHE_AGE_MS = 1000 * 60 * 20; // 20 minutes max
+// Hard ceiling for emergency-offline display: even without connectivity, cached
+// weather older than this is never presented to the user (it is dropped instead).
+export const MAX_EMERGENCY_WEATHER_CACHE_AGE_MS = 1000 * 60 * 60 * 6; // 6 hours max
 
 // Mandi market wholesale prices change 1-2 times daily after morning auctions.
 export const MAX_MARKET_CACHE_AGE_MS = 1000 * 60 * 60 * 12; // 12 hours max
@@ -316,9 +319,9 @@ export function saveCachedWeather(locationKey: string, data: any, model: string 
       locationKey,
       isFallback: false
     };
-    // Save scoped to exact coordinates and model
+    // Save scoped to exact coordinates and model (never to an unscoped key, so a
+    // future model toggle can never read another engine's data)
     localStorage.setItem(`${WEATHER_CACHE_PREFIX}${model}_${locationKey}`, JSON.stringify(entry));
-    localStorage.setItem(WEATHER_CACHE_PREFIX + locationKey, JSON.stringify(entry));
     recordGlobalSync(now);
   } catch (err) {
     console.warn('Failed to cache weather to localStorage:', err);
@@ -338,7 +341,7 @@ export function getCachedWeather(
 ): CacheEntry<any> | null {
   try {
     const scopedKey = `${WEATHER_CACHE_PREFIX}${model}_${locationKey}`;
-    const raw = localStorage.getItem(scopedKey) || localStorage.getItem(WEATHER_CACHE_PREFIX + locationKey);
+    const raw = localStorage.getItem(scopedKey);
     
     if (raw) {
       const parsed: CacheEntry<any> = JSON.parse(raw);
@@ -354,8 +357,9 @@ export function getCachedWeather(
       
       // If older than 20 minutes:
       // When online, do NOT return stale cache so live data isn't interfered with.
-      // Only when confirmed offline, return it marked explicitly as fallback.
-      if (isEmergencyOffline) {
+      // Only when confirmed offline, return it marked explicitly as fallback —
+      // and only within a bounded window so multi-day-old data is never shown.
+      if (isEmergencyOffline && age < MAX_EMERGENCY_WEATHER_CACHE_AGE_MS) {
         return {
           ...parsed,
           isFallback: true
@@ -420,7 +424,12 @@ export function saveCachedMarket(cropKey: string, locationKey: string, data: any
 }
 
 /**
- * Retrieve cached market insights
+ * Retrieve cached market insights.
+ *
+ * Returns ONLY genuinely cached, non-expired entries (or null). Synthetic
+ * offline baselines are intentionally NOT returned here — use
+ * `getMarketOfflineFallback()` so callers can tell "real cached data" apart
+ * from "no data available".
  */
 export function getCachedMarket(cropKey: string, locationKey: string): CacheEntry<any> | null {
   const normCrop = cropKey.toLowerCase();
@@ -445,7 +454,17 @@ export function getCachedMarket(cropKey: string, locationKey: string): CacheEntr
     console.warn('Failed to read cached market insights:', err);
   }
 
-  // Check pre-seeded fallback
+  return null;
+}
+
+/**
+ * Synthetic regional baseline used ONLY when the device has no connectivity and
+ * no cached data exists. Explicitly marked as a fallback so the UI can label it.
+ */
+export function getMarketOfflineFallback(cropKey: string): CacheEntry<any> | null {
+  const normCrop = cropKey.toLowerCase();
+
+  // Pre-seeded fallback
   const fallback = COX_BAZAR_OFFLINE_MARKET[normCrop];
   if (fallback) {
     return {
@@ -459,7 +478,7 @@ export function getCachedMarket(cropKey: string, locationKey: string): CacheEntr
   // Generic fallback if crop isn't pre-seeded
   return {
     data: {
-      insights: `### 🌾 কক্সবাজার আঞ্চলিক বাজার পর্যবেক্ষণ (অফলাইন মোড)\n* স্থানীয় চকরিয়া ও কস্তুরী ঘাট আড়তে এ ফসলের চাহিদা মাঝারি থেকে স্থিতিশীল।\n* অনলাইন সংযোগ পাওয়া মাত্রই রিয়েল-টাইম এআই অ্যানালাইসিস স্বয়ংক্রিয়ভাবে আপডেট হবে।`,
+      insights: `### 🌾 কক্সবাজার আঞ্চলিক বাজার পর্যবেক্ষণ (অফলাইন মোড)\n* স্থানীয় চকরিয়া ও কস্তুরী ঘাট আড়তে এ ফসলের চাহিদা মাঝারি থেকে স্থিতিশীল।\n* অনলাইন সংযোগ পাওয়া মাত্রই রিয়েল-টাইম এআই অ্যানালাইসিস স্বয়ংক্রিয়ভাবে আপডেট হবে।`,
       priceRange: { min: 30, max: 40, avg: 35, unit: 'kg' },
       trend: 'stable'
     },

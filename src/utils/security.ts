@@ -62,9 +62,12 @@ export const safeStorage = {
       if (!raw) return fallback;
       
       const parsed = JSON.parse(raw);
-      // Guard against Prototype Pollution
+      // Guard against Prototype Pollution.
+      // NOTE: use Object.hasOwn (own-property check) — the `in` operator also matches
+      // inherited Object.prototype members ('__proto__', 'constructor', 'prototype'),
+      // which are present on every object and made this check always true.
       if (parsed && typeof parsed === 'object') {
-        if ('__proto__' in parsed || 'constructor' in parsed || 'prototype' in parsed) {
+        if (Object.hasOwn(parsed, '__proto__') || Object.hasOwn(parsed, 'constructor') || Object.hasOwn(parsed, 'prototype')) {
           console.warn(`[Security Alert] Prototype pollution detected in localStorage key: ${key}`);
           return fallback;
         }

@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
-import { saveCachedMarket, getCachedMarket, formatCacheAge } from '../utils/offlineCache';
+import { saveCachedMarket, getCachedMarket, getMarketOfflineFallback, formatCacheAge } from '../utils/offlineCache';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'paddy', 'betelLeaf', 'chili', 'watermelon', 'potato', 'onion'];
 const MARKET_LOCATIONS = [
@@ -118,6 +118,14 @@ export default function MarketConnect({
         setInsights(cached.data);
         setMarketCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
         setLastUpdated(new Date(cached.timestamp).toLocaleString());
+      } else if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        // Genuinely offline with no cache: restore the labelled regional baseline
+        const offlineBaseline = getMarketOfflineFallback(produce);
+        if (offlineBaseline) {
+          setInsights(offlineBaseline.data);
+          setMarketCacheInfo({ isCached: true, timestamp: offlineBaseline.timestamp, isFallback: true });
+          setLastUpdated(new Date(offlineBaseline.timestamp).toLocaleString());
+        }
       }
     }
 
@@ -222,6 +230,26 @@ export default function MarketConnect({
           : 'Loaded cached mandi rates from offline storage');
         setIsLoading(false);
         return;
+      }
+
+      // No usable cache: only when the device is genuinely offline may we show the
+      // synthetic regional baseline (clearly labelled), instead of an error.
+      const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (isOffline) {
+        const offlineBaseline = getMarketOfflineFallback(targetProduce);
+        if (offlineBaseline) {
+          setInsights(offlineBaseline.data);
+          setMarketCacheInfo({ isCached: true, timestamp: offlineBaseline.timestamp, isFallback: true });
+          if (setPersistedInsights) {
+            setPersistedInsights(offlineBaseline.data);
+          }
+          setLastUpdated(new Date(offlineBaseline.timestamp).toLocaleString());
+          toast(lang === 'bn'
+            ? 'অফলাইন মোড: আঞ্চলিক অনুমানভিত্তিক বাজারদর দেখানো হচ্ছে'
+            : 'Offline: showing estimated regional rates (not live market data)', { icon: '\u26A0\uFE0F' });
+          setIsLoading(false);
+          return;
+        }
       }
 
       const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');

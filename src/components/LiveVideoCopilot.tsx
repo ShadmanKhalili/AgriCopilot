@@ -1316,10 +1316,24 @@ Return a JSON object with this exact structure:
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // drawImage throws unless the source actually holds decodable pixels:
+    // images need `complete`, video needs HAVE_CURRENT_DATA (readyState >= 2).
     if (activeDemoPreset && presetImageRef.current) {
-      ctx.drawImage(presetImageRef.current, 0, 0, 640, 480);
+      const presetImg = presetImageRef.current;
+      if (!presetImg.complete || presetImg.naturalWidth === 0) {
+        toast.error(lang === 'bn' ? 'ডেমো ছবি এখনো লোড হয়নি, একটু পরে চেষ্টা করুন।' : 'Demo image is still loading, please try again shortly.');
+        return;
+      }
+      ctx.drawImage(presetImg, 0, 0, 640, 480);
     } else if (videoRef.current) {
+      if (videoRef.current.readyState < 2) {
+        toast.error(lang === 'bn' ? 'ক্যামেরা ফ্রেম এখনো প্রস্তুত নেই, একটু পরে চেষ্টা করুন।' : 'Camera frame is not ready yet, please try again shortly.');
+        return;
+      }
       ctx.drawImage(videoRef.current, 0, 0, 640, 480);
+    } else {
+      toast.error(lang === 'bn' ? 'ক্যাপচার করার জন্য কোনো ফ্রেম নেই।' : 'No frame available to capture.');
+      return;
     }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);

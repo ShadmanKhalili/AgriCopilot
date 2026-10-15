@@ -101,7 +101,9 @@ const generateContent = async (params: any) => {
 
 export { Type };
 
-const getModelName = (isAdvanced?: boolean) => 'gemini-3.5-flash-lite';
+// Advanced (Premium) analysis uses the larger model; standard requests use flash-lite.
+// Keep in sync with the server-side failover cascade in server.ts.
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite';
 const SEARCH_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
@@ -116,19 +118,19 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500
       return await fn();
     } catch (error: any) {
       const errorStr = JSON.stringify(error || {}).toLowerCase() + ' ' + (error?.message || '').toLowerCase();
-      const isQuotaError = error.message?.includes('429') || 
-                          error.message?.includes('RESOURCE_EXHAUSTED') || 
-                          errorStr.includes('quota') || 
+      const isQuotaError = error?.message?.includes('429') ||
+                          error?.message?.includes('RESOURCE_EXHAUSTED') ||
+                          errorStr.includes('quota') ||
                           errorStr.includes('429');
-      
+
       const isHighDemand = error?.status === 503 ||
-                          error.message?.includes('503') ||
-                          error.message?.includes('UNAVAILABLE') ||
-                          error.message?.includes('high demand') ||
+                          error?.message?.includes('503') ||
+                          error?.message?.includes('UNAVAILABLE') ||
+                          error?.message?.includes('high demand') ||
                           errorStr.includes('high demand') ||
                           errorStr.includes('spikes in demand');
 
-      const isNotFoundError = error.message?.includes('404') || 
+      const isNotFoundError = error?.message?.includes('404') ||
                               errorStr.includes('not_found');
 
       const isPermissionDenied = error?.status === 403 || 
@@ -234,9 +236,12 @@ export const diagnoseCrop = async (
         "differentialDiagnosis": "Reasoning for choosing the final diagnosis",
         "diagnosis": "Detailed markdown final diagnosis and treatment plan (approx 100 words)",
         "qualitativeSeverity": "Low" | "Medium" | "High",
+        "confidence": 0-100,
         "symptomsBreakdown": ["Symptom 1", "Symptom 2", "Symptom 3"],
         "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers)."
       }
+      
+      - confidence: an integer 0-100 representing how certain you are of the final diagnosis given only the provided image(s). Be conservative: below 60 means the image is ambiguous, blurry, or atypical enough that a human agronomist must verify in person. Never inflate it.
       
       If the image is not related to agriculture or is too blurry, set status to "Invalid" and explain why in the diagnosis field.`;
       
@@ -251,6 +256,7 @@ export const diagnoseCrop = async (
             differentialDiagnosis: { type: Type.STRING },
             diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
             qualitativeSeverity: { type: Type.STRING, description: 'Low, Medium, or High' },
+            confidence: { type: Type.NUMBER, description: 'Certainty of the diagnosis, 0-100 (be conservative; below 60 = ambiguous image)' },
             symptomsBreakdown: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
@@ -258,7 +264,7 @@ export const diagnoseCrop = async (
             },
             verificationAdvice: { type: Type.STRING, description: 'Advice for further verification' }
           },
-          required: ['status', 'visibleSymptoms', 'possibleDiseases', 'differentialDiagnosis', 'diagnosis', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice']
+          required: ['status', 'visibleSymptoms', 'possibleDiseases', 'differentialDiagnosis', 'diagnosis', 'qualitativeSeverity', 'confidence', 'symptomsBreakdown', 'verificationAdvice']
         }
       };
       
@@ -1257,9 +1263,12 @@ export const syncCuratedSchemes = async () => {
         const existingDocs = existingSnapshot.docs.map(d => ({ id: d.id, titleEn: d.data().title?.en }));
 
         parsed.schemes.forEach((scheme: any) => {
-          // Generate a deterministic ID based on the English title to prevent future duplicates
+          // Generate a deterministic ID based on the English title to prevent future duplicates.
+          // slugify can legitimately produce '' (e.g. titles that are entirely non-Latin),
+          // which would make doc(colRef, '') throw — always fall back to a usable ID.
           const titleEn = scheme.title?.en || '';
-          const deterministicId = titleEn ? slugify(titleEn) : Math.random().toString(36).substr(2, 9);
+          const slug = titleEn ? slugify(titleEn) : '';
+          const deterministicId = slug || `scheme-${Math.random().toString(36).substr(2, 9)}`;
           
           // Cleanup existing duplicates that match by title but have different IDs (old random IDs)
           existingDocs.forEach(oldDoc => {
@@ -1287,5 +1296,8 @@ export const syncCuratedSchemes = async () => {
 };
 
 export const getMarketInsightsByLocation = async (produce: string, location: string, lang: string) => {
+  // Location is intentionally not forwarded to the shared insight engine yet: the
+  // current model prompt is location-agnostic. Kept in the signature for API
+  // stability — callers get the same behaviour as getMarketInsights.
   return await getMarketInsights(produce, lang, false);
 };
