@@ -48,11 +48,15 @@ export default defineConfig(({mode}) => {
           ],
         },
         workbox: {
-          // Only precache the app shell. Precaching every vendor chunk previously
-          // made the service worker download ~2.8 MB before the app was usable,
-          // which is a serious problem for farmers on slow rural connections.
-          // Everything else is fetched on demand and cached at runtime instead.
-          globPatterns: ['**/*.{css,html,ico,png,svg,woff,woff2}'],
+          // In production only precache the app shell. Precaching every vendor
+          // chunk previously made the service worker download ~2.8 MB before the
+          // app was usable, which is a serious problem for farmers on slow rural
+          // connections. Hashed assets are cached on demand at runtime instead.
+          // In dev the output dir contains no built assets, so keep the full glob
+          // there (otherwise workbox warns about an unmatched pattern).
+          globPatterns: mode === 'production'
+            ? ['**/*.{css,html,ico,png,svg,woff,woff2}']
+            : ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           globIgnores: ['**/node_modules/**'],
           maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
           navigateFallback: 'index.html',

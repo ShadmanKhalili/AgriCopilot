@@ -82,7 +82,7 @@ async function startServer() {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         "script-src": [
-          "'self'", 
+"'self'", 
           "'unsafe-inline'", 
           "'unsafe-eval'", 
           "https://pagead2.googlesyndication.com", 
@@ -92,7 +92,11 @@ async function startServer() {
           "https://adservice.google.com",
           "https://partner.googleadservices.com",
           "https://www.googletagmanager.com", 
-          "https://apis.google.com"
+          "https://apis.google.com",
+          // AdSense's sodar telemetry loads its own scripts, so these must be
+          // allowed in script-src as well as connect-src.
+          ...adsCspExtras,
+          ...devCspExtras
         ],
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         "font-src": ["'self'", "https://fonts.gstatic.com"],
