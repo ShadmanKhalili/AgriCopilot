@@ -379,12 +379,19 @@ export default function Profile({ lang, onUpgrade }: Props) {
           >
             <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
             
-            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-10 flex items-center">
-              <div className="bg-blue-50 p-2 rounded-xl mr-3">
-                <Award className="w-5 h-5" />
-              </div>
-              {t.certificatesHistory}
-            </h3>
+            <div className="mb-8">
+              <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest flex items-center">
+                <div className="bg-blue-50 p-2 rounded-xl mr-3">
+                  <Award className="w-5 h-5" />
+                </div>
+                {lang === 'bn' ? 'ফসল প্রাক-বাছাই ও গুণমান মূল্যায়ন' : 'Indicative Grading Assessments'}
+              </h3>
+              <p className="text-[10px] text-gray-400 mt-1 pl-11">
+                {lang === 'bn' 
+                  ? 'বাজার দরকষাকষির সহায়ক প্রাক-বাছাই • সংবিধিবদ্ধ সরকারি সনদ নয়' 
+                  : 'Farmgate trade bargaining aids • Non-statutory indicative assessments'}
+              </p>
+            </div>
             
             {loading ? (
               <div className="flex justify-center py-12">

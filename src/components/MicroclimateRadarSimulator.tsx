@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../utils/translations';
+import DataStatusBadge from './DataStatusBadge';
 
 export interface HourlyPoint {
   time: string;
@@ -205,26 +206,28 @@ export default function MicroclimateRadarSimulator({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-700/50">
-                {lang === 'bn' ? 'বাস্তবসম্মত ডপলার রাডার' : 'Calibrated Doppler Radar'}
+              <DataStatusBadge
+                status="demo"
+                lang={lang}
+                source="Mathematical Microclimate Simulation (Not Live BMD Radar)"
+                compact={true}
+              />
+              <span className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800/50">
+                {lang === 'bn' ? 'গাণিতিক বায়ুমণ্ডলীয় মডেল' : 'Thermodynamic Convective Model'}
               </span>
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-[10px] font-bold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800/40">
-                {lang === 'bn' ? 'পূর্ণাঙ্গ ৪৮ ঘণ্টা সিমুলেশন' : 'True 48-Hour Coverage'}
+              <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800/40">
+                {lang === 'bn' ? 'সিমুলেশন পরিধি: ৪৮ ঘণ্টা' : 'Simulation: 48h Window'}
               </span>
             </div>
             <h3 className="text-xl md:text-2xl font-black tracking-tight text-white mt-1">
               {lang === 'bn' 
-                ? 'বায়ুমণ্ডলীয় রাডার ও ৪৮ ঘণ্টার সিমুলেশন' 
-                : 'Atmospheric Radar & 48-Hour Microclimate Simulation'}
+                ? 'মাইক্রোক্লাইমেট সিমুলেশন ও ক্লাউড ট্র্যাকিং' 
+                : 'Microclimate Atmospheric Simulation & Cloud Tracking'}
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-stone-400 mt-0.5">
               {lang === 'bn'
-                ? 'মেঘের বিস্তার, ডপলার প্রতিফলন তীব্রতা (dBZ) এবং ক্ষেতের জরুরি সতর্কতা'
-                : 'Cloud cell tracking, Doppler reflectivity (dBZ) & farm operational timing'}
+                ? 'তাত্ত্বিক মেঘের বিস্তার ও প্রতিফলন তীব্রতা (সিমুলেটেড dBZ)। এটি সরাসরি আবহাওয়া অধিদপ্তরের রাডার স্টেশন নয়।'
+                : 'Simulated cloud cell dynamics & synthetic reflectivity (dBZ). Not direct BMD ground Doppler radar.'}
             </p>
           </div>
         </div>

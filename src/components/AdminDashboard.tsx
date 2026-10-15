@@ -808,7 +808,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black text-amber-300 font-mono">BARI Verified</span>
+                <span className="text-[10px] font-black text-emerald-300 font-mono">{lang === 'bn' ? 'মাঠ মূল্যায়ন' : 'Field Evaluated'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
                 {stats.helpfulRatio.toFixed(1)}%

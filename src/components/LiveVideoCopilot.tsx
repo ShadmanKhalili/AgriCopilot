@@ -5,7 +5,7 @@ import {
   Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
   BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award
 } from 'lucide-react';
-import { getAi, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
+import { getLiveAiClient, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -70,6 +70,8 @@ export default function LiveVideoCopilot({
   const [isRxModalOpen, setIsRxModalOpen] = useState(false);
   const [currentRxData, setCurrentRxData] = useState<PrescriptionData | null>(null);
   const presetImageRef = useRef<HTMLImageElement | null>(null);
+  const isAiTurnCancelledRef = useRef<boolean>(false);
+  const [measuredInterruptionLatencyMs, setMeasuredInterruptionLatencyMs] = useState<number | null>(null);
 
   // Pre-load SVG image when demo preset changes
   useEffect(() => {
@@ -337,12 +339,16 @@ export default function LiveVideoCopilot({
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (camErr: any) {
-        if (activeDemoPreset) {
-          console.warn("Webcam unavailable, falling back to audio-only stream for investor demo:", camErr);
+        console.warn("Camera video stream unavailable or denied, falling back to audio-only microphone stream:", camErr?.name || camErr?.message || camErr);
+        try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: constraints.audio
           });
-        } else {
+          toast(lang === 'bn' 
+            ? 'ক্যামেরা সংযোগ ছাড়া শুধুমাত্র অডিও মোডে সংযুক্ত হচ্ছে...' 
+            : 'Camera stream unavailable; continuing in voice-only copilot mode...', { icon: '🎙️' });
+        } catch (audioErr: any) {
+          console.warn("Microphone stream unavailable:", audioErr?.name || audioErr?.message || audioErr);
           throw camErr;
         }
       }
@@ -364,10 +370,15 @@ export default function LiveVideoCopilot({
       }
       return stream;
     } catch (err: any) {
-      console.error("Camera access failed:", err);
+      console.warn("Camera/microphone permission notice:", err?.name || err?.message || err);
+      const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       const msg = lang === 'bn' 
-        ? "ক্যামেরা বা মাইক্রোফোন ব্যবহারের অনুমতি পাওয়া যায়নি। ব্রাউজার সেটিংসে অনুমতি নিশ্চিত করুন।" 
-        : "Camera or microphone permission was denied. Please allow access in your browser.";
+        ? (isDenied
+            ? "ক্যামেরা বা মাইক্রোফোন ব্যবহারের অনুমতি পাওয়া যায়নি। ব্রাউজারের লক আইকনে ক্লিক করে অনুমতি দিন অথবা নমুনা প্রিসেট ব্যবহার করুন।" 
+            : "ক্যামেরা ডিভাইসটি খুঁজে পাওয়া যায়নি। নিচে উল্লেখিত নমুনা প্রিসেট দিয়ে পরীক্ষা করতে পারেন।")
+        : (isDenied
+            ? "Camera or microphone permission was denied. Please allow access in browser permissions or select a sample preset below."
+            : "Camera or audio device not detected. You can select one of the sample presets below to test the copilot.");
       setCameraError(msg);
       toast.error(msg);
       return null;
@@ -394,10 +405,45 @@ export default function LiveVideoCopilot({
     }
   };
 
-  // Flip Camera
+  // Flip Camera - safely replaces ONLY the video track so audio pipeline is never broken
   const flipCamera = async () => {
     const nextMode = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(nextMode);
+
+    if (mediaStreamRef.current && isCameraActive) {
+      try {
+        const oldVideoTracks = mediaStreamRef.current.getVideoTracks();
+        const newVideoStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: nextMode,
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          }
+        });
+        const newVideoTrack = newVideoStream.getVideoTracks()[0];
+        if (newVideoTrack) {
+          // Stop and remove old video track; keep audio tracks 100% active and connected
+          oldVideoTracks.forEach(t => {
+            t.stop();
+            mediaStreamRef.current?.removeTrack(t);
+          });
+          mediaStreamRef.current.addTrack(newVideoTrack);
+          if (videoRef.current) {
+            videoRef.current.srcObject = mediaStreamRef.current;
+            await videoRef.current.play().catch(() => {});
+          }
+          const capabilities: any = newVideoTrack.getCapabilities ? newVideoTrack.getCapabilities() : {};
+          setIsTorchSupported(!!capabilities.torch);
+          setIsTorchOn(false);
+          toast.success(lang === 'bn' 
+            ? (nextMode === 'user' ? 'সামনের ক্যামেরা চালু' : 'পেছনের ক্যামেরা চালু') 
+            : (nextMode === 'user' ? 'Front camera active' : 'Rear camera active'));
+          return;
+        }
+      } catch (flipErr) {
+        console.warn("Track-level camera flip fallback:", flipErr);
+      }
+    }
     await startCamera(nextMode);
   };
 
@@ -602,6 +648,12 @@ export default function LiveVideoCopilot({
         return;
       }
 
+      // Explicitly reset session transcript refs to guarantee clear session boundaries
+      transcriptsRef.current = [];
+      setTranscripts([]);
+      callDurationRef.current = 0;
+      setCallDuration(0);
+
       // Output AudioContext (24kHz for crystal-clear model speech playback)
       const outputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
         sampleRate: 24000,
@@ -633,7 +685,19 @@ export default function LiveVideoCopilot({
       isAiTurnInProgressRef.current = false;
       updateVisualizer();
 
-      const ai = getAi(true);
+      let ai: any = null;
+      try {
+        ai = await getLiveAiClient();
+      } catch (err: any) {
+        console.error("Live AI client connection failed:", err);
+        toast.error(lang === 'bn' 
+          ? "লাইভ ভিডিও সেশন সার্ভারের সাথে সংযুক্ত হতে পারেনি। অনুগ্রহ করে আবার চেষ্টা করুন।" 
+          : "Could not establish secure Live video session. Please try again.");
+        setIsConnecting(false);
+        isStartingSessionRef.current = false;
+        return;
+      }
+
       if (!ai) {
         throw new Error("Gemini AI instance unavailable");
       }
@@ -641,16 +705,22 @@ export default function LiveVideoCopilot({
       const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
       const systemInstruction = isExtendedThinking
-        ? `You are an elite Senior Plant Pathologist and Agronomic Scientist at BARI/BRRI in Bangladesh observing a LIVE MULTIMODAL VIDEO STREAM from a farmer's smartphone in ${locationContext}.
-MODE: GEMINI 3.8 LIVE EXTENDED THINKING (SUPER SPECIALIZED CLINICAL PATHOLOGY & DIFFERENTIAL DIAGNOSIS).
+        ? `You are KrishiVip Multimodal AI Assistant (কৃষিভিপ মাল্টিমোডাল এআই সহকারী), an intelligent real-time agricultural decision-support tool observing a LIVE MULTIMODAL VIDEO STREAM from a smartphone in ${locationContext}.
+MODE: GEMINI 3.8 LIVE EXTENDED THINKING (CLINICAL PATHOLOGY & DIFFERENTIAL DECISION-SUPPORT).
+
+ROLE & IDENTITY TRANSPARENCY:
+You are an AI agricultural assistant providing preliminary visual scouting and decision-support guidance. You are NOT an employee, representative, or official of BARI (Bangladesh Agricultural Research Institute) or BRRI (Bangladesh Rice Research Institute), and your suggestions are decision-support indications, not official government certifications. Always advise farmers to have critical plant symptoms verified by local Sub-Assistant Agriculture Officers (SAAO) or authorized agronomy specialists before applying regulated chemical pesticides.
 
 CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
 2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the farmer actually speaks first or asks a question.
 3. Start speaking ONLY after the user talks to you. When the farmer speaks, respond directly and concisely in natural spoken Bangla (বাংলা).
-4. NEVER say robotic meta-announcements like "আমি আপনার ভিডিও দেখছি", "ক্যামেরা ফুটেজ দেখছি", or announce that you are an AI. Act as an expert agronomist in the field.
-5. Switch to English ONLY if the user explicitly requests ("ইংরেজিতে বলুন" / "Speak in English").
-6. Understand Bangladeshi regional farming terms and accents (Chittagong, Sylhet, Rangpur, Barisal, Jessore) effortlessly.
+4. CLEAR, EVIDENCE-BASED GUIDANCE: Jump straight into the diagnostic assessment like an attentive agronomic advisor.
+5. IMMEDIATE VALUE MANDATE:
+   - If symptoms are visible or described, state the possible preliminary diagnosis and safe cultural/sanitary step immediately.
+   - If inquiry is broad, ask ONE targeted diagnostic question with 2 options.
+6. Switch to English ONLY if the user explicitly requests ("ইংরেজিতে বলুন" / "Speak in English").
+7. Understand Bangladeshi regional farming terms and accents (Chittagong, Sylhet, Rangpur, Barisal, Jessore) effortlessly.
 
 CAMERA & VISUAL COACHING DIRECTIVE:
 - Actively coach the farmer for optimal diagnostic video:
@@ -666,7 +736,7 @@ Before formulating your spoken response, quickly evaluate:
 4. Chemical Safety: NEVER suggest banned chemicals (Paraquat, Carbofuran, Monocrotophos). For approved remedies, state generic active ingredient + popular BD brand, exact water ratio, and safety precaution.
 
 SPOKEN DELIVERY CADENCE:
-- Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step.`
+- Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step. Do NOT narrate thoughts out loud.`
         : `You are a warm, highly knowledgeable Universal Plant, Gardening & Agriculture Companion (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh observing a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from a user's smartphone in ${locationContext}.
 MODE: GEMINI 3.8 LIVE (FAST, BROAD & VERSATILE GREEN COMPANION).
 
@@ -682,7 +752,7 @@ CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
 2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the user actually speaks first or asks a question.
 3. Start speaking ONLY after the user speaks. Respond directly, warmly, and concisely in natural spoken Bangla (বাংলা).
-4. NEVER say robotic meta-announcements like "আমি আপনার ভিডিও দেখছি" or announce looking at camera footage. Jump straight into answering the user's question.
+4. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic phrases like "আমি আপনার ভিডিও দেখছি", "উপায়গুলো দেখছি", "আমি এআই", or announce looking at camera footage. Jump straight into answering the user's question.
 5. Switch to English ONLY if the user explicitly says "Speak in English" or "ইংরেজিতে বলুন".
 
 LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
@@ -712,8 +782,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.HIGH,
-          includeThoughts: true
+          thinkingLevel: ThinkingLevel.LOW
         };
       }
 
@@ -770,6 +839,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
               // 3. INSTANT BARGE-IN & INTERRUPTION
               // If user speaks deliberately while AI is active -> immediately cut local audio playback!
               if (isAiActive && rms > 0.035) {
+                const interruptStart = performance.now();
                 sourceNodesRef.current.forEach(node => {
                   try { node.stop(); } catch (err) {}
                 });
@@ -778,8 +848,11 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
                   nextPlayTimeRef.current = outCtx.currentTime;
                 }
                 isAiTurnInProgressRef.current = false;
+                isAiTurnCancelledRef.current = true;
                 clearSubtitles();
                 setLiveState('listening');
+                const measuredLatency = Math.round(performance.now() - interruptStart);
+                setMeasuredInterruptionLatencyMs(measuredLatency);
               } else if (isAiPlaying && !isUserSpeaking) {
                 // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
                 return;
@@ -839,6 +912,14 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 
         onmessage: (message: LiveServerMessage) => {
           if (sessionIdRef.current !== currentSessionId) return;
+
+          // Discard subsequent chunks if the response was cancelled or stopped by user
+          if (isAiTurnCancelledRef.current) {
+            if (message.serverContent?.turnComplete || message.serverContent?.interrupted) {
+              isAiTurnCancelledRef.current = false;
+            }
+            return;
+          }
 
           // 1. Play all audio parts in this model turn
           const parts = message.serverContent?.modelTurn?.parts;
@@ -967,27 +1048,39 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 
   // Extraction of live session data into farmer profile & credit dossier (Summary Only - Never verbatim)
   const saveLiveSessionDossier = async (dialogueTurns: TranscriptTurn[], duration: number) => {
-    const effectiveUid = user?.uid || 'guest_farmer_demo';
-    const effectiveName = user?.displayName || '';
+    // Isolated temporary guest session to prevent attribution to shared identifiers
+    let guestSessionId = typeof window !== 'undefined' ? sessionStorage.getItem('agri_temp_guest_session_id') : null;
+    if (!guestSessionId) {
+      guestSessionId = `guest_session_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('agri_temp_guest_session_id', guestSessionId);
+      }
+    }
+    const isGuest = !user?.uid;
+    const effectiveUid = user?.uid || guestSessionId;
+    const effectiveName = user?.displayName || (isGuest ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest Farmer') : '');
 
-    // 1. If dialogue occurred, distill an executive summary via server-side AI proxy
+    // 1. If dialogue occurred, distill an executive summary via server-side AI proxy with explicit provenance
     if (dialogueTurns.length > 0) {
       const dialogueText = dialogueTurns
-        .map(t => `${t.role === 'user' ? 'কৃষক' : 'কৃষি বিশেষজ্ঞ'}: ${t.text}`)
+        .map(t => `${t.role === 'user' ? 'কৃষক' : 'কৃষি এআই'}: ${t.text}`)
         .join('\n');
 
-      const prompt = `You are a certified senior agronomist and agricultural data auditor in Bangladesh.
+      const prompt = `You are an AI agricultural assistant and data auditor in Bangladesh.
 A live video and voice consultation session just took place between a farmer and an AI agronomist.
-Session Duration: ${Math.round(duration)} seconds.
+Session Duration: ${Math.max(1, Math.round(duration))} seconds.
 Location context: ${locationContext}.
 Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
 
 CONVERSATION CONTEXT:
 ${dialogueText}
 
-CRITICAL PRIVACY & SUMMARY REQUIREMENT:
+CRITICAL PRIVACY & PROVENANCE REQUIREMENT:
 - DO NOT save or output verbatim dialogue or quotes. 
 - Distill ONLY a clean, professional, synthesized 2-3 sentence agricultural summary and key factual bullet points.
+- Identify the origin of facts:
+  * Farmer-stated symptoms -> [Self-reported]
+  * AI visual suggestions -> [AI-generated, unverified]
 - If a crop or disease was not mentioned, leave crop null.
 
 Return a JSON object with this exact structure:
@@ -995,8 +1088,8 @@ Return a JSON object with this exact structure:
   "crop": "Detected crop (e.g., টমেটো, মরিচ, ধান, বেগুন, আলু) or null",
   "diseaseOrIssue": "Identified disease, pest, or problem or null",
   "sessionTitle": "Concise, descriptive title for this session (in ${lang === 'bn' ? 'Bangla' : 'English'})",
-  "comprehensiveSummary": "A clear, professional synthesized 2-3 sentence summary of the crop condition and advice given. DO NOT include verbatim dialogue or farmer quotes.",
-  "keyFacts": ["Array of 3-5 concise factual bullet points (e.g., 'ফসল: মরিচ', 'লক্ষণ: পাতা কুঁকড়ে যাওয়া', 'পরামর্শ: নিম তেল স্প্রে') in ${lang === 'bn' ? 'Bangla' : 'English'}"],
+  "comprehensiveSummary": "A clear, professional synthesized 2-3 sentence summary labeled as preliminary AI guidance. DO NOT include verbatim dialogue.",
+  "keyFacts": ["Array of 3-5 concise factual bullet points labeled with origin [Self-reported] or [AI-generated, unverified]"],
   "insightForCreditProfile": "Credit & farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}"
 }`;
 
@@ -1018,17 +1111,17 @@ Return a JSON object with this exact structure:
           const parsed = JSON.parse(proxyData.text || '{}');
           const title = parsed.sessionTitle || (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video & Voice Consultation Session');
           const summary = parsed.comprehensiveSummary || (lang === 'bn' 
-            ? 'সরাসরি ভিডিও ক্যামেরায় ফসলের স্বাস্থ্য পর্যবেক্ষণ করা হয়েছে এবং বালাই ব্যবস্থাপনার পরামর্শ প্রদান করা হয়েছে।'
-            : 'Visual crop health inspection completed with IPM management advisory provided.');
+            ? 'সরাসরি ভিডিও ক্যামেরায় ফসলের স্বাস্থ্য পর্যবেক্ষণ করা হয়েছে এবং বালাই ব্যবস্থাপনার প্রাথমিক পরামর্শ প্রদান করা হয়েছে (এআই অনুমান, অপ্রমাণিত)।'
+            : 'Visual crop health inspection completed with IPM management advisory provided (AI-generated, unverified).');
           const keyFacts: string[] = Array.isArray(parsed.keyFacts) && parsed.keyFacts.length > 0 
             ? parsed.keyFacts 
             : [
-                `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
-                `পদ্ধতি: লাইভ ক্যামেরা ভিজ্যুয়াল মূল্যায়ন`,
-                ...(parsed.crop ? [`ফসল: ${parsed.crop}`] : [])
+                `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড [সিস্টেম রেকর্ড]`,
+                `পদ্ধতি: লাইভ ক্যামেরা ভিজ্যুয়াল মূল্যায়ন [AI-generated, unverified]`,
+                ...(parsed.crop ? [`ফসল: ${parsed.crop} [AI visual identification]`] : [])
               ];
           const crop = parsed.crop || undefined;
-          const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় বিশেষজ্ঞ পরামর্শ নিয়েছেন' : 'Conducted live visual consultation');
+          const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় ডিজিটাল পরামর্শ গ্রহণ' : 'Conducted live visual consultation');
 
           await recordFarmerInteractionEvent({
             userId: effectiveUid,
@@ -1038,7 +1131,10 @@ Return a JSON object with this exact structure:
             summary,
             keyFacts,
             crop,
-            insight
+            insight,
+            origin: isGuest ? 'demo_excluded' : 'ai_unverified',
+            evidenceStatus: isGuest ? 'Demo, excluded from assessment' : 'AI-generated, unverified',
+            isDemoOrGuest: isGuest
           });
 
           setLastSavedSession({
@@ -1049,9 +1145,15 @@ Return a JSON object with this exact structure:
             duration: Math.max(1, Math.round(duration))
           });
 
-          toast.success(lang === 'bn' 
-            ? 'পরামর্শের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
-            : 'Consultation summary saved to your Krishi Dossier!');
+          toast.success(
+            isGuest 
+              ? (lang === 'bn' 
+                  ? 'পরামর্শের সারসংক্ষেপ প্রস্তুত (অতিথি সেশন - ডাটাবেজ থেকে সুরক্ষিত)!' 
+                  : 'Consultation summary prepared (Guest session - isolated from database)!')
+              : (lang === 'bn' 
+                  ? 'পরামর্শের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে (AI-generated, unverified)!' 
+                  : 'Consultation summary logged to your Krishi Dossier (AI-generated, unverified)!')
+          );
           return;
         }
       } catch (aiErr) {
@@ -1062,16 +1164,16 @@ Return a JSON object with this exact structure:
     // 2. Factual fallback summary (NO verbatim transcripts saved)
     const summaryText = dialogueTurns.length > 0
       ? (lang === 'bn' 
-          ? `কৃষক এবং এআই কৃষিবিদের মধ্যে ${Math.max(1, Math.round(duration))} সেকেন্ডের লাইভ ভিডিও পরামর্শ সম্পন্ন হয়েছে। সরাসরি ক্যামেরায় ফসলের দৃশ্যমান লক্ষণ পর্যবেক্ষণ করে আইপিএম ও সার ব্যবস্থাপনার প্রয়োজনীয় নির্দেশনা প্রদান করা হয়েছে।`
-          : `Live video and voice agronomic consultation completed (${Math.max(1, Math.round(duration))}s). Real-time visual crop assessment was conducted and tailored IPM guidance was provided.`)
+          ? `কৃষক এবং এআই কৃষি সহকারীর মধ্যে ${Math.max(1, Math.round(duration))} সেকেন্ডের লাইভ ভিডিও পর্যবেক্ষণ সম্পন্ন হয়েছে। সরাসরি ক্যামেরায় দৃশ্যমান লক্ষণ আলোচনা করা হয়েছে (AI-generated, unverified)।`
+          : `Live video agronomic scouting completed (${Math.max(1, Math.round(duration))}s). Real-time visual crop symptoms discussed (AI-generated, unverified).`)
       : (lang === 'bn' 
           ? `কৃষক ${Math.max(1, Math.round(duration))} সেকেন্ডের জন্য লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন। কোনো নির্দিষ্ট রোগের বিবরণ রেকর্ড করা হয়নি।` 
           : `Farmer conducted a ${Math.max(1, Math.round(duration))}s visual crop inspection.`);
 
     const title = lang === 'bn' ? 'লাইভ ক্যামেরা পরিদর্শন সেশন' : 'Live Camera Field Inspection';
     const keyFacts = [
-      `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড`,
-      `পদ্ধতি: লাইভ ক্যামেরা ভিজ্যুয়াল চেক`
+      `কলের ব্যাপ্তি: ${Math.max(1, Math.round(duration))} সেকেন্ড [সিস্টেম রেকর্ড]`,
+      `উৎস: লাইভ ক্যামেরা ভিজ্যুয়াল চেক [AI-generated, unverified]`
     ];
 
     await recordFarmerInteractionEvent({
@@ -1081,7 +1183,10 @@ Return a JSON object with this exact structure:
       title,
       summary: summaryText,
       keyFacts,
-      insight: lang === 'bn' ? 'নিয়মিত লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন' : 'Conducted live camera inspection'
+      insight: lang === 'bn' ? 'লাইভ ক্যামেরা পরিদর্শন সম্পন্ন করেছেন' : 'Conducted live camera inspection',
+      origin: isGuest ? 'demo_excluded' : 'ai_unverified',
+      evidenceStatus: isGuest ? 'Demo, excluded from assessment' : 'AI-generated, unverified',
+      isDemoOrGuest: isGuest
     });
 
     setLastSavedSession({
@@ -1091,9 +1196,15 @@ Return a JSON object with this exact structure:
       duration: Math.max(1, Math.round(duration))
     });
 
-    toast.success(lang === 'bn' 
-      ? 'পরামর্শের সারসংক্ষেপ আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' 
-      : 'Consultation summary logged to your Krishi Dossier!');
+    toast.success(
+      isGuest
+        ? (lang === 'bn' 
+            ? 'পরিদর্শনের সারসংক্ষেপ সংরক্ষিত (অতিথি সেশন - ডাটাবেজ বহির্ভূত)' 
+            : 'Inspection summary stored (Guest session - isolated)')
+        : (lang === 'bn' 
+            ? 'পরিদর্শন খতিয়ান স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে (AI-generated, unverified)' 
+            : 'Inspection summary logged to your Krishi Dossier (AI-generated, unverified)')
+    );
   };
 
   // Stop all media & connections
@@ -1156,25 +1267,30 @@ Return a JSON object with this exact structure:
       mediaStreamRef.current = null;
     }
 
-    // Capture duration and transcripts for persistent dossier compounding (Strictly >= 90 seconds requirement)
+    // Capture duration and transcripts for persistent dossier compounding (Meaningful evidence gate, NOT arbitrary 90s)
     const currentTranscripts = [...transcriptsRef.current];
     const currentDuration = callDurationRef.current || callDuration;
 
-    if (currentDuration >= 90) {
+    // A session is eligible for summary only if meaningful dialogue / crop symptoms were exchanged
+    const hasMeaningfulDialogue = currentTranscripts.some(t => t.text && t.text.trim().length > 3);
+
+    if (hasMeaningfulDialogue) {
       setIsSavingSummary(true);
       saveLiveSessionDossier(currentTranscripts, currentDuration)
         .finally(() => setIsSavingSummary(false));
     } else {
-      if (currentDuration >= 5) {
+      if (currentDuration >= 2) {
         toast(
           lang === 'bn' 
-            ? `সেশনটি ${Math.round(currentDuration)} সেকেন্ড স্থায়ী ছিল। স্মার্ট কৃষক কার্ডে সংরক্ষণের জন্য ন্যূনতম ৯০ সেকেন্ড দীর্ঘ সেশন প্রয়োজন।` 
-            : `Session was ${Math.round(currentDuration)}s. Minimum 90s required to save to Smart Krishi Card.`,
+            ? 'কোনো ফসলের লক্ষণ বা বার্তা বিনিময় হয়নি বলে কৃষক খতিয়ানে কোনো অনুমান সংরক্ষণ করা হয়নি।' 
+            : 'No crop inquiry or dialogue was exchanged; no speculative entry was logged.',
           { icon: 'ℹ️' }
         );
       }
     }
 
+    // Explicitly reset session and transcript state to prevent bleed across sessions
+    transcriptsRef.current = [];
     setIsSessionActive(false);
     setIsConnecting(false);
     setIsCameraActive(false);
@@ -1187,8 +1303,8 @@ Return a JSON object with this exact structure:
     clearSubtitles();
   };
 
-  // Handle tap-to-focus
-  const handleTapVideo = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+  // Handle tap-to-focus: applies hardware autofocus constraints where supported
+  const handleTapVideo = async (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     let clientX = 0;
     let clientY = 0;
@@ -1207,6 +1323,28 @@ Return a JSON object with this exact structure:
     const y = clientY - rect.top;
     setFocusPoint({ x, y });
     playTone(900, 0.05, 0.03);
+
+    // Apply supported camera hardware focus controls
+    const videoTrack = mediaStreamRef.current?.getVideoTracks()[0];
+    if (videoTrack) {
+      try {
+        const capabilities: any = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        if (capabilities.focusMode && Array.isArray(capabilities.focusMode)) {
+          const mode = capabilities.focusMode.includes('continuous') 
+            ? 'continuous' 
+            : capabilities.focusMode.includes('single-shot') 
+            ? 'single-shot' 
+            : null;
+          if (mode) {
+            await (videoTrack as any).applyConstraints({
+              advanced: [{ focusMode: mode }]
+            });
+          }
+        }
+      } catch (focusErr) {
+        console.debug("Optical autofocus constraint notice:", focusErr);
+      }
+    }
 
     setTimeout(() => {
       setFocusPoint(null);
@@ -1277,33 +1415,33 @@ Return a JSON object with this exact structure:
       crop: lastSavedSession?.crop || (lang === 'bn' ? 'শনাক্তকৃত ফসল / উদ্ভিদ' : 'Observed Crop / Plant'),
       cropStage: lang === 'bn' ? 'মাঠ পর্যায় (লাইভ স্ক্যান)' : 'Field Stage (Live Multimodal Scan)',
       location: locationContext || 'Bangladesh',
-      diseaseName: lastSavedSession?.title || (lang === 'bn' ? 'লাইভ ভিডিও রোগ নির্ণয়' : 'Live Stream Diagnosis'),
-      pathogen: 'AI Multimodal Vision Certified',
-      severity: isExtendedThinking ? (lang === 'bn' ? 'মাঝারি থেকে উচ্চ' : 'Moderate to High') : (lang === 'bn' ? 'মাঝারি' : 'Medium'),
-      confidence: 96.5,
+      diseaseName: lastSavedSession?.title || (lang === 'bn' ? 'সম্ভাব্য রোগের লক্ষণ (প্রাথমিক পর্যবেক্ষণ)' : 'Preliminary Visual Symptom Observation'),
+      pathogen: lang === 'bn' ? 'অনির্ধারিত (সরেজমিন পর্যবেক্ষণ আবশ্যক)' : 'Unconfirmed (Field Agronomic Inspection Required)',
+      severity: lang === 'bn' ? 'যাচাই করা হয়নি (Not Assessed)' : 'Not Assessed',
+      confidence: null,
+      chemicalGated: true,
       symptoms: lastSavedSession?.keyFacts && lastSavedSession.keyFacts.length > 0 
         ? lastSavedSession.keyFacts 
         : [
-            lang === 'bn' ? 'পাতায় অস্বাভাবিক দাগ ও ক্লোরোসিস পরিলক্ষিত' : 'Leaf spotting and chlorosis detected',
-            lang === 'bn' ? 'ক্যামেরা স্ক্যানে কলাবিনষ্টের লক্ষণ স্পষ্ট' : 'Tissue necrosis patterns identified on live video'
+            lang === 'bn' ? 'লাইভ ভিডিওতে পাতার রঙ ও কলার প্রাথমিক অস্বাভাবিকতা পরিলক্ষিত' : 'Preliminary foliar discoloration noticed on live video'
           ],
+      investigationSteps: [
+        lang === 'bn' ? 'আক্রান্ত পাতার তাজা নমুনা সংগ্রহ করে নিকটস্থ উপজেলা কৃষি অফিসে (DAE/SAAO) প্রদর্শন করুন।' : 'Collect fresh leaf sample for physical inspection by Upazila Agriculture Officer (DAE/SAAO).',
+        lang === 'bn' ? 'পাতার নিচের পিঠ ও কাণ্ডে ম্যাগনিফায়িং গ্লাস বা হ্যান্ড লেন্স দিয়ে জীবাণু বা ডিম্ব গুচ্ছ পরীক্ষা করুন।' : 'Examine foliar undersides with a hand lens for mycelia, spores, or insect egg clusters.',
+        lang === 'bn' ? 'জমি বা টবের ড্রেনেজ ব্যবস্থা ও মাটির আর্দ্রতা পরীক্ষা করে শিকড়ের স্বাস্থ্য পর্যবেক্ষণ করুন।' : 'Check furrow drainage, soil compaction, and root health.'
+      ],
       culturalSteps: [
-        lang === 'bn' ? 'আক্রান্ত পাতা সাবধানে কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ নিশ্চিত করুন।' : 'Prune severely infected leaves and ensure adequate container drainage.',
-        lang === 'bn' ? 'ইউরিয়া সারের প্রয়োগ সাময়িক স্থগিত রাখুন।' : 'Temporarily suspend high-nitrogen urea fertilizer.'
+        lang === 'bn' ? 'আক্রান্ত পাতা সাবধানে কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ নিশ্চিত করুন।' : 'Prune severely infected leaves safely and ensure adequate container drainage.',
+        lang === 'bn' ? 'ইউরিয়া সারের অতিরিক্ত প্রয়োগ সাময়িক স্থগিত রাখুন।' : 'Temporarily suspend high-nitrogen urea fertilizer.'
       ],
       organicSteps: [
-        lang === 'bn' ? 'নিম তেলের নির্যাস (৫ মিলি/লিটার) ও ট্রাইকোডার্মা বায়ো-ফার্টিলাইজার স্প্রে করুন।' : 'Spray organic Neem oil (5ml/L) and apply Trichoderma bio-agent.'
+        lang === 'bn' ? 'প্রাথমিক জৈব সুরক্ষা হিসেবে নিম তেলের নির্যাস (৫ মিলি/লিটার সাবান পানিসহ) ব্যবহার করতে পারেন।' : 'Apply botanical Neem oil spray (5ml/L with mild soapy water) as safe organic protection.'
       ],
       chemicalSteps: [
-        lang === 'bn' ? 'কপার অক্সিক্লোরাইড ৫০ ডব্লিউপি (২ গ্রাম/লিটার পানিতে মিশিয়ে বিকেলে স্প্রে করুন)।' : 'Apply Copper Oxychloride 50 WP (2g/L water) in late afternoon.'
+        lang === 'bn' ? '🔒 রাসায়নিক চিকিৎসা স্থগিত: মাঠ পর্যায়ের অনুমোদিত কৃষি কর্মকর্তা বা উদ্ভিদ রোগতত্ত্ববিদের সরেজমিন যাচাই ও প্রেসক্রিপশন ব্যতিরেকে কোনো রাসায়নিক কীটনাশক প্রয়োগ করবেন না।' : '🔒 Chemical Rx Withheld: Direct field verification by an authorised agricultural extension officer or plant pathologist is required before chemical application.'
       ],
-      harvestIntervalDays: 10,
-      weatherSnapshot: {
-        temp: '28.4°C',
-        humidity: '82%',
-        rainRisk: 'Moderate',
-        advisory: lang === 'bn' ? 'বৃষ্টিহীন সময়ে স্প্রে করুন।' : 'Apply during dry non-rainy window.'
-      }
+      harvestIntervalDays: undefined,
+      weatherSnapshot: undefined
     });
     setIsRxModalOpen(true);
   };
@@ -1416,6 +1554,9 @@ Return a JSON object with this exact structure:
               className="absolute w-12 h-12 border-2 border-emerald-400 rounded-xl pointer-events-none z-30 shadow-[0_0_12px_rgba(52,211,153,0.8)]"
             >
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full absolute inset-0 m-auto" />
+              <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold text-emerald-300 bg-black/80 px-1.5 py-0.5 rounded backdrop-blur-xs pointer-events-none">
+                {lang === 'bn' ? 'ফোকাস এরিয়া' : 'Target area'}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1796,6 +1937,7 @@ Return a JSON object with this exact structure:
                       onClick={(e) => {
                         e.stopPropagation();
                         isAiTurnInProgressRef.current = false;
+                        isAiTurnCancelledRef.current = true; // Signals onmessage to discard any trailing incoming chunks
                         sourceNodesRef.current.forEach(node => {
                           try { node.stop(); } catch (err) {}
                         });
@@ -1805,10 +1947,23 @@ Return a JSON object with this exact structure:
                         }
                         clearSubtitles();
                         setLiveState('listening');
-                        toast(lang === 'bn' ? 'এআই থামানো হয়েছে' : 'AI speech stopped', { duration: 1200, icon: '✋' });
+
+                        // Send client turn cancellation / interrupt message to halt server generation
+                        const currentSession = sessionRef.current;
+                        if (currentSession && typeof currentSession.sendRealtimeInput === 'function') {
+                          try {
+                            currentSession.sendRealtimeInput({
+                              clientContent: { turns: [], turnComplete: true }
+                            });
+                          } catch (cancelErr) {
+                            console.debug("Session cancellation signal handled:", cancelErr);
+                          }
+                        }
+
+                        toast(lang === 'bn' ? 'এআই উত্তর বাতিল করা হয়েছে' : 'AI speech response cancelled', { duration: 1200, icon: '✋' });
                       }}
                       className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse"
-                      title={lang === 'bn' ? 'এআই থামান' : 'Stop AI'}
+                      title={lang === 'bn' ? 'এআই উত্তর বাতিল করুন' : 'Cancel AI Response'}
                     >
                       <Square className="w-3 h-3 fill-current" />
                       <span>{lang === 'bn' ? 'থামুন' : 'Stop'}</span>

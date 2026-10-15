@@ -40,8 +40,29 @@ export interface CommodityItem {
   volumeTonnes: number;
   seasonContextBn: string;
   seasonContextEn: string;
-  officialDamVerified: boolean;
+  officialDamVerified?: boolean;
+  verificationEvidence?: PriceVerificationEvidence;
 }
+
+export interface PriceVerificationEvidence {
+  status: 'verified_bulletin' | 'web_search_estimate';
+  bulletinSource: string;
+  sourceUrl?: string;
+  market: string;
+  date: string;
+  unit: string;
+  verificationMethod: 'official_government_bulletin' | 'automated_search_grounding';
+}
+
+const createDamEvidence = (market: string, unit: string = 'kg'): PriceVerificationEvidence => ({
+  status: 'verified_bulletin',
+  bulletinSource: 'Department of Agricultural Marketing (DAM - dam.gov.bd)',
+  sourceUrl: 'https://dam.gov.bd',
+  market,
+  date: '2026-09-30',
+  unit,
+  verificationMethod: 'official_government_bulletin'
+});
 
 /**
  * Grounded in official Department of Agricultural Marketing (DAM - dam.gov.bd)
@@ -67,7 +88,8 @@ export const MANDI_COMMODITIES: CommodityItem[] = [
     volumeTonnes: 165,
     seasonContextBn: 'কক্সবাজার চকরিয়া ও চট্টগ্রামের আড়তে গ্রীষ্মকালীন টমেটোর পাশাপাশি আগাম চালান আসায় পাইকারি দর কমে ৮৫-৯৫ টাকায় নেমেছে।',
     seasonContextEn: 'Early harvest inflows at Chittagong & Cox\'s Bazar mandis have eased wholesale rates to ৳85-95/kg (retail ৳110-120).',
-    officialDamVerified: true
+    officialDamVerified: true,
+    verificationEvidence: createDamEvidence("Chittagong & Cox's Bazar Mandi", "kg")
   },
   {
     id: 'pabna_chili',
@@ -310,6 +332,14 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
         setCommodities(prev => prev.map(comm => {
           const update = result.items.find(u => u.id === comm.id);
           if (!update) return comm;
+          const webEvidence: PriceVerificationEvidence = {
+            status: 'web_search_estimate',
+            bulletinSource: `Google Search Grounding (${result.source || 'Online Mandi Bulletin'})`,
+            market: comm.marketEn,
+            date: new Date().toISOString().split('T')[0],
+            unit: comm.unitEn,
+            verificationMethod: 'automated_search_grounding'
+          };
           return {
             ...comm,
             wholesalePrice: update.wholesalePrice || comm.wholesalePrice,
@@ -318,13 +348,14 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
             trend: (update.trend as any) || comm.trend,
             low24h: update.low24h || comm.low24h,
             high24h: update.high24h || comm.high24h,
-            seasonContextBn: update.notes ? `${update.notes} (লাইভ গুগল সার্চ গ্রাউন্ডেড)` : comm.seasonContextBn,
-            officialDamVerified: true
+            seasonContextBn: update.notes ? `${update.notes} (লাইভ ওয়েব সার্চ - অনির্ধারিত)` : comm.seasonContextBn,
+            officialDamVerified: false,
+            verificationEvidence: webEvidence
           };
         }));
         setLastSyncText(lang === 'bn' 
-          ? `আজকের লাইভ ওয়েব সার্চ • ${result.source}` 
-          : `Live Web Searched • ${result.source}`);
+          ? `আজকের লাইভ ওয়েব সার্চ • ${result.source} (অনুমান)` 
+          : `Live Web Search • ${result.source} (Estimate)`);
       } else {
         setLastSyncText(lang === 'bn' 
           ? 'যাচাইকৃত: ৩০ সেপ্টেম্বর ২০২৬ • DAM dam.gov.bd' 
@@ -560,31 +591,57 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               </p>
             </div>
 
-            {/* Official Source & Verification Seal */}
-            <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-[11px] text-stone-300 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="font-bold text-emerald-300">
-                    {lang === 'bn' ? 'কৃষি বিপণন অধিদপ্তর (DAM) দৈনিক বাজার বুলেটিন' : 'Dept of Agricultural Marketing (DAM) Daily Bulletin'}
+            {/* Evidence-Based Source & Verification Details */}
+            {selectedCommodity.verificationEvidence?.status === 'web_search_estimate' ? (
+              <div className="p-3 rounded-xl bg-sky-950/40 border border-sky-500/30 text-[11px] text-stone-300 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="w-4 h-4 text-sky-400 shrink-0" />
+                    <span className="font-bold text-sky-300">
+                      {selectedCommodity.verificationEvidence.bulletinSource}
+                    </span>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
+                    {lang === 'bn' ? 'ওয়েব সার্চ অনুমান' : 'Automated Estimate'}
                   </span>
                 </div>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                  {lang === 'bn' ? 'যাচাইকৃত' : 'Grounded'}
-                </span>
+                <div className="text-[10px] text-stone-400 font-mono flex items-center justify-between">
+                  <span>
+                    {selectedCommodity.verificationEvidence.date} • {selectedCommodity.verificationEvidence.market} ({selectedCommodity.verificationEvidence.unit})
+                  </span>
+                  <span className="text-amber-400 text-[9px] font-bold">
+                    {lang === 'bn' ? 'অপ্রমাণিত • সরকারি নয়' : 'Unaudited Estimate'}
+                  </span>
+                </div>
               </div>
-              <div className="text-[10px] text-stone-400 font-mono flex items-center justify-between">
-                <span>{lastSyncText}</span>
-                <a 
-                  href="https://dam.gov.bd" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-emerald-400 hover:underline flex items-center gap-0.5"
-                >
-                  dam.gov.bd <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+            ) : (
+              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-[11px] text-stone-300 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-bold text-emerald-300">
+                      {lang === 'bn' ? 'কৃষি বিপণন অধিদপ্তর (DAM) দৈনিক বাজার বুলেটিন' : 'Dept of Agricultural Marketing (DAM) Daily Bulletin'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                    {lang === 'bn' ? 'সরকারি বুলেটিন' : 'Official Bulletin'}
+                  </span>
+                </div>
+                <div className="text-[10px] text-stone-400 font-mono flex items-center justify-between">
+                  <span>
+                    {selectedCommodity.verificationEvidence?.date || '2026-09-30'} • {selectedCommodity.verificationEvidence?.market || selectedCommodity.marketEn}
+                  </span>
+                  <a 
+                    href="https://dam.gov.bd" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-emerald-400 hover:underline flex items-center gap-0.5"
+                  >
+                    dam.gov.bd <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Interactive Actions */}
             <div className="flex items-center gap-2 pt-1">

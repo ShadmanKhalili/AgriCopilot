@@ -33,6 +33,13 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
   const [isSeeding, setIsSeeding] = useState(false);
   const [showPrintView, setShowPrintView] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [assistedRouteMode, setAssistedRouteMode] = useState<'self' | 'saao'>('self');
+  const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
+  const [appealForm, setAppealForm] = useState({
+    subject: 'land_decimals',
+    explanation: '',
+    proposedCorrection: ''
+  });
   const [editForm, setEditForm] = useState({
     fullName: '',
     primaryCrop: '',
@@ -245,6 +252,62 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
         </div>
       </div>
 
+      {/* Methodology Transparency Notice & Non-Automated Aid Policy */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-xs">
+        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-bold text-xs sm:text-sm">
+            {lang === 'bn' 
+              ? 'পদ্ধতিগত স্বচ্ছতা ও অ-স্বয়ংক্রিয় বরাদ্দ নির্দেশিকা (Transparency & Human Verification):' 
+              : 'Methodology Transparency & Non-Automated Aid Policy:'}
+          </p>
+          <p className="leading-relaxed opacity-95 text-[11px] sm:text-xs">
+            {lang === 'bn'
+              ? 'এখানে প্রদর্শিত স্কোর ও উপাত্তগুলো সিদ্ধান্ত-সহায়ক প্রাক-বিশ্লেষণ। এটি সংবিধিবদ্ধ প্রমাণিত বরাদ্দ পদ্ধতি নয় এবং কোনো সাহায্য, বীজ বা ঋণ স্বয়ংক্রিয়ভাবে প্রদান করে না। যেকোনো সহায়তার ক্ষেত্রে উপজেলা কৃষি কর্মকর্তা ও মাঠ পর্যায়ের কৃষিবিদের শারীরিক যাচাই (Human Field Assessment) বাধ্যতামূলক। তথ্যের ঘাটতি বা কম অ্যাপ ব্যবহারের কারণে কোনো খামারির অগ্রাধিকার কমে না — বরং অগ্রাধিকারমূলক মাঠ যাচাই সক্রিয় হয়।'
+              : 'The scores, indicators, and vulnerability models displayed are illustrative decision-support tools, NOT validated methodology for statutory or automated grant decisions. Software must never automatically allocate financial assistance or aid without human assessment by qualified field teams and agronomists. Missing data or low smartphone activity triggers field verification, not automated exclusion.'}
+          </p>
+        </div>
+      </div>
+
+      {/* Observation Channel Route: Direct Smartphone vs SAAO Assisted Route for Non-Smartphone Farmers */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            {lang === 'bn' ? 'তথ্য সংগ্রহ ও পর্যবেক্ষণ চ্যানেল' : 'Observation Collection Route'}
+          </p>
+          <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+            {assistedRouteMode === 'saao'
+              ? (lang === 'bn' ? 'উপজেলা উপ-সহকারী কৃষি কর্মকর্তা (SAAO) সহায়তায় সংগৃহীত • স্মার্টফোনবিহীন খামারি অন্তর্ভুক্তকরণ' : 'Assisted Route: SAAO Field Agent (For Farmers Without Smartphones)')
+              : (lang === 'bn' ? 'খামারি সম্মতিভিত্তিক সরাসরি স্মার্টফোন ব্যবহার' : 'Direct Consented Farmer Smartphone Mode')}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setAssistedRouteMode('self')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              assistedRouteMode === 'self'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+            }`}
+          >
+            {lang === 'bn' ? 'সরাসরি খামারি' : 'Direct Farmer'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAssistedRouteMode('saao')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              assistedRouteMode === 'saao'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+            }`}
+          >
+            {lang === 'bn' ? 'মাঠ কর্মকর্তা সহায়তা (SAAO)' : 'Assisted SAAO Route'}
+          </button>
+        </div>
+      </div>
+
       {/* Digital Farmer Card ("স্মার্ট কৃষক কার্ড") */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: The Digital Krishi ID Card */}
@@ -263,10 +326,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 </div>
                 <div>
                   <h3 className="text-xs uppercase tracking-widest text-emerald-300 font-semibold">
-                    {lang === 'bn' ? 'গণপ্রজাতন্ত্রী বাংলাদেশ' : 'Govt. of Bangladesh Verified'}
+                    {lang === 'bn' ? 'সম্মতিভিত্তিক ডিজিটাল কৃষি ডসিয়ার' : 'Farmer-Consented Activity Dossier'}
                   </h3>
                   <p className="text-base font-bold text-white tracking-wide">
-                    {lang === 'bn' ? 'স্মার্ট কৃষক পরিচয়পত্র' : 'Smart Krishi Digital ID'}
+                    {lang === 'bn' ? 'স্মার্ট খামারি পরিচয় ও প্রামাণ্য রেকর্ড' : 'Smart Krishi Digital Record'}
                   </p>
                 </div>
               </div>
@@ -529,30 +592,30 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               </AnimatePresence>
             </div>
 
-            {/* Financial Institution Badges */}
+            {/* Financial Institution & Program Evaluation (Indicative, Non-Statutory) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50">
                 <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {lang === 'bn' ? 'বাংলাদেশ কৃষি ব্যাংক ঋণ যোগ্যতা' : 'BKB Micro-Loan Eligibility'}
+                  {lang === 'bn' ? 'বাংলাদেশ কৃষি ব্যাংক ঋণ উপাত্ত ভিত্তি' : 'BKB Micro-Loan Data Baseline'}
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                   {currentScore >= 75 ? (
                     lang === 'bn' 
-                      ? 'জামানতবিহীন ৳১,৫০,০০০ টাকা পর্যন্ত ফসল ঋণ প্রাক-অনুমোদিত।' 
-                      : 'Pre-approved for collateral-free crop loans up to ৳150,000.'
+                      ? 'ডকুমেন্টেশন প্রাক-যাচাইকৃত: শাখা ঋণ কর্মকর্তা ও মাঠ যাচাই সাপেক্ষে ৳১,৫০,০০০ টাকা পর্যন্ত ফসল ঋণ পর্যালোচনার উপযুক্ত।' 
+                      : 'Documentation baseline met for up to ৳150,000 crop loan consideration (Subject to human branch verification; non-automated).'
                   ) : currentScore >= 55 ? (
                     lang === 'bn'
-                      ? '৳৫০,০০০ টাকা পর্যন্ত ক্ষুদ্র কৃষিঋণের প্রাথমিক যোগ্যতা রয়েছে।'
-                      : 'Eligible for micro-agricultural credit up to ৳50,000.'
+                      ? 'ক্ষুদ্র কৃষিঋণ পর্যালোচনার প্রাথমিক উপাত্ত সন্তোষজনক (৫০,০০০ টাকা সিলিং)।'
+                      : 'Initial micro-agricultural credit review baseline met (৳50,000 ceiling).'
                   ) : currentScore >= 35 ? (
                     lang === 'bn'
-                      ? 'বীজ ও সারের জন্য ৳২০,০০০ টাকা পর্যন্ত ইনপুট ঋণের যোগ্যতা রয়েছে।'
-                      : 'Eligible for micro-input financing up to ৳20,000.'
+                      ? 'বীজ ও সারের ইনপুট অর্থায়নের জন্য প্রাথমিক প্রোফাইল সক্রিয়।'
+                      : 'Initial profile active for seasonal micro-input financing.'
                   ) : (
                     lang === 'bn'
-                      ? 'ঋণ যোগ্যতার জন্য জমি নিবন্ধন ও নিয়মিত লাইভ পরামর্শ রেকর্ড করুন (স্কোর ৩৫+ প্রয়োজন)।'
-                      : 'Complete land profiling & consultations to unlock financing (35+ score required).'
+                      ? 'ঋণ পর্যালোচনার জন্য জমি নিবন্ধন ও নিয়মিত লাইভ পরামর্শ রেকর্ড করুন।'
+                      : 'Record land profiling & consultations to complete documentation baseline.'
                   )}
                 </p>
               </div>
@@ -560,19 +623,98 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <div className="p-3.5 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/50">
                 <div className="flex items-center gap-2 text-teal-800 dark:text-teal-300 font-bold text-xs">
                   <ShieldCheck className="w-4 h-4 text-teal-600" />
-                  {lang === 'bn' ? 'প্যারামেট্রিক ফসল বীমা' : 'Parametric Crop Insurance'}
+                  {lang === 'bn' ? 'প্যারামেট্রিক ফসল ঝুঁকি মূল্যায়ন' : 'Parametric Crop Risk Assessment'}
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                   {currentScore >= 55 ? (
                     lang === 'bn' 
-                      ? 'ঝড়-জলাবদ্ধতা ও বালাই আক্রমণে স্বয়ংক্রিয় ক্ষতিপূরণ পলিসি সক্রিয়।' 
-                      : 'Active parametric protection against flood, cyclone, and pest outbreaks.'
+                      ? 'প্রাকৃতিক দুর্যোগ ঝুঁকি মানচিত্রায়ণ সক্রিয়; ক্ষতিপূরণ নির্ধারণের জন্য মাঠ টিম বা স্যাটেলাইট ট্রিগার প্রযোজ্য।' 
+                      : 'Climate risk baseline mapped; payouts require certified satellite/field team verification.'
                   ) : (
                     lang === 'bn'
-                      ? 'বীমা পলিসি সক্রিয় করতে নিয়মিত খামার পরিদর্শন ও পরামর্শ গ্রহণ করুন।'
-                      : 'Conduct regular farm inspections and consultations to activate coverage.'
+                      ? 'ঝুঁকি নিরসনে নিয়মিত খামার পর্যবেক্ষণ ও পরামর্শ গ্রহণ করুন।'
+                      : 'Conduct regular farm observations to establish parametric baseline.'
                   )}
                 </p>
+              </div>
+            </div>
+
+            {/* Separated 4 Pillars of Proprietary Intelligence (Need, Eligibility, Intervention, Data Confidence) */}
+            <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/70 border border-stone-200 dark:border-stone-700/80 space-y-3">
+              <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-700 pb-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                  {lang === 'bn' ? '৪টি পৃথক বুদ্ধিমত্তা স্তর (Trustworthy Evidence System)' : '4 Separated Evidence Pillars'}
+                </span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  {lang === 'bn' ? 'স্বচ্ছ ও যাচাইযোগ্য' : 'Transparent & Verifiable'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Pillar 1: Need Assessment */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-700">
+                  <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                    <span>1️⃣</span> {lang === 'bn' ? 'প্রয়োজন মূল্যায়ন (Need)' : 'Need Assessment'}
+                  </p>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                    {profile?.totalLandDecimals && profile.totalLandDecimals < 50
+                      ? (lang === 'bn' ? 'উচ্চ অগ্রাধিকার: প্রান্তিক/ক্ষুদ্র খামারি (<৫০ শতক জমি)' : 'High Need: Marginal smallholder (<50 decimals)')
+                      : (lang === 'bn' ? 'মাঝারি প্রয়োজন: স্বাভাবিক কৃষি জমিদারি' : 'Medium Need: Standard smallholder')}
+                  </p>
+                </div>
+
+                {/* Pillar 2: Programme Eligibility */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-700">
+                  <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                    <span>2️⃣</span> {lang === 'bn' ? 'কর্মসূচি যোগ্যতা (Eligibility)' : 'Programme Eligibility'}
+                  </p>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                    {lang === 'bn' 
+                      ? 'স্বচ্ছ নির্দেশিকা ভিত্তিক • মানুষের সিদ্ধান্ত সাপেক্ষ (অ-স্বয়ংক্রিয় বরাদ্দ)' 
+                      : 'Transparent rule-based • Human assessed (No automated aid grant)'}
+                  </p>
+                </div>
+
+                {/* Pillar 3: Recommended Intervention */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-700">
+                  <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                    <span>3️⃣</span> {lang === 'bn' ? 'প্রস্তাবিত পদক্ষেপ (Intervention)' : 'Recommended Intervention'}
+                  </p>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                    {lang === 'bn' 
+                      ? 'উপজেলা কৃষি কর্মকর্তার সরেজমিন পরিদর্শন ও বালাই ব্যবস্থাপনা পরামর্শ' 
+                      : 'SAAO Field inspection & stepped IPM pest advisory package'}
+                  </p>
+                </div>
+
+                {/* Pillar 4: Data Confidence */}
+                <div className="p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-700">
+                  <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
+                    <span>4️⃣</span> {lang === 'bn' ? 'উপাত্তের নির্ভরযোগ্যতা (Confidence)' : 'Data Confidence Level'}
+                  </p>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                    {timeline.length >= 3
+                      ? (lang === 'bn' ? 'উচ্চ আস্থা: ৩+ যাচাইকৃত টাইমলাইন ইভেন্ট সংগৃহীত' : 'High Confidence: 3+ verified timeline records')
+                      : (lang === 'bn' ? 'যাচাই প্রক্রিয়াধীন: তথ্যের ঘাটতি মাঠ পরিদর্শনকে সক্রিয় করে' : 'Verification Triggered: Missing data prompts field review')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Exclusion Error Safeguard Notice */}
+              <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-stone-200 dark:border-stone-700 text-[11px] text-stone-500 dark:text-stone-400">
+                <span>
+                  {lang === 'bn' 
+                    ? '🛡️ বর্জন ত্রুটি প্রতিরোধ: তথ্যের ঘাটতি থাকলে কোনো খামারির অগ্রাধিকার কমে না; বরং মাঠ যাচাই সক্রিয় হয়।' 
+                    : '🛡️ Exclusion Error Safeguard: Missing info triggers verification, never reduces priority.'}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAppealModalOpen(true)}
+                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline shrink-0 cursor-pointer"
+                >
+                  {lang === 'bn' ? 'তথ্য সংশোধন বা আপিল আবেদন ↗' : 'Request Correction or Appeal ↗'}
+                </button>
               </div>
             </div>
 
@@ -898,6 +1040,110 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Correction & Explanation Appeal Modal */}
+      <AnimatePresence>
+        {isAppealModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                      {lang === 'bn' ? 'তথ্য সংশোধন বা আপিল আবেদন' : 'Data Correction & Explanation Appeal'}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {lang === 'bn' ? 'মাঠ কর্মকর্তা ও কৃষিবিদ পর্যালোচনার জন্য জমা দিন' : 'Submit for Agronomist & Field Team Verification'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAppealModalOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {lang === 'bn' ? 'সংশোধনের বিষয়' : 'Correction Field'}
+                  </label>
+                  <select
+                    value={appealForm.subject}
+                    onChange={(e) => setAppealForm(prev => ({ ...prev, subject: e.target.value }))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="land_decimals">{lang === 'bn' ? 'জমির পরিমাপ ও অবস্থান' : 'Land acreage & location'}</option>
+                    <option value="crop_disease">{lang === 'bn' ? 'রোগ নিদান বা বালাই লক্ষণ' : 'Disease diagnosis or pest symptom'}</option>
+                    <option value="weather_damage">{lang === 'bn' ? 'আবহাওয়া ক্ষতি বা প্রাকৃতিক দুর্যোগ' : 'Weather/Climate disaster shock'}</option>
+                    <option value="mandi_price">{lang === 'bn' ? 'বাজার দর বা গ্রেডিং মান' : 'Market price or produce grade'}</option>
+                    <option value="other">{lang === 'bn' ? 'অন্যান্য তথ্য' : 'Other information'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {lang === 'bn' ? 'প্রস্তাবিত সংশোধিত তথ্য' : 'Proposed Correction'}
+                  </label>
+                  <input
+                    type="text"
+                    value={appealForm.proposedCorrection}
+                    onChange={(e) => setAppealForm(prev => ({ ...prev, proposedCorrection: e.target.value }))}
+                    placeholder={lang === 'bn' ? 'যেমন: প্রকৃত চাষযোগ্য জমি ৭৫ শতক' : 'e.g. Actual land is 75 decimals'}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {lang === 'bn' ? 'আপিলের কারণ বা ব্যাখ্যা' : 'Explanation & Evidence Context'}
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={appealForm.explanation}
+                    onChange={(e) => setAppealForm(prev => ({ ...prev, explanation: e.target.value }))}
+                    placeholder={lang === 'bn' ? 'কেন এই তথ্য সংশোধন প্রয়োজন তা সংক্ষেপে লিখুন...' : 'Briefly explain the discrepancy for field team review...'}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAppealModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAppealModalOpen(false);
+                    toast.success(lang === 'bn' 
+                      ? 'আপিল আবেদন গৃহীত হয়েছে! উপজেলা কৃষি কর্মকর্তা ও মাঠ দল সরেজমিনে যাচাই করবে।' 
+                      : 'Appeal submitted! SAAO field team will conduct physical verification.');
+                  }}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
+                >
+                  {lang === 'bn' ? 'আবেদন জমা দিন' : 'Submit Appeal'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

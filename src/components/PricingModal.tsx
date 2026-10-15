@@ -4,18 +4,34 @@ import { translations, Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { motion, AnimatePresence } from 'motion/react';
 
+import toast from 'react-hot-toast';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  onOpenAuth?: () => void;
 }
 
-export default function PricingModal({ isOpen, onClose, lang }: Props) {
+export default function PricingModal({ isOpen, onClose, lang, onOpenAuth }: Props) {
   const { user, userProfile } = useAuth();
   const t = translations[lang];
 
   const handleContactSales = () => {
     window.location.href = "tel:01410456453";
+  };
+
+  const handleCreateAccount = () => {
+    onClose();
+    if (onOpenAuth) {
+      onOpenAuth();
+    } else {
+      toast(lang === 'bn' ? 'লগইন বা রেজিস্ট্রেশন উইন্ডো খোলা হচ্ছে...' : 'Opening sign-in window...', { icon: '🔐' });
+    }
+  };
+
+  const handleDowngrade = () => {
+    toast.success(lang === 'bn' ? 'আপনি বর্তমানে স্ট্যান্ডার্ড ফ্রি একাউন্ট ব্যবহার করছেন।' : 'You are currently on the Standard Free tier.');
   };
 
   const isFree = user && userProfile?.tier !== 'premium';
@@ -87,9 +103,10 @@ export default function PricingModal({ isOpen, onClose, lang }: Props) {
                   </ul>
                   <button 
                     disabled={!user}
-                    className={`w-full py-4 px-6 rounded-2xl font-black uppercase tracking-widest text-xs border ${!user ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'bg-white text-gray-600 border-gray-200'}`}
+                    onClick={handleDowngrade}
+                    className={`w-full py-4 px-6 rounded-2xl font-black uppercase tracking-widest text-xs border transition-all ${!user ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 cursor-pointer'}`}
                   >
-                    {!user ? "Current Plan" : "Downgrade"}
+                    {!user ? "Current Plan" : "Active Standard"}
                   </button>
                 </motion.div>
 
@@ -132,10 +149,11 @@ export default function PricingModal({ isOpen, onClose, lang }: Props) {
                     </ul>
                     <button 
                       disabled={isFree}
-                      className={`w-full py-5 px-6 rounded-2xl font-black uppercase tracking-widest text-xs transition-all relative z-10 shadow-xl ${
+                      onClick={handleCreateAccount}
+                      className={`w-full py-5 px-6 rounded-2xl font-black uppercase tracking-widest text-xs transition-all relative z-10 shadow-xl cursor-pointer ${
                         isFree
                           ? 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-400 shadow-none cursor-not-allowed border border-gray-100'
-                          : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-900/20'
+                          : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-green-900/20 active:scale-95'
                       }`}
                     >
                       {isFree ? "Current Plan" : "Create Free Account"}

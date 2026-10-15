@@ -11,6 +11,8 @@ interface TactileStepperProps {
   className?: string;
   size?: 'sm' | 'md';
   precision?: number;
+  lang?: 'en' | 'bn';
+  label?: string;
 }
 
 export const TactileStepper: React.FC<TactileStepperProps> = ({
@@ -23,6 +25,8 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
   className = '',
   size = 'md',
   precision,
+  lang = 'bn',
+  label,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [rawText, setRawText] = useState(String(value));
@@ -74,13 +78,14 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
         type="button"
         onClick={handleDecrement}
         disabled={value <= min}
-        aria-label="Decrease value"
-        className={`${btnPad} flex items-center justify-center text-stone-600 dark:text-stone-300 hover:bg-stone-200/70 dark:hover:bg-stone-700 rounded-l-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
+        aria-label={lang === 'bn' ? `${label ? label + ' ' : ''}মান কমান` : `Decrease ${label || 'value'}`}
+        title={lang === 'bn' ? 'কমান' : 'Decrease'}
+        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-l-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
       >
-        <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+        <Minus className="w-4 h-4 stroke-[2.5]" />
       </button>
 
-      <div className={`relative flex items-center justify-center min-w-[72px] sm:min-w-[88px] text-center border-x border-stone-200/60 dark:border-stone-700/60 bg-white dark:bg-stone-900 ${textPad}`}>
+      <div className={`relative flex items-center justify-center min-w-[76px] sm:min-w-[96px] text-center border-x border-stone-200/80 dark:border-stone-700/80 bg-white dark:bg-stone-900 ${textPad}`}>
         {isEditing ? (
           <input
             type="number"
@@ -89,21 +94,23 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
             min={min}
             max={max}
             step={step}
+            aria-label={lang === 'bn' ? `${label || 'মান'} লিখুন` : `Input ${label || 'value'}`}
             onChange={(e) => setRawText(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full text-center font-mono font-bold text-stone-900 dark:text-stone-100 bg-transparent outline-none p-0 m-0 tabular-nums"
+            className="w-full text-center font-mono font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100 bg-transparent outline-none p-0 m-0 tabular-nums"
           />
         ) : (
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            title="Tap to type"
-            className="w-full flex items-baseline justify-center gap-1 font-mono font-bold text-stone-900 dark:text-stone-100 tabular-nums cursor-text hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            title={lang === 'bn' ? 'সরাসরি সংখ্যা টাইপ করতে ক্লিক করুন' : 'Click to edit number manually'}
+            aria-label={lang === 'bn' ? `${label ? label + ': ' : ''}${value} ${unit || ''} (সম্পাদনা করতে ক্লিক করুন)` : `${label ? label + ': ' : ''}${value} ${unit || ''} (click to edit)`}
+            className="w-full flex items-baseline justify-center gap-1 font-mono font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100 tabular-nums cursor-text hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
           >
             <span>{typeof value === 'number' ? value.toLocaleString() : value}</span>
             {unit && (
-              <span className="text-[10px] font-sans font-normal text-stone-500 dark:text-stone-400 select-none">
+              <span className="text-xs font-sans font-medium text-stone-500 dark:text-stone-400 select-none">
                 {unit}
               </span>
             )}
@@ -115,10 +122,11 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
         type="button"
         onClick={handleIncrement}
         disabled={value >= max}
-        aria-label="Increase value"
-        className={`${btnPad} flex items-center justify-center text-stone-600 dark:text-stone-300 hover:bg-stone-200/70 dark:hover:bg-stone-700 rounded-r-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
+        aria-label={lang === 'bn' ? `${label ? label + ' ' : ''}মান বাড়ান` : `Increase ${label || 'value'}`}
+        title={lang === 'bn' ? 'বাড়ান' : 'Increase'}
+        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-r-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
       >
-        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
+        <Plus className="w-4 h-4 stroke-[2.5]" />
       </button>
     </div>
   );

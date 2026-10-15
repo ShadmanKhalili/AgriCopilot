@@ -3,7 +3,7 @@ import {
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
   ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown,
-  Search, Sun, Moon, Sparkles
+  Search, Sun, Moon, Sparkles, Grid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -753,7 +753,7 @@ export default function Layout() {
               </span>
               <span className="text-stone-300 dark:text-emerald-800">•</span>
               <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
-                BARI / DAE Certified
+                {lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা প্রোটোকল' : 'AI Decision Support Protocol'}
               </span>
             </div>
 
@@ -869,6 +869,55 @@ export default function Layout() {
             </div>
 
             <div className="relative z-10 min-h-full flex flex-col w-full max-w-7xl mx-auto">
+              {/* Simplified First Experience Quick Action Bar */}
+              <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <button
+                    onClick={() => setActiveTab('agri-copilot')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      activeTab === 'agri-copilot'
+                        ? 'bg-emerald-700 text-white shadow-emerald-900/20'
+                        : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800'
+                    }`}
+                  >
+                    <Sprout className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>{lang === 'bn' ? 'ফসল জিজ্ঞাসা' : 'Ask about my crop'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('weather-advisory')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      activeTab === 'weather-advisory'
+                        ? 'bg-emerald-700 text-white shadow-emerald-900/20'
+                        : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800'
+                    }`}
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-sky-500" />
+                    <span>{lang === 'bn' ? 'আবহাওয়া দেখুন' : 'Check weather'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('farmer-dossier')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      activeTab === 'farmer-dossier'
+                        ? 'bg-emerald-700 text-white shadow-emerald-900/20'
+                        : 'bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 border border-stone-200/80 dark:border-stone-800'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />
+                    <span>{lang === 'bn' ? 'খামার রেকর্ড' : 'My farm record'}</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white bg-white/70 dark:bg-stone-900/70 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200/60 dark:border-stone-800 transition-colors shrink-0 cursor-pointer"
+                >
+                  <Grid className="w-3.5 h-3.5 text-stone-400" />
+                  <span>{lang === 'bn' ? 'আরও সেবা...' : 'More tools...'}</span>
+                </button>
+              </div>
+
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
@@ -1031,6 +1080,7 @@ export default function Layout() {
           isOpen={isPricingOpen} 
           onClose={() => setIsPricingOpen(false)} 
           lang={lang} 
+          onOpenAuth={() => setIsAuthModalOpen(true)}
         />
 
         {/* Legal Modal */}

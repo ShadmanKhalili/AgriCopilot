@@ -33,6 +33,42 @@ const callAiProxy = async (params: any) => {
 let aiInstance: GoogleGenAI | null = null;
 let directSdkBlocked = false; // Flag if direct client SDK is blocked by referrer or 403
 
+// Ephemeral Live API Token retrieval for direct WebSocket sessions
+export const getEphemeralLiveToken = async (): Promise<string> => {
+  const response = await fetch('/api/gemini/live-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+  if (!response.ok) {
+    let errMsg = `Live Token Request Failed (Status: ${response.status})`;
+    try {
+      const data = await response.json();
+      if (data.error) errMsg = data.error;
+    } catch (e) {
+      // Not JSON
+    }
+    throw new Error(errMsg);
+  }
+  const data = await response.json();
+  if (!data.token) {
+    throw new Error("No token returned by live-token service");
+  }
+  return data.token;
+};
+
+// Returns a fresh GoogleGenAI instance initialized with a single-use ephemeral token
+export const getLiveAiClient = async (): Promise<GoogleGenAI> => {
+  try {
+    const token = await getEphemeralLiveToken();
+    return new GoogleGenAI({ apiKey: token });
+  } catch (err) {
+    console.warn("Ephemeral Live token acquisition failed, attempting fallback if available:", err);
+    const directAi = getAi(true);
+    if (directAi) return directAi;
+    throw err;
+  }
+};
+
 export const getAi = (ignoreBlocked: boolean = false) => {
   if (directSdkBlocked && !ignoreBlocked) {
     return null;
@@ -525,8 +561,14 @@ export const generateSpeech = async (text: string) => {
         return null;
       }
 
-      // Gemini TTS returns raw 16-bit PCM at 24000Hz. 
+      // Gemini 3.8 TTS unary returns complete WAV file with RIFF header.
+      // If it already has a RIFF header, return base64 directly to avoid double-header corruption.
       const binary = atob(base64Audio);
+      if (binary.startsWith('RIFF')) {
+        return base64Audio;
+      }
+
+      // Fallback for headerless raw PCM (24000Hz, 16-bit mono):
       const pcmData = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
         pcmData[i] = binary.charCodeAt(i);

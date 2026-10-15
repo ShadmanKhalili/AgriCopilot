@@ -23,11 +23,14 @@ export interface PrescriptionData {
   diseaseName: string;
   pathogen?: string;
   severity: 'Low' | 'Medium' | 'Critical' | string;
-  confidence: number;
+  confidence?: number | null;
   symptoms: string[];
+  investigationSteps?: string[];
   culturalSteps: string[];
   organicSteps: string[];
   chemicalSteps: string[];
+  chemicalGated?: boolean;
+  expertVerified?: boolean;
   harvestIntervalDays?: number;
   weatherSnapshot?: {
     temp?: string;
@@ -122,7 +125,7 @@ ${data.organicSteps.map((s, i) => `• ${s}`).join('\n')}
 
 🏛️ ${lang === 'bn' ? 'কৃষি কল সেন্টার' : 'Krishi Helpline'}: 16123
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
+KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
 
     navigator.clipboard.writeText(text);
     setIsCopied(true);
@@ -259,8 +262,8 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
                     </h2>
                     <p className="text-[11px] font-bold text-emerald-800 mt-0.5 tracking-wide">
                       {lang === 'bn' 
-                        ? 'স্মার্ট কৃষি কপিলট • এআই রোগনির্ণয় ও কৃষি সম্প্রসারণ নেটওয়ার্ক' 
-                        : 'Smart Agri-Copilot Multimodal AI • BARI / BRRI Validated Network'}
+                        ? 'স্মার্ট কৃষি কপিলট • এআই রোগনির্ণয় ও কৃষি সিদ্ধান্ত সহায়তা নেটওয়ার্ক' 
+                        : 'Smart Agri-Copilot Multimodal AI • Decision-Support Advisory Network'}
                     </p>
                     <p className="text-[10px] text-stone-500 mt-0.5">
                       Govt. of Bangladesh Agricultural Services Protocol • Toll Free 16123
@@ -356,14 +359,22 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
                       ? 'bg-rose-500/20 text-rose-300 border-rose-400/40'
                       : data.severity === 'Medium' || data.severity === 'মাঝারি'
                       ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                      : data.severity === 'Not Assessed' || (typeof data.severity === 'string' && data.severity.includes('Not Assessed'))
+                      ? 'bg-stone-500/20 text-stone-300 border-stone-400/40'
                       : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
                   }`}>
                     {lang === 'bn' ? `তীব্রতা: ${data.severity}` : `Severity: ${data.severity}`}
                   </div>
-                  {/* Confidence */}
-                  <div className="bg-white/10 px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
-                    {data.confidence}% {lang === 'bn' ? 'সঠিকতা' : 'Confidence'}
-                  </div>
+                  {/* Confidence or Not Assessed */}
+                  {data.confidence !== null && data.confidence !== undefined ? (
+                    <div className="bg-white/10 px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
+                      {data.confidence}% {lang === 'bn' ? 'সঠিকতা' : 'Confidence'}
+                    </div>
+                  ) : (
+                    <div className="bg-amber-500/20 text-amber-200 border border-amber-400/40 px-3 py-1 rounded-xl text-xs font-bold">
+                      {lang === 'bn' ? 'সঠিকতা: যাচাই করা হয়নি' : 'Confidence: Not Assessed'}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -371,7 +382,7 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
               {data.symptoms && data.symptoms.length > 0 && (
                 <div className="mt-3.5 pt-3 border-t border-emerald-800/80">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
-                    {lang === 'bn' ? 'শনাক্তকৃত দৃশ্যমান লক্ষণসমূহ:' : 'Key Symptoms Confirmed by Visual Model:'}
+                    {lang === 'bn' ? 'প্রাথমিক দৃশ্যমান পর্যবেক্ষণ (Visual Symptoms):' : 'Preliminary Visual Observations:'}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {data.symptoms.map((sym, idx) => (
@@ -387,11 +398,29 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
             {/* Prescribed Step-by-Step Regimen (Rx ℞) */}
             <div className="relative z-10 space-y-4 mb-6">
               
+              {/* Recommended Agronomic Investigation Steps */}
+              {data.investigationSteps && data.investigationSteps.length > 0 && (
+                <div className="border border-amber-300/80 rounded-2xl p-4 bg-amber-50/60 shadow-2xs">
+                  <div className="flex items-center space-x-2 text-amber-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-amber-200">
+                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px] font-black">🔬</span>
+                    <span>{lang === 'bn' ? 'সুপারিশকৃত সরেজমিন অনুসন্ধান ও ল্যাব পরীক্ষা' : 'Recommended Field Investigations & Lab Diagnostics'}</span>
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-amber-950 pl-2">
+                    {data.investigationSteps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-amber-700 font-bold">🔍</span>
+                        <span className="leading-relaxed font-medium">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Section 1: Immediate Field Cultural & Mechanical Action */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
                 <div className="flex items-center space-x-2 text-stone-900 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-stone-100">
                   <span className="w-5 h-5 rounded-full bg-stone-800 text-white flex items-center justify-center text-[10px] font-black">1</span>
-                  <span>{lang === 'bn' ? 'তাৎক্ষণিক জমি/টব ব্যবস্থাপনা ও স্যানিটেশন' : 'Immediate Cultural & Sanitation Protocols'}</span>
+                  <span>{lang === 'bn' ? 'তাৎক্ষণিক জমি/টব স্যানিটেশন ও নন-কেমিক্যাল পরিচর্যা' : 'Immediate Cultural & Sanitation Protocols'}</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
                   {data.culturalSteps.map((step, idx) => (
@@ -403,33 +432,60 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
                 </ul>
               </div>
 
-              {/* Section 2: Certified Agrochemical Treatment (Exact Dosages) */}
-              <div className="border-2 border-emerald-600/30 rounded-2xl p-4 bg-emerald-50/40 shadow-2xs">
-                <div className="flex items-center justify-between text-emerald-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-emerald-200">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">2</span>
-                    <span>{lang === 'bn' ? 'অনুমোদিত রাসায়নিক চিকিৎসা ও সুনির্দিষ্ট মাত্রা' : 'Precision Chemical Treatment & Exact Dilution'}</span>
-                  </div>
-                  {data.harvestIntervalDays && (
-                    <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
-                      {lang === 'bn' ? `ফসল তোলার বিরতি (PHI): ${data.harvestIntervalDays} দিন` : `Pre-Harvest Interval (PHI): ${data.harvestIntervalDays} Days`}
+              {/* Section 2: Chemical Regimen with Gating */}
+              {data.chemicalGated ? (
+                <div className="border-2 border-rose-500/40 rounded-2xl p-4 bg-rose-50/70 shadow-2xs">
+                  <div className="flex items-center justify-between text-rose-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-rose-200">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-black">🔒</span>
+                      <span>{lang === 'bn' ? 'রাসায়নিক চিকিৎসা স্থগিত • বিশেষজ্ঞ অনুমোদন আবশ্যক' : 'Chemical Rx Withheld • Agronomic Review Required'}</span>
+                    </div>
+                    <span className="text-[10px] bg-rose-700 text-white px-2.5 py-0.5 rounded-full font-bold">
+                      {lang === 'bn' ? 'অনুমোদন পেন্ডিং' : 'Review Required'}
                     </span>
-                  )}
+                  </div>
+                  <ul className="space-y-2 text-xs text-rose-950 pl-2">
+                    {data.chemicalSteps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-rose-700 font-black shrink-0 mt-0.5">⚠️</span>
+                        <span className="leading-relaxed font-semibold">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 p-2.5 rounded-xl bg-rose-100/90 text-[11px] text-rose-900 border border-rose-300 leading-relaxed">
+                    {lang === 'bn' 
+                      ? 'খাদ্য নিরাপত্তা ও ফসলের বিষক্রিয়া রোধে: কৃত্রিম বুদ্ধিমত্তা কোনো অনির্ধারিত রাসায়নিক প্রয়োগের অনুমতি প্রদান করে না। স্প্রে করার পূর্বে অবশ্যই মাঠ পর্যায়ের উপ-সহকারী কৃষি কর্মকর্তা (SAAO) বা লাইসেন্সপ্রাপ্ত উদ্ভিদ রোগতত্ত্ববিদের লিখিত অনুমোদন নিন।'
+                      : 'Crop & Consumer Safety Directive: Automated systems prohibit unverified pesticide distribution. Direct physical evaluation and prescription by an accredited agronomist or extension officer is required before chemical application.'}
+                  </div>
                 </div>
-                <ul className="space-y-2 text-xs text-emerald-950 pl-2">
-                  {data.chemicalSteps.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-emerald-800 font-black shrink-0 mt-0.5">💊</span>
-                      <span className="leading-relaxed font-medium">{step}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-[10px] text-emerald-800/80 italic mt-2.5 pl-6">
-                  {lang === 'bn' 
-                    ? '⚠️ সতর্কতা: তীব্র রোদে বা বৃষ্টির সম্ভাবনায় স্প্রে করবেন না। স্প্রে করার সময় মাস্ক ও গ্লাভস পরিধান করুন।' 
-                    : '⚠️ Caution: Do not spray under direct scorching midday sun or pending rainfall. Wear safety mask and gloves.'}
-                </p>
-              </div>
+              ) : (
+                <div className="border-2 border-emerald-600/30 rounded-2xl p-4 bg-emerald-50/40 shadow-2xs">
+                  <div className="flex items-center justify-between text-emerald-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-emerald-200">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">2</span>
+                      <span>{lang === 'bn' ? 'অনুমোদিত রাসায়নিক চিকিৎসা ও সুনির্দিষ্ট মাত্রা' : 'Precision Chemical Treatment & Exact Dilution'}</span>
+                    </div>
+                    {data.harvestIntervalDays && (
+                      <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
+                        {lang === 'bn' ? `ফসল তোলার বিরতি (PHI): ${data.harvestIntervalDays} দিন` : `Pre-Harvest Interval (PHI): ${data.harvestIntervalDays} Days`}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="space-y-2 text-xs text-emerald-950 pl-2">
+                    {data.chemicalSteps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-emerald-800 font-black shrink-0 mt-0.5">💊</span>
+                        <span className="leading-relaxed font-medium">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-emerald-800/80 italic mt-2.5 pl-6">
+                    {lang === 'bn' 
+                      ? '⚠️ সতর্কতা: তীব্র রোদে বা বৃষ্টির সম্ভাবনায় স্প্রে করবেন না। স্প্রে করার সময় মাস্ক ও গ্লাভস পরিধান করুন।' 
+                      : '⚠️ Caution: Do not spray under direct scorching midday sun or pending rainfall. Wear safety mask and gloves.'}
+                  </p>
+                </div>
+              )}
 
               {/* Section 3: Organic & Eco-Friendly Alternative */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
@@ -494,12 +550,12 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
 
                 <div className="text-xs">
                   <p className="font-bold text-stone-900 leading-snug">
-                    {lang === 'bn' ? 'প্রমাণীকৃত ডিজিটাল প্রেসক্রিপশন' : 'Digitally Certified Agro-Prescription'}
+                    {lang === 'bn' ? 'ডিজিটাল কৃষি সিদ্ধান্ত সহায়তা পরামর্শপত্র' : 'Digital Agri Decision-Support Advisory'}
                   </p>
                   <p className="text-[10px] text-stone-500 mt-0.5">
                     {lang === 'bn' 
-                      ? 'কৃষি সম্প্রসারণ অধিদপ্তর (DAE) ও BARI গবেষণা ডাটাবেজ সমন্বিত।' 
-                      : 'Validated against BARI/BRRI agronomic research knowledge base.'}
+                      ? 'কৃষি জ্ঞানভিত্তিক সিদ্ধান্ত সহায়তা মডেল • রাসায়নিক চিকিৎসার পূর্বে মাঠের বিশেষজ্ঞ যাচাই আবশ্যক।' 
+                      : 'Agronomic decision-support model • Recorded expert review required before chemical application.'}
                   </p>
                   <p className="text-[10px] text-emerald-800 font-semibold mt-1">
                     📞 Helpline: 16123 (Krishi Call Centre) • Free Farmer Support
@@ -511,11 +567,13 @@ Agri-Copilot Multimodal AI • BARI / BRRI Validated`;
               <div className="text-center sm:text-right border-t sm:border-t-0 sm:border-l border-stone-200 pt-3 sm:pt-0 sm:pl-5">
                 <div className="inline-block p-1.5 rounded-xl border border-emerald-700/30 bg-emerald-50/50 mb-1">
                   <div className="font-serif italic text-xs font-bold text-emerald-950 px-2">
-                    Agri-Copilot AI
+                    KrishiVip AI Advisory
                   </div>
                 </div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-emerald-900">
-                  BARI / BRRI Validated Model
+                  {data.expertVerified 
+                    ? (lang === 'bn' ? 'বিশেষজ্ঞ কর্তৃক যাচাইকৃত' : 'Expert Verified') 
+                    : (lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা • রিভিউ পেন্ডিং' : 'AI Decision Support • Review Pending')}
                 </p>
                 <p className="text-[9px] text-stone-400 font-mono">
                   SHA256: {rxId.replace(/-/g, '').slice(0, 16)}

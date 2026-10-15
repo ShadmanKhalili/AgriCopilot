@@ -7,7 +7,8 @@ import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
-import { saveCachedWeather, getCachedWeather, formatCacheAge } from '../utils/offlineCache';
+import { saveCachedWeather, getCachedWeather, formatCacheAge, formatExactSyncTime } from '../utils/offlineCache';
+import DataStatusBadge from './DataStatusBadge';
 import toast from 'react-hot-toast';
 
 interface Props {
@@ -635,22 +636,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   <h3 className="font-bold text-stone-900 dark:text-stone-100 text-lg sm:text-xl tracking-tight">
                     {t.weatherForecast}
                   </h3>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[10px] sm:text-[11px] font-semibold border border-emerald-200/60 dark:border-emerald-800">
-                    <span className="recording-dot shrink-0" />
-                    <span>{lang === 'bn' ? 'সরাসরি স্যাটেলাইট ডেটা' : 'Live Data'}</span>
-                  </span>
-                  {cacheInfo?.isCached && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-medium border border-amber-200 dark:border-amber-800">
-                      <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                      <span>
-                        {cacheInfo.isFallback 
-                          ? (lang === 'bn' ? "কক্সবাজার অফলাইন ক্যাশ" : "Offline Cache")
-                          : (lang === 'bn' 
-                              ? `ক্যাশ • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'bn')}`
-                              : `Cached • ${formatCacheAge(cacheInfo.timestamp || Date.now(), 'en')}`)}
-                      </span>
-                    </span>
-                  )}
+                  <DataStatusBadge
+                    status={cacheInfo?.isCached ? 'cached' : 'forecast'}
+                    lang={lang}
+                    source="Open-Meteo ECMWF/GFS Ensemble"
+                    timestamp={formatExactSyncTime(cacheInfo?.timestamp || Date.now(), lang)}
+                    cacheAge={cacheInfo?.isCached ? formatCacheAge(cacheInfo.timestamp || Date.now(), lang) : undefined}
+                    compact={false}
+                  />
                 </div>
                 {globalLocation && (
                   <div className="mt-1.5">
@@ -711,7 +704,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           {lang === 'bn' ? 'মডেল নির্ভুলতা' : 'Accuracy'}
                         </span>
                         <span className="text-xs font-black text-emerald-400">
-                          {weather.ensembleConfidence || 96}% {lang === 'bn' ? 'সঠিক' : 'Confidence'}
+                          {weather.ensembleConfidence !== undefined 
+                            ? `${weather.ensembleConfidence}% ${lang === 'bn' ? 'কনভারজেন্স' : 'Confidence'}`
+                            : (lang === 'bn' ? 'অপ্রাপ্য' : 'Not Assessed')}
                         </span>
                       </div>
                     </div>
@@ -906,12 +901,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {weather.dewPoint !== undefined ? weather.dewPoint.toFixed(1) : 21.0}°C
+                          {weather.dewPoint !== undefined ? `${weather.dewPoint.toFixed(1)}°C` : '—'}
                         </div>
                         <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
-                          {lang === 'bn' 
-                            ? `শিশিরাঙ্ক ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`
-                            : `Depr: ${weather.dewPointDepression ? weather.dewPointDepression.toFixed(1) : '3.5'}°C`}
+                          {weather.dewPointDepression !== undefined 
+                            ? (lang === 'bn' ? `শিশিরাঙ্ক ${weather.dewPointDepression.toFixed(1)}°C` : `Depr: ${weather.dewPointDepression.toFixed(1)}°C`)
+                            : (lang === 'bn' ? 'শিশিরাঙ্ক অপ্রাপ্য' : 'Depression: N/A')}
                         </p>
                       </div>
 
@@ -924,13 +919,15 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {weather.precipitationSpread?.p10 ?? 0} - {weather.precipitationSpread?.p90 ?? (weather.rainfall > 0 ? (weather.rainfall * 1.5).toFixed(1) : '2.0')}
+                          {weather.precipitationSpread 
+                            ? `${weather.precipitationSpread.p10} - ${weather.precipitationSpread.p90}` 
+                            : (weather.rainfall !== undefined ? `${weather.rainfall.toFixed(1)}` : '—')}
                           <span className="text-[10px] text-stone-500 ml-0.5 font-normal">mm</span>
                         </div>
                         <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
-                          {lang === 'bn' 
-                            ? `ভারী বৃষ্টি ঝুঁকি: ${weather.heavyRainRisk ?? 10}%`
-                            : `Heavy Risk: ${weather.heavyRainRisk ?? 10}%`}
+                          {weather.heavyRainRisk !== undefined 
+                            ? (lang === 'bn' ? `ভারী বৃষ্টি ঝুঁকি: ${weather.heavyRainRisk}%` : `Heavy Risk: ${weather.heavyRainRisk}%`)
+                            : (lang === 'bn' ? 'ঝুঁকি পরিমাপ অপ্রাপ্য' : 'Heavy Risk: N/A')}
                         </p>
                       </div>
                     </div>

@@ -39,7 +39,8 @@ export default function Tooltip({ content, children, position = 'top' }: Props) 
             initial={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
-            className={`absolute z-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white bg-gray-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 whitespace-nowrap pointer-events-none ${positionClasses[position]}`}
+            className={`absolute z-50 px-3.5 py-2 text-xs font-semibold leading-snug text-white bg-stone-900/95 dark:bg-stone-950/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/15 max-w-[260px] sm:max-w-xs whitespace-normal break-words pointer-events-none text-center ${positionClasses[position]}`}
+            role="tooltip"
           >
             {content}
             <div className={`absolute border-[6px] border-transparent ${arrowClasses[position]} opacity-90`} />

@@ -23,6 +23,15 @@ export interface FarmerProfileData {
   createdAt: string;
 }
 
+export type RecordOriginType = 
+  | 'self_reported'          // Farmer's statement (Self-reported)
+  | 'ai_unverified'           // AI interpretation (AI-generated, unverified)
+  | 'source_linked_estimate'  // External weather or market value (Source-linked estimate or observation)
+  | 'expert_reviewed'         // Agronomist assessment (Expert-reviewed)
+  | 'farmer_confirmed'        // Farmer's completed action (Farmer-confirmed)
+  | 'outcome_evidence'        // Follow-up measurement (Outcome evidence)
+  | 'demo_excluded';          // Demonstration content (Demo, excluded from assessment)
+
 export interface FarmerTimelineEventData {
   id?: string;
   userId: string;
@@ -31,6 +40,9 @@ export interface FarmerTimelineEventData {
   summary: string;
   keyFacts: string[];
   confidenceScore?: number;
+  origin?: RecordOriginType;
+  evidenceStatus?: string;
+  isDemoOrGuest?: boolean;
   createdAt: string;
 }
 
@@ -41,6 +53,9 @@ export interface RecordEventParams {
   title: string;
   summary: string;
   keyFacts: string[];
+  origin?: RecordOriginType;
+  evidenceStatus?: string;
+  isDemoOrGuest?: boolean;
   crop?: string;
   landDecimals?: number;
   district?: string;
@@ -280,14 +295,37 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
 
   const now = new Date().toISOString();
 
-  // 1. Prepare the timeline event with validated bounds
+  const isGuestOrDemo = Boolean(
+    params.isDemoOrGuest ||
+    cleanUserId.startsWith('guest_') ||
+    cleanUserId === 'guest_farmer_demo' ||
+    params.origin === 'demo_excluded'
+  );
+
+  const effectiveOrigin: RecordOriginType = params.origin || (
+    isGuestOrDemo ? 'demo_excluded' :
+    params.eventType === 'voice_consultation' || params.eventType === 'crop_diagnosis' ? 'ai_unverified' :
+    params.eventType === 'planting_intent' ? 'farmer_confirmed' :
+    'source_linked_estimate'
+  );
+
+  // 1. Prepare the timeline event with validated bounds and provenance
   const newEvent: FarmerTimelineEventData = {
     userId: cleanUserId,
     eventType: params.eventType,
     title: cleanTitle,
     summary: cleanSummary,
     keyFacts: cleanKeyFacts,
-    confidenceScore: 0.95,
+    origin: effectiveOrigin,
+    isDemoOrGuest: isGuestOrDemo,
+    evidenceStatus: params.evidenceStatus || (
+      effectiveOrigin === 'ai_unverified' ? 'AI-generated, unverified' :
+      effectiveOrigin === 'self_reported' ? 'Self-reported' :
+      effectiveOrigin === 'farmer_confirmed' ? 'Farmer-confirmed' :
+      effectiveOrigin === 'demo_excluded' ? 'Demo, excluded from assessment' :
+      'Source-linked estimate'
+    ),
+    confidenceScore: effectiveOrigin === 'ai_unverified' ? undefined : 0.95,
     createdAt: now
   };
 
@@ -369,18 +407,21 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
   profile.lastInteractionDate = now;
   profile.updatedAt = now;
 
-  // 3. Save to Firestore
-  try {
-    await addDoc(collection(db, 'farmer_timeline_events'), newEvent);
-  } catch (error) {
-    console.warn("Firestore error saving timeline event, continuing locally:", error);
-  }
+  // 3. Save to Firestore ONLY for authenticated non-guest beneficiary profiles
+  // Guest and demo sessions are strictly excluded from contaminating database datasets
+  if (!isGuestOrDemo) {
+    try {
+      await addDoc(collection(db, 'farmer_timeline_events'), newEvent);
+    } catch (error) {
+      console.warn("Firestore error saving timeline event, continuing locally:", error);
+    }
 
-  try {
-    const profileRef = doc(db, 'farmer_profiles', cleanUserId);
-    await setDoc(profileRef, profile, { merge: true });
-  } catch (error) {
-    console.warn("Firestore error saving farmer profile, continuing locally:", error);
+    try {
+      const profileRef = doc(db, 'farmer_profiles', cleanUserId);
+      await setDoc(profileRef, profile, { merge: true });
+    } catch (error) {
+      console.warn("Firestore error saving farmer profile, continuing locally:", error);
+    }
   }
 
   // 4. Update local cache safely

@@ -1,8 +1,9 @@
-import React from 'react';
-import { WifiOff, Database } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { WifiOff, Database, AlertCircle } from 'lucide-react';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
+import { getCacheSummary, formatCacheAge, CacheSummary } from '../utils/offlineCache';
 
 interface Props {
   lang: Language;
@@ -10,6 +11,18 @@ interface Props {
 
 export default function OfflineBanner({ lang }: Props) {
   const isOnline = useNetworkStatus();
+  const [cacheSummary, setCacheSummary] = useState<CacheSummary | null>(null);
+
+  useEffect(() => {
+    if (!isOnline) {
+      getCacheSummary().then(setCacheSummary);
+    }
+  }, [isOnline]);
+
+  const hasCache = (cacheSummary?.totalEntries || 0) > 0;
+  const cacheAgeStr = cacheSummary?.lastSyncTimestamp 
+    ? formatCacheAge(cacheSummary.lastSyncTimestamp, lang)
+    : null;
 
   return (
     <AnimatePresence>
@@ -25,14 +38,26 @@ export default function OfflineBanner({ lang }: Props) {
             <span>{lang === 'bn' ? 'অফলাইন মোড' : 'Offline Mode'}</span>
           </div>
           <span className="hidden sm:inline text-stone-500">•</span>
-          <div className="flex items-center space-x-1.5 text-stone-200">
-            <Database className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>
-              {lang === 'bn' 
-                ? "কক্সবাজার ও স্থানীয় অঞ্চলের সংরক্ষিত আবহাওয়া ও আড়ৎ বাজারদর ক্যাশ থেকে সচল রয়েছে।"
-                : "Preserved Cox's Bazar weather advisory and mandi rates are active from offline cache."}
-            </span>
-          </div>
+          
+          {hasCache ? (
+            <div className="flex items-center space-x-1.5 text-stone-200">
+              <Database className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>
+                {lang === 'bn' 
+                  ? `স্থানীয় ক্যাশ সচল (${cacheSummary?.weatherEntriesCount || 0} আবহাওয়া, ${cacheSummary?.marketEntriesCount || 0} বাজারদর${cacheAgeStr ? ` • বয়স: ${cacheAgeStr}` : ''})`
+                  : `Local cache active (${cacheSummary?.weatherEntriesCount || 0} weather, ${cacheSummary?.marketEntriesCount || 0} mandi${cacheAgeStr ? ` • age: ${cacheAgeStr}` : ''})`}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1.5 text-amber-200">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>
+                {lang === 'bn' 
+                  ? 'কোনো সংরক্ষিত ক্যাশ রেকর্ড নেই। জরুরি অফলাইন নির্দেশিকা সক্রিয়।'
+                  : 'No cached local records found. Emergency static reference guide active.'}
+              </span>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

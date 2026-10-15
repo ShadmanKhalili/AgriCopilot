@@ -57,6 +57,10 @@ export default function SmartGrade({ lang }: Props) {
     }
   };
 
+  const [isBuyerModalOpen, setIsBuyerModalOpen] = useState(false);
+  const [buyerPhone, setBuyerPhone] = useState('');
+  const [buyerQuantityKg, setBuyerQuantityKg] = useState('100');
+
   const handleGrade = async () => {
     if (!image) return;
     
@@ -77,7 +81,7 @@ export default function SmartGrade({ lang }: Props) {
       
       await incrementUsage();
 
-      // Save to Firestore if user is logged in
+      // Save to Firestore as indicative visual assessment if user is logged in
       if (user) {
         try {
           await addDoc(collection(db, 'certificates'), {
@@ -86,6 +90,9 @@ export default function SmartGrade({ lang }: Props) {
             grade: gradeResult.grade,
             justification: gradeResult.justification,
             estimatedPriceBdt: gradeResult.estimatedPriceBdt,
+            assessmentType: 'indicative_visual_assessment',
+            isStatutoryCertificate: false,
+            authorityDisclaimer: 'Indicative visual assessment for farmgate bargaining; not statutory BSTI/DAM certification',
             createdAt: new Date().toISOString()
           });
 
@@ -93,15 +100,17 @@ export default function SmartGrade({ lang }: Props) {
             userId: user.uid,
             fullName: user.displayName || 'কৃষক ভাই (Farmer)',
             eventType: 'smart_grading',
-            title: lang === 'bn' ? `ফসলের মান সনদ: ${produce} (গ্রেড ${gradeResult.grade})` : `Quality Certificate: ${produce} (Grade ${gradeResult.grade})`,
+            origin: 'ai_unverified',
+            evidenceStatus: 'unverified',
+            title: lang === 'bn' ? `ফসলের প্রাক-বাছাই মূল্যায়ন: ${produce} (গ্রেড ${gradeResult.grade})` : `Indicative Visual Assessment: ${produce} (Grade ${gradeResult.grade})`,
             summary: gradeResult.justification.substring(0, 300),
             keyFacts: [
               `ফসল: ${produce}`,
-              `মান গ্রেড: ${gradeResult.grade}`,
-              `আনুমানিক বাজারদর: ৳${gradeResult.estimatedPriceBdt}`
+              `মান গ্রেড: ${gradeResult.grade} (প্রাক-বাছাই)`,
+              `আনুমানিক বাজারদর: ৳${gradeResult.estimatedPriceBdt}/কেজি`
             ],
             crop: produce,
-            insight: `গ্রেড ${gradeResult.grade} ফসল উৎপাদনে সক্ষম (বাজার সংযোগ প্রাক-যোগ্য)`
+            insight: `গ্রেড ${gradeResult.grade} ফসল উৎপাদনে সক্ষম (বাজার দরকষাকষির সহায়ক প্রাক-বাছাই)`
           }).catch(e => console.warn(e));
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'certificates');
@@ -379,7 +388,8 @@ export default function SmartGrade({ lang }: Props) {
                       <motion.button 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all uppercase tracking-widest text-xs"
+                        onClick={() => setIsBuyerModalOpen(true)}
+                        className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-blue-200 transition-all uppercase tracking-widest text-xs cursor-pointer active:scale-95"
                       >
                         {t.sendToBuyer}
                       </motion.button>
@@ -398,12 +408,135 @@ export default function SmartGrade({ lang }: Props) {
                 <div className="bg-gray-50 p-6 md:p-10 rounded-[28px] md:rounded-[32px] mb-6 md:mb-8 shadow-inner relative z-10">
                   <Award className="w-16 h-16 md:w-20 h-20 text-gray-200" />
                 </div>
-                <p className="text-xl md:text-2xl font-black text-gray-300 max-w-sm leading-tight relative z-10 tracking-tight">Upload a batch photo and generate a certificate to see results here.</p>
+                <p className="text-xl md:text-2xl font-black text-gray-400 max-w-sm leading-tight relative z-10 tracking-tight">
+                  {lang === 'bn' 
+                    ? 'ফসলের ব্যাচ ছবি আপলোড করে প্রাক-বাছাই গুণমান মূল্যায়ন দেখতে ক্লিক করুন।' 
+                    : 'Upload a batch photo to view an indicative visual pre-grading assessment here.'}
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Buyer Connect & Share Assessment Modal */}
+      <AnimatePresence>
+        {isBuyerModalOpen && result && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-2xl p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-stone-100 dark:border-stone-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-stone-900 dark:text-white text-base">
+                      {lang === 'bn' ? 'পাইকারি ক্রেতাকে বিবরণ পাঠান' : 'Send Offer to Buyer'}
+                    </h3>
+                    <p className="text-[10px] text-stone-500">
+                      {lang === 'bn' ? 'প্রাক-বাছাই গ্রেড ও প্রস্তাবিত দর শেয়ার করুন' : 'Share indicative grade & target price'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBuyerModalOpen(false)}
+                  className="p-1.5 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-400"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200/80 dark:border-stone-700/80 text-xs space-y-1">
+                <div className="flex justify-between font-medium text-stone-700 dark:text-stone-300">
+                  <span>{lang === 'bn' ? 'ফসল:' : 'Produce:'}</span>
+                  <span className="font-bold text-stone-900 dark:text-white">{t.produce[produce as keyof typeof t.produce]}</span>
+                </div>
+                <div className="flex justify-between font-medium text-stone-700 dark:text-stone-300">
+                  <span>{lang === 'bn' ? 'প্রাক-বাছাই গ্রেড:' : 'Indicative Grade:'}</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">গ্রেড {result.grade}</span>
+                </div>
+                <div className="flex justify-between font-medium text-stone-700 dark:text-stone-300">
+                  <span>{lang === 'bn' ? 'প্রস্তাবিত পাইকারি দর:' : 'Target Price:'}</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">৳{result.estimatedPriceBdt}/কেজি</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    {lang === 'bn' ? 'ক্রেতার ফোন নম্বর / হোয়াটসঅ্যাপ (ঐচ্ছিক)' : 'Buyer Phone / WhatsApp (Optional)'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={buyerPhone}
+                    onChange={(e) => setBuyerPhone(e.target.value)}
+                    placeholder="017XXXXXXXX"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
+                    {lang === 'bn' ? 'লটের পরিমাণ (কেজি)' : 'Batch Quantity (Kg)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={buyerQuantityKg}
+                    onChange={(e) => setBuyerQuantityKg(e.target.value)}
+                    placeholder="100"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const message = lang === 'bn'
+                      ? `[Agri-Copilot ফসল প্রস্তাব]\nফসল: ${t.produce[produce as keyof typeof t.produce]}\nপ্রাক-বাছাই গ্রেড: ${result.grade}\nপরিমাণ: ${buyerQuantityKg} কেজি\nপ্রস্তাবিত পাইকারি দর: ৳${result.estimatedPriceBdt}/কেজি\nসার্বক্ষণিক বাজার: ${result.bestMarket}\n*এটি খামারি দরকষাকষির জন্য এআই প্রাক-বাছাই মূল্যায়ন।*`
+                      : `[Agri-Copilot Offer]\nProduce: ${t.produce[produce as keyof typeof t.produce]}\nIndicative Grade: ${result.grade}\nQuantity: ${buyerQuantityKg} Kg\nTarget Price: ৳${result.estimatedPriceBdt}/Kg\nMarket: ${result.bestMarket}\n*Indicative pre-grading assessment for trade negotiation.*`;
+
+                    const targetNumber = buyerPhone.trim().replace(/[^0-9]/g, '');
+                    const url = targetNumber 
+                      ? `https://wa.me/${targetNumber.startsWith('88') ? targetNumber : '88' + targetNumber}?text=${encodeURIComponent(message)}`
+                      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    
+                    window.open(url, '_blank');
+                    setIsBuyerModalOpen(false);
+                    toast.success(lang === 'bn' ? 'হোয়াটসঅ্যাপে বিবরণ প্রস্তুত করা হয়েছে!' : 'WhatsApp offer message generated!');
+                  }}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <span>{lang === 'bn' ? 'হোয়াটসঅ্যাপে পাঠান' : 'Share on WhatsApp'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const message = lang === 'bn'
+                      ? `[Agri-Copilot ফসল প্রস্তাব]\nফসল: ${t.produce[produce as keyof typeof t.produce]}\nপ্রাক-বাছাই গ্রেড: ${result.grade}\nপরিমাণ: ${buyerQuantityKg} কেজি\nপ্রস্তাবিত পাইকারি দর: ৳${result.estimatedPriceBdt}/কেজি\nসার্বক্ষণিক বাজার: ${result.bestMarket}`
+                      : `[Agri-Copilot Offer]\nProduce: ${t.produce[produce as keyof typeof t.produce]}\nIndicative Grade: ${result.grade}\nQuantity: ${buyerQuantityKg} Kg\nTarget Price: ৳${result.estimatedPriceBdt}/Kg\nMarket: ${result.bestMarket}`;
+                    
+                    navigator.clipboard.writeText(message);
+                    toast.success(lang === 'bn' ? 'বিবরণ ক্লিপবোর্ডে কপি হয়েছে!' : 'Offer copied to clipboard!');
+                    setIsBuyerModalOpen(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold text-xs transition-colors"
+                >
+                  {lang === 'bn' ? 'বিবরণ কপি করুন (SMS/বার্তা)' : 'Copy Offer (SMS/Text)'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

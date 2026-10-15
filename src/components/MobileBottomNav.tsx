@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Cloud, TrendingUp, BookOpen, Grid } from 'lucide-react';
+import { Sprout, Cloud, FileText, Grid } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../utils/translations';
 
@@ -7,13 +7,12 @@ type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilien
 
 export type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
 
-interface NavCategoryItem {
-  id: PillarKey;
+interface PrimaryNavItem {
+  id: string;
   targetTab: Tab;
-  tabs: Tab[];
   label: string;
+  sublabel: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string | null;
 }
 
 interface Props {
@@ -33,69 +32,53 @@ export default function MobileBottomNav({
 }: Props) {
   const t = translations[lang];
 
-  // The 4 Core Agri Pillars matching the Sidebar & Menu Categories
-  const categoryNavItems: NavCategoryItem[] = [
+  // Simplified First Experience: Ask about my crop, Check weather, My farm record. Specialist tools under "More".
+  const primaryNavItems: PrimaryNavItem[] = [
     {
-      id: 'health',
+      id: 'ask-crop',
       targetTab: 'agri-copilot',
-      tabs: ['agri-copilot', 'crop-health', 'community-radar'],
-      label: t.quickHealth || (lang === 'bn' ? 'স্বাস্থ্য' : 'Health'),
-      icon: ShieldCheck,
+      label: lang === 'bn' ? 'ফসল জিজ্ঞাসা' : 'Ask Crop',
+      sublabel: lang === 'bn' ? 'রোগ ও যত্ন' : 'Disease & Care',
+      icon: Sprout,
     },
     {
-      id: 'weather',
+      id: 'check-weather',
       targetTab: 'weather-advisory',
-      tabs: ['weather-advisory', 'smart-planting', 'climate-resilience'],
-      label: t.quickWeather || (lang === 'bn' ? 'আবহাওয়া' : 'Weather'),
+      label: lang === 'bn' ? 'আবহাওয়া' : 'Weather',
+      sublabel: lang === 'bn' ? 'বৃষ্টি ও রাডার' : 'Rain & Radar',
       icon: Cloud,
     },
     {
-      id: 'economics',
-      targetTab: 'market-connect',
-      tabs: ['market-connect', 'krishi-profit', 'smart-grade', 'gov-schemes'],
-      label: t.quickMarket || (lang === 'bn' ? 'বাজার' : 'Market'),
-      icon: TrendingUp,
-    },
-    {
-      id: 'support',
-      targetTab: 'user-guide',
-      // 'admin-dashboard' intentionally excluded: the privileged Admin Operations Hub
-      // is only offered through the admin-gated sidebar menu (see Layout.tsx).
-      tabs: ['user-guide', 'profile', 'farmer-dossier'],
-      label: t.quickSupport || (lang === 'bn' ? 'সহায়তা' : 'Support'),
-      icon: BookOpen,
+      id: 'farm-record',
+      targetTab: 'farmer-dossier',
+      label: lang === 'bn' ? 'খামার রেকর্ড' : 'Farm Record',
+      sublabel: lang === 'bn' ? 'ডিজিটাল কার্ড' : 'Krishi Card',
+      icon: FileText,
     }
   ];
 
-  const handleCategoryClick = (item: NavCategoryItem) => {
-    const isAlreadyInPillar = item.tabs.includes(activeTab);
-    if (isAlreadyInPillar && onSelectPillar) {
-      onSelectPillar(item.id);
-    } else {
-      setActiveTab(item.targetTab);
-    }
-  };
+  const isSpecialistToolActive = !primaryNavItems.some(item => item.targetTab === activeTab);
 
   return (
     <nav 
-      aria-label={lang === 'bn' ? 'মোবাইল ক্যাটাগরি নেভিগেশন' : 'Mobile category navigation'}
+      aria-label={lang === 'bn' ? 'মোবাইল প্রধান নেভিগেশন' : 'Mobile primary navigation'}
       className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md border-t border-stone-200/80 dark:border-stone-800 shadow-xs px-2 pt-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] transition-colors duration-200"
     >
       <div className="flex items-center justify-around max-w-md mx-auto gap-1">
-        {categoryNavItems.map((item) => {
+        {primaryNavItems.map((item) => {
           const Icon = item.icon;
-          const isPillarActive = item.tabs.includes(activeTab);
+          const isActive = activeTab === item.targetTab;
 
           return (
             <button
               key={item.id}
-              onClick={() => handleCategoryClick(item)}
+              onClick={() => setActiveTab(item.targetTab)}
               aria-label={item.label}
-              className={`relative flex flex-col items-center justify-center flex-1 py-1 px-0.5 rounded-xl transition-colors duration-150 select-none min-h-[48px] cursor-pointer ${
-                isPillarActive ? 'text-emerald-900 dark:text-emerald-200' : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200'
+              className={`relative flex flex-col items-center justify-center flex-1 py-1 px-0.5 rounded-xl transition-colors duration-150 select-none min-h-[50px] cursor-pointer ${
+                isActive ? 'text-emerald-900 dark:text-emerald-200 font-bold' : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 font-medium'
               }`}
             >
-              {isPillarActive && (
+              {isActive && (
                 <motion.div
                   layoutId="mobileNavIndicator"
                   className="absolute inset-0 bg-emerald-50/90 dark:bg-emerald-950/60 rounded-xl -z-10 border border-emerald-200/60 dark:border-emerald-800/40"
@@ -104,36 +87,42 @@ export default function MobileBottomNav({
               )}
 
               <div className="p-1">
-                <Icon className={`w-5 h-5 transition-colors ${isPillarActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
+                <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
               </div>
 
-              <span className={`text-[10px] leading-tight tracking-tight truncate max-w-[64px] text-center ${
-                isPillarActive ? 'font-bold text-emerald-900 dark:text-emerald-200' : 'font-medium text-stone-500 dark:text-stone-400'
-              }`}>
+              <span className="text-[10px] leading-tight tracking-tight truncate max-w-[70px] text-center">
                 {item.label}
               </span>
             </button>
           );
         })}
 
-        {/* 5th Button: All Tools Drawer Trigger */}
+        {/* 4th Button: Specialist Tools Drawer Trigger ("More") */}
         <button
           onClick={() => {
             if (onSelectPillar) {
               onSelectPillar('all');
-            } else {
-              onOpenAllTools();
             }
+            onOpenAllTools();
           }}
           aria-haspopup="dialog"
-          aria-label={t.allTools || (lang === 'bn' ? 'সকল সেবা' : 'All Tools')}
-          className="relative flex flex-col items-center justify-center flex-1 py-1 px-0.5 rounded-xl transition-colors duration-150 select-none min-h-[48px] cursor-pointer text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200"
+          aria-label={lang === 'bn' ? 'আরও সেবা ও বিশেষায়িত টুলস' : 'More Specialist Tools'}
+          className={`relative flex flex-col items-center justify-center flex-1 py-1 px-0.5 rounded-xl transition-colors duration-150 select-none min-h-[50px] cursor-pointer ${
+            isSpecialistToolActive ? 'text-emerald-900 dark:text-emerald-200 font-bold' : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-200 font-medium'
+          }`}
         >
+          {isSpecialistToolActive && (
+            <motion.div
+              layoutId="mobileNavIndicator"
+              className="absolute inset-0 bg-emerald-50/90 dark:bg-emerald-950/60 rounded-xl -z-10 border border-emerald-200/60 dark:border-emerald-800/40"
+              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            />
+          )}
           <div className="p-1">
-            <Grid className="w-5 h-5 text-stone-500 dark:text-stone-400 stroke-[1.8]" />
+            <Grid className={`w-5 h-5 transition-colors ${isSpecialistToolActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
           </div>
-          <span className="text-[10px] leading-tight tracking-tight truncate max-w-[64px] text-center font-medium text-stone-500 dark:text-stone-400">
-            {t.allTools || (lang === 'bn' ? 'সকল সেবা' : 'All Tools')}
+          <span className="text-[10px] leading-tight tracking-tight truncate max-w-[70px] text-center">
+            {lang === 'bn' ? 'আরও সেবা' : 'More'}
           </span>
         </button>
       </div>

@@ -81,10 +81,32 @@ async function startServer() {
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://pagead2.googlesyndication.com", "https://tpc.googlesyndication.com", "https://googleads.g.doubleclick.net", "https://www.googletagmanager.com", "https://apis.google.com"],
+        "script-src": [
+          "'self'", 
+          "'unsafe-inline'", 
+          "'unsafe-eval'", 
+          "https://pagead2.googlesyndication.com", 
+          "https://tpc.googlesyndication.com", 
+          "https://googleads.g.doubleclick.net", 
+          "https://www.googletagservices.com",
+          "https://adservice.google.com",
+          "https://partner.googleadservices.com",
+          "https://www.googletagmanager.com", 
+          "https://apis.google.com"
+        ],
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         "font-src": ["'self'", "https://fonts.gstatic.com"],
-        "img-src": ["'self'", "data:", "blob:", "https:", "https://pagead2.googlesyndication.com", "https://tpc.googlesyndication.com", "https://*.doubleclick.net", "https://googleads.g.doubleclick.net"],
+        "img-src": [
+          "'self'", 
+          "data:", 
+          "blob:", 
+          "https:", 
+          "https://pagead2.googlesyndication.com", 
+          "https://tpc.googlesyndication.com", 
+          "https://*.doubleclick.net", 
+          "https://googleads.g.doubleclick.net",
+          "https://*.google.com"
+        ],
         "connect-src": [
           "'self'", 
           "data:",
@@ -106,6 +128,8 @@ async function startServer() {
           "https://pagead2.googlesyndication.com",
           "https://googleads.g.doubleclick.net",
           "https://tpc.googlesyndication.com",
+          "https://*.doubleclick.net",
+          "https://adservice.google.com",
           "https://fonts.googleapis.com",
           "https://fonts.gstatic.com",
           "wss://*.googleapis.com",
@@ -118,8 +142,10 @@ async function startServer() {
         "frame-src": [
           "'self'", 
           "https://googleads.g.doubleclick.net", 
-          "https://pagead2.googlesyndication.com",
-          "https://tpc.googlesyndication.com",
+          "https://pagead2.googlesyndication.com", 
+          "https://tpc.googlesyndication.com", 
+          "https://*.googlesyndication.com",
+          "https://adservice.google.com",
           "https://www.google.com", 
           "https://content-cloudrun-static-files-pa.googleapis.com",
           "https://*.firebaseapp.com"
@@ -128,6 +154,7 @@ async function startServer() {
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
     frameguard: false, // Frameguard disabled to allow preview inside Google AI Studio container
   }));
 
@@ -145,8 +172,16 @@ async function startServer() {
 
   // AdSense & Bot verification
   app.get("/ads.txt", (req, res) => {
-    res.type("text/plain");
-    res.send("google.com, pub-8691248886116699, DIRECT, f08c47fec0942fa0");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("X-Robots-Tag", "all");
+    res.send("google.com, pub-8691248886116699, DIRECT, f08c47fec0942fa0\ngoogle.com, pub-8294149074042302, DIRECT, f08c47fec0942fa0\n");
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send("User-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: *\nAllow: /\n\nSitemap: https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/sitemap.xml\n");
   });
 
   app.get("/api/health", (req, res) => {
@@ -186,6 +221,40 @@ async function startServer() {
       "gemini-3.8-flash"
     ]));
   };
+
+  // Endpoint to issue short-lived ephemeral session tokens for direct browser Live API sessions
+  app.post("/api/gemini/live-token", aiLimiter, async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          error: "GEMINI_API_KEY is not configured in server environment."
+        });
+      }
+
+      const client = getServerAi();
+      if (!client || !client.authTokens?.create) {
+        return res.status(500).json({
+          error: "Gemini AuthTokens service is unavailable on the server."
+        });
+      }
+
+      // Mint a single-use short-lived ephemeral token for the Live API WebSocket session
+      const tokenResponse = await client.authTokens.create({
+        config: { uses: 1 }
+      });
+
+      return res.json({
+        token: tokenResponse.name,
+        expireTime: (tokenResponse as any)?.expireTime || null
+      });
+    } catch (err: any) {
+      console.error("Failed to generate ephemeral Live API token:", err);
+      return res.status(500).json({
+        error: err.message || "Failed to generate ephemeral session token."
+      });
+    }
+  });
 
   app.post("/api/ai-proxy", aiLimiter, async (req, res) => {
     try {
