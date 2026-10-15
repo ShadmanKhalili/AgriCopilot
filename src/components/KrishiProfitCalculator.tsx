@@ -333,10 +333,11 @@ ${tenureNote}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Crop Selector */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-stone-700 dark:text-stone-300">
+            <label htmlFor="crop-selector" className="block text-xs font-bold text-stone-700 dark:text-stone-300">
               {lang === 'bn' ? '১. ফসল নির্বাচন করুন' : '1. Select Crop'}
             </label>
             <select
+              id="crop-selector"
               value={selectedCrop}
               onChange={(e) => handleCropChange(e.target.value)}
               className="w-full bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none cursor-pointer"
@@ -370,6 +371,7 @@ ${tenureNote}
                 className="flex-1"
               />
               <select
+                aria-label={lang === 'bn' ? '\u098F\u0995\u0995' : 'Area unit'}
                 value={landUnit}
                 onChange={(e: any) => setLandUnit(e.target.value)}
                 className="bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 dark:text-stone-200 outline-none cursor-pointer shrink-0"
@@ -437,9 +439,9 @@ ${tenureNote}
               <DollarSign className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
+              <h2 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
                 {lang === 'bn' ? 'প্রত্যাশিত বাজারদর (প্রতি মণ ৪০ কেজি)' : 'Expected Market Price (per Mon / 40kg)'}
-              </h4>
+              </h2>
               <p className="text-[11px] text-stone-500 dark:text-stone-400">
                 {lang === 'bn' ? 'আজকের বাজারদরে পরিবর্তন করতে পারেন' : 'Adjust according to current wholesale rate'}
               </p>
@@ -586,6 +588,7 @@ ${tenureNote}
                   type="number"
                   min="0"
                   step="100"
+                  aria-label={item.title}
                   value={costs[item.key as keyof typeof costs]}
                   onChange={(e) => updateCostItem(item.key as any, parseFloat(e.target.value) || 0)}
                   className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"
@@ -633,6 +636,7 @@ ${tenureNote}
                 type="number"
                 min="0"
                 step="500"
+                aria-label={lang === 'bn' ? '\u099C\u09AE\u09BF \u09B2\u09BF\u099C \u09AB\u09BF' : 'Land lease fee'}
                 value={costs.lease}
                 onChange={(e) => updateCostItem('lease' as any, parseFloat(e.target.value) || 0)}
                 className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"

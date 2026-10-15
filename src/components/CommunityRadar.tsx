@@ -100,9 +100,9 @@ export default function CommunityRadar({ lang }: Props) {
           <ShieldAlert className="w-5 h-5 text-red-600" />
         </div>
         <div className="min-w-0">
-          <h4 className="font-black text-red-900 uppercase tracking-widest text-xs mb-0.5">
+          <h3 className="font-black text-red-900 uppercase tracking-widest text-xs mb-0.5">
             {lang === 'bn' ? 'সতর্কতা ও কমিউনিটি রাডার' : 'Community Warning System'}
-          </h4>
+          </h3>
           <p className="text-xs sm:text-sm text-red-800/80 font-medium leading-relaxed">
             {lang === 'bn' 
               ? 'এই রাডারে আপনার এলাকার অন্যান্য কৃষকদের দ্বারা শনাক্ত করা গুরুতর রোগ ও পোকার আক্রমণ দেখানো হচ্ছে। আপনার ফসলের সুরক্ষায় আগাম ব্যবস্থা নিন।' 

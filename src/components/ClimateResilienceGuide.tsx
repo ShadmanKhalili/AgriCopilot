@@ -504,9 +504,9 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                 <div className="p-5 space-y-4">
                   {/* Name & Season */}
                   <div>
-                    <h3 className="text-xl font-black text-stone-900 tracking-tight">
+                    <h2 className="text-xl font-black text-stone-900 tracking-tight">
                       {variety.name}
-                    </h3>
+                    </h2>
                     <div className="text-xs font-bold text-stone-500 mt-1 flex items-center space-x-2">
                       <span className="bg-stone-100 text-stone-700 px-2 py-0.5 rounded-md">{variety.season}</span>
                       <span>•</span>
@@ -668,22 +668,22 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
 
                       <div className="space-y-2 pt-2 border-t border-stone-200 text-xs">
                         <div>
-                          <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'সহনশীলতা' : 'Tolerance'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'সহনশীলতা' : 'Tolerance'}</div>
                           <div className="font-bold text-stone-900">{lang === 'bn' ? variety.toleranceLevelBn : variety.toleranceLevelEn}</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'জীবনকাল' : 'Duration'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'জীবনকাল' : 'Duration'}</div>
                           <div className="font-black text-stone-900 font-mono text-base">{variety.durationDays} দিন (Days)</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield'}</div>
                           <div className="font-black text-emerald-800 font-mono text-base">{lang === 'bn' ? variety.yieldPotentialBn : variety.yieldPotentialEn}</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-400 uppercase text-[10px]">{lang === 'bn' ? 'মাঠ পরামর্শ' : 'Tips'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'মাঠ পরামর্শ' : 'Tips'}</div>
                           <div className="text-stone-700">{lang === 'bn' ? variety.managementTipsBn : variety.managementTipsEn}</div>
                         </div>
                       </div>

@@ -325,9 +325,9 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                   🌾
                 </div>
                 <div>
-                  <h3 className="text-xs uppercase tracking-widest text-emerald-300 font-semibold">
+                  <h2 className="text-xs uppercase tracking-widest text-emerald-300 font-semibold">
                     {lang === 'bn' ? 'সম্মতিভিত্তিক ডিজিটাল কৃষি ডসিয়ার' : 'Farmer-Consented Activity Dossier'}
-                  </h3>
+                  </h2>
                   <p className="text-base font-bold text-white tracking-wide">
                     {lang === 'bn' ? 'স্মার্ট খামারি পরিচয় ও প্রামাণ্য রেকর্ড' : 'Smart Krishi Digital Record'}
                   </p>

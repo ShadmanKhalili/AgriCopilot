@@ -195,8 +195,9 @@ export default function SmartGrade({ lang }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
+              <label htmlFor="produce-type-grade" className="block text-xs font-black text-gray-400 uppercase tracking-widest">{t.produceType}</label>
               <select 
+                id="produce-type-grade"
                 value={produce} 
                 onChange={(e) => setProduce(e.target.value)}
                 className="w-full rounded-xl sm:rounded-2xl border-blue-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-blue-50/30 p-3 sm:p-3.5 border text-sm sm:text-base font-bold text-gray-900 transition-all"

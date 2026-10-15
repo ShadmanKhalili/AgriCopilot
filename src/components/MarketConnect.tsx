@@ -329,12 +329,13 @@ export default function MarketConnect({
               
               {/* Product Selection */}
               <div className="space-y-1.5">
-                <label className="flex items-center text-xs font-bold text-stone-700 dark:text-stone-300">
+                <label htmlFor="produce-select" className="flex items-center text-xs font-bold text-stone-700 dark:text-stone-300">
                   <Package className="w-3.5 h-3.5 mr-1.5 text-orange-500" />
                   {t.produceName}
                 </label>
                 <div className="relative">
                   <select 
+                    id="produce-select"
                     value={produce} 
                     onChange={(e) => setProduce(e.target.value)}
                     className="w-full appearance-none rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80 p-2.5 sm:p-3 pr-10 text-xs sm:text-sm font-semibold text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-orange-500 outline-none transition-colors cursor-pointer"
@@ -453,7 +454,7 @@ export default function MarketConnect({
               {/* Usage Bar */}
               <div className="py-0.5">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">{t.usage}</span>
+                  <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">{t.usage}</span>
                   <span className="text-[10px] font-mono font-semibold text-stone-600 dark:text-stone-300">{currentUsage} / {limit}</span>
                 </div>
                 <div className="w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1 overflow-hidden">

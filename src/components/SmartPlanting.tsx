@@ -287,6 +287,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
               ) : (
                 <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <select
+                    aria-label={lang === 'bn' ? '\u099C\u09C7\u09B2\u09BE' : 'District'}
                     value={selectedDistrict}
                     onChange={(e) => {
                       setSelectedDistrict(e.target.value);
@@ -304,6 +305,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
                     ))}
                   </select>
                   <select
+                    aria-label={lang === 'bn' ? '\u0989\u09AA\u099C\u09C7\u09B2\u09BE' : 'Upazila'}
                     value={selectedUpazila}
                     onChange={(e) => setSelectedUpazila(e.target.value)}
                     className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-green-500 outline-none"
@@ -368,11 +370,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           {/* Target Time */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="target-time" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <Sun className="w-4 h-4 text-orange-500" />
               <span>{lang === 'bn' ? 'কবে চাষ শুরু করবেন?' : 'Target Planting Time'}</span>
             </label>
             <select 
+              id="target-time"
               value={targetTime}
               onChange={(e) => setTargetTime(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
@@ -385,11 +388,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
           {/* Land Type */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="land-type" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <Sprout className="w-4 h-4 text-green-600" />
               <span>{lang === 'bn' ? 'জমির ধরন' : 'Land Type'}</span>
             </label>
             <select 
+              id="land-type"
               value={landType}
               onChange={(e) => setLandType(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
@@ -404,11 +408,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
           {/* Irrigation */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="irrigation-system" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <Droplets className="w-4 h-4 text-blue-500" />
               <span>{lang === 'bn' ? 'সেচ ব্যবস্থা' : 'Irrigation System'}</span>
             </label>
             <select 
+              id="irrigation-system"
               value={irrigation}
               onChange={(e) => setIrrigation(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
@@ -422,11 +427,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
           {/* Previous Crop */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="previous-crop" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <History className="w-4 h-4 text-purple-500" />
               <span>{lang === 'bn' ? 'আগের ফসল' : 'Previous Crop'}</span>
             </label>
             <select 
+              id="previous-crop"
               value={previousCrop}
               onChange={(e) => setPreviousCrop(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
@@ -452,11 +458,12 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
           {/* Budget */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="investment-budget" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <Wallet className="w-4 h-4 text-emerald-600" />
               <span>{lang === 'bn' ? 'বিনিয়োগ ক্ষমতা' : 'Investment Budget'}</span>
             </label>
             <select 
+              id="investment-budget"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"
@@ -469,12 +476,13 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
 
           {/* Land Size */}
           <div className="space-y-2">
-            <label className="text-sm font-bold text-gray-700 flex items-center space-x-2">
+            <label htmlFor="land-size" className="text-sm font-bold text-gray-700 flex items-center space-x-2">
               <MapPin className="w-4 h-4 text-green-600" />
               <span>{lang === 'bn' ? 'জমির পরিমাণ (শতাংশ)' : 'Land Size (Decimals)'}</span>
             </label>
             <input 
               type="number" 
+              id="land-size"
               value={landSize}
               onChange={(e) => setLandSize(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none"

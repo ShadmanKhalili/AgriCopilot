@@ -866,6 +866,7 @@ export default function MicroclimateRadarSimulator({
           min="0"
           max={totalHours - 1}
           value={selectedHour}
+          aria-label={lang === 'bn' ? '\u09AA\u09C2\u09B0\u09CD\u09AC\u09BE\u09AD\u09BE\u09B8\u09C7\u09B0 \u09B8\u09AE\u09DF \u09A8\u09BF\u09B0\u09CD\u09AC\u09BE\u099A\u09A8 \u0995\u09B0\u09C1\u09A8' : 'Select forecast hour'}
           onChange={(e) => {
             setSelectedHour(parseInt(e.target.value));
             setIsPlaying(false);

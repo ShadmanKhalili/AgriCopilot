@@ -436,7 +436,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                     key={`${item.id}-${idx}`}
                     type="button"
                     onClick={() => handleItemClick(item)}
-                    className="inline-flex items-center gap-1.5 hover:bg-white/10 px-2 py-0.5 rounded-md transition-colors cursor-pointer group"
+                    className="inline-flex items-center gap-1.5 hover:bg-white/10 px-2 py-1 rounded-md transition-colors cursor-pointer group"
                     title={lang === 'bn' ? 'বিস্তারিত সরকারি বাজারদর দেখতে ক্লিক করুন' : 'Click to inspect official DAM market depth'}
                   >
                     <span className="text-sm">{item.emoji}</span>
@@ -483,7 +483,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                 audioFeedback.playTactileClick();
                 onNavigateToMarket();
               }}
-              className="hidden md:flex items-center gap-1 px-3 h-full bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 text-[10px] font-mono font-bold uppercase tracking-wider border-l border-emerald-500/20 shrink-0 cursor-pointer transition-colors"
+              className="hidden md:flex items-center gap-1 px-3 h-full bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 text-[10px] font-mono font-bold uppercase tracking-wider border-l border-emerald-500/20 shrink-0 cursor-pointer transition-colors relative z-10"
             >
               <span>{lang === 'bn' ? 'বাজার অনুসন্ধান' : 'Market Connect'}</span>
               <ChevronRight className="w-3 h-3" />

@@ -658,7 +658,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   disabled={isLoading || isRefreshingLive}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
                   title={lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather & Satellite Data'}
-                  aria-label="Refresh Live Weather"
                 >
                   <RefreshCcw className={`w-3.5 h-3.5 ${isLoading || isRefreshingLive ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
                   <span>{isLoading || isRefreshingLive ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating...') : (lang === 'bn' ? 'লাইভ রিফ্রেশ' : 'Live Refresh')}</span>
@@ -669,7 +668,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   disabled={isDetecting}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
                   title={lang === 'bn' ? 'জিপিএস অবস্থান রিফ্রেশ করুন' : 'Refresh GPS Location'}
-                  aria-label="Refresh GPS Location"
                 >
                   <Navigation className={`w-3.5 h-3.5 ${isDetecting ? 'animate-spin' : ''}`} />
                   <span>{isDetecting ? (lang === 'bn' ? 'শনাক্ত হচ্ছে...' : 'Detecting...') : (lang === 'bn' ? 'জিপিএস রিফ্রেশ' : 'Refresh GPS')}</span>
@@ -793,7 +791,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                           {weather.windSpeed.toFixed(1)}
                         </span>
-                        <span className="text-[10px] font-medium text-stone-400 ml-1">km/h</span>
+                        <span className="text-[10px] font-medium text-stone-500 dark:text-stone-400 ml-1">km/h</span>
                       </div>
                     </motion.div>
                   </Tooltip>
@@ -942,7 +940,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
                         <span>{t.hourlyForecastTrend || '24-Hour AI Weather Trend'}</span>
                       </h4>
-                      <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wider">
+                      <span className="text-[10px] font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                         {lang === 'bn' ? 'প্রতি ঘণ্টা' : 'Hourly'}
                       </span>
                     </div>
@@ -956,7 +954,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               : 'bg-stone-50 dark:bg-stone-800/60 text-stone-800 dark:text-stone-200 border-stone-200/70 dark:border-stone-700/70'
                           }`}
                         >
-                          <span className={`text-[10px] font-semibold ${idx === 0 ? 'text-blue-100' : 'text-stone-500 dark:text-stone-400'}`}>
+                          <span className={`text-[10px] font-semibold ${idx === 0 ? 'text-blue-50' : 'text-stone-500 dark:text-stone-400'}`}>
                             {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : hour.time}
                           </span>
                           <div className="my-1">
@@ -971,7 +969,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           <span className="text-xs font-bold tabular-nums">{Math.round(hour.temp)}°C</span>
                           <div className="mt-0.5 flex items-center gap-0.5 text-[9px]">
                             <Droplets className={`w-2 h-2 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
-                            <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
+                            <span className={idx === 0 ? 'text-blue-50 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
                               {hour.rainProb}%
                             </span>
                           </div>

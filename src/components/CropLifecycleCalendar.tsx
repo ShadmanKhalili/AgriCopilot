@@ -323,6 +323,7 @@ export default function CropLifecycleCalendar({
               {lang === 'bn' ? 'ফসল:' : 'Crop:'}
             </span>
             <select
+              aria-label={lang === 'bn' ? '\u09AB\u09B8\u09B2' : 'Crop'}
               value={cropKey}
               onChange={(e) => setCropKey(e.target.value)}
               className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2.5 sm:px-3 py-1 text-xs font-black text-gray-800 outline-none cursor-pointer flex-1 sm:flex-none"
@@ -340,6 +341,7 @@ export default function CropLifecycleCalendar({
             </span>
             <input
               type="date"
+              aria-label={lang === 'bn' ? '\u09B0\u09CB\u09AA\u09A3 \u09A4\u09BE\u09B0\u09BF\u0996' : 'Sowing date'}
               value={sowingDate}
               onChange={(e) => setSowingDate(e.target.value)}
               className="bg-white border border-gray-200 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 text-xs font-black text-gray-800 outline-none cursor-pointer flex-1 sm:flex-none"
