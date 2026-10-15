@@ -1150,7 +1150,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   </div>
                   <div>
                     <strong className="text-amber-800 dark:text-amber-300 font-bold block">
-                      {lang === 'bn' ? 'উচ্চ আর্দ্রতা ও ঘন কুয়াশা অ্যালার্ট (DeepMind WeatherNext ৩)' : 'Atmospheric Inversion & High Fog Index Alert (DeepMind WeatherNext 3)'}
+                      {lang === 'bn' ? 'উচ্চ আর্দ্রতা ও ঘন কুয়াশা অ্যালার্ট (এগ্রোকাস্ট এআই পূর্বাভাস)' : 'Atmospheric Inversion & High Fog Index Alert (AgroCast AI Forecast)'}
                     </strong>
                     <span className="text-stone-600 dark:text-stone-300">
                       {lang === 'bn' 
@@ -1770,7 +1770,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 space-y-1.5">
                   <span className="text-[10px] font-black uppercase text-blue-600 font-mono">SDG 13: Climate Action</span>
                   <p className="text-xs font-bold text-stone-900 dark:text-stone-100">Climate Resilience & Soil Care</p>
-                  <p className="text-[11px] text-stone-500">DeepMind WeatherNext 3 microclimate forecasting avoids futile chemical washouts.</p>
+                  <p className="text-[11px] text-stone-500">AgroCast AI microclimate forecasting avoids futile chemical washouts.</p>
                 </div>
               </div>
             </div>

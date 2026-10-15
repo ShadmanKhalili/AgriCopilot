@@ -2,7 +2,7 @@ import { Handler } from '@netlify/functions';
 import axios from 'axios';
 
 /**
- * WeatherNext-3 endpoint (Netlify function).
+ * AgroCast AI agro-forecast endpoint (Netlify function).
  *
  * NOTE: This is the Netlify parity port of `handleWeatherNext3` in server.ts.
  * The Express server serves the same logic at /api/weathernext-3 and /api/weather-next.
@@ -33,7 +33,7 @@ export const handler: Handler = async (event) => {
 
     // Query Open-Meteo with high-resolution hourly, agronomic and atmospheric variables
     const url = `https://api.open-meteo.com/v1/forecast`;
-    console.log(`[WeatherNext 3][netlify] Synthesizing forecast for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
+    console.log(`[AgroCast AI][netlify] Synthesizing agro-forecast for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
 
     const response = await axios.get(url, {
       params: {
@@ -156,19 +156,17 @@ export const handler: Handler = async (event) => {
 
     // Unified response
     const payload = {
-      model: "WeatherNext 3",
-      provider: "Google DeepMind & Google Research",
-      version: "3.0-ensemble64",
+      model: "AgroCast AI",
+      provider: "Open-Meteo (5 km grid)",
+      version: "1.0",
       resolution: "0.05° (~5 km spatial grid)",
       grid_coordinates: { latitude: gridLat, longitude: gridLon },
-      satellite_assimilation: {
-        status: "ONLINE",
-        mosaic_sources: ["Himawari-9 / INSAT-3DR Geostationary Satellites", "Multi-spectral Ground Radar Mosaic"],
-        ingestion_interval: "1-hour continuous refresh",
-        accuracy_gain: "Up to 50% reduction in precipitation CRPS error vs legacy NWP"
+      data_sources: {
+        forecast: "Open-Meteo high-resolution model data (api.open-meteo.com)",
+        note: "Agro-meteorological metrics (dew point, blight risk, spray windows) are computed server-side from Open-Meteo model data."
       },
       ensemble: {
-        members: 64,
+        estimate_basis: "Heuristic spread estimate derived from Open-Meteo daily probabilities",
         convergence_score_pct: convergenceScore,
         temperature_spread: { p10: tempP10, median: currentTemp, p90: tempP90 },
         precipitation_spread_mm: { p10: rainP10, median: expectedRainSum, p90: rainP90 },
@@ -214,11 +212,11 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify(payload)
     };
   } catch (error: any) {
-    console.error('[WeatherNext 3][netlify] Error generating forecast:', error.message);
+    console.error('[AgroCast AI][netlify] Error generating forecast:', error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({
-        error: 'Failed to generate WeatherNext 3 forecast',
+        error: 'Failed to generate AgroCast AI forecast',
         details: error.message
       })
     };

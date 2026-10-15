@@ -49,7 +49,7 @@ interface WeatherData {
   soilNitrogen?: number;
   soilCarbon?: number;
   safeSprayingWindow?: string;
-  // WeatherNext 3 Fields
+  // AgroCast AI fields
   isWeatherNext3?: boolean;
   weatherNext3?: any;
   boundaryWind100m?: number;
@@ -145,12 +145,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         );
         if (!wnRes.ok) {
           const errJson = await wnRes.json().catch(() => ({}));
-          console.error("WeatherNext 3 API Error Response:", wnRes.status, errJson);
-          throw new Error(errJson.error || `WeatherNext 3 service returned ${wnRes.status}`);
+          console.error("AgroCast AI API Error Response:", wnRes.status, errJson);
+          throw new Error(errJson.error || `AgroCast AI service returned ${wnRes.status}`);
         }
         const wnData = await wnRes.json();
         if (!wnData.current) {
-          throw new Error("Invalid WeatherNext 3 data structure received");
+          throw new Error("Invalid AgroCast AI data structure received");
         }
 
         const code = wnData.current?.weather_code || 0;
@@ -210,7 +210,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           soilMoisture: wnData.agro_metrics?.soil_moisture_0_7cm,
           evapotranspiration: wnData.agro_metrics?.evapotranspiration_et0_mm,
           safeSprayingWindow,
-          // WeatherNext 3 Specific Fields
+          // AgroCast AI specific fields
           isWeatherNext3: true,
           weatherNext3: wnData,
           boundaryWind100m: wnData.agro_metrics?.boundary_layer_wind_100m_kmh,
@@ -657,7 +657,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   onClick={() => fetchWeatherAndAdvisory(forecastModel, true)} 
                   disabled={isLoading || isRefreshingLive}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
-                  title={lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather & Satellite Data'}
+                  title={lang === 'bn' ? 'সরাসরি আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather Data'}
                 >
                   <RefreshCcw className={`w-3.5 h-3.5 ${isLoading || isRefreshingLive ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
                   <span>{isLoading || isRefreshingLive ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating...') : (lang === 'bn' ? 'লাইভ রিফ্রেশ' : 'Live Refresh')}</span>
@@ -677,7 +677,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
             {weather ? (
               <div className="space-y-3 sm:space-y-3.5">
-                {/* WeatherNext 3 Advanced Weather AI banner (Squeezed) */}
+                {/* AgroCast AI advanced weather banner (Squeezed) */}
                 {weather.isWeatherNext3 && (
                   <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-3 rounded-xl border border-blue-400/25 shadow-xs relative overflow-hidden">
                     <div className="flex items-center justify-between gap-2">
@@ -687,9 +687,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-black tracking-widest uppercase text-blue-300">Google AI</span>
+                            <span className="text-[9px] font-black tracking-widest uppercase text-blue-300">AgroCast AI</span>
                             <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
-                              5km AI
+                              5 km grid
                             </span>
                           </div>
                           <h4 className="text-xs sm:text-sm font-bold text-white truncate">
@@ -699,7 +699,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wider block">
-                          {lang === 'bn' ? 'মডেল নির্ভুলতা' : 'Accuracy'}
+                          {lang === 'bn' ? 'মডেল কনসেনসাস (আনুমানিক)' : 'Consensus (est.)'}
                         </span>
                         <span className="text-xs font-black text-emerald-400">
                           {weather.ensembleConfidence !== undefined 
@@ -831,7 +831,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   </Tooltip>
                 </div>
 
-                {/* WeatherNext 3 Agro-Meteorology Cards (Squeezed) */}
+                {/* AgroCast AI agro-meteorology cards (Squeezed) */}
                 {weather.isWeatherNext3 && (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center justify-between">
@@ -840,7 +840,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
                       </h4>
                       <span className="text-[9px] bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">
-                        {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
+                        {lang === 'bn' ? 'মডেল-ভিত্তিক' : 'Model-derived'}
                       </span>
                     </div>
 

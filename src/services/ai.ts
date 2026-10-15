@@ -499,13 +499,13 @@ export const generateWeatherAdvisory = async (
       let weatherNext3Context = "";
       if (weatherData.isWeatherNext3 && weatherData.weatherNext3) {
         const wn = weatherData.weatherNext3;
-        weatherNext3Context = `Google DeepMind WeatherNext 3 (5km Satellite AI Engine):
-        - AI Model: WeatherNext 3.0 (64-member ensemble, 5km spatial grid)
-        - Model Confidence & Convergence: ${wn.ensemble?.convergence_score_pct || 96}%
+        weatherNext3Context = `AgroCast AI agro-forecast (Open-Meteo 5 km grid):
+        - Data Source: Open-Meteo high-resolution model data with server-side agro-metric computation
+        - Model Confidence Estimate: ${wn.ensemble?.convergence_score_pct || 96}% (heuristic)
         - 100m Upper Canopy Wind: ${wn.agro_metrics?.boundary_layer_wind_100m_kmh || 'N/A'} km/h
         - Direct Solar Irradiance (DNI): ${wn.agro_metrics?.direct_normal_irradiance_wm2 || 0} W/m²
         - Dew Point Depression & Spore Risk: ${wn.agro_metrics?.dew_point_depression_celsius || 'N/A'}°C (${wn.agro_metrics?.fungal_blight_risk?.toUpperCase()} risk of fungal blight)
-        - 64-Ensemble Precipitation Spread: ${wn.ensemble?.precipitation_spread_mm?.p10 || 0}mm - ${wn.ensemble?.precipitation_spread_mm?.p90 || 0}mm`;
+        - Estimated Precipitation Spread: ${wn.ensemble?.precipitation_spread_mm?.p10 || 0}mm - ${wn.ensemble?.precipitation_spread_mm?.p90 || 0}mm`;
       }
 
       const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
@@ -527,7 +527,7 @@ export const generateWeatherAdvisory = async (
       - Pest/Disease & Fungal Blight risk (reference dew point depression and humidity)
       - Sowing/Harvesting timing
       - Use of the Safe Spraying Window for pesticide application.
-      ${weatherData.isWeatherNext3 ? '- Note that forecasts are powered with 5km satellite precision by Google DeepMind WeatherNext 3.' : ''}
+      ${weatherData.isWeatherNext3 ? '- Note that agro-metrics are derived from the Open-Meteo 5 km grid forecast with server-side computation.' : ''}
       
       Use markdown for formatting. Be direct and practical.`;
 
