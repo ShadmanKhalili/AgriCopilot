@@ -159,7 +159,7 @@ async function startServer() {
     },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
-    frameguard: false, // Frameguard disabled to allow preview inside Google AI Studio container
+    frameguard: { action: 'sameorigin' }, // Clickjacking protection for the public deployment
   }));
 
   // 2. Extra Cyber Defense Headers
@@ -185,7 +185,7 @@ async function startServer() {
   app.get("/robots.txt", (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=3600");
-    res.send("User-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: *\nAllow: /\n\nSitemap: https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/sitemap.xml\n");
+    res.send("User-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: *\nAllow: /\n\nSitemap: https://agri-copilot.netlify.app/sitemap.xml\n");
   });
 
   app.get("/api/health", (req, res) => {

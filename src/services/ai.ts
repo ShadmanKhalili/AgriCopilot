@@ -73,7 +73,10 @@ export const getAi = (ignoreBlocked: boolean = false) => {
   if (directSdkBlocked && !ignoreBlocked) {
     return null;
   }
-  const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
+  // SECURITY: no server secret is bundled into the client. The direct SDK path is
+  // only enabled when an operator explicitly opts in via VITE_GEMINI_API_KEY (a
+  // public build-time value); otherwise every AI call is proxied through the server.
+  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   
   if (apiKey && !aiInstance) {
     aiInstance = new GoogleGenAI({ apiKey });

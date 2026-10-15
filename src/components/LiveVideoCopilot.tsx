@@ -631,16 +631,8 @@ export default function LiveVideoCopilot({
     }
 
     try {
-      const apiKey = (process.env.GEMINI_API_KEY as string) || (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-      if (!apiKey) {
-        toast.error(lang === 'bn' 
-          ? "লাইভ ভিডিও ফিচারের জন্য GEMINI_API_KEY কনফিগার থাকতে হবে।" 
-          : "Live video assistant requires GEMINI_API_KEY.");
-        setIsConnecting(false);
-        isStartingSessionRef.current = false;
-        return;
-      }
-
+      // The Live session authenticates with a single-use ephemeral token minted
+      // server-side (/api/gemini/live-token), so no client-side API key is needed.
       const stream = await startCamera();
       if (!stream) {
         setIsConnecting(false);

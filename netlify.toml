@@ -2,15 +2,53 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "22"
+
 [functions]
   node_bundler = "esbuild"
+
+# --- API rewrites (order matters: specific routes before the /api/* catch-all) ---
+
+[[redirects]]
+  from = "/api/gemini/live-token"
+  to = "/.netlify/functions/gemini-live-token"
+  status = 200
+
+[[redirects]]
+  from = "/api/weather-next"
+  to = "/.netlify/functions/weathernext-3"
+  status = 200
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
+# SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# --- Production security headers (parity with the Express helmet config) ---
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(self), camera=(self), microphone=(self)"
+
+# The service worker must always be revalidated so PWA updates land immediately
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Hashed build assets are immutable
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

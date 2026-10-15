@@ -4,4 +4,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/sitemap.xml
+Sitemap: https://agri-copilot.netlify.app/sitemap.xml

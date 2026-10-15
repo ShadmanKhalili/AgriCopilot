@@ -88,6 +88,42 @@ export default function LegalModal({ isOpen, onClose, lang }: Props) {
               </p>
             </section>
 
+            <section className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600"/>
+                {lang === 'bn' ? '৪. কুকিজ ও বিজ্ঞাপন' : '4. Cookies & Advertising'}
+              </h3>
+              <p>
+                {lang === 'bn'
+                ? 'এই অ্যাপে Google AdSense-এর বিজ্ঞাপন প্রদর্শিত হতে পারে। Google ও তার পার্টনাররা কুকিজ (যেমন DoubleClick কুকি) ব্যবহার করে আপনার আগের ভিজিটের ভিত্তিতে বিজ্ঞাপন দেখাতে পারে। আপনি adssettings.google.com থেকে ব্যক্তিগতকৃত বিজ্ঞাপন বন্ধ করতে পারেন। অ্যাপের মূল কৃষি-কার্যকারিতা কুকি ছাড়াও সম্পূর্ণ ব্যবহারযোগ্য।'
+                : 'This app may display ads served by Google AdSense. Google and its partners may use cookies (including the DoubleClick cookie) to serve ads based on your prior visits to this and other websites. You can opt out of personalized advertising at adssettings.google.com. Core agricultural features work fully without ad cookies.'}
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600"/>
+                {lang === 'bn' ? '৫. ডেটা সংরক্ষণ, মুছে ফেলা ও তৃতীয় পক্ষ' : '5. Data Retention, Deletion & Third Parties'}
+              </h3>
+              <p>
+                {lang === 'bn'
+                ? 'আপনার অ্যাকাউন্টের রোগ নির্ণয়ের ইতিহাস আপনার অ্যাকাউন্টে সংরক্ষিত থাকে, যতক্ষণ না আপনি তা মুছে ফেলেন। আপনি যেকোনো সময় আপনার ডেটা মুছে ফেলার অনুরোধ করতে পারেন। আমরা যে তৃতীয় পক্ষের সেবা ব্যবহার করি: Google AI (ছবি বিশ্লেষণ), Firebase (অ্যাকাউন্ট ও ডেটা সংরক্ষণ), Open-Meteo (আবহাওয়ার পূর্বাভাস), Google AdSense (বিজ্ঞাপন)।'
+                : 'Your diagnosis history is stored in your account until you delete it. You may request deletion of your data at any time. Third-party services we rely on: Google AI (image analysis), Firebase (account & data storage), Open-Meteo (weather forecasts), and Google AdSense (advertising).'}
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600"/>
+                {lang === 'bn' ? '৬. যোগাযোগ ও হালনাগাদ' : '6. Contact & Updates'}
+              </h3>
+              <p>
+                {lang === 'bn'
+                ? 'প্রশ্ন বা ডেটা-সংক্রান্ত অনুরোধের জন্য যোগাযোগ করুন: sadmankhalili@gmail.com। সর্বশেষ হালনাগাদ: ১৫ অক্টোবর, ২০২৬।'
+                : 'For questions or data requests, contact: sadmankhalili@gmail.com. Last updated: 15 October 2026.'}
+              </p>
+            </section>
+
           </div>
 
           {/* Footer */}
