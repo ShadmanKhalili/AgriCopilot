@@ -36,6 +36,7 @@ import LegalModal from './LegalModal';
 import AuthModal from './AuthModal';
 import RegionModal from './RegionModal';
 import MobileBottomNav from './MobileBottomNav';
+import InAppBrowserBanner from './InAppBrowserBanner';
 import { useLocationName } from '../hooks/useLocationName';
 import { detectUserLocation } from '../utils/geolocation';
 
@@ -1046,6 +1047,9 @@ export default function Layout() {
               </AnimatePresence>
             </div>
           </main>
+
+          {/* In-app browser warning: camera/mic are blocked inside Messenger/Facebook webviews */}
+          <InAppBrowserBanner lang={lang} />
 
           {/* ================= SLEEK MOBILE BOTTOM ACTION BAR ================= */}
           <MobileBottomNav 

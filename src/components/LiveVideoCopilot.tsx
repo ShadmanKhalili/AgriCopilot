@@ -131,6 +131,33 @@ export default function LiveVideoCopilot({
   const isAiTurnCancelledRef = useRef<boolean>(false);
   const [measuredInterruptionLatencyMs, setMeasuredInterruptionLatencyMs] = useState<number | null>(null);
 
+  // ---- Mobile risk fix #1: Wake Lock -------------------------------------
+  // On phones, an auto-locked screen suspends the audio pipeline and silently
+  // drops the Gemini Live WebSocket mid-diagnosis. Hold the screen wake lock
+  // for the duration of an active session only.
+  const wakeLockRef = useRef<any>(null);
+  const acquireWakeLock = async () => {
+    try {
+      const wakeLockApi = (navigator as any).wakeLock;
+      if (!wakeLockApi?.request) return; // unsupported (older iOS, some desktops) — degrade silently
+      wakeLockRef.current = await wakeLockApi.request('screen');
+      wakeLockRef.current?.addEventListener?.('release', () => {
+        wakeLockRef.current = null;
+      });
+    } catch (e) {
+      // Battery saver active or permission denied — the session still works,
+      // only screen-sleep protection is absent.
+    }
+  };
+  const releaseWakeLock = async () => {
+    try {
+      await wakeLockRef.current?.release?.();
+    } catch (e) {
+      // Already released (e.g. the browser auto-released it while backgrounded)
+    }
+    wakeLockRef.current = null;
+  };
+
   // Pre-load SVG image when demo preset changes
   useEffect(() => {
     if (activeDemoPreset) {
@@ -668,6 +695,25 @@ export default function LiveVideoCopilot({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
 
+  // Re-acquire the wake lock when the app returns to the foreground: browsers
+  // auto-release the lock while backgrounded, but the Live session keeps
+  // running when the farmer switches apps and comes back.
+  useEffect(() => {
+    if (!isSessionActive) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !wakeLockRef.current) {
+        acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [isSessionActive]);
+
+  // Belt-and-braces: never leave a wake lock held after the component unmounts.
+  useEffect(() => {
+    return () => { releaseWakeLock(); };
+  }, []);
+
   // Start Gemini 3.8 Live Multimodal Stream
   const startLiveSession = async () => {
     if (isSessionActive || isConnecting || isStartingSessionRef.current) {
@@ -867,6 +913,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
           setIsConnecting(false);
           isStartingSessionRef.current = false;
           setIsSessionActive(true);
+          acquireWakeLock();
           setLiveState('listening');
           playTone(880, 0.15, 0.08);
 
@@ -1298,6 +1345,7 @@ Return a JSON object with this exact structure:
   const stopAllMedia = () => {
     sessionIdRef.current += 1;
     isStartingSessionRef.current = false;
+    releaseWakeLock();
     if (frameIntervalRef.current) {
       clearInterval(frameIntervalRef.current);
       frameIntervalRef.current = null;
