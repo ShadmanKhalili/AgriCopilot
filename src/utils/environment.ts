@@ -23,7 +23,8 @@ const IN_APP_SIGNATURES = [
   'MicroMessenger', 'WeChat',
   'musical_ly', 'TikTok', 'Bytedance',
   'Snapchat',
-  'Telegram'
+  'Telegram',
+  'WhatsApp'
 ];
 
 export function detectInAppBrowser(): InAppBrowserInfo {
