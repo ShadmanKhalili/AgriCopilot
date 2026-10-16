@@ -113,7 +113,7 @@ async function fetchWeatherBlock(
         'unknown source';
 
       const lines = [
-        `- Right now: ${cur.temperature_2m ?? '?'}°C, humidity ${cur.relative_humidity_2m ?? '?'}%, wind ${cur.wind_speed_10m ?? '?'} km/h, precipitation ${cur.precipitation ?? 0} mm, condition: ${conditionFromCode(cur.weather_code || 0)}`,
+        `- Right now: ${cur.temperature_2m ?? '?'}°C, humidity ${cur.relative_humidity_2m ?? '?'}%, wind ${cur.wind_speed_10m ?? '?'} km/h, precipitation ${cur.precipitation ?? 0} mm, condition: ${cur.condition || conditionFromCode(cur.weather_code || 0)}`,
         `- Rain probability — whole day's maximum: ${daily.precipitation_probability_max?.[0] ?? '?'}%; from now through the next 12 hours (max): ${maxRain12 ?? '?'}%; max UV today: ${daily.uv_index_max?.[0] ?? '?'}`,
         `- Wind — maximum expected in the next 12 hours: ${maxWind12 ?? '?'} km/h`,
         `- Safe spraying window: ${agro.safe_spraying_window || 'not available'}`,

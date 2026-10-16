@@ -51,13 +51,16 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Invalid latitude or longitude' }) };
     }
 
-    // Resolve Google API key from client header, query, or server secrets
+    // Resolve Google API key. Server-side secrets take priority so the browser's
+    // (possibly HTTP-referrer-restricted) key can never break the server-to-server
+    // Google Weather lookup. The client header/query remain a development fallback.
     const googleKey =
-      event.headers['x-google-maps-key'] ||
-      qs.apiKey ||
-      process.env.VITE_GOOGLE_MAPS_API_KEY ||
       process.env.GOOGLE_MAPS_API_KEY ||
-      process.env.GOOGLE_API_KEY;
+      process.env.GOOGLE_API_KEY ||
+      process.env.MAPS_API_KEY ||
+      process.env.VITE_GOOGLE_MAPS_API_KEY ||
+      event.headers['x-google-maps-key'] ||
+      qs.apiKey;
 
     const gridLat = Math.round(lat / 0.05) * 0.05;
     const gridLon = Math.round(lon / 0.05) * 0.05;
@@ -213,7 +216,8 @@ export const handler: Handler = async (event) => {
             const isSafe = hRainProb <= 18 && hWind <= 14 && hWind100 <= 24 && hTemp >= 12 && hTemp <= 31;
 
             const displayDate = new Date(intervalTime);
-            const displayTime = displayDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            // Google Weather API returns UTC (Z) timestamps — label them in Bangladesh time
+            const displayTime = displayDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Dhaka' });
 
             hourlySpread.push({
               time: intervalTime,
@@ -248,8 +252,13 @@ export const handler: Handler = async (event) => {
             if (hourlySpread[i].isSafeSpray && hourlySpread[i + 1]?.isSafeSpray && hourlySpread[i + 2]?.isSafeSpray) {
               const sDate = new Date(hourlySpread[i].time);
               const eDate = new Date(hourlySpread[i + 2].time);
-              const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-              const dayLabel = sDate.getDate() === new Date().getDate() ? "Today" : "Tomorrow";
+              const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Dhaka' });
+              const dhakaDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+              const dayLabel = dhakaDay(sDate) === dhakaDay(new Date())
+                ? "Today"
+                : (dhakaDay(new Date(Date.now() + 86400000)) === dhakaDay(sDate)
+                  ? "Tomorrow"
+                  : sDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Dhaka' }));
               safeSprayingWindow = `${dayLabel}, ${formatTime(sDate)} - ${formatTime(eDate)}`;
               safeWindowDetailed = {
                 start: hourlySpread[i].time,
