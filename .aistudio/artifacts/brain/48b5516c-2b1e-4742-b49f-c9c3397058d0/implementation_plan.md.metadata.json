@@ -1,6 +1,6 @@
 {
-  "summary": "Comprehensive implementation plan to fix the 4 high-priority clinical and security findings:\n1. Prohibit unvalidated chemical prescriptions and mark missing confidence metrics as 'Not Assessed'.\n2. Re-architect PlantHealthRecoveryTracker into an 'Illustrative Recovery Guide & Field Observation Log' with interactive farmer logging and elimination of unverified residue/harvest guarantees.\n3. Remove fraudulent institutional identity (BARI/BRRI) and pseudo-certifications from system prompts and UI badges, clearly identifying the assistant as an AI agricultural copilot.\n4. Secure Gemini Live API credentials by introducing a backend-issued ephemeral session token endpoint and purging long-lived keys from client bundles.",
-  "updatedAt": "2026-10-14T17:41:12.084319267Z",
+  "summary": "Comprehensive implementation plan for integrating Google DeepMind WeatherNext 3 via the Google Weather API with automatic ensemble fallback, featuring real-time weather alerts, precipitation risk curves, and a dual-model comparison toggle.",
+  "updatedAt": "2026-10-16T08:12:28.419680487Z",
   "requestFeedback": true,
   "userFacing": true
 }
