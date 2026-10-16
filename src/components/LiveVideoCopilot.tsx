@@ -3,9 +3,11 @@ import {
   Camera, Mic, MicOff, PhoneOff, Video, VideoOff, RefreshCw, Zap, ZapOff, 
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
   Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
-  BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award
+  BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award,
+  CalendarDays, HelpCircle, ListChecks, Share2
 } from 'lucide-react';
-import { getLiveAiClient, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
+import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
+import { buildFarmMemoryContext } from '../utils/farmMemory';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -18,6 +20,7 @@ import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptio
 interface LiveVideoCopilotProps {
   lang: Language;
   locationContext?: string;
+  globalLocation?: { latitude: number; longitude: number } | null;
   onCaptureFrameForDeepDiagnosis?: (imageDataUrl: string) => void;
 }
 
@@ -28,9 +31,52 @@ interface TranscriptTurn {
   timestamp: string;
 }
 
+// Low-literacy friendly diagnostic questions: big tap-buttons instead of typing.
+// Tapping an answer streams it into the live conversation as user text input.
+interface DiagnosticQuestion {
+  key: string;
+  qBn: string;
+  qEn: string;
+  options: { bn: string; en: string }[];
+}
+
+const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
+  {
+    key: 'crop_age',
+    qBn: 'ফসলের বয়স কত?',
+    qEn: 'Crop age?',
+    options: [
+      { bn: 'নতুন চারা (২ সপ্তাহের কম)', en: 'Young seedling (<2 weeks)' },
+      { bn: 'বাড়ন্ত (২-৬ সপ্তাহ)', en: 'Growing (2-6 weeks)' },
+      { bn: 'ফুল/ফল বা পরিপক্ব', en: 'Flowering/fruiting/mature' }
+    ]
+  },
+  {
+    key: 'problem_days',
+    qBn: 'সমস্যা কত দিন ধরে?',
+    qEn: 'How long has the problem?',
+    options: [
+      { bn: 'আজ বা গতকাল শুরু', en: 'Since today/yesterday' },
+      { bn: '৩-৭ দিন', en: '3-7 days' },
+      { bn: '১ সপ্তাহের বেশি', en: 'More than a week' }
+    ]
+  },
+  {
+    key: 'recent_input',
+    qBn: 'শেষ কী দিয়েছেন?',
+    qEn: 'Last input applied?',
+    options: [
+      { bn: 'কিছুই দিইনি', en: 'Nothing applied' },
+      { bn: 'সার দিয়েছি', en: 'Fertilizer applied' },
+      { bn: 'ওষুধ/স্প্রে করেছি', en: 'Pesticide/spray applied' }
+    ]
+  }
+];
+
 export default function LiveVideoCopilot({
   lang,
   locationContext = "Bangladesh",
+  globalLocation = null,
   onCaptureFrameForDeepDiagnosis
 }: LiveVideoCopilotProps) {
   const { user } = useAuth();
@@ -59,9 +105,21 @@ export default function LiveVideoCopilot({
     summary: string;
     crop?: string;
     keyFacts: string[];
+    actionSteps?: string[];
     duration?: number;
   } | null>(null);
   const [isSavingSummary, setIsSavingSummary] = useState(false);
+
+  // Farm Memory indicator + low-literacy tap-to-answer chips
+  const [memoryLoaded, setMemoryLoaded] = useState(false);
+  const [chipAnswers, setChipAnswers] = useState<Record<string, string>>({});
+  const [showQuestionPanel, setShowQuestionPanel] = useState(false);
+
+  // Post-session action card voice playback
+  const [isActionAudioLoading, setIsActionAudioLoading] = useState(false);
+  const [isActionAudioPlaying, setIsActionAudioPlaying] = useState(false);
+  const actionAudioRef = useRef<HTMLAudioElement | null>(null);
+  const actionAudioUrlRef = useRef<string | null>(null);
 
   // Investor Pitch Presets & 1-Click Digital Rx State
   const [activeDemoPreset, setActiveDemoPreset] = useState<DemoPreset | null>(null);
@@ -696,6 +754,24 @@ export default function LiveVideoCopilot({
 
       const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
+      // Farm Memory: silently gather today's weather + saved farm history so the
+      // session can answer "can I spray today?" with real numbers and refer back
+      // to past consultations. Best-effort: never blocks session start for long.
+      setChipAnswers({});
+      setShowQuestionPanel(false);
+      let farmMemoryBlock = '';
+      try {
+        farmMemoryBlock = await buildFarmMemoryContext({
+          userId: user?.uid || null,
+          locationContext,
+          globalLocation,
+          lang,
+        });
+      } catch (memErr) {
+        console.warn('Farm memory unavailable:', memErr);
+      }
+      setMemoryLoaded(!!farmMemoryBlock);
+
       const systemInstruction = isExtendedThinking
         ? `You are KrishiVip Multimodal AI Assistant (কৃষিভিপ মাল্টিমোডাল এআই সহকারী), an intelligent real-time agricultural decision-support tool observing a LIVE MULTIMODAL VIDEO STREAM from a smartphone in ${locationContext}.
 MODE: GEMINI 3.8 LIVE EXTENDED THINKING (CLINICAL PATHOLOGY & DIFFERENTIAL DECISION-SUPPORT).
@@ -760,6 +836,11 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 7. Plant & Chemical Safety: For home gardens, indoor pots, and edible herbs, strongly prioritize safe organic remedies. Never recommend banned toxic chemicals (Paraquat, Carbofuran, Monocrotophos).
 8. SINGLE RESPONSE MANDATE: Give exactly ONE concise, complete spoken answer per inquiry. Never repeat or restart your answer.`;
 
+      // Append the silent Farm Memory block (weather + saved history) when available
+      const systemInstructionWithMemory = farmMemoryBlock
+        ? `${systemInstruction}\n\n${farmMemoryBlock}`
+        : systemInstruction;
+
       const liveConfig: any = {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -769,7 +850,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
         },
         outputAudioTranscription: {},
         inputAudioTranscription: {},
-        systemInstruction,
+        systemInstruction: systemInstructionWithMemory,
       };
 
       if (isExtendedThinking) {
@@ -1052,6 +1133,11 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
     const effectiveUid = user?.uid || guestSessionId;
     const effectiveName = user?.displayName || (isGuest ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest Farmer') : '');
 
+    // Safe generic fallback steps when the model could not distill specific ones
+    const defaultActionSteps = lang === 'bn'
+      ? ['সন্দেহজনক আক্রান্ত পাতা আলাদা করে ফেলুন', 'পরিষ্কার ছবি তুলে সংরক্ষণ করুন', '৩ দিন পর আবার লাইভ ভিডিওতে দেখান']
+      : ['Isolate suspicious affected leaves', 'Keep clear photos for comparison', 'Re-check with live video in 3 days'];
+
     // 1. If dialogue occurred, distill an executive summary via server-side AI proxy with explicit provenance
     if (dialogueTurns.length > 0) {
       const dialogueText = dialogueTurns
@@ -1082,7 +1168,8 @@ Return a JSON object with this exact structure:
   "sessionTitle": "Concise, descriptive title for this session (in ${lang === 'bn' ? 'Bangla' : 'English'})",
   "comprehensiveSummary": "A clear, professional synthesized 2-3 sentence summary labeled as preliminary AI guidance. DO NOT include verbatim dialogue.",
   "keyFacts": ["Array of 3-5 concise factual bullet points labeled with origin [Self-reported] or [AI-generated, unverified]"],
-  "insightForCreditProfile": "Credit & farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}"
+  "insightForCreditProfile": "Credit & farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}",
+  "actionSteps": "Array of exactly 2-3 extremely short imperative action steps for TODAY/THIS WEEK in ${lang === 'bn' ? 'Bangla' : 'English'} (max 8 words each, priority order, based only on what was discussed; at most ONE chemical step and only if clearly needed, phrased with a safety caution; never include banned chemicals)"
 }`;
 
       try {
@@ -1114,6 +1201,12 @@ Return a JSON object with this exact structure:
               ];
           const crop = parsed.crop || undefined;
           const insight = parsed.insightForCreditProfile || (lang === 'bn' ? 'লাইভ ক্যামেরায় ডিজিটাল পরামর্শ গ্রহণ' : 'Conducted live visual consultation');
+          const actionSteps: string[] = Array.isArray(parsed.actionSteps)
+            ? parsed.actionSteps
+                .slice(0, 3)
+                .map((s: any) => String(s).trim())
+                .filter((s: string) => s.length > 0)
+            : [];
 
           await recordFarmerInteractionEvent({
             userId: effectiveUid,
@@ -1134,6 +1227,7 @@ Return a JSON object with this exact structure:
             summary,
             crop,
             keyFacts,
+            actionSteps: actionSteps.length > 0 ? actionSteps : defaultActionSteps,
             duration: Math.max(1, Math.round(duration))
           });
 
@@ -1185,6 +1279,7 @@ Return a JSON object with this exact structure:
       title,
       summary: summaryText,
       keyFacts,
+      actionSteps: defaultActionSteps,
       duration: Math.max(1, Math.round(duration))
     });
 
@@ -1436,6 +1531,197 @@ Return a JSON object with this exact structure:
       weatherSnapshot: undefined
     });
     setIsRxModalOpen(true);
+  };
+
+  // Tap-to-answer: stream the farmer's tapped answer into the live conversation
+  const handleChipAnswer = (qKey: string, qBn: string, qEn: string, optBn: string, optEn: string) => {
+    const session = sessionRef.current;
+    if (!session) {
+      toast.error(lang === 'bn' ? 'সেশন এখনো প্রস্তুত নয়।' : 'Session is not ready yet.');
+      return;
+    }
+    const question = lang === 'bn' ? qBn : qEn;
+    const answer = lang === 'bn' ? optBn : optEn;
+    try {
+      session.sendRealtimeInput({
+        text: `[কৃষকের ট্যাপ-উত্তর / Tapped answer] ${question} → ${answer}`
+      });
+      setChipAnswers(prev => ({ ...prev, [qKey]: answer }));
+      playTone(1400, 0.08, 0.08);
+    } catch (err) {
+      console.warn('Could not send tapped answer:', err);
+      toast.error(lang === 'bn' ? 'উত্তর পাঠানো যায়নি, আবার চেষ্টা করুন।' : 'Could not send the answer, please try again.');
+    }
+  };
+
+  // Post-session action card: stop any running voice playback and free the blob URL
+  const stopActionAudio = () => {
+    if (actionAudioRef.current) {
+      try {
+        actionAudioRef.current.pause();
+        actionAudioRef.current.currentTime = 0;
+      } catch (e) {}
+      actionAudioRef.current = null;
+    }
+    if (actionAudioUrlRef.current) {
+      try { URL.revokeObjectURL(actionAudioUrlRef.current); } catch (e) {}
+      actionAudioUrlRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    setIsActionAudioPlaying(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount: stop voice + free URL
+      if (actionAudioRef.current) {
+        try { actionAudioRef.current.pause(); } catch (e) {}
+        actionAudioRef.current = null;
+      }
+      if (actionAudioUrlRef.current) {
+        try { URL.revokeObjectURL(actionAudioUrlRef.current); } catch (e) {}
+        actionAudioUrlRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
+    };
+  }, []);
+
+  // Read the post-session action card aloud in Bangla (Gemini TTS with Web Speech fallback)
+  const handleSpeakActionCard = async () => {
+    if (!lastSavedSession || isActionAudioLoading) return;
+    if (isActionAudioPlaying) {
+      stopActionAudio();
+      return;
+    }
+    const L = lang === 'bn';
+    const parts = [
+      lastSavedSession.title,
+      lastSavedSession.summary,
+      ...(lastSavedSession.actionSteps || []).map((s, i) => `${L ? `${i + 1}। ` : `${i + 1}. `}${s}`),
+      L
+        ? 'এটি প্রাথমিক কৃত্রিম বুদ্ধিমত্তার পরামর্শ; প্রয়োগের আগে যাচাই করে নিন।'
+        : 'This is preliminary AI advice; please verify before acting.',
+    ];
+    const text = parts.join(' ');
+    setIsActionAudioLoading(true);
+    try {
+      const b64 = await generateSpeech(text);
+      if (!b64) throw new Error('No audio data returned');
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      actionAudioUrlRef.current = url;
+      const audio = new Audio(url);
+      actionAudioRef.current = audio;
+      audio.onended = () => stopActionAudio();
+      audio.onerror = () => stopActionAudio();
+      await audio.play();
+      setIsActionAudioPlaying(true);
+    } catch (err) {
+      console.warn('Action card TTS failed, falling back to Web Speech:', err);
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_`🔒]/g, ''));
+          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+          utterance.rate = 0.95;
+          utterance.onend = () => setIsActionAudioPlaying(false);
+          utterance.onerror = () => setIsActionAudioPlaying(false);
+          window.speechSynthesis.speak(utterance);
+          setIsActionAudioPlaying(true);
+        } catch (synthErr) {
+          toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
+        }
+      } else {
+        toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
+      }
+    } finally {
+      setIsActionAudioLoading(false);
+    }
+  };
+
+  // Download a 3-day follow-up reminder (.ics) that opens in the phone calendar
+  const handleDownloadReminder = () => {
+    if (!lastSavedSession) return;
+    try {
+      const start = new Date(Date.now() + 3 * 86400000);
+      start.setHours(8, 0, 0, 0);
+      const end = new Date(start.getTime() + 30 * 60000);
+      const fp = (n: number) => n.toString().padStart(2, '0');
+      const fmtLocal = (d: Date) =>
+        `${d.getFullYear()}${fp(d.getMonth() + 1)}${fp(d.getDate())}T${fp(d.getHours())}${fp(d.getMinutes())}00`;
+      const fmtUtc = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+      const esc = (s: string) =>
+        (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+      const title = lang === 'bn'
+        ? `🌾 ফসল আবার দেখুন: ${lastSavedSession.title}`
+        : `🌾 Re-check crop: ${lastSavedSession.title}`;
+      const desc = [
+        lastSavedSession.summary,
+        ...(lastSavedSession.actionSteps || []).map((s, i) => `${i + 1}. ${s}`),
+        lang === 'bn' ? 'Agri-Copilot (এআই-পরামর্শ, যাচাইকৃত নয়)' : 'Agri-Copilot (AI advice, unverified)',
+      ].join('\n');
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//AgriCopilot//Krishi Reminder//BN',
+        'CALSCALE:GREGORIAN',
+        'BEGIN:VEVENT',
+        `UID:krishi-${Date.now()}@agri-copilot.netlify.app`,
+        `DTSTAMP:${fmtUtc(new Date())}`,
+        `DTSTART:${fmtLocal(start)}`,
+        `DTEND:${fmtLocal(end)}`,
+        `SUMMARY:${esc(title)}`,
+        `DESCRIPTION:${esc(desc)}`,
+        'BEGIN:VALARM',
+        'TRIGGER:-PT30M',
+        'ACTION:DISPLAY',
+        `DESCRIPTION:${esc(title)}`,
+        'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'krishi-reminder-3din.ics';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success(
+        lang === 'bn'
+          ? '📅 রিমাইন্ডার ফাইল তৈরি হয়েছে — খুলে ফোনের ক্যালেন্ডারে সেভ করুন (৩ দিন পর, সকাল ৮টা)।'
+          : '📅 Reminder file ready — open it to save to your phone calendar (in 3 days, 8 AM).',
+        { duration: 6000 }
+      );
+    } catch (err) {
+      console.error('Reminder generation failed:', err);
+      toast.error(lang === 'bn' ? 'রিমাইন্ডার তৈরি করা যায়নি।' : 'Could not create the reminder.');
+    }
+  };
+
+  // Share the session outcome with family on WhatsApp (text only, honest label)
+  const handleShareSessionWhatsApp = () => {
+    if (!lastSavedSession) return;
+    const stepsText = (lastSavedSession.actionSteps || []).map((s, i) => `${i + 1}. ${s}`).join('\n');
+    const lines: string[] = [`🌾 ${lastSavedSession.title}`, '', lastSavedSession.summary];
+    if (stepsText) {
+      lines.push('', `✅ ${lang === 'bn' ? 'আজ যা করবেন' : 'To do'}:`, stepsText);
+    }
+    lines.push(
+      '',
+      lang === 'bn' ? '— Agri-Copilot (এআই পরামর্শ, যাচাইকৃত নয়)' : '— Agri-Copilot (AI advice, unverified)',
+      'https://agri-copilot.netlify.app'
+    );
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
   };
 
   const handleCaptureSnapshot = () => {
@@ -2182,6 +2468,88 @@ Return a JSON object with this exact structure:
         )}
       </div>
 
+      {/* Low-literacy Tap-to-Answer Questions (active session only) */}
+      {isSessionActive && !activeDemoPreset && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-emerald-500/20 shadow-sm overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowQuestionPanel(!showQuestionPanel)}
+            className="w-full flex items-center justify-between gap-2 px-4 py-3 cursor-pointer"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <HelpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                {lang === 'bn' ? '৩টি প্রশ্নের উত্তর দিন (ট্যাপ করুন)' : 'Answer 3 quick questions (tap)'}
+              </span>
+              {memoryLoaded && (
+                <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
+                  🧠 {lang === 'bn' ? 'খামার-স্মৃতি যুক্ত' : 'Farm memory on'}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {Object.keys(chipAnswers).length > 0 && (
+                <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                  {Object.keys(chipAnswers).length}/3 ✓
+                </span>
+              )}
+              {showQuestionPanel ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </div>
+          </button>
+
+          <AnimatePresence>
+            {showQuestionPanel && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/60"
+              >
+                <div className="pt-3 space-y-3">
+                  {DIAGNOSTIC_QUESTIONS.map(q => (
+                    <div key={q.key}>
+                      <div className="text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                        {chipAnswers[q.key] ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        )}
+                        {lang === 'bn' ? q.qBn : q.qEn}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {q.options.map(opt => {
+                          const label = lang === 'bn' ? opt.bn : opt.en;
+                          const isPicked = chipAnswers[q.key] === label;
+                          return (
+                            <button
+                              key={opt.en}
+                              type="button"
+                              onClick={() => handleChipAnswer(q.key, q.qBn, q.qEn, opt.bn, opt.en)}
+                              className={`px-3 py-2 rounded-xl text-[11px] font-bold border transition-all active:scale-95 cursor-pointer ${
+                                isPicked
+                                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                                  : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                    💡 {lang === 'bn'
+                      ? 'ট্যাপ করলেই এআই আপনার উত্তর জেনে নেবে — টাইপ করার দরকার নেই। চাইলে মুখেও উত্তর দিতে পারেন।'
+                      : 'Tapping tells the AI instantly — no typing needed. You can also answer by speaking.'}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       {/* Institutional Legal & SAAO Advisory Notice */}
       <div className="bg-emerald-50/80 rounded-2xl p-3.5 border border-emerald-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-emerald-900">
         <div className="flex items-center gap-2">
@@ -2224,7 +2592,7 @@ Return a JSON object with this exact structure:
               </div>
             </div>
             <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">
-              {lang === 'bn' ? 'সংরক্ষিত' : 'Verified'}
+              {lang === 'bn' ? 'সংরক্ষিত' : 'Saved'}
             </span>
           </div>
 
@@ -2250,25 +2618,89 @@ Return a JSON object with this exact structure:
             </div>
           )}
 
+          {/* Today's Action Card: max 3 icon steps, listenable, shareable */}
+          {lastSavedSession.actionSteps && lastSavedSession.actionSteps.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <ListChecks className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  {lang === 'bn' ? 'আজ যা করবেন (এআই-পরামর্শ, যাচাইকৃত নয়)' : 'Do This Now (AI advice, unverified)'}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSpeakActionCard}
+                  disabled={isActionAudioLoading}
+                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    isActionAudioPlaying
+                      ? 'bg-emerald-600 text-white border-emerald-500'
+                      : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800/60'
+                  } disabled:opacity-50`}
+                >
+                  {isActionAudioLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : isActionAudioPlaying ? (
+                    <Square className="w-3 h-3 fill-current" />
+                  ) : (
+                    <Volume2 className="w-3 h-3" />
+                  )}
+                  {isActionAudioPlaying
+                    ? (lang === 'bn' ? 'থামান' : 'Stop')
+                    : (lang === 'bn' ? 'শুনুন' : 'Listen')}
+                </button>
+              </div>
+              {lastSavedSession.actionSteps.map((step, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2.5 bg-emerald-50/70 dark:bg-emerald-900/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-xl px-3 py-2.5"
+                >
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0">
+                    {idx + 1}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 leading-snug">
+                    {step}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* 1-Click Digital Krishi Prescription Action in Post-Session Card */}
-          <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="pt-2 border-t border-gray-100 dark:border-gray-700/50 space-y-3">
             <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
               <span>
-                {lang === 'bn' 
-                  ? 'গোপনীয়তা সুরক্ষা: অনুমোদিত সারসংক্ষেপ ও প্রেসক্রিপশন সংরক্ষিত হয়েছে।' 
-                  : 'Privacy Protected: Agronomic summary & Rx verified.'}
+                {lang === 'bn' ? 'গোপনীয়তা সুরক্ষা: সারসংক্ষেপ সংরক্ষিত (মূল কথপোকথন সংরক্ষণ করা হয় না)।' : 'Privacy Protected: summary saved (verbatim dialogue is never stored).'}
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleOpenCurrentLivePrescription}
-              className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>{lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন (Rx Card)' : 'Open Digital Rx Prescription'}</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadReminder}
+                className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-gray-700/60 hover:bg-amber-50 dark:hover:bg-gray-700 text-amber-900 dark:text-amber-200 border border-amber-300/70 dark:border-amber-700/60 rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <CalendarDays className="w-4 h-4" />
+                <span>{lang === 'bn' ? '৩ দিন পরে মনে করিয়ে দিন' : 'Remind me in 3 days'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleShareSessionWhatsApp}
+                className="w-full sm:w-auto px-4 py-2 bg-white dark:bg-gray-700/60 hover:bg-emerald-50 dark:hover:bg-gray-700 text-emerald-900 dark:text-emerald-200 border border-emerald-300/70 dark:border-emerald-700/60 rounded-xl text-xs font-bold shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>{lang === 'bn' ? 'পরিবারের সাথে শেয়ার' : 'Share with family'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenCurrentLivePrescription}
+                className="w-full sm:w-auto sm:ml-auto px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন (Rx Card)' : 'Open Digital Rx Prescription'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

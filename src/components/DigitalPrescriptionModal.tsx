@@ -1,12 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   X, Download, Printer, Share2, Check, ShieldCheck, QrCode, 
   MapPin, Calendar, Clock, AlertTriangle, Leaf, Award, 
-  FileText, ArrowDownToLine, Copy, ExternalLink, Sparkles, Droplets, Thermometer, Wind
+  FileText, ArrowDownToLine, Copy, ExternalLink, Sparkles, Droplets, Thermometer, Wind,
+  Volume2, Square, Loader2
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
+import { generateSpeech } from '../services/ai';
 import { useAuth } from './AuthProvider';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
@@ -61,6 +63,46 @@ export default function DigitalPrescriptionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showRecoveryTracker, setShowRecoveryTracker] = useState(false);
 
+  // Read-aloud (Bangla voice) so non-reading farmers can listen to the Rx
+  const [isSpeechLoading, setIsSpeechLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechUrlRef = useRef<string | null>(null);
+
+  // Stop any running voice playback when the modal closes or unmounts
+  useEffect(() => {
+    return () => {
+      if (speechAudioRef.current) {
+        try { speechAudioRef.current.pause(); } catch (e) {}
+        speechAudioRef.current = null;
+      }
+      if (speechUrlRef.current) {
+        try { URL.revokeObjectURL(speechUrlRef.current); } catch (e) {}
+        speechUrlRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (speechAudioRef.current) {
+        try { speechAudioRef.current.pause(); } catch (e) {}
+        speechAudioRef.current = null;
+      }
+      if (speechUrlRef.current) {
+        try { URL.revokeObjectURL(speechUrlRef.current); } catch (e) {}
+        speechUrlRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+      }
+      setIsSpeaking(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const rxId = data.rxId || `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -106,6 +148,97 @@ export default function DigitalPrescriptionModal({
   // Trigger browser print
   const handlePrint = () => {
     window.print();
+  };
+
+  // Build a clean spoken script from the prescription (strip emojis/markup)
+  const buildReadAloudText = (): string => {
+    const L = lang === 'bn';
+    const parts: string[] = [];
+    parts.push(L ? `ডিজিটাল কৃষি ব্যবস্থাপত্র। আইডি ${rxId}।` : `Digital Krishi Prescription. ID ${rxId}.`);
+    parts.push(L ? `ফসল: ${data.crop}।` : `Crop: ${data.crop}.`);
+    parts.push(L ? `সমস্যা: ${data.diseaseName}।` : `Issue: ${data.diseaseName}.`);
+    if (data.symptoms && data.symptoms.length > 0) {
+      parts.push(L ? `লক্ষণ: ${data.symptoms.join('। ')}।` : `Symptoms: ${data.symptoms.join('. ')}.`);
+    }
+    if (data.culturalSteps && data.culturalSteps.length > 0) {
+      parts.push(L ? `প্রথম করণীয়: ${data.culturalSteps.join('। ')}।` : `First steps: ${data.culturalSteps.join('. ')}.`);
+    }
+    if (data.organicSteps && data.organicSteps.length > 0) {
+      parts.push(L ? `জৈব প্রতিকার: ${data.organicSteps.join('। ')}।` : `Organic remedies: ${data.organicSteps.join('. ')}.`);
+    }
+    if (data.chemicalSteps && data.chemicalSteps.length > 0) {
+      parts.push(L ? `রাসায়নিক প্রতিকার, সতর্কতার সাথে: ${data.chemicalSteps.join('। ')}।` : `Chemical remedies, with caution: ${data.chemicalSteps.join('. ')}.`);
+    }
+    if (data.investigationSteps && data.investigationSteps.length > 0) {
+      parts.push(L ? `যাচাইয়ের ধাপ: ${data.investigationSteps.join('। ')}।` : `Verification steps: ${data.investigationSteps.join('. ')}.`);
+    }
+    parts.push(
+      L
+        ? 'এটি প্রাথমিক এআই পরামর্শ। রাসায়নিক প্রয়োগের আগে স্থানীয় কৃষি কর্মকর্তা অথবা ১৬১২৩ নম্বরে পরামর্শ নিন।'
+        : 'This is preliminary AI advice. Before chemical application, consult a local agriculture officer or call 16123.'
+    );
+    return parts.join(' ').replace(/[*#_`•━🔒]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const stopReadAloud = () => {
+    if (speechAudioRef.current) {
+      try { speechAudioRef.current.pause(); } catch (e) {}
+      speechAudioRef.current = null;
+    }
+    if (speechUrlRef.current) {
+      try { URL.revokeObjectURL(speechUrlRef.current); } catch (e) {}
+      speechUrlRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    setIsSpeaking(false);
+  };
+
+  const handleReadAloud = async () => {
+    if (isSpeechLoading) return;
+    if (isSpeaking) {
+      stopReadAloud();
+      return;
+    }
+    const text = buildReadAloudText();
+    setIsSpeechLoading(true);
+    try {
+      const b64 = await generateSpeech(text);
+      if (!b64) throw new Error('No audio data returned');
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      speechUrlRef.current = url;
+      const audio = new Audio(url);
+      speechAudioRef.current = audio;
+      audio.onended = () => stopReadAloud();
+      audio.onerror = () => stopReadAloud();
+      await audio.play();
+      setIsSpeaking(true);
+    } catch (err) {
+      console.warn('Prescription TTS failed, falling back to Web Speech:', err);
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+          utterance.rate = 0.95;
+          utterance.onend = () => setIsSpeaking(false);
+          utterance.onerror = () => setIsSpeaking(false);
+          window.speechSynthesis.speak(utterance);
+          setIsSpeaking(true);
+        } catch (synthErr) {
+          toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
+        }
+      } else {
+        toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
+      }
+    } finally {
+      setIsSpeechLoading(false);
+    }
   };
 
   // Copy textual summary to clipboard
@@ -214,6 +347,29 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             >
               <Printer className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{lang === 'bn' ? 'প্রিন্ট' : 'Print'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReadAloud}
+              disabled={isSpeechLoading}
+              className={`p-2 sm:px-3 sm:py-1.5 text-xs font-bold rounded-xl transition-all border flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                isSpeaking
+                  ? 'bg-emerald-600 text-white border-emerald-500'
+                  : 'text-stone-700 dark:text-stone-300 bg-stone-100 dark:bg-stone-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-stone-200 dark:border-stone-700'
+              }`}
+              title={lang === 'bn' ? 'প্রেসক্রিপশন শুনুন (বাংলা)' : 'Listen to prescription'}
+            >
+              {isSpeechLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isSpeaking ? (
+                <Square className="w-3.5 h-3.5 fill-current" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {isSpeaking ? (lang === 'bn' ? 'থামান' : 'Stop') : (lang === 'bn' ? 'শুনুন' : 'Listen')}
+              </span>
             </button>
 
             <button

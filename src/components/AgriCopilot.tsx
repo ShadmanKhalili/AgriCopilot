@@ -1630,7 +1630,15 @@ export default function AgriCopilot({
         <div className="w-full">
           <LiveVideoCopilot 
             lang={lang} 
-            locationContext={selectedDistrict ? `${selectedDistrict}, Bangladesh` : "Bangladesh"}
+            locationContext={activeDistrict ? `${lang === 'bn' ? activeDistrict.bn_name : activeDistrict.name}, Bangladesh` : "Bangladesh"}
+            globalLocation={
+              globalLocation ||
+              (activeUpazila
+                ? { latitude: activeUpazila.lat, longitude: activeUpazila.lng }
+                : activeDistrict
+                  ? { latitude: activeDistrict.lat, longitude: activeDistrict.lng }
+                  : null)
+            }
             onCaptureFrameForDeepDiagnosis={(dataUrl: string) => {
               const arr = dataUrl.split(',');
               const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
