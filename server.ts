@@ -190,14 +190,14 @@ async function startServer() {
   app.get("/robots.txt", (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=3600");
-    res.send("User-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: *\nAllow: /\n\nSitemap: https://ais-pre-2nwljfwnsxb7xxmaxdswrv-588005236984.asia-east1.run.app/sitemap.xml\n");
+    res.send("User-agent: Mediapartners-Google\nAllow: /\n\nUser-agent: *\nAllow: /\n\nSitemap: https://agri-copilot.netlify.app/sitemap.xml\n");
   });
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  // Check if Google Maps / WeatherNext 3 API keys are configured in environment secrets
+  // Check if Google Maps / Google Weather API keys are configured in environment secrets
   app.get("/api/config-status", (req, res) => {
     const googleMapsConfigured = Boolean(
       process.env.GOOGLE_MAPS_API_KEY || 
@@ -205,17 +205,15 @@ async function startServer() {
       process.env.MAPS_API_KEY
     );
     const weatherNextConfigured = Boolean(
-      process.env.WEATHERNEXT_API_KEY || 
-      process.env.VITE_GOOGLE_MAPS_API_KEY ||
       process.env.GOOGLE_MAPS_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      process.env.GEMINI_API_KEY
+      process.env.VITE_GOOGLE_MAPS_API_KEY ||
+      process.env.MAPS_API_KEY
     );
     res.json({
       googleMapsConfigured,
       weatherNextConfigured,
       activeProviders: {
-        weatherNext: weatherNextConfigured ? "Google DeepMind WeatherNext 3 (Live Google Maps Weather API)" : "Standard Open-Meteo Ensemble",
+        weatherNext: weatherNextConfigured ? "Google Maps Platform Weather API (live)" : "Open-Meteo agro-forecast ensemble",
         googleMaps: googleMapsConfigured ? "Google Maps Platform (Authenticated)" : "Standard Web Maps"
       }
     });
@@ -911,7 +909,7 @@ async function startServer() {
     }
   });
 
-  // Google DeepMind WeatherNext 3 - AI-Powered High-Resolution Agrometeorological Endpoint
+  // AgroCast AI / Google Weather API - High-Resolution Agrometeorological Endpoint
   const handleWeatherNext3 = async (req: express.Request, res: express.Response) => {
     try {
       const { latitude, longitude, timezone = 'auto', forecast_days = '7' } = req.query;
@@ -932,7 +930,6 @@ async function startServer() {
         (req.query.apiKey as string) ||
         process.env.VITE_GOOGLE_MAPS_API_KEY ||
         process.env.GOOGLE_MAPS_API_KEY ||
-        process.env.WEATHERNEXT_API_KEY ||
         process.env.GOOGLE_API_KEY;
 
       const gridLat = Math.round(lat / 0.05) * 0.05;
@@ -942,11 +939,11 @@ async function startServer() {
       let weatherPayload: any = null;
 
       // =========================================================================
-      // PATHWAY 1: Live Google Maps Platform Weather API (DeepMind Weather Engine)
+      // PATHWAY 1: Live Google Maps Platform Weather API (Google Weather API)
       // =========================================================================
       if (googleKey) {
         try {
-          console.log(`[WeatherNext 3] Initiating live Google Maps Weather API request for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
+          console.log(`[AgroCast AI] Initiating live Google Maps Weather API request for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
           
           const gmpHeaders = {
             'X-Goog-Maps-Solution-ID': 'gmp_mcp_codeassist_v1_aistudio'
@@ -992,7 +989,7 @@ async function startServer() {
           const publicAlertsData = alertsRes.data?.weatherAlerts || [];
 
           if (currentCond && forecastHours.length > 0) {
-            console.log(`[WeatherNext 3] Live Google Weather API lookup successful! ${forecastHours.length} hours received.`);
+            console.log(`[AgroCast AI] Live Google Weather API lookup successful! ${forecastHours.length} hours received.`);
 
             const currentTemp = currentCond.temperature?.degrees ?? 28;
             const currentHumidity = currentCond.relativeHumidity ?? 60;
@@ -1107,7 +1104,7 @@ async function startServer() {
               });
             }
 
-            // Calculate 64-member DeepMind ensemble parameters
+            // Heuristic ensemble spread & convergence estimate
             const ensembleSeed = Math.abs(Math.sin(lat * 12.9898 + lon * 78.233) * 1000);
             const varianceFactor = 0.82 + ((ensembleSeed % 100) / 280);
             const convergenceScore = Math.min(99, Math.max(93, Math.round(97 - (varianceFactor - 1) * 10)));
@@ -1237,28 +1234,26 @@ async function startServer() {
                 expires: new Date(Date.now() + 86400000).toISOString(),
                 agroImpact: "Clear field drainage furrows to prevent root inundation; secure harvested produce and postpone fertilizer broadcasting.",
                 dataSource: {
-                  name: "Google Maps Weather API & DeepMind WeatherNext 3",
+                  name: "Google Maps Weather API Forecast Analytics",
                   authorityUri: "https://developers.google.com/maps/documentation/weather"
                 }
               });
             }
 
             weatherPayload = {
-              model: "WeatherNext 3",
-              provider: "Google DeepMind & Google Maps Weather API",
-              version: "3.0-live-gmp",
+              model: "Google Weather API",
+              provider: "Google Maps Platform",
+              version: "1.0-live-gmp",
               source: "google_weather_api",
               resolution: "0.05° (~5 km spatial grid)",
               grid_coordinates: { latitude: gridLat, longitude: gridLon },
-              satellite_assimilation: {
-                status: "LIVE_STREAM",
-                mosaic_sources: ["Google Maps Platform Weather API", "Google DeepMind WeatherNext 3 AI Engine", "Himawari-9 / INSAT-3DR Rapid Scanning"],
-                ingestion_interval: "Continuous real-time API assimilation",
-                accuracy_gain: "Up to 50% reduction in precipitation CRPS error vs legacy NWP"
+              data_sources: {
+                forecast: "Google Maps Platform Weather API (weather.googleapis.com)",
+                note: "Agro-meteorological metrics (dew point, blight risk, spray windows, spread envelopes) are computed server-side from the live Google Weather API response."
               },
               alerts: alerts,
               ensemble: {
-                members: 64,
+                estimate_basis: "Heuristic spread envelope derived from hourly Google Weather API forecast data",
                 convergence_score_pct: convergenceScore,
                 temperature_spread: {
                   p10: parseFloat((currentTemp - 0.7 * varianceFactor).toFixed(1)),
@@ -1325,8 +1320,8 @@ async function startServer() {
                 temperature_2m_min: [Math.min(...hourlyTemps.slice(0, 24), currentTemp - 4)]
               },
               dataSource: {
-                name: "Google Maps Platform Weather API & Google DeepMind",
-                authorityUri: "https://developers.google.com/maps/documentation/weather?utm_campaign=gmp_mcp_codeassist_v1_aistudio"
+                name: "Google Maps Platform Weather API",
+                authorityUri: "https://developers.google.com/maps/documentation/weather"
               },
               agentAttribution: "Google Maps"
             };
@@ -1334,7 +1329,7 @@ async function startServer() {
             googleWeatherSucceeded = true;
           }
         } catch (gmpErr: any) {
-          console.warn("[WeatherNext 3] Google Maps Weather API lookup failed, gracefully engaging automatic ensemble fallback:", gmpErr.response?.data || gmpErr.message);
+          console.warn("[AgroCast AI] Google Maps Weather API lookup failed, gracefully engaging automatic ensemble fallback:", gmpErr.response?.data || gmpErr.message);
         }
       }
 
@@ -1342,7 +1337,7 @@ async function startServer() {
       // PATHWAY 2: Automatic High-Resolution Agro Ensemble Fallback
       // =========================================================================
       if (!googleWeatherSucceeded) {
-        console.log(`[WeatherNext 3] Synthesizing high-resolution DeepMind meteorological ensemble fallback for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
+        console.log(`[AgroCast AI] Synthesizing high-resolution agro-meteorological ensemble fallback (Open-Meteo) for (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
         
         const url = `https://api.open-meteo.com/v1/forecast`;
         const response = await axios.get(url, {
@@ -1544,21 +1539,19 @@ async function startServer() {
         }
 
         weatherPayload = {
-          model: "WeatherNext 3",
-          provider: "Open-Meteo High-Resolution Ensemble (Automatic Fallback)",
-          version: "3.0-ensemble64",
+          model: "AgroCast AI",
+          provider: "Open-Meteo (5 km grid)",
+          version: "1.0-ensemble",
           source: "ensemble_synthesis",
           resolution: "0.05° (~5 km spatial grid)",
           grid_coordinates: { latitude: gridLat, longitude: gridLon },
-          satellite_assimilation: {
-            status: "ONLINE",
-            mosaic_sources: ["Multi-model ECMWF IFS / GFS NWP Ensemble", "Himawari-9 / INSAT-3DR Geostationary Satellites"],
-            ingestion_interval: "1-hour continuous refresh",
-            accuracy_gain: "High-resolution 0.05° spatial downscaling"
+          data_sources: {
+            forecast: "Open-Meteo high-resolution model data (api.open-meteo.com)",
+            note: "Agro-meteorological metrics (dew point, blight risk, spray windows, spread envelopes) are computed server-side from Open-Meteo model data."
           },
           alerts: ensembleAlerts,
           ensemble: {
-            members: 64,
+            estimate_basis: "Heuristic spread estimate derived from Open-Meteo daily probabilities",
             convergence_score_pct: convergenceScore,
             temperature_spread: { p10: tempP10, median: currentTemp, p90: tempP90 },
             precipitation_spread_mm: { p10: rainP10, median: expectedRainSum, p90: rainP90 },
@@ -1600,9 +1593,9 @@ async function startServer() {
       res.setHeader("Surrogate-Control", "no-store");
       return res.json(weatherPayload);
     } catch (error: any) {
-      console.error("[WeatherNext 3] Error generating AI weather forecast:", error.message);
+      console.error("[AgroCast AI] Error generating weather forecast:", error.message);
       return res.status(500).json({
-        error: "Failed to generate WeatherNext 3 forecast",
+        error: "Failed to generate weather forecast",
         details: error.message
       });
     }

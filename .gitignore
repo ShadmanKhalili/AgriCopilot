@@ -7,3 +7,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# AI tool artifacts (kept local, not tracked)
+.aistudio/
+.gmp_cache/
+bun.lock

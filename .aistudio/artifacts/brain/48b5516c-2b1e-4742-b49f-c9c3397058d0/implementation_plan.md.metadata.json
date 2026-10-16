@@ -1,6 +1,0 @@
-{
-  "summary": "Comprehensive implementation plan for integrating Google DeepMind WeatherNext 3 via the Google Weather API with automatic ensemble fallback, featuring real-time weather alerts, precipitation risk curves, and a dual-model comparison toggle.",
-  "updatedAt": "2026-10-16T08:12:28.419680487Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

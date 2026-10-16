@@ -54,7 +54,7 @@ interface WeatherData {
   soilCarbon?: number;
   safeSprayingWindow?: string;
   safeWindowDetail?: any;
-  // WeatherNext 3 Fields
+  // High-resolution AI forecast fields
   isWeatherNext3?: boolean;
   weatherNext3?: any;
   alerts?: WeatherAlertItem[];
@@ -164,12 +164,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         );
         if (!wnRes.ok) {
           const errJson = await wnRes.json().catch(() => ({}));
-          console.error("WeatherNext 3 API Error Response:", wnRes.status, errJson);
-          throw new Error(errJson.error || `WeatherNext 3 service returned ${wnRes.status}`);
+          console.error("Weather API Error Response:", wnRes.status, errJson);
+          throw new Error(errJson.error || `Weather service returned ${wnRes.status}`);
         }
         const wnData = await wnRes.json();
         if (!wnData.current) {
-          throw new Error("Invalid WeatherNext 3 data structure received");
+          throw new Error("Invalid weather data structure received");
         }
 
         const code = wnData.current?.weather_code || 0;
@@ -230,7 +230,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           evapotranspiration: wnData.agro_metrics?.evapotranspiration_et0_mm,
           safeSprayingWindow,
           safeWindowDetail: wnData.agro_metrics?.safe_spraying_window_detail,
-          // WeatherNext 3 Specific Fields
+          // High-resolution AI forecast fields
           isWeatherNext3: true,
           weatherNext3: wnData,
           alerts: wnData.alerts || [],
@@ -702,7 +702,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   <DataStatusBadge
                     status={cacheInfo?.isCached ? 'cached' : 'forecast'}
                     lang={lang}
-                    source={weather?.isWeatherNext3 ? (weather.source === 'google_weather_api' ? 'Google Maps Weather API' : 'DeepMind WeatherNext 3') : 'Open-Meteo ECMWF/GFS Ensemble'}
+                    source={weather?.isWeatherNext3 ? (weather.source === 'google_weather_api' ? 'Google Maps Weather API' : 'AgroCast AI (Open-Meteo)') : 'Open-Meteo ECMWF/GFS Ensemble'}
                     timestamp={formatExactSyncTime(cacheInfo?.timestamp || Date.now(), lang)}
                     cacheAge={cacheInfo?.isCached ? formatCacheAge(cacheInfo.timestamp || Date.now(), lang) : undefined}
                     compact={false}
@@ -720,7 +720,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   onClick={() => fetchWeatherAndAdvisory(forecastModel, true)} 
                   disabled={isLoading || isRefreshingLive}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
-                  title={lang === 'bn' ? 'সরাসরি স্যাটেলাইট ও আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather & Satellite Data'}
+                  title={lang === 'bn' ? 'লাইভ আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather Data'}
                   aria-label="Refresh Live Weather"
                 >
                   <RefreshCcw className={`w-3.5 h-3.5 ${isLoading || isRefreshingLive ? 'animate-spin text-emerald-600 dark:text-emerald-400' : ''}`} />
@@ -742,7 +742,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
             {weather ? (
               <div className="space-y-3 sm:space-y-3.5">
-                {/* WeatherNext 3 Advanced Weather AI banner */}
+                {/* High-resolution AI weather banner */}
                 {weather.isWeatherNext3 && (
                   <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white p-3 rounded-xl border border-blue-400/25 shadow-xs relative overflow-hidden">
                     <div className="flex items-center justify-between gap-2">
@@ -753,30 +753,30 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[9px] font-black tracking-widest uppercase text-blue-300">
-                              {weather.source === 'google_weather_api' ? 'Google Maps Live API' : 'Google AI DeepMind'}
+                              {weather.source === 'google_weather_api' ? 'Google Maps Live API' : 'AgroCast AI (Open-Meteo)'}
                             </span>
                             <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
-                              5km AI
+                              {weather.source === 'google_weather_api' ? 'Live API' : '5 km grid'}
                             </span>
                           </div>
                           <h4 className="text-xs sm:text-sm font-bold text-white truncate">
                             {weather.source === 'google_weather_api'
                               ? (lang === 'bn' ? 'গুগল ম্যাপস লাইভ ওয়েদার এপিআই' : 'Google Maps Platform Live Weather')
-                              : (lang === 'bn' ? 'উন্নত এআই আবহাওয়া মডেল' : 'DeepMind WeatherNext 3 AI')}
+                              : (lang === 'bn' ? 'এগ্রোকাস্ট এআই আবহাওয়া মডেল' : 'AgroCast AI Weather Model')}
                           </h4>
                           <div className="mt-0.5 text-[9px] text-blue-200 flex items-center gap-1 font-medium">
                             <span>🔒</span>
                             <span className="truncate">
                               {weather.source === 'google_weather_api'
                                 ? (lang === 'bn' ? 'আপনার গুগল ম্যাপস এপিআই কি দ্বারা সরাসরি সংযুক্ত' : 'Live Google Weather API · Authenticated via Secret Key')
-                                : (lang === 'bn' ? '৬৪-মেম্বার এনসেম্বল ফলব্যাক সক্রিয়' : 'Automatic 64-Member Ensemble Fallback Active')}
+                                : (lang === 'bn' ? 'স্বয়ংক্রিয় Open-Meteo এনসেম্বল ফলব্যাক সক্রিয়' : 'Automatic Open-Meteo Ensemble Fallback Active')}
                             </span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wider block">
-                          {lang === 'bn' ? 'মডেল নির্ভুলতা' : 'Accuracy'}
+                          {lang === 'bn' ? 'মডেল কনসেন্সাস (আনুমানিক)' : 'Consensus (est.)'}
                         </span>
                         <span className="text-xs font-black text-emerald-400 tabular-nums">
                           {weather.ensembleConfidence !== undefined 
@@ -908,7 +908,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   </Tooltip>
                 </div>
 
-                {/* WeatherNext 3 Agro-Meteorology Cards (Squeezed) */}
+                {/* High-resolution agro-meteorology cards */}
                 {weather.isWeatherNext3 && (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center justify-between">

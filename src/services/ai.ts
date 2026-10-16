@@ -499,8 +499,9 @@ export const generateWeatherAdvisory = async (
       let weatherNext3Context = "";
       if (weatherData.isWeatherNext3 && weatherData.weatherNext3) {
         const wn = weatherData.weatherNext3;
-        weatherNext3Context = `AgroCast AI agro-forecast (Open-Meteo 5 km grid):
-        - Data Source: Open-Meteo high-resolution model data with server-side agro-metric computation
+        const wnSourceLabel = wn.source === 'google_weather_api' ? 'live Google Maps Platform Weather API' : 'Open-Meteo 5 km grid (automatic fallback)';
+        weatherNext3Context = `AgroCast AI agro-forecast (source: ${wnSourceLabel}):
+        - Data Source: ${wn.source === 'google_weather_api' ? 'Google Maps Platform Weather API (weather.googleapis.com) with server-side agro-metric computation' : 'Open-Meteo high-resolution model data with server-side agro-metric computation'}
         - Model Confidence Estimate: ${wn.ensemble?.convergence_score_pct || 96}% (heuristic)
         - 100m Upper Canopy Wind: ${wn.agro_metrics?.boundary_layer_wind_100m_kmh || 'N/A'} km/h
         - Direct Solar Irradiance (DNI): ${wn.agro_metrics?.direct_normal_irradiance_wm2 || 0} W/m²
@@ -527,7 +528,7 @@ export const generateWeatherAdvisory = async (
       - Pest/Disease & Fungal Blight risk (reference dew point depression and humidity)
       - Sowing/Harvesting timing
       - Use of the Safe Spraying Window for pesticide application.
-      ${weatherData.isWeatherNext3 ? '- Note that agro-metrics are derived from the Open-Meteo 5 km grid forecast with server-side computation.' : ''}
+      ${weatherData.isWeatherNext3 ? '- Note that agro-meteorological metrics are computed server-side from the active weather data source (Google Weather API or Open-Meteo).' : ''}
       
       Use markdown for formatting. Be direct and practical.`;
 

@@ -45,7 +45,7 @@ export default function DualModelComparison({
             <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
               <span>{lang === 'bn' ? 'আবহাওয়া মডেল ইঞ্জিন নির্বাচন' : 'Meteorological Engine'}</span>
               <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-normal">
-                {activeModel === 'weathernext3' ? '(Google DeepMind AI)' : '(ECMWF/GFS Ensemble)'}
+                {activeModel === 'weathernext3' ? '(AgroCast AI)' : '(ECMWF/GFS Ensemble)'}
               </span>
             </h4>
           </div>
@@ -63,7 +63,7 @@ export default function DualModelComparison({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>WeatherNext 3 (5km)</span>
+            <span>AgroCast AI (5km)</span>
           </button>
 
           <button
@@ -91,13 +91,13 @@ export default function DualModelComparison({
           <span>
             {showDiffInspector
               ? (lang === 'bn' ? 'মডেল তুলনা বন্ধ করুন' : 'Hide Dual-Model Variance Diff')
-              : (lang === 'bn' ? 'মডেল দুটির পার্থক্য ও নির্ভুলতা তুলনা দেখুন' : 'Compare WeatherNext 3 vs NWP Ensemble Variance')}
+              : (lang === 'bn' ? 'এগ্রোকাস্ট এআই বনাম NWP এনসেম্বল তুলনা করুন' : 'Compare AgroCast AI vs NWP Ensemble Variance')}
           </span>
           {showDiffInspector ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
         <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">
-          {lang === 'bn' ? '৫০% কম বৃষ্টিপাত ত্রুটি' : '50% lower CRPS error'}
+          {lang === 'bn' ? 'সম্ভাব্যতা বিস্তার (P10-P90)' : 'Probabilistic P10-P90 spread'}
         </span>
       </div>
 
@@ -116,7 +116,7 @@ export default function DualModelComparison({
                   <tr className="border-b border-stone-200 dark:border-stone-800 text-[11px] text-stone-400">
                     <th className="py-2 pr-3 font-medium">{lang === 'bn' ? 'বৈশিষ্ট্য' : 'Metric'}</th>
                     <th className="py-2 px-3 text-cyan-600 dark:text-cyan-400 font-bold bg-cyan-50/50 dark:bg-cyan-950/20 rounded-t-lg">
-                      WeatherNext 3 (Google AI)
+                      AgroCast AI
                     </th>
                     <th className="py-2 pl-3 text-blue-600 dark:text-blue-400 font-bold">
                       ECMWF/GFS (Legacy NWP)

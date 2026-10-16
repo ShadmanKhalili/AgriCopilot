@@ -76,8 +76,8 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
           </div>
           <p className="text-xs text-stone-400 mt-0.5">
             {lang === 'bn' 
-              ? 'গুগল ডিপমাইন্ড এআই ৬৪-মেম্বার এনসেম্বল ভিত্তিক বৃষ্টিপাতের চরম ঝুঁকি ও ন্যূনতম সীমা'
-              : 'Google DeepMind AI 64-member meteorological ensemble variance & cloudburst tail risk'}
+              ? 'মডেল-ভিত্তিক বৃষ্টিপাত বিস্তার (P10-P90) ও অতি-বৃষ্টির ঝুঁকি'
+              : 'Model-derived precipitation spread (P10-P90) & cloudburst tail risk'}
           </p>
         </div>
 
