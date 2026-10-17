@@ -4,7 +4,7 @@ import {
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
   Scan, Info, Maximize2, Minimize2, ArrowRight, CheckCircle2, Loader2, Bot, User,
   BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award,
-  CalendarDays, HelpCircle, ListChecks, Share2
+  CalendarDays, HelpCircle, ListChecks, Share2, X
 } from 'lucide-react';
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
@@ -124,6 +124,9 @@ export default function LiveVideoCopilot({
   // Investor Pitch Presets & 1-Click Digital Rx State
   const [activeDemoPreset, setActiveDemoPreset] = useState<DemoPreset | null>(null);
   const [showInvestorPresetsBar, setShowInvestorPresetsBar] = useState(false);
+  // Investor demo is a boardroom tool, not a farmer feature: the panel stays
+  // collapsed behind a tiny ghost button for the general public.
+  const [showInvestorPanel, setShowInvestorPanel] = useState(false);
   const [showPitchCheatSheet, setShowPitchCheatSheet] = useState(false);
   const [isRxModalOpen, setIsRxModalOpen] = useState(false);
   const [currentRxData, setCurrentRxData] = useState<PrescriptionData | null>(null);
@@ -1916,65 +1919,44 @@ Return a JSON object with this exact structure:
               </p>
             </div>
 
-            {/* Analysis Depth & Scope Toggle */}
-            <div className="bg-gray-900/80 p-3 rounded-2xl border border-gray-800 backdrop-blur-md text-left">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`p-2 rounded-xl shrink-0 transition-colors ${
-                    isExtendedThinking ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  }`}>
-                    {isExtendedThinking ? <BrainCircuit className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-white block">
-                      {isExtendedThinking 
-                        ? (lang === 'bn' ? 'গভীর রোগ ও প্যাথলজি মোড' : 'Deep Clinical Pathology Mode')
-                        : (lang === 'bn' ? 'দ্রুত পরামর্শ মোড (বাগান, ইনডোর ও ফসল)' : 'Fast Mode (Gardens, Houseplants & Crops)')}
-                    </span>
-                    <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">
-                      {isExtendedThinking
-                        ? (lang === 'bn' ? 'সুপার স্পেশালাইজড: জটিল ফসলি রোগের বিশদ কারণ ও বৈজ্ঞানিক ব্যবচ্ছেদ' : 'Super specialized: In-depth clinical pathology & differential diagnosis')
-                        : (lang === 'bn' ? 'বিস্তৃত পরিধি: ছাদ বাগান, ইনডোর গাছ বাছাই, টবের মাটি ও তাৎক্ষণিক সমাধান' : 'Broad scope: Rooftop gardens, indoor plant buying, potting mix & quick tips')}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsExtendedThinking(!isExtendedThinking)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    isExtendedThinking ? 'bg-purple-600' : 'bg-gray-700'
+            {/* Analysis depth — one quiet line (default behavior unchanged) */}
+            <button
+              type="button"
+              onClick={() => setIsExtendedThinking(!isExtendedThinking)}
+              className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md text-left transition-colors cursor-pointer ${
+                isExtendedThinking
+                  ? 'bg-purple-950/40 border-purple-500/30 hover:bg-purple-950/60'
+                  : 'bg-gray-900/60 border-gray-800/80 hover:bg-gray-800/60'
+              }`}
+              role="switch"
+              aria-checked={isExtendedThinking}
+              aria-label={lang === 'bn'
+                ? (isExtendedThinking ? 'গভীর রোগ ও প্যাথলজি মোড বন্ধ করুন' : 'গভীর রোগ ও প্যাথলজি মোড চালু করুন')
+                : (isExtendedThinking ? 'Turn off Deep Clinical Pathology Mode' : 'Turn on Deep Clinical Pathology Mode')}
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                {isExtendedThinking
+                  ? <BrainCircuit className="w-3.5 h-3.5 text-purple-300 shrink-0" aria-hidden="true" />
+                  : <Zap className="w-3.5 h-3.5 text-emerald-300 shrink-0" aria-hidden="true" />}
+                <span className={`text-[11px] font-bold truncate ${isExtendedThinking ? 'text-purple-200' : 'text-emerald-200'}`}>
+                  {isExtendedThinking
+                    ? (lang === 'bn' ? 'গভীর রোগ বিশ্লেষণ' : 'Deep pathology mode')
+                    : (lang === 'bn' ? 'দ্রুত পরামর্শ' : 'Quick advice')}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
+                  isExtendedThinking ? 'bg-purple-500' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none mt-0.5 ml-0.5 inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-200 ${
+                    isExtendedThinking ? 'translate-x-3' : ''
                   }`}
-                  role="switch"
-                  aria-checked={isExtendedThinking}
-                  aria-label={lang === 'bn'
-                    ? (isExtendedThinking ? 'গভীর রোগ ও প্যাথলজি মোড বন্ধ করুন' : 'গভীর রোগ ও প্যাথলজি মোড চালু করুন')
-                    : (isExtendedThinking ? 'Turn off Deep Clinical Pathology Mode' : 'Turn on Deep Clinical Pathology Mode')}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      isExtendedThinking ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Quick Topic Guide Chips */}
-              <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-gray-800/80">
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
-                  {lang === 'bn' ? '🌱 ছাদ ও বারান্দা বাগান' : '🌱 Rooftop & Balcony'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
-                  {lang === 'bn' ? '🪴 ইনডোর গাছ বাছাই' : '🪴 Indoor Plants to Buy'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
-                  {lang === 'bn' ? '🌿 টবের মাটি ও সার' : '🌿 Potting Mix & Care'}
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-gray-800/80 text-emerald-300 border border-gray-700/50">
-                  {lang === 'bn' ? '🌾 ফসলি রোগবালাই' : '🌾 Crop Advisory'}
-                </span>
-              </div>
-            </div>
+                />
+              </span>
+            </button>
 
             <motion.button
               whileHover={{ scale: 1.03 }}
@@ -1995,7 +1977,8 @@ Return a JSON object with this exact structure:
               </span>
             </motion.button>
 
-            {/* Investor Pitch & Demo Presets Bar */}
+            {/* Investor demo — collapsed behind a tiny ghost control (boardroom tool, no public use) */}
+            {showInvestorPanel ? (
             <div className="pt-2 text-left">
               <div className="bg-gradient-to-br from-amber-500/10 via-emerald-950/40 to-teal-950/40 p-3.5 rounded-2xl border border-amber-500/30 backdrop-blur-md">
                 <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -2013,13 +1996,24 @@ Return a JSON object with this exact structure:
                     </div>
                   </div>
                   
-                  <button
-                    type="button"
-                    onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
-                    className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all shrink-0 cursor-pointer"
-                  >
-                    {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
+                      className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all cursor-pointer"
+                    >
+                      {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowInvestorPanel(false)}
+                      aria-label={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
+                      title={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
+                      className="p-1 text-amber-300/70 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg border border-amber-400/20 transition-all cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Pitch Cheat Sheet Accordion */}
@@ -2115,6 +2109,20 @@ Return a JSON object with this exact structure:
                 </div>
               </div>
             </div>
+            ) : (
+              <div className="pt-1 flex justify-end pr-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowInvestorPanel(true)}
+                  aria-label={lang === 'bn' ? 'ইনভেস্টর ডেমো প্যানেল খুলুন' : 'Open investor demo panel'}
+                  title={lang === 'bn' ? 'ইনভেস্টর ডেমো' : 'Investor demo'}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-stone-500/60 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer select-none"
+                >
+                  <Briefcase className="w-3 h-3" aria-hidden="true" />
+                  <span>{lang === 'bn' ? 'ডেমো' : 'Demo'}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
