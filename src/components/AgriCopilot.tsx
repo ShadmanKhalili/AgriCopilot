@@ -480,56 +480,6 @@ const SAMPLE_DIAGNOSIS_CASES = [
     }
   },
   {
-    crop: 'chili',
-    categoryBn: 'মরিচ',
-    categoryEn: 'Chili / Pepper',
-    titleBn: 'মরিচের ডাই-ব্যাক ও অ্যানথ্রাকনোজ (ফল পচা)',
-    titleEn: 'Chili Anthracnose & Die-back',
-    descBn: 'ডাল শুকিয়ে যাওয়া ও পাকা মরিচে গোল গোল ক্ষত',
-    descEn: 'Twig die-back starting from top with sunken fruit lesions',
-    sampleDiagnosis: {
-      disease: 'Chili Anthracnose & Die-back (Colletotrichum capsici)',
-      diseaseBn: 'মরিচের অ্যানথ্রাকনোজ ও ডাল শুকিয়ে যাওয়া (ডাই-ব্যাক) রোগ',
-      confidence: 93,
-      severity: 'High',
-      qualitativeSeverity: 'High',
-      cause: 'Fungal spores splashing from rain and dew during warm, humid conditions.',
-      organicRemedy: 'Collect and burn dead twigs; spray garlic cloves extract (50g/L) or neem leaf extract.',
-      chemicalRemedy: 'Azoxystrobin + Difenoconazole (Amistar Top) @ 1ml/L or Propiconazole (Tilt 250 EC) @ 0.5ml/L.',
-      verificationAdvice: 'Look for sunken circular black spots with concentric rings on ripe chili pods.',
-      symptomsBreakdown: [
-        'Twig tips turn brown and dry downwards ("die-back")',
-        'Sunken circular water-soaked spots on red and green chilies',
-        'Premature fruit drop and black speckles on stems'
-      ]
-    }
-  },
-  {
-    crop: 'chili',
-    categoryBn: 'মরিচ',
-    categoryEn: 'Chili / Pepper',
-    titleBn: 'মরিচের পাতা কোঁকড়ানো (থ্রিপস ও মাইট)',
-    titleEn: 'Chili Leaf Curl (Thrips & Mites)',
-    descBn: 'পাতা নৌকা বা বাটির মতো কুঁকড়ে যাওয়া',
-    descEn: 'Upward or downward boat-shaped curling with stunted growth',
-    sampleDiagnosis: {
-      disease: 'Chili Leaf Curl Complex (Thrips & Yellow Mite)',
-      diseaseBn: 'মরিচের পাতা কোঁকড়ানো রোগ (চুষি পোকা ও লাল মাকড়)',
-      confidence: 91,
-      severity: 'Medium',
-      qualitativeSeverity: 'Medium',
-      cause: 'Thrips feeding causes upward cupping; yellow mites cause downward inverted boat cupping.',
-      organicRemedy: 'Spray neem oil (3ml/L) with liquid soap; place blue and yellow sticky traps in field.',
-      chemicalRemedy: 'Fipronil (Ascend 5 SC) @ 1ml/L for thrips; Fenpyroximate or Abamectin @ 1.2ml/L for mites.',
-      verificationAdvice: 'Hold curled leaves against sunlight to check for silvery scrape marks and minute mites.',
-      symptomsBreakdown: [
-        'Upward boat-shaped curl indicates thrips; downward curling indicates mite infestation',
-        'Brittle, thickened foliage with bronzed appearance underneath',
-        'Flower dropping and severely stunted bushy plant canopy'
-      ]
-    }
-  },
-  {
     crop: 'watermelon',
     categoryBn: 'তরমুজ',
     categoryEn: 'Watermelon',
@@ -551,106 +501,6 @@ const SAMPLE_DIAGNOSIS_CASES = [
         'Vines wilt during hot midday sun and temporarily recover at night',
         'Permanent yellowing and dry shriveling of runners within 3-4 days',
         'Brown vascular streaks inside stem xylem bundles'
-      ]
-    }
-  },
-  {
-    crop: 'betelLeaf',
-    categoryBn: 'পান পাতা',
-    categoryEn: 'Betel Leaf / Paan',
-    titleBn: 'পানের গোড়া পচা ও ডাঁটা পচা রোগ',
-    titleEn: 'Betel Vine Foot Rot & Stem Rot',
-    descBn: 'লতার গোড়ায় কালো পচন ও পাতা ঝরে বরজ ফাঁকা হওয়া',
-    descEn: 'Dark basal stem rot leading to sudden vine wilting in boroj',
-    sampleDiagnosis: {
-      disease: 'Betel Leaf Foot & Stem Rot (Phytophthora parasitica & Sclerotium rolfsii)',
-      diseaseBn: 'পানের গোড়া পচা ও বরজের ডাঁটা পচা রোগ',
-      confidence: 95,
-      severity: 'High',
-      qualitativeSeverity: 'High',
-      cause: 'Excessive humidity inside betel conservatory (boroj) and poor root drainage.',
-      organicRemedy: 'Improve boroj aeration; apply mustard oil cake with Trichoderma around vine bases.',
-      chemicalRemedy: 'Drench soil with Bordeaux mixture (1%) or Metalaxyl + Mancozeb (Ridomil Gold) @ 2g/L.',
-      verificationAdvice: 'Inspect stem base near soil line: soft brown water-soaked rotting with mustard-seed-like sclerotia.',
-      symptomsBreakdown: [
-        'Dark brown to black slimy rot on stem right at the soil line',
-        'Rapid yellowing, drooping, and shedding of lush green betel leaves',
-        'White fungal threads visible at moist base under dense shade'
-      ]
-    }
-  },
-  {
-    crop: 'onion',
-    categoryBn: 'পেঁয়াজ ও রসুন',
-    categoryEn: 'Onion & Garlic',
-    titleBn: 'পেঁয়াজের পার্পল ব্লচ (বেগুনি দাগ রোগ)',
-    titleEn: 'Onion Purple Blotch',
-    descBn: 'পাতায় ডিম্বাকার জলছাপ দাগের মাঝে বেগুনি কেন্দ্র',
-    descEn: 'Sunken purplish-brown lesions on tubular leaves and seed stalks',
-    sampleDiagnosis: {
-      disease: 'Purple Blotch (Alternaria porri)',
-      diseaseBn: 'পেঁয়াজের পার্পল ব্লচ বা বেগুনি দাগ রোগ',
-      confidence: 90,
-      severity: 'Medium',
-      qualitativeSeverity: 'Medium',
-      cause: 'High relative humidity (80-90%) and temperatures around 21-30°C.',
-      organicRemedy: 'Crop rotation with non-allium crops; spray garlic extract and ensure wide spacing.',
-      chemicalRemedy: 'Iprodione (Rovral 50 WP) @ 2g/L or Difenoconazole (Score 250 EC) @ 1ml/L + sticker.',
-      verificationAdvice: 'Look for elongated purplish-brown spots surrounded by chlorotic yellow halos on leaves.',
-      symptomsBreakdown: [
-        'Small water-soaked lesions expanding into purplish-brown center',
-        'Leaves snap and collapse at the lesion point during windy periods',
-        'Premature drying of onion tops reducing bulb size and storage quality'
-      ]
-    }
-  },
-  {
-    crop: 'wheat',
-    categoryBn: 'গম',
-    categoryEn: 'Wheat',
-    titleBn: 'গমের ব্লাস্ট ও পাতা মরিচা রোগ',
-    titleEn: 'Wheat Blast & Leaf Rust',
-    descBn: 'শীষের কিছু অংশ সাদা হয়ে যাওয়া ও পাতায় বাদামি গুঁড়ো',
-    descEn: 'Bleached white spikelets with rust pustules on leaf surface',
-    sampleDiagnosis: {
-      disease: 'Wheat Blast (Magnaporthe oryzae Triticum) & Leaf Rust (Puccinia triticina)',
-      diseaseBn: 'গমের ব্লাস্ট ও পাতা মরিচা (রাস্ট) রোগ',
-      confidence: 94,
-      severity: 'High',
-      qualitativeSeverity: 'High',
-      cause: 'Warm unseasonal rain and high humidity during wheat heading stage.',
-      organicRemedy: 'Plant blast-resistant certified seeds (e.g. BARI Gom 33); timely early sowing.',
-      chemicalRemedy: 'Nativo 75 WG (Tebuconazole + Trifloxystrobin) @ 0.6g/L applied at first heading.',
-      verificationAdvice: 'Examine wheat ears: bleached white spikelets while rest of ear remains green.',
-      symptomsBreakdown: [
-        'Complete or partial bleaching of wheat ear above the infection point',
-        'Grey fungal mold at the rachis node of the ear',
-        'Shriveled, light grains causing drastic harvest loss'
-      ]
-    }
-  },
-  {
-    crop: 'tea',
-    categoryBn: 'চা পাতা',
-    categoryEn: 'Tea',
-    titleBn: 'চায়ের লাল মাকড় ও রেড রাস্ট (শ্যাওলা রোগ)',
-    titleEn: 'Tea Red Spider Mite & Red Rust',
-    descBn: 'পাতার উপরিভাগ তামাটে লাল ও ছোট ছোট শ্যাওলা দাগ',
-    descEn: 'Bronzed leaf surface with orange algal patches on tea branches',
-    sampleDiagnosis: {
-      disease: 'Red Spider Mite (Oligonychus coffeae) & Red Rust (Cephaleuros parasiticus)',
-      diseaseBn: 'চায়ের লাল মাকড় আক্রমণ ও রেড রাস্ট রোগ',
-      confidence: 88,
-      severity: 'Medium',
-      qualitativeSeverity: 'Medium',
-      cause: 'Dry spells and hot sunny exposed sections in tea gardens.',
-      organicRemedy: 'Maintain shade trees; spray wettable sulfur (2g/L) during early morning.',
-      chemicalRemedy: 'Propargite 57 EC (Omite) @ 2ml/L or Hexythiazox @ 1ml/L targeted under leaves.',
-      verificationAdvice: 'Rub fingers on red leaf: orange stain left on skin indicates active mite colony.',
-      symptomsBreakdown: [
-        'Upper surface of mature leaves turns rusty bronze or brick-red',
-        'Dull, dry appearance with reduced flushing of two leaves and a bud',
-        'Defoliation of maintenance leaves during dry winter and pre-monsoon'
       ]
     }
   },
@@ -3338,7 +3188,7 @@ export default function AgriCopilot({
               className="w-full text-sm sm:text-base font-semibold tracking-wide bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-stone-800 dark:text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-xs"
             >
               <option value="" disabled className="text-sm font-semibold tracking-wider">
-                {lang === 'bn' ? 'নমুনা নির্বাচন করুন ( ১৮ টি আঞ্চলিক রোগ )...' : 'Select sample scenario (18 regional cases)...'}
+                {lang === 'bn' ? 'নমুনা নির্বাচন করুন ( ২০ টি আঞ্চলিক রোগ )...' : 'Select sample scenario (20 regional cases)...'}
               </option>
               {Array.from(new Set(SAMPLE_DIAGNOSIS_CASES.map(s => lang === 'bn' ? s.categoryBn : s.categoryEn))).map(cat => (
                 <optgroup key={cat} label={`— ${cat} —`}>
