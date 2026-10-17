@@ -39,7 +39,7 @@ export const AgriCurrency: React.FC<AgriCurrencyProps> = ({
       </span>
       {unit && (
         <span
-          className={`text-[0.75em] font-sans font-normal opacity-70 ml-0.5 select-none ${unitClassName}`}
+          className={`text-[length:max(0.75em,11px)] font-sans font-normal opacity-70 ml-0.5 select-none ${unitClassName}`}
         >
           {unit.startsWith('/') ? unit : `/${unit}`}
         </span>

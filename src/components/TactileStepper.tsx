@@ -67,7 +67,7 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
     }
   };
 
-  const btnPad = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9 sm:w-10 sm:h-10';
+  const btnPad = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10 sm:w-11 sm:h-11';
   const textPad = size === 'sm' ? 'py-1 px-2 text-xs' : 'py-1.5 px-3 text-sm';
 
   return (
