@@ -465,7 +465,7 @@ export default function Layout() {
                     Smart Krishi Platform
                   </span>
                   {(userRole === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
-                    <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300/80 font-bold px-1.5 py-0.2 rounded-md">
+                    <span className="text-[11px] bg-amber-100 text-amber-900 border border-amber-300/80 font-bold px-1.5 py-0.2 rounded-md">
                       Admin
                     </span>
                   )}
@@ -477,7 +477,7 @@ export default function Layout() {
               type="button"
               onClick={() => setIsMobileMenuOpen(false)}
               aria-label={lang === 'bn' ? 'মেনু বন্ধ করুন' : 'Close Menu'}
-              className="md:hidden p-2.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-white/10 dark:text-white/90 rounded-2xl active:scale-90 focus:outline-none transition-all cursor-pointer"
+              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-white/10 dark:text-white/90 rounded-2xl active:scale-90 focus:outline-none transition-all cursor-pointer"
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -494,7 +494,7 @@ export default function Layout() {
                     onClick={() => {
                       setSelectedPillarFilter(cat.key);
                     }}
-                    className={`py-1.5 px-0.5 text-[10px] font-black rounded-xl transition-all truncate text-center cursor-pointer ${
+                    className={`py-2.5 px-0.5 text-[11px] font-black rounded-xl transition-all truncate text-center cursor-pointer ${
                       isCatActive
                         ? 'bg-emerald-700 text-white shadow-xs dark:bg-emerald-300 dark:text-emerald-950'
                         : 'text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/70 dark:text-emerald-300 dark:hover:text-white dark:hover:bg-white/5'
@@ -514,12 +514,12 @@ export default function Layout() {
                 value={menuSearchQuery}
                 onChange={(e) => setMenuSearchQuery(e.target.value)}
                 placeholder={lang === 'bn' ? 'টুল বা বিষয় খুঁজুন...' : 'Search tools or tasks...'}
-                className="w-full bg-white dark:bg-emerald-950/60 text-slate-900 dark:text-white placeholder-emerald-700/50 dark:placeholder-emerald-400/50 text-xs pl-8 pr-7 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/50 focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 transition-all shadow-2xs"
+                className="w-full bg-white dark:bg-emerald-950/60 text-slate-900 dark:text-white placeholder-emerald-700/50 dark:placeholder-emerald-400/50 text-xs pl-8 pr-7 py-3 rounded-xl border border-emerald-200 dark:border-emerald-800/50 focus:outline-none focus:border-emerald-500 dark:focus:border-emerald-400 transition-all shadow-2xs"
               />
               {menuSearchQuery && (
                 <button 
                   onClick={() => setMenuSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-700 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-white p-0.5 cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-700 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-white p-2 -mr-1.5 cursor-pointer"
                   aria-label="Clear search"
                 >
                   <X className="w-3 h-3" />
@@ -574,7 +574,7 @@ export default function Layout() {
                           </span>
                         </div>
                       </div>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
                         {pillarTabs.length}
                       </span>
                     </div>
@@ -640,7 +640,7 @@ export default function Layout() {
                                   }`}>
                                     {tab.subcategory}
                                   </span>
-                                  <span className={`text-[10px] truncate ${isActive ? 'text-emerald-50 dark:text-emerald-900' : 'text-slate-600 dark:text-emerald-200'}`}>
+                                  <span className={`text-[11px] truncate ${isActive ? 'text-emerald-50 dark:text-emerald-900' : 'text-slate-600 dark:text-emerald-200'}`}>
                                     {tab.description}
                                   </span>
                                 </div>
@@ -648,7 +648,7 @@ export default function Layout() {
                             </div>
 
                             {tab.badge && (
-                              <span className={`relative z-10 text-[9px] font-semibold px-2 py-0.5 rounded-full tracking-wide shrink-0 ml-1 ${
+                              <span className={`relative z-10 text-[11px] font-semibold px-2 py-0.5 rounded-full tracking-wide shrink-0 ml-1 ${
                                 isActive 
                                   ? 'bg-white text-emerald-900 dark:bg-emerald-800 dark:text-white' 
                                   : 'bg-emerald-100 text-emerald-800 border border-emerald-300/70 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
@@ -685,7 +685,7 @@ export default function Layout() {
                     <div className="font-black tracking-tight truncate max-w-[90px] text-slate-900 dark:text-white">
                       {user.displayName}
                     </div>
-                    <div className="text-emerald-700 dark:text-emerald-400 text-[9px] font-bold uppercase tracking-wider">{userRole}</div>
+                    <div className="text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wider">{userRole}</div>
                   </div>
                 </button>
                 <button 
@@ -732,7 +732,7 @@ export default function Layout() {
                   audioFeedback.playTactileClick();
                   setIsMobileMenuOpen(true);
                 }}
-                className="md:hidden p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:hover:bg-emerald-800 dark:text-emerald-200 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
+                className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:hover:bg-emerald-800 dark:text-emerald-200 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
                 aria-label={lang === 'bn' ? 'মেনু খুলুন' : 'Open Menu'}
               >
                 <Menu className="w-5 h-5" />
@@ -753,7 +753,7 @@ export default function Layout() {
                 {lang === 'bn' ? '$৪৫০M ফসল সাশ্রয়' : '$450M Loss Shield'}
               </span>
               <span className="text-stone-300 dark:text-emerald-800">•</span>
-              <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
+              <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider text-[11px]">
                 {lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা প্রোটোকল' : 'AI Decision Support Protocol'}
               </span>
             </div>
@@ -766,7 +766,7 @@ export default function Layout() {
                 <button
                   type="button"
                   onClick={() => setIsRegionModalOpen(true)}
-                  className="flex items-center space-x-1 sm:space-x-1.5 bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/70 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 dark:border-emerald-800/60 px-2 py-1.5 sm:px-2.5 rounded-xl transition-all active:scale-95 shadow-2xs group shrink-0 cursor-pointer"
+                  className="flex items-center space-x-1 sm:space-x-1.5 min-h-[44px] bg-emerald-50/90 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/70 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 dark:border-emerald-800/60 px-2 py-1.5 sm:px-2.5 rounded-xl transition-all active:scale-95 shadow-2xs group shrink-0 cursor-pointer"
                 >
                   <span className="relative flex h-2 w-2">
                     {globalLocation ? (
@@ -797,7 +797,7 @@ export default function Layout() {
               <button 
                 type="button"
                 onClick={toggleTheme} 
-                className="flex items-center space-x-1 font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 px-2 py-1.5 sm:px-2.5 rounded-xl border border-gray-200 dark:border-emerald-800/60 transition-all active:scale-95 shrink-0 cursor-pointer"
+                className="flex items-center space-x-1 min-h-[44px] font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 px-2 sm:px-2.5 rounded-xl border border-gray-200 dark:border-emerald-800/60 transition-all active:scale-95 shrink-0 cursor-pointer"
                 title={theme === 'light' ? t.darkMode : t.lightMode}
                 // Accessible name must contain the visible label ("Dark"/"Light") to satisfy
                 // WCAG 2.5.3 Label in Name.
@@ -820,7 +820,7 @@ export default function Layout() {
               <button 
                 type="button"
                 onClick={toggleLanguage} 
-                className="flex items-center space-x-1 font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 px-2 py-1.5 sm:px-2.5 rounded-xl border border-gray-200 dark:border-emerald-800/60 transition-all active:scale-95 shrink-0 cursor-pointer"
+                className="flex items-center space-x-1 min-h-[44px] font-black text-[11px] sm:text-xs bg-gray-100/90 hover:bg-gray-200 text-gray-800 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:text-emerald-200 px-2 sm:px-2.5 rounded-xl border border-gray-200 dark:border-emerald-800/60 transition-all active:scale-95 shrink-0 cursor-pointer"
                 title="Toggle Language"
               >
                 <Globe className="w-3.5 h-3.5 text-gray-500 dark:text-emerald-400" aria-hidden="true" />
@@ -834,17 +834,17 @@ export default function Layout() {
               {user ? (
                 <button
                   onClick={() => setActiveTab('profile')}
-                  className="p-1 sm:p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:border-emerald-800/60 transition-all shrink-0 cursor-pointer"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center p-1 sm:p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 dark:bg-emerald-950/80 dark:hover:bg-emerald-900/80 dark:border-emerald-800/60 transition-all shrink-0 cursor-pointer"
                   title="Profile"
                 >
-                  <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center">
                     {user.displayName?.charAt(0) || 'U'}
                   </div>
                 </button>
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="inline-flex items-center space-x-1 sm:space-x-1.5 text-[11px] sm:text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-2 py-1.5 sm:px-3 rounded-xl transition-all shadow-xs active:scale-95 shrink-0 cursor-pointer"
+                  className="inline-flex items-center min-h-[44px] space-x-1 sm:space-x-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-2 py-1.5 sm:px-3 rounded-xl transition-all shadow-xs active:scale-95 shrink-0 cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">{t.signIn}</span>
@@ -912,7 +912,7 @@ export default function Layout() {
 
                 <button
                   onClick={() => setIsMobileMenuOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white bg-white/70 dark:bg-stone-900/70 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200/60 dark:border-stone-800 transition-colors shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-xl text-xs font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white bg-white/70 dark:bg-stone-900/70 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200/60 dark:border-stone-800 transition-colors shrink-0 cursor-pointer"
                 >
                   <Grid className="w-3.5 h-3.5 text-stone-400" />
                   <span>{lang === 'bn' ? 'আরও সেবা...' : 'More tools...'}</span>

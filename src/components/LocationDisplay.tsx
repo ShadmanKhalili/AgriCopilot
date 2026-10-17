@@ -43,17 +43,17 @@ export default function LocationDisplay({ coords, lang, color, accuracy, isManua
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <p className="text-[10px] font-black uppercase tracking-widest opacity-75">
+          <p className="text-[11px] font-black uppercase tracking-widest opacity-75">
             {isManual 
               ? (lang === 'bn' ? 'নির্বাচিত এলাকা' : 'Selected Region')
               : (t.locationDetected || "Location Detected")}
           </p>
           {accuracy ? (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-white/80 border border-black/5 opacity-80">
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-white/80 border border-black/5 opacity-80">
               {lang === 'bn' ? `নির্ভুলতা: ±${accuracy}মি` : `Accuracy: ±${accuracy}m`}
             </span>
           ) : isManual ? (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-white/80 border border-black/5 opacity-80">
+            <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-white/80 border border-black/5 opacity-80">
               {lang === 'bn' ? 'ম্যানুয়াল সেট' : 'Manual'}
             </span>
           ) : null}

@@ -145,7 +145,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
               <option value="katha">{lang === 'bn' ? 'কাঠা' : 'Katha'}</option>
             </select>
           </div>
-          <div className="text-[10px] text-gray-400 font-medium">
+          <div className="text-[11px] text-gray-400 font-medium">
             ≈ {normalizedDecimals.toFixed(1)} {lang === 'bn' ? 'শতাংশ' : 'decimals'}
           </div>
         </div>
@@ -173,7 +173,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
               <option value="ml">{lang === 'bn' ? 'মিলি (ml)' : 'Milliliters (ml)'}</option>
             </select>
           </div>
-          <div className="text-[10px] text-gray-400 font-medium">
+          <div className="text-[11px] text-gray-400 font-medium">
             {lang === 'bn' ? 'প্যাকেটের নির্দেশ অনুযায়ী' : 'As per label/AI advice'}
           </div>
         </div>
@@ -193,7 +193,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <option value={20}>{lang === 'bn' ? '২০ লিটার (ব্যাটারি স্প্রেয়ার)' : '20 Liters (Battery Sprayer)'}</option>
             <option value={5}>{lang === 'bn' ? '৫ লিটার (হাতে চালিত)' : '5 Liters (Hand Pump)'}</option>
           </select>
-          <div className="text-[10px] text-gray-400 font-medium">
+          <div className="text-[11px] text-gray-400 font-medium">
             {lang === 'bn' ? '১ ড্রাম = ১৬ লিটার' : 'Default is 16L'}
           </div>
         </div>
@@ -214,7 +214,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
               className="w-full bg-emerald-50/40 border border-emerald-200 rounded-xl pl-7 pr-3 py-1.5 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
             />
           </div>
-          <div className="text-[10px] text-gray-400 font-medium">
+          <div className="text-[11px] text-gray-400 font-medium">
             {lang === 'bn' ? 'বাজারদর অনুযায়ী' : 'Approximate retail rate in BDT'}
           </div>
         </div>
@@ -228,7 +228,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-emerald-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-emerald-700 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">
+            <span className="text-[11px] font-black uppercase tracking-wider">
               {lang === 'bn' ? 'প্রতি ট্যাংকে মিশ্রণ' : 'Per Knapsack Tank'}
             </span>
             <Droplets className="w-4 h-4 text-emerald-500" />
@@ -237,7 +237,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <div className="text-2xl md:text-3xl font-black text-emerald-900 tracking-tight">
               {chemicalPerTank} <span className="text-xs font-bold text-emerald-600">{dosageUnit}</span>
             </div>
-            <p className="text-[10px] text-gray-500 font-medium mt-1">
+            <p className="text-[11px] text-gray-500 font-medium mt-1">
               {lang === 'bn' ? `প্রতি ${sprayerCapacity} লিটার পানিতে মেশাবেন` : `Mix in each ${sprayerCapacity}L water`}
             </p>
           </div>
@@ -249,7 +249,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-teal-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-teal-700 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">
+            <span className="text-[11px] font-black uppercase tracking-wider">
               {lang === 'bn' ? 'মোট স্প্রে সংখ্যা' : 'Total Tanks'}
             </span>
             <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
@@ -258,7 +258,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <div className="text-2xl md:text-3xl font-black text-teal-900 tracking-tight">
               {totalTanks} <span className="text-xs font-bold text-teal-600">{lang === 'bn' ? 'ট্যাংক' : 'Tanks'}</span>
             </div>
-            <p className="text-[10px] text-gray-500 font-medium mt-1">
+            <p className="text-[11px] text-gray-500 font-medium mt-1">
               {lang === 'bn' ? `মোট ${totalWaterNeeded} লিটার পানি` : `Total ${totalWaterNeeded}L water needed`}
             </p>
           </div>
@@ -270,7 +270,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-blue-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-blue-700 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">
+            <span className="text-[11px] font-black uppercase tracking-wider">
               {lang === 'bn' ? 'মোট ওষুধ কিনবেন' : 'Total Required'}
             </span>
             <CheckCircle2 className="w-4 h-4 text-blue-500" />
@@ -282,7 +282,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
                 {totalChemicalNeeded >= 1000 ? (dosageUnit === 'g' ? 'kg' : 'L') : dosageUnit}
               </span>
             </div>
-            <p className="text-[10px] text-gray-500 font-medium mt-1">
+            <p className="text-[11px] text-gray-500 font-medium mt-1">
               {lang === 'bn' ? 'সম্পূর্ণ জমিতে ১ বার স্প্রে' : 'For 1 full field spray cycle'}
             </p>
           </div>
@@ -294,7 +294,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl p-4 shadow-lg shadow-orange-500/20 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-amber-100 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">
+            <span className="text-[11px] font-black uppercase tracking-wider">
               {lang === 'bn' ? 'আনুমানিক মোট খরচ' : 'Estimated Cost'}
             </span>
             <DollarSign className="w-4 h-4 text-white" />
@@ -303,7 +303,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <div className="text-2xl md:text-3xl font-black text-white tracking-tight">
               ৳ {estimatedCost.toLocaleString()}
             </div>
-            <p className="text-[10px] text-amber-100 font-medium mt-1">
+            <p className="text-[11px] text-amber-100 font-medium mt-1">
               {lang === 'bn' ? 'দোকানের আনুমানিক খুচরা মূল্য' : 'Based on local retail rates'}
             </p>
           </div>

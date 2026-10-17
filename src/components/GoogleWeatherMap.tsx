@@ -32,7 +32,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
             <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
               {lang === 'bn' ? 'গুগল ম্যাপে খামার ও মাইক্রোক্লাইমেট অবস্থান' : 'Farm & Microclimate Location Map'}
             </h4>
-            <span className="text-[10px] text-stone-400 font-mono">
+            <span className="text-[11px] text-stone-400 font-mono">
               Google Maps Platform · {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E
             </span>
           </div>
@@ -100,7 +100,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
       </div>
 
       <div className="mt-2 text-right">
-        <span className="text-[10px] text-stone-400 font-mono">
+        <span className="text-[11px] text-stone-400 font-mono">
           Google Maps
         </span>
       </div>

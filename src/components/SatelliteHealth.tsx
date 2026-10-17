@@ -166,7 +166,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
               timestamp={imageryMetadata.acquisitionDate}
               compact={false}
             />
-            <span className="text-[10px] text-stone-500 font-mono">
+            <span className="text-[11px] text-stone-500 font-mono">
               {lang === 'bn' ? '১০মি. পিক্সেল স্যাম্পল • বহুভুজ নয়' : '10m Point Pixel • Non-Polygon'}
             </span>
           </div>
@@ -182,26 +182,26 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
               {lang === 'bn' ? 'স্যাটেলাইট পর্যবেক্ষণ শর্তাবলী ও মাঠ প্রাসঙ্গিকতা' : 'Plot-Level Satellite Monitoring Notice'}
             </h3>
           </div>
-          <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-300 dark:border-amber-800">
+          <span className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-300 dark:border-amber-800">
             {lang === 'bn' ? 'সরেজমিন বহুভুজ যাচাইকরণ আবশ্যক' : 'Ground Polygon Verification Required'}
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
           <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800">
-            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'চিত্রগ্রহণের তারিখ' : 'Acquisition Date'}</span>
+            <span className="text-[11px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'চিত্রগ্রহণের তারিখ' : 'Acquisition Date'}</span>
             <span className="font-semibold text-stone-800 dark:text-stone-200">{imageryMetadata.acquisitionDate}</span>
           </div>
           <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800">
-            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'বায়ুমণ্ডলীয় মান' : 'Atmospheric QA'}</span>
+            <span className="text-[11px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'বায়ুমণ্ডলীয় মান' : 'Atmospheric QA'}</span>
             <span className="font-semibold text-stone-800 dark:text-stone-200">{imageryMetadata.qualityFlag}</span>
           </div>
           <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800">
-            <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'প্লট সীমানা পদ্ধতি' : 'Boundary Status'}</span>
+            <span className="text-[11px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'প্লট সীমানা পদ্ধতি' : 'Boundary Status'}</span>
             <span className="font-semibold text-stone-800 dark:text-stone-200">{imageryMetadata.boundaryType}</span>
           </div>
           <div className="p-2.5 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800">
-            <span id="crop-stage-label" className="text-[10px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'ফসলের পর্যায়' : 'Crop Stage Context'}</span>
+            <span id="crop-stage-label" className="text-[11px] font-bold text-stone-500 dark:text-stone-400 block uppercase">{lang === 'bn' ? 'ফসলের পর্যায়' : 'Crop Stage Context'}</span>
             <select
               aria-labelledby="crop-stage-label"
               value={cropStage}
@@ -367,7 +367,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                 <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                   {lang === 'bn' ? '১. ক্যানোপি স্বাস্থ্য ও ঘনত্ব' : '1. Canopy Vigor'}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getHealthStatus(ndvi).bgClass}`}>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${getHealthStatus(ndvi).bgClass}`}>
                   {getHealthStatus(ndvi).label}
                 </span>
               </div>
@@ -375,7 +375,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                 {getHealthStatus(ndvi).insight}
               </p>
               <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
-                <span className="text-[10px] font-medium">NDVI Index</span>
+                <span className="text-[11px] font-medium">NDVI Index</span>
                 <span className="text-xs font-bold text-stone-900 dark:text-stone-100 tabular-nums">{ndvi.toFixed(2)}</span>
               </div>
             </motion.div>
@@ -391,7 +391,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                 <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                   {lang === 'bn' ? '২. আর্দ্রতা ও সেচ পরামর্শ' : '2. Canopy Moisture'}
                 </span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getMoistureStatus(ndmi).bgClass}`}>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${getMoistureStatus(ndmi).bgClass}`}>
                   {getMoistureStatus(ndmi).label}
                 </span>
               </div>
@@ -399,7 +399,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                 {getMoistureStatus(ndmi).insight}
               </p>
               <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
-                <span className="text-[10px] font-medium">NDMI Index</span>
+                <span className="text-[11px] font-medium">NDMI Index</span>
                 <span className="text-xs font-bold text-stone-900 dark:text-stone-100 tabular-nums">{ndmi.toFixed(2)}</span>
               </div>
             </motion.div>
@@ -415,7 +415,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                 <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                   {lang === 'bn' ? '৩. তাত্ক্ষণিক মাঠ অ্যাকশন' : '3. Immediate Field Action'}
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                   {lang === 'bn' ? 'কার্যকর করণীয়' : 'Actionable'}
                 </span>
               </div>
@@ -425,7 +425,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                   : (lang === 'bn' ? 'মাঠের নিম্ন-ঘনত্ব অংশে ইউরিয়া উপরিপ্রয়োগ বা আগাছা দমন নিশ্চিত করতে সরেজমিনে পরিদর্শন করুন।' : 'Conduct priority field scouting on low-biomass sections to verify root health or weed competition.')}
               </p>
               <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-baseline justify-between text-stone-500">
-                <span className="text-[10px] font-medium">Scouting Priority</span>
+                <span className="text-[11px] font-medium">Scouting Priority</span>
                 <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
                   {ndvi > 0.6 ? (lang === 'bn' ? 'স্বাভাবিক পর্যবেক্ষণ' : 'Routine') : (lang === 'bn' ? 'জরুরি পরিদর্শন' : 'High Priority')}
                 </span>
@@ -449,7 +449,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                     <span className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
                       {lang === 'bn' ? 'স্পেকট্রাল সূচক ও সেন্সর বিশ্লেষণ' : 'Field Metrology & Spectral Readings'}
                     </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400">
                       {lang === 'bn' ? 'এনডিভিআই ও এনডিএমআই ডায়াল' : 'NDVI / NDMI Gauges'}
                     </span>
                   </div>
@@ -519,7 +519,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                             {getHealthStatus(ndvi).label}
                           </span>
                         </div>
-                        <p className="text-stone-400 text-[10px] font-semibold uppercase tracking-wider">{t.ndviValue} (NIR - Red)/(NIR + Red)</p>
+                        <p className="text-stone-400 text-[11px] font-semibold uppercase tracking-wider">{t.ndviValue} (NIR - Red)/(NIR + Red)</p>
                       </div>
                     </div>
 
@@ -558,7 +558,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
                             {getMoistureStatus(ndmi).label}
                           </span>
                         </div>
-                        <p className="text-stone-400 text-[10px] font-semibold uppercase tracking-wider">Moisture Index (NIR - SWIR)/(NIR + SWIR)</p>
+                        <p className="text-stone-400 text-[11px] font-semibold uppercase tracking-wider">Moisture Index (NIR - SWIR)/(NIR + SWIR)</p>
                       </div>
                     </div>
                   </div>

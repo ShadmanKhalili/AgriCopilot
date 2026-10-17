@@ -1150,6 +1150,25 @@ export default function AgriCopilot({
     }
   };
 
+  // Voice-first: read a chat answer aloud with Web Speech (one tap per bubble).
+  const speakChatMessage = (rawText: string) => {
+    if (!('speechSynthesis' in window)) {
+      toast.error(lang === 'bn' ? 'এই ফোনে কণ্ঠস্বর সমর্থিত নয়।' : 'Speech is not supported on this device.');
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const plainText = rawText.replace(/[*#_`>|-]/g, ' ').replace(/\s+/g, ' ').trim();
+      const utterance = new SpeechSynthesisUtterance(plainText);
+      utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+      toast.success(lang === 'bn' ? 'উত্তরটি পড়ে শোনানো হচ্ছে...' : 'Reading the answer aloud...');
+    } catch {
+      toast.error(lang === 'bn' ? 'কণ্ঠস্বর চালানো যায়নি।' : 'Could not play speech.');
+    }
+  };
+
   const handleDiagnose = async () => {
     if (images.length === 0) return;
     
@@ -1448,7 +1467,7 @@ export default function AgriCopilot({
         <button
           type="button"
           onClick={() => setCopilotMode('live_stream')}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer relative whitespace-nowrap ${
+          className={`flex-1 min-w-0 min-h-[46px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer relative whitespace-nowrap ${
             copilotMode === 'live_stream'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-sm shadow-emerald-600/30'
               : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 hover:bg-white/50'
@@ -1465,7 +1484,7 @@ export default function AgriCopilot({
         <button
           type="button"
           onClick={() => setCopilotMode('static_upload')}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap ${
+          className={`flex-1 min-w-0 min-h-[46px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer whitespace-nowrap ${
             copilotMode === 'static_upload'
               ? 'bg-white dark:bg-stone-800 text-emerald-950 dark:text-emerald-300 shadow-sm border border-emerald-200 dark:border-emerald-800'
               : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 hover:bg-white/50'
@@ -1544,7 +1563,7 @@ export default function AgriCopilot({
                       {lang === 'bn' ? '💼 ইনভেস্টর ডেমো প্রিসেট (১-ক্লিক লোড)' : '💼 Investor Pitch Demo Presets (1-Click)'}
                     </span>
                   </div>
-                  <span className="text-[9px] text-amber-800 font-bold bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300/60">
+                  <span className="text-[11px] text-amber-800 font-bold bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300/60">
                     {lang === 'bn' ? 'বোর্ডরুম ব্যাকআপ' : 'Pitch Backup'}
                   </span>
                 </div>
@@ -1809,7 +1828,7 @@ export default function AgriCopilot({
                           <h3 className="text-xl sm:text-3xl font-black text-gray-900 tracking-tight leading-tight mb-0.5 sm:mb-1">{t.diagnosisResult}</h3>
                           <div className="flex items-center">
                             <Calendar className="w-3.5 h-3.5 mr-1.5 text-green-500" aria-hidden="true" />
-                            <span className="text-[10px] sm:text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                            <span className="text-[11px] sm:text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
                               <span className="sr-only">{lang === 'bn' ? 'তারিখ:' : 'Date:'}</span>
                               {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
@@ -1822,7 +1841,7 @@ export default function AgriCopilot({
                           onClick={handleClearAll}
                           aria-label={lang === 'bn' ? 'নতুন রোগ নির্ণয় শুরু করুন' : 'Start fresh diagnosis'}
                           title={lang === 'bn' ? 'বর্তমান ফলাফল মুছে নতুন রোগ পরীক্ষা শুরু করুন' : 'Clear results and start over'}
-                          className="flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-black text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-rose-200 uppercase tracking-widest transition-all focus:ring-2 focus:ring-rose-400 outline-none shadow-xs active:scale-95 cursor-pointer"
+                          className="flex items-center space-x-1.5 text-[11px] sm:text-[11px] font-black text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-rose-200 uppercase tracking-widest transition-all focus:ring-2 focus:ring-rose-400 outline-none shadow-xs active:scale-95 cursor-pointer"
                         >
                           <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                           <span>{lang === 'bn' ? 'নতুন পরীক্ষা' : 'Start Over'}</span>
@@ -1833,7 +1852,7 @@ export default function AgriCopilot({
                           onClick={scrollToContextSection}
                           aria-label={lang === 'bn' ? 'নতুন লক্ষণ বা তথ্য যোগ করুন' : 'Add new symptoms or context'}
                           title={lang === 'bn' ? 'ফসলের বর্তমান অবস্থা বা নতুন পরিস্থিতি যোগ করে পরামর্শ আপডেট করুন' : 'Add new field context or symptoms'}
-                          className="flex items-center space-x-1.5 text-[10px] sm:text-[11px] font-black text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 uppercase tracking-widest transition-all focus:ring-2 focus:ring-emerald-400 outline-none shadow-xs active:scale-95 cursor-pointer"
+                          className="flex items-center space-x-1.5 text-[11px] sm:text-[11px] font-black text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-emerald-200 dark:border-emerald-800 uppercase tracking-widest transition-all focus:ring-2 focus:ring-emerald-400 outline-none shadow-xs active:scale-95 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
                           <span>{lang === 'bn' ? 'নতুন তথ্য যোগ' : 'Add Context'}</span>
@@ -1844,14 +1863,14 @@ export default function AgriCopilot({
                           onClick={handleTranslate}
                           disabled={isTranslating}
                           aria-label={lang === 'en' ? 'বাংলায় অনুবাদ করুন' : 'Translate to English'}
-                          className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-xs active:scale-95 cursor-pointer"
+                          className="flex items-center space-x-1.5 sm:space-x-2 text-[11px] sm:text-[11px] font-black text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-blue-100 uppercase tracking-widest transition-all focus:ring-2 focus:ring-blue-400 outline-none shadow-xs active:scale-95 cursor-pointer"
                         >
                           {isTranslating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Globe className="w-3.5 h-3.5" aria-hidden="true" />}
                           <span>{lang === 'en' ? 'বাংলায় দেখুন' : 'View in English'}</span>
                         </button>
                         <div className="flex items-center space-x-1.5 sm:space-x-2 bg-green-50 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-green-100 shadow-xs transition-all">
                           <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
-                          <span className="text-[10px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
+                          <span className="text-[11px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
                         </div>
                       </div>
                     </div>
@@ -1954,7 +1973,7 @@ export default function AgriCopilot({
                               {/* Helpfulness Rating Section */}
                               <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
-                                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
+                                  <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
                                   <p className="text-xs font-bold text-gray-500">{lang === 'en' ? 'Was this diagnosis helpful?' : 'এই পরামর্শটি কি আপনার উপকারে এসেছে?'}</p>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -2071,7 +2090,7 @@ export default function AgriCopilot({
                               {diagnosis.confidence < 70 && (
                                 <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
                                   <AlertTriangle className="w-3.5 h-3.5" />
-                                  <span className="text-[10px] font-bold uppercase tracking-wider">{t.lowConfidenceWarning}</span>
+                                  <span className="text-[11px] font-bold uppercase tracking-wider">{t.lowConfidenceWarning}</span>
                                 </div>
                               )}
                             </div>
@@ -2215,7 +2234,7 @@ export default function AgriCopilot({
                                       </div>
                                     </div>
                                     <div className="flex items-center space-x-4 bg-blue-50/50 px-6 py-3 rounded-2xl border border-blue-100 shadow-sm">
-                                      <span className="text-[10px] font-black text-blue-800 uppercase tracking-widest leading-none">{lang === 'bn' ? 'তীব্রতা স্কোর' : 'Severity Score'}</span>
+                                      <span className="text-[11px] font-black text-blue-800 uppercase tracking-widest leading-none">{lang === 'bn' ? 'তীব্রতা স্কোর' : 'Severity Score'}</span>
                                       <div className="flex items-center space-x-1.5">
                                         <span className="text-2xl font-black text-blue-900 leading-none">{deepDiagnosis.severityScore || 'N/A'}</span>
                                         <span className="text-xs font-bold text-blue-400">/ 10</span>
@@ -2227,8 +2246,8 @@ export default function AgriCopilot({
                                   {/* Severity Meter */}
                                   <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 shadow-inner">
                                     <div className="flex items-center justify-between mb-3 px-1">
-                                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{lang === 'bn' ? 'নিরাপদ' : 'Safe'}</span>
-                                      <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">{lang === 'bn' ? 'মারাত্মক' : 'Critical'}</span>
+                                      <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{lang === 'bn' ? 'নিরাপদ' : 'Safe'}</span>
+                                      <span className="text-[11px] font-black text-red-500 uppercase tracking-widest">{lang === 'bn' ? 'মারাত্মক' : 'Critical'}</span>
                                     </div>
                                     <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden flex shadow-inner">
                                       <div 
@@ -2244,7 +2263,7 @@ export default function AgriCopilot({
                                   {/* Step 1: Hypothesis Verification */}
                                   <div className="bg-blue-50/40 p-8 rounded-[2.5rem] border border-blue-100 shadow-sm relative overflow-hidden group hover:bg-blue-50/60 transition-colors">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50 pointer-events-none group-hover:scale-110 transition-transform"></div>
-                                    <h4 className="flex items-center text-[10px] font-black text-blue-800 uppercase tracking-[0.3em] mb-6">
+                                    <h4 className="flex items-center text-[11px] font-black text-blue-800 uppercase tracking-[0.3em] mb-6">
                                       <CheckCircle2 className="w-4 h-4 mr-2.5 text-blue-600" />
                                       {lang === 'bn' ? 'প্রাথমিক অনুমান যাচাই' : 'Initial Hypothesis Verification'}
                                     </h4>
@@ -2256,7 +2275,7 @@ export default function AgriCopilot({
                                   {/* Step 2: Deductive Reasoning & Alternatives */}
                                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     <div className="lg:col-span-2 space-y-6">
-                                      <h4 className="flex items-center text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] pl-2">
+                                      <h4 className="flex items-center text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] pl-2">
                                         <Activity className="w-4 h-4 mr-2.5 text-indigo-500" />
                                         {lang === 'bn' ? 'ডিফারেনশিয়াল যুক্তি এবং প্রমাণ' : 'Differential Reasoning & Evidence'}
                                       </h4>
@@ -2265,7 +2284,7 @@ export default function AgriCopilot({
                                       </div>
                                     </div>
                                     <div className="space-y-6">
-                                      <h4 className="flex items-center text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] pl-2">
+                                      <h4 className="flex items-center text-[11px] font-black text-gray-500 uppercase tracking-[0.3em] pl-2">
                                         <HelpCircle className="w-4 h-4 mr-2.5 text-gray-400" />
                                         {lang === 'bn' ? 'বিকল্প সম্ভাবনা' : 'Possible Alternatives'}
                                       </h4>
@@ -2287,7 +2306,7 @@ export default function AgriCopilot({
                                   {/* Step 3: Final Detailed Diagnosis */}
                                   <div className="bg-white p-8 md:p-10 rounded-[3rem] border-2 border-green-50 shadow-sm relative overflow-hidden">
                                     <div className="absolute top-0 right-0 w-40 h-40 bg-green-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-40 pointer-events-none"></div>
-                                    <h4 className="flex items-center text-[10px] font-black text-green-700 uppercase tracking-[0.3em] mb-6">
+                                    <h4 className="flex items-center text-[11px] font-black text-green-700 uppercase tracking-[0.3em] mb-6">
                                       <Plus className="w-4 h-4 mr-2.5 text-green-600" />
                                       {lang === 'bn' ? 'চূড়ান্ত বিস্তারিত নির্ণয়' : 'Final Detailed Diagnosis'}
                                     </h4>
@@ -2300,7 +2319,7 @@ export default function AgriCopilot({
                                   <div className="space-y-6">
                                     <div className="bg-emerald-600/95 backdrop-blur-md p-8 md:p-10 rounded-[3.5rem] shadow-2xl shadow-emerald-200/50 text-white relative overflow-hidden group">
                                       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                                      <h4 className="flex items-center text-[10px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
+                                      <h4 className="flex items-center text-[11px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
                                         <ShieldAlert className="w-5 h-5 mr-3 text-white" />
                                         {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা এবং সঠিক মাত্রা' : 'Advanced Treatment & Exact Dosages'}
                                       </h4>
@@ -2320,7 +2339,7 @@ export default function AgriCopilot({
                                   {/* Step 5: Timeline & Context */}
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="bg-amber-50/50 p-7 rounded-[2.5rem] border border-amber-100 shadow-sm hover:bg-amber-50/80 transition-colors">
-                                      <h4 className="flex items-center text-[10px] font-black text-amber-800 uppercase tracking-[0.3em] mb-5">
+                                      <h4 className="flex items-center text-[11px] font-black text-amber-800 uppercase tracking-[0.3em] mb-5">
                                         <Calendar className="w-4 h-4 mr-2.5 text-amber-600" />
                                         {lang === 'bn' ? 'সফলতার সময়সীমা' : 'Actionable Timeline'}
                                       </h4>
@@ -2329,7 +2348,7 @@ export default function AgriCopilot({
                                       </div>
                                     </div>
                                     <div className="bg-indigo-50/50 p-7 rounded-[2.5rem] border border-indigo-100 shadow-sm hover:bg-indigo-50/80 transition-colors">
-                                      <h4 className="flex items-center text-[10px] font-black text-indigo-800 uppercase tracking-[0.3em] mb-5">
+                                      <h4 className="flex items-center text-[11px] font-black text-indigo-800 uppercase tracking-[0.3em] mb-5">
                                         <Globe className="w-4 h-4 mr-2.5 text-indigo-600" />
                                         {lang === 'bn' ? 'পরিবেশ ও প্রাদুর্ভাবের তথ্য' : 'Environmental & Outbreak Context'}
                                       </h4>
@@ -2341,7 +2360,7 @@ export default function AgriCopilot({
 
                                   {/* Technical Details (Pathogen) - Moved to bottom */}
                                   <div className="bg-gray-50/50 p-5 rounded-2xl border border-gray-200 opacity-60 hover:opacity-100 transition-opacity">
-                                    <h4 className="flex items-center text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">
+                                    <h4 className="flex items-center text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">
                                       <Bug className="w-3 h-3 mr-2" />
                                       {lang === 'bn' ? 'প্রযুক্তিগত তথ্য (প্যাথোজেন)' : 'Technical Pathogen Data'}
                                     </h4>
@@ -2352,10 +2371,10 @@ export default function AgriCopilot({
                                   
                                   {deepDiagnosis.sources && deepDiagnosis.sources.length > 0 && (
                                     <div className="pt-4 border-t border-gray-100">
-                                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{lang === 'bn' ? 'যাচাইকৃত তথ্যসূত্র' : 'Verified Sources'}</h4>
+                                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{lang === 'bn' ? 'যাচাইকৃত তথ্যসূত্র' : 'Verified Sources'}</h4>
                                       <div className="flex flex-wrap gap-2">
                                         {deepDiagnosis.sources.map((source: string, idx: number) => (
-                                          <div key={idx} className="flex items-center space-x-2 text-[10px] bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                                          <div key={idx} className="flex items-center space-x-2 text-[11px] bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
                                             <Globe className="w-2.5 h-2.5 text-gray-400" />
                                             <span className="text-gray-500 font-bold max-w-[150px] truncate">{source.replace(/https?:\/\/(www\.)?/, '')}</span>
                                           </div>
@@ -2403,12 +2422,12 @@ export default function AgriCopilot({
                                   </div>
                                   <div>
                                     <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
-                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
+                                    <p className="text-[11px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                  <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
+                                  <span className="text-[11px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
                                 </div>
                               </div>
 
@@ -2434,7 +2453,7 @@ export default function AgriCopilot({
                                           {lang === 'bn' ? 'নতুন ফিল্ড লক্ষণ বা অতিরিক্ত তথ্য যোগ করুন:' : 'Add Field Context & Symptoms:'}
                                         </h5>
                                       </div>
-                                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
                                         {lang === 'bn' ? '১-ক্লিকে প্রেসক্রিপশন আপডেট' : '1-Click Refine'}
                                       </span>
                                     </div>
@@ -2548,9 +2567,20 @@ export default function AgriCopilot({
                                           ? 'bg-gradient-to-br from-green-600 to-emerald-600 text-white rounded-tr-none' 
                                           : 'bg-white text-gray-800 border border-gray-50 rounded-tl-none'
                                       }`}>
-                                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
+                                        <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[11px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
                                           {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
                                           <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
+                                          {msg.role !== 'user' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => speakChatMessage(msg.text)}
+                                              className="ml-auto p-2 -mr-2 -mt-2 shrink-0 rounded-lg text-gray-400 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:text-emerald-300 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer"
+                                              aria-label={lang === 'bn' ? 'উত্তরটি শুনুন' : 'Listen to the answer'}
+                                              title={lang === 'bn' ? 'উত্তরটি শুনুন' : 'Listen to the answer'}
+                                            >
+                                              <Volume2 className="w-4 h-4" aria-hidden="true" />
+                                            </button>
+                                          )}
                                         </div>
                                         <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
                                           <ReactMarkdown>{msg.text}</ReactMarkdown>
@@ -2586,7 +2616,7 @@ export default function AgriCopilot({
                                             className="w-1.5 h-1.5 bg-green-500 rounded-full"
                                           ></motion.div>
                                         </div>
-                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
+                                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{t.tooltips.aiThinking}</span>
                                       </div>
                                     </motion.div>
                                   )}
@@ -2798,7 +2828,7 @@ export default function AgriCopilot({
                                     </p>
                                   </div>
                                 </div>
-                                <span className="text-[10px] bg-emerald-500 text-emerald-950 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm shrink-0">
+                                <span className="text-[11px] bg-emerald-500 text-emerald-950 font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm shrink-0">
                                   {crop ? (t.crops[crop as keyof typeof t.crops] || crop) : (lang === 'bn' ? 'স্মার্ট সেবা' : 'Smart Action')}
                                 </span>
                               </div>
@@ -2818,7 +2848,7 @@ export default function AgriCopilot({
                                       <span>{lang === 'bn' ? 'উৎপাদন ব্যয় ও লাভ' : 'Cost & Profit'}</span>
                                       <ArrowRight className="w-3 h-3 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
-                                    <div className="text-[10px] text-emerald-200 truncate mt-0.5 font-medium">
+                                    <div className="text-[11px] text-emerald-200 truncate mt-0.5 font-medium">
                                       {lang === 'bn' ? 'ব্রেক-ইভেন ও খরচের হিসাব' : 'Estimate profit margin'}
                                     </div>
                                   </div>
@@ -2838,7 +2868,7 @@ export default function AgriCopilot({
                                       <span>{lang === 'bn' ? 'পাইকারি বাজারদর' : 'Mandi Rates'}</span>
                                       <ArrowRight className="w-3 h-3 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
-                                    <div className="text-[10px] text-amber-200 truncate mt-0.5 font-medium">
+                                    <div className="text-[11px] text-amber-200 truncate mt-0.5 font-medium">
                                       {lang === 'bn' ? 'আড়তের লাইভ দর ও ট্রেন্ড' : 'Wholesale price trends'}
                                     </div>
                                   </div>
@@ -2858,7 +2888,7 @@ export default function AgriCopilot({
                                       <span>{lang === 'bn' ? 'সহনশীল জাত গাইড' : 'Resilient Seeds'}</span>
                                       <ArrowRight className="w-3 h-3 text-sky-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
-                                    <div className="text-[10px] text-sky-200 truncate mt-0.5 font-medium">
+                                    <div className="text-[11px] text-sky-200 truncate mt-0.5 font-medium">
                                       {lang === 'bn' ? 'বন্যা/খরা/লবণাক্ততা' : 'Flood/saline varieties'}
                                     </div>
                                   </div>
@@ -2878,7 +2908,7 @@ export default function AgriCopilot({
                                       <span>{lang === 'bn' ? 'স্যাটেলাইট স্ক্যান' : 'Satellite Scan'}</span>
                                       <ArrowRight className="w-3 h-3 text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
-                                    <div className="text-[10px] text-teal-200 truncate mt-0.5 font-medium">
+                                    <div className="text-[11px] text-teal-200 truncate mt-0.5 font-medium">
                                       {lang === 'bn' ? 'জমির NDVI স্বাস্থ্য সূচক' : 'Field vegetation index'}
                                     </div>
                                   </div>
@@ -3112,14 +3142,14 @@ export default function AgriCopilot({
             <div className="pt-2">
               <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center space-x-1">
-                  <span id="usage-label" className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
+                  <span id="usage-label" className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
                   <Tooltip content={t.tooltips.usage}>
                     <button type="button" aria-label={t.tooltips.usage} className="focus:outline-none">
                       <HelpCircle className="w-3 h-3 text-gray-300" aria-hidden="true" />
                     </button>
                   </Tooltip>
                 </div>
-                <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
+                <span className="text-[11px] font-black text-green-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
               </div>
               <div 
                 className="w-full bg-green-100/50 rounded-full h-2 overflow-hidden shadow-inner"
@@ -3168,7 +3198,7 @@ export default function AgriCopilot({
               <label htmlFor="sample-scenarios-select" className="text-xs font-bold text-stone-800 dark:text-stone-200 block truncate cursor-pointer">
                 {lang === 'bn' ? 'নমুনা ফসল রোগ নির্ণয় ও লক্ষণ পরিস্থিতি' : 'Sample Crop Disease Scenarios'}
               </label>
-              <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+              <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
                 {lang === 'bn' ? 'ড্রপডাউন থেকে নমুনা রোগ বেছে নিয়ে পরীক্ষা করুন' : 'Select a sample scenario from the dropdown menu'}
               </p>
             </div>

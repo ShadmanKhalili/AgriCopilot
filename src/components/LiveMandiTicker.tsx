@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toBn } from '../utils/banglaNum';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -378,7 +379,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
         role="region"
         aria-label="Live Mandi Commodity Ticker"
       >
-        <div className="flex items-center h-8 sm:h-9">
+        <div className="flex items-center h-9 sm:h-10">
           
           {/* Live Radar Fixed Badge with Wholesale / Retail Mode Switcher */}
           <div className="h-full px-2 sm:px-3 bg-gradient-to-r from-emerald-950 via-stone-900 to-transparent flex items-center gap-1.5 shrink-0 z-10 border-r border-emerald-500/20">
@@ -386,7 +387,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-[9px] sm:text-[10px] font-mono font-black tracking-wider uppercase text-emerald-400">
+            <span className="text-[11px] sm:text-[11px] font-mono font-black tracking-wider uppercase text-emerald-400">
               {lang === 'bn' ? 'লাইভ মান্ডি' : 'MANDI RADAR'}
             </span>
 
@@ -394,7 +395,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
             <button
               type="button"
               onClick={togglePriceTier}
-              className="ml-1 px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-mono font-bold uppercase transition-all bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 cursor-pointer"
+              className="ml-1 px-2 py-1 rounded text-[11px] sm:text-[11px] font-mono font-bold uppercase transition-all bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 cursor-pointer"
               title={lang === 'bn' ? 'পাইকারি ও খুচরা মূল্যের মধ্যে পরিবর্তন করুন' : 'Toggle Wholesale vs Retail Price'}
             >
               {priceTier === 'wholesale' 
@@ -407,7 +408,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               type="button"
               onClick={handleLiveWebSync}
               disabled={isSyncingWeb}
-              className="hidden lg:flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-mono text-stone-300 bg-stone-800/80 hover:bg-stone-700 hover:text-white border border-stone-600 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+              className="hidden lg:flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono text-stone-300 bg-stone-800/80 hover:bg-stone-700 hover:text-white border border-stone-600 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
               title={lang === 'bn' ? 'গুগল সার্চ ও DAM দিয়ে লাইভ বাজারদর রিফ্রেশ করুন' : 'Live Google Search & DAM price re-sync'}
             >
               <RefreshCw className={`w-2.5 h-2.5 ${isSyncingWeb ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
@@ -436,7 +437,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                     key={`${item.id}-${idx}`}
                     type="button"
                     onClick={() => handleItemClick(item)}
-                    className="inline-flex items-center gap-1.5 hover:bg-white/10 px-2 py-1 rounded-md transition-colors cursor-pointer group"
+                    className="inline-flex items-center gap-1.5 hover:bg-white/10 px-2 py-2 rounded-md transition-colors cursor-pointer group"
                     title={lang === 'bn' ? 'বিস্তারিত সরকারি বাজারদর দেখতে ক্লিক করুন' : 'Click to inspect official DAM market depth'}
                   >
                     <span className="text-sm">{item.emoji}</span>
@@ -444,22 +445,22 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                       {lang === 'bn' ? item.nameBn : item.nameEn}:
                     </span>
                     <span className="text-white font-black">
-                      ৳{activePrice}/{lang === 'bn' ? item.unitBn : item.unitEn}
+                      ৳{toBn(activePrice)}/{lang === 'bn' ? item.unitBn : item.unitEn}
                     </span>
 
-                    <span className={`inline-flex items-center text-[10px] font-bold ${
+                    <span className={`inline-flex items-center text-[11px] font-bold ${
                       isPositive ? 'text-emerald-400' : isNegative ? 'text-rose-400' : 'text-stone-400'
                     }`}>
                       {isPositive && (
                         <>
                           <TrendingUp className="w-3 h-3 mr-0.5" />
-                          (+৳{item.change.toFixed(1)})
+                          (+৳{toBn(item.change.toFixed(1))})
                         </>
                       )}
                       {isNegative && (
                         <>
                           <TrendingDown className="w-3 h-3 mr-0.5" />
-                          (-৳{Math.abs(item.change).toFixed(1)})
+                          (-৳{toBn(Math.abs(item.change).toFixed(1))})
                         </>
                       )}
                       {!isPositive && !isNegative && (
@@ -483,7 +484,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                 audioFeedback.playTactileClick();
                 onNavigateToMarket();
               }}
-              className="hidden md:flex items-center gap-1 px-3 h-full bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 text-[10px] font-mono font-bold uppercase tracking-wider border-l border-emerald-500/20 shrink-0 cursor-pointer transition-colors relative z-10"
+              className="hidden md:flex items-center gap-1 px-3 h-full bg-emerald-900/40 hover:bg-emerald-900/70 text-emerald-300 text-[11px] font-mono font-bold uppercase tracking-wider border-l border-emerald-500/20 shrink-0 cursor-pointer transition-colors relative z-10"
             >
               <span>{lang === 'bn' ? 'বাজার অনুসন্ধান' : 'Market Connect'}</span>
               <ChevronRight className="w-3 h-3" />
@@ -529,10 +530,10 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               {/* Wholesale / Arat Price */}
               <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
+                  <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-400 font-bold">
                     {lang === 'bn' ? 'পাইকারি আড়ত দর' : 'Wholesale Mandi'}
                   </span>
-                  <span className="text-[9px] font-mono text-stone-400">মোকাম</span>
+                  <span className="text-[11px] font-mono text-stone-400">মোকাম</span>
                 </div>
                 <div className="text-2xl sm:text-3xl font-display font-black text-white font-mono">
                   ৳{selectedCommodity.wholesalePrice}
@@ -540,7 +541,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                     /{lang === 'bn' ? selectedCommodity.unitBn : selectedCommodity.unitEn}
                   </span>
                 </div>
-                <span className="text-[10px] text-emerald-300 font-mono block">
+                <span className="text-[11px] text-emerald-300 font-mono block">
                   {lang === 'bn' ? 'কৃষক ও মিলার বিক্রয়মূল্য' : 'Farm-gate & Miller Rate'}
                 </span>
               </div>
@@ -548,10 +549,10 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               {/* Retail / City Consumer Price */}
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-stone-400 font-bold">
+                  <span className="text-[11px] font-mono uppercase tracking-widest text-stone-400 font-bold">
                     {lang === 'bn' ? 'খুচরা বাজার দর' : 'City Retail Rate'}
                   </span>
-                  <span className="text-[9px] font-mono text-stone-400">বাজার</span>
+                  <span className="text-[11px] font-mono text-stone-400">বাজার</span>
                 </div>
                 <div className="text-2xl sm:text-3xl font-display font-black text-emerald-400 font-mono">
                   ৳{selectedCommodity.retailPrice}
@@ -559,7 +560,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                     /{lang === 'bn' ? selectedCommodity.unitBn : selectedCommodity.unitEn}
                   </span>
                 </div>
-                <span className="text-[10px] text-stone-400 font-mono block">
+                <span className="text-[11px] text-stone-400 font-mono block">
                   {lang === 'bn' ? 'ভোক্তা খুচরা বাজার' : 'Retail Consumer Price'}
                 </span>
               </div>
@@ -568,13 +569,13 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
             {/* 24h Trading Spread & Daily Inflow */}
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[10px] text-stone-400 uppercase">24h Price Range</span>
+                <span className="text-[11px] text-stone-400 uppercase">24h Price Range</span>
                 <div className="font-bold text-white">
                   ৳{selectedCommodity.low24h} - ৳{selectedCommodity.high24h}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                <span className="text-[10px] text-stone-400 uppercase">Daily Mandi Inflow</span>
+                <span className="text-[11px] text-stone-400 uppercase">Daily Mandi Inflow</span>
                 <div className="font-bold text-emerald-400">
                   ~{selectedCommodity.volumeTonnes} Tonnes
                 </div>
@@ -583,7 +584,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
 
             {/* Season Context & Driver */}
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1">
-              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider block">
+              <span className="text-[11px] font-mono text-emerald-400 font-bold uppercase tracking-wider block">
                 {lang === 'bn' ? 'বাজারের বর্তমান অবস্থা ও কারণ:' : 'Market Dynamics & Drivers:'}
               </span>
               <p className="text-stone-300 leading-relaxed text-[11px]">
@@ -601,15 +602,15 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                       {selectedCommodity.verificationEvidence.bulletinSource}
                     </span>
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 font-mono">
                     {lang === 'bn' ? 'ওয়েব সার্চ অনুমান' : 'Automated Estimate'}
                   </span>
                 </div>
-                <div className="text-[10px] text-stone-400 font-mono flex items-center justify-between">
+                <div className="text-[11px] text-stone-400 font-mono flex items-center justify-between">
                   <span>
                     {selectedCommodity.verificationEvidence.date} • {selectedCommodity.verificationEvidence.market} ({selectedCommodity.verificationEvidence.unit})
                   </span>
-                  <span className="text-amber-400 text-[9px] font-bold">
+                  <span className="text-amber-400 text-[11px] font-bold">
                     {lang === 'bn' ? 'অপ্রমাণিত • সরকারি নয়' : 'Unaudited Estimate'}
                   </span>
                 </div>
@@ -623,11 +624,11 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                       {lang === 'bn' ? 'কৃষি বিপণন অধিদপ্তর (DAM) দৈনিক বাজার বুলেটিন' : 'Dept of Agricultural Marketing (DAM) Daily Bulletin'}
                     </span>
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
                     {lang === 'bn' ? 'সরকারি বুলেটিন' : 'Official Bulletin'}
                   </span>
                 </div>
-                <div className="text-[10px] text-stone-400 font-mono flex items-center justify-between">
+                <div className="text-[11px] text-stone-400 font-mono flex items-center justify-between">
                   <span>
                     {selectedCommodity.verificationEvidence?.date || '2026-09-30'} • {selectedCommodity.verificationEvidence?.market || selectedCommodity.marketEn}
                   </span>

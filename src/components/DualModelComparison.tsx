@@ -44,7 +44,7 @@ export default function DualModelComparison({
           <div>
             <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
               <span>{lang === 'bn' ? 'আবহাওয়া মডেল ইঞ্জিন নির্বাচন' : 'Meteorological Engine'}</span>
-              <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-normal">
+              <span className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono font-normal">
                 {activeModel === 'weathernext3' ? '(AgroCast AI)' : '(ECMWF/GFS Ensemble)'}
               </span>
             </h4>

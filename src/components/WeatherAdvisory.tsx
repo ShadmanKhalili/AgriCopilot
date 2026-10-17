@@ -752,10 +752,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[9px] font-black tracking-widest uppercase text-blue-300">
+                            <span className="text-[11px] font-black tracking-widest uppercase text-blue-300">
                               {weather.source === 'google_weather_api' ? 'Google Maps Live API' : 'AgroCast AI (Open-Meteo)'}
                             </span>
-                            <span className="text-[9px] bg-emerald-500/25 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
+                            <span className="text-[11px] bg-emerald-500/25 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-emerald-400/30">
                               {weather.source === 'google_weather_api' ? 'Live API' : '5 km grid'}
                             </span>
                           </div>
@@ -764,7 +764,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               ? (lang === 'bn' ? 'গুগল ম্যাপস লাইভ ওয়েদার এপিআই' : 'Google Maps Platform Live Weather')
                               : (lang === 'bn' ? 'এগ্রোকাস্ট এআই আবহাওয়া মডেল' : 'AgroCast AI Weather Model')}
                           </h4>
-                          <div className="mt-0.5 text-[9px] text-blue-200 flex items-center gap-1 font-medium">
+                          <div className="mt-0.5 text-[11px] text-blue-200 flex items-center gap-1 font-medium">
                             <span>🔒</span>
                             <span className="truncate">
                               {weather.source === 'google_weather_api'
@@ -775,7 +775,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="text-[9px] font-bold text-gray-300 uppercase tracking-wider block">
+                        <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">
                           {lang === 'bn' ? 'মডেল কনসেন্সাস (আনুমানিক)' : 'Consensus (est.)'}
                         </span>
                         <span className="text-xs font-black text-emerald-400 tabular-nums">
@@ -868,7 +868,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                           {weather.windSpeed.toFixed(1)}
                         </span>
-                        <span className="text-[10px] font-medium text-stone-400 ml-1">km/h</span>
+                        <span className="text-[11px] font-medium text-stone-400 ml-1">km/h</span>
                       </div>
                     </motion.div>
                   </Tooltip>
@@ -916,7 +916,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
                         {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
                       </h4>
-                      <span className="text-[9px] bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-[11px] bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">
                         {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
                       </span>
                     </div>
@@ -926,15 +926,15 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       <div className="bg-sky-50/60 dark:bg-sky-950/30 p-2.5 rounded-xl border border-sky-100 dark:border-sky-900/40">
                         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
                           <Wind className="w-3 h-3" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                          <span className="text-[11px] font-bold uppercase tracking-wider truncate">
                             {lang === 'bn' ? '১০০মি বাতাস' : 'Canopy Wind'}
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                           {weather.boundaryWind100m !== undefined ? weather.boundaryWind100m.toFixed(1) : (weather.windSpeed * 1.35).toFixed(1)}
-                          <span className="text-[10px] text-gray-500 ml-0.5 font-normal">km/h</span>
+                          <span className="text-[11px] text-gray-500 ml-0.5 font-normal">km/h</span>
                         </div>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {lang === 'bn' ? 'স্প্রে ড্রিফট ঝুঁকি' : 'Spray drift risk'}
                         </p>
                       </div>
@@ -943,15 +943,15 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       <div className="bg-amber-50/60 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-100 dark:border-amber-900/40">
                         <div className="flex items-center gap-1 text-amber-700 dark:text-amber-300 mb-1">
                           <Sun className="w-3 h-3" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                          <span className="text-[11px] font-bold uppercase tracking-wider truncate">
                             {lang === 'bn' ? 'সৌর বিকিরণ' : 'Solar DNI'}
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                           {weather.solarRadiationDNI !== undefined ? Math.round(weather.solarRadiationDNI) : 480}
-                          <span className="text-[10px] text-gray-500 ml-0.5 font-normal">W/m²</span>
+                          <span className="text-[11px] text-gray-500 ml-0.5 font-normal">W/m²</span>
                         </div>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {lang === 'bn' ? 'সোলার পাম্প/সালোকসংশ্লেষণ' : 'Solar pump/photosynthesis'}
                         </p>
                       </div>
@@ -961,11 +961,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1 text-emerald-700 dark:text-emerald-300">
                             <ShieldAlert className="w-3 h-3" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                            <span className="text-[11px] font-bold uppercase tracking-wider truncate">
                               {lang === 'bn' ? 'ছত্রাক ঝুঁকি' : 'Blight Risk'}
                             </span>
                           </div>
-                          <span className={`text-[8px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
+                          <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
                             weather.fungalBlightRisk === 'high'
                               ? 'bg-red-100 text-red-700'
                               : weather.fungalBlightRisk === 'moderate'
@@ -978,7 +978,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                           {weather.dewPoint !== undefined ? `${weather.dewPoint.toFixed(1)}°C` : '—'}
                         </div>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {weather.dewPointDepression !== undefined 
                             ? (lang === 'bn' ? `শিশিরাঙ্ক ${weather.dewPointDepression.toFixed(1)}°C` : `Depr: ${weather.dewPointDepression.toFixed(1)}°C`)
                             : (lang === 'bn' ? 'শিশিরাঙ্ক অপ্রাপ্য' : 'Depression: N/A')}
@@ -989,7 +989,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       <div className="bg-sky-50/60 dark:bg-sky-950/30 p-2.5 rounded-xl border border-sky-100 dark:border-sky-900/40">
                         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
                           <CloudRain className="w-3 h-3" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                          <span className="text-[11px] font-bold uppercase tracking-wider truncate">
                             {lang === 'bn' ? 'বৃষ্টির পরিধি' : 'Rain Range'}
                           </span>
                         </div>
@@ -997,9 +997,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           {weather.precipitationSpread 
                             ? `${weather.precipitationSpread.p10} - ${weather.precipitationSpread.p90}` 
                             : (weather.rainfall !== undefined ? `${weather.rainfall.toFixed(1)}` : '—')}
-                          <span className="text-[10px] text-stone-500 ml-0.5 font-normal">mm</span>
+                          <span className="text-[11px] text-stone-500 ml-0.5 font-normal">mm</span>
                         </div>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {weather.heavyRainRisk !== undefined 
                             ? (lang === 'bn' ? `ভারী বৃষ্টি ঝুঁকি: ${weather.heavyRainRisk}%` : `Heavy Risk: ${weather.heavyRainRisk}%`)
                             : (lang === 'bn' ? 'ঝুঁকি পরিমাপ অপ্রাপ্য' : 'Heavy Risk: N/A')}
@@ -1025,7 +1025,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
                         <span>{t.hourlyForecastTrend || '24-Hour AI Weather Trend'}</span>
                       </h4>
-                      <span className="text-[10px] font-medium text-stone-400 uppercase tracking-wider">
+                      <span className="text-[11px] font-medium text-stone-400 uppercase tracking-wider">
                         {lang === 'bn' ? 'প্রতি ঘণ্টা' : 'Hourly'}
                       </span>
                     </div>
@@ -1039,7 +1039,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               : 'bg-stone-50 dark:bg-stone-800/60 text-stone-800 dark:text-stone-200 border-stone-200/70 dark:border-stone-700/70'
                           }`}
                         >
-                          <span className={`text-[10px] font-semibold ${idx === 0 ? 'text-blue-100' : 'text-stone-500 dark:text-stone-400'}`}>
+                          <span className={`text-[11px] font-semibold ${idx === 0 ? 'text-blue-100' : 'text-stone-500 dark:text-stone-400'}`}>
                             {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : hour.time}
                           </span>
                           <div className="my-1">
@@ -1052,7 +1052,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                             )}
                           </div>
                           <span className="text-xs font-bold tabular-nums">{Math.round(hour.temp)}°C</span>
-                          <div className="mt-0.5 flex items-center gap-0.5 text-[9px]">
+                          <div className="mt-0.5 flex items-center gap-0.5 text-[11px]">
                             <Droplets className={`w-2 h-2 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
                             <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
                               {hour.rainProb}%
@@ -1150,7 +1150,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 )}
 
                 {lastUpdated && (
-                  <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-[10px] text-stone-400">
+                  <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-[11px] text-stone-400">
                     <span className="font-medium uppercase tracking-wider">{lang === 'bn' ? 'সর্বশেষ আপডেট' : 'Last Updated'}</span>
                     <span className="font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">{lastUpdated}</span>
                   </div>

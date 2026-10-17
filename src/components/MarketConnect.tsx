@@ -360,7 +360,7 @@ export default function MarketConnect({
                   <button 
                     onClick={handleDetectLocation}
                     disabled={isDetectingLocation}
-                    className="flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
+                    className="flex items-center space-x-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
                   >
                     {isDetectingLocation ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -375,7 +375,7 @@ export default function MarketConnect({
 
                 {/* Major Wholesale Market Hubs Quick Select (Unified Toolbar Chips) */}
                 <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                  <span className="text-[10px] text-stone-400 mr-0.5">
+                  <span className="text-[11px] text-stone-400 mr-0.5">
                     {lang === 'bn' ? 'মোকাম:' : 'Mandi:'}
                   </span>
                   {[
@@ -388,7 +388,7 @@ export default function MarketConnect({
                       key={m.nameEn}
                       type="button"
                       onClick={() => handleSelectMarketPreset(m.lat, m.lng)}
-                      className="px-2 py-0.5 rounded-md text-[10px] font-medium border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition-colors cursor-pointer"
+                      className="px-2 py-0.5 rounded-md text-[11px] font-medium border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition-colors cursor-pointer"
                     >
                       {lang === 'bn' ? m.nameBn : m.nameEn}
                     </button>
@@ -439,7 +439,7 @@ export default function MarketConnect({
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-stone-900 dark:text-stone-100">Premium Analysis</h4>
-                      <p className="text-[10px] text-stone-500 dark:text-stone-400">1 free daily run</p>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400">1 free daily run</p>
                     </div>
                   </div>
                   <button
@@ -454,8 +454,8 @@ export default function MarketConnect({
               {/* Usage Bar */}
               <div className="py-0.5">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">{t.usage}</span>
-                  <span className="text-[10px] font-mono font-semibold text-stone-600 dark:text-stone-300">{currentUsage} / {limit}</span>
+                  <span className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">{t.usage}</span>
+                  <span className="text-[11px] font-mono font-semibold text-stone-600 dark:text-stone-300">{currentUsage} / {limit}</span>
                 </div>
                 <div className="w-full bg-stone-100 dark:bg-stone-800 rounded-full h-1 overflow-hidden">
                   <div 
@@ -541,11 +541,11 @@ export default function MarketConnect({
                     {/* Wholesale Mandi Average */}
                     <div className="bg-gradient-to-br from-emerald-900/90 to-stone-900 p-4 rounded-2xl text-white border border-emerald-700/40 shadow-xs relative overflow-hidden">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
                           <Store className="w-3.5 h-3.5" />
                           {lang === 'bn' ? 'পাইকারি মোকাম দর (আড়ৎ)' : 'Wholesale Mandi Rates'}
                         </span>
-                        <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        <span className="text-[11px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
                           {insights.wholesaleRates?.primaryMarket || (lang === 'bn' ? 'কারওয়ান বাজার মোকাম' : 'Kawran Bazar')}
                         </span>
                       </div>
@@ -563,11 +563,11 @@ export default function MarketConnect({
                     {/* Supermarket Retail Average */}
                     <div className="bg-gradient-to-br from-orange-950/90 to-stone-900 p-4 rounded-2xl text-white border border-orange-700/40 shadow-xs relative overflow-hidden">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-orange-300 flex items-center gap-1.5">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-orange-300 flex items-center gap-1.5">
                           <ShoppingBag className="w-3.5 h-3.5" />
                           {lang === 'bn' ? 'সুপারমার্কেট খুচরা দর' : 'Supermarket Shelves'}
                         </span>
-                        <span className="text-[10px] font-bold bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30">
+                        <span className="text-[11px] font-bold bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full border border-orange-500/30">
                           {lang === 'bn' ? 'স্বপ্ন / মীনা বাজার / আগোরা' : 'Shwapno / Agora'}
                         </span>
                       </div>
@@ -585,11 +585,11 @@ export default function MarketConnect({
                     {/* Value-Chain Margin Spread */}
                     <div className="bg-gradient-to-br from-indigo-950/90 to-stone-900 p-4 rounded-2xl text-white border border-indigo-700/40 shadow-xs flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
                           <BadgePercent className="w-3.5 h-3.5" />
                           {lang === 'bn' ? 'রিটেইল মার্জিন স্প্রেড' : 'Retail Margin Spread'}
                         </span>
-                        <span className="text-[10px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-800/40">
+                        <span className="text-[11px] font-bold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-800/40">
                           {lang === 'bn' ? 'ভ্যালু-চেইন' : 'Value Chain'}
                         </span>
                       </div>
@@ -599,7 +599,7 @@ export default function MarketConnect({
                         </span>
                         <span className="text-xs text-stone-300 font-bold">{lang === 'bn' ? 'দাম বৃদ্ধি' : 'Markup'}</span>
                       </div>
-                      <p className="text-[10px] text-stone-300 leading-tight mt-1">
+                      <p className="text-[11px] text-stone-300 leading-tight mt-1">
                         {lang === 'bn' 
                           ? 'গ্রেডিং, প্যাকেজিং ও কোল্ড চেইনের কারণে পাইকারি থেকে সুপারমার্কেটের এই ব্যবধান।' 
                           : 'Spread driven by sorting, branded packaging & shelf distribution.'}
@@ -620,12 +620,12 @@ export default function MarketConnect({
                           <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
                             {lang === 'bn' ? 'সুপারমার্কেট ও অনলাইন গ্রোসারি লাইভ দর' : 'Supermarket & E-Grocery Shelf Prices'}
                           </h4>
-                          <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                          <p className="text-[11px] text-stone-500 dark:text-stone-400">
                             {lang === 'bn' ? 'স্বপ্ন, মীনা বাজার, আগোরা ও চালডালের সরাসরি তালিকাভুক্ত মূল্য' : 'Verified data from Shwapno, Meena Bazar, Agora & Chaldal catalogs'}
                           </p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
+                      <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 px-2 py-0.5 rounded-full border border-orange-200 dark:border-orange-800">
                         {lang === 'bn' ? 'ওয়েব সার্চ তথ্য' : 'Web Grounded'}
                       </span>
                     </div>
@@ -638,7 +638,7 @@ export default function MarketConnect({
                               <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
                                 {sm.name}
                               </span>
-                              <span className="text-[9px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
                                 {sm.stockStatus || 'ইন স্টক'}
                               </span>
                             </div>
@@ -647,9 +647,9 @@ export default function MarketConnect({
                             </span>
                           </div>
                           <div className="flex items-baseline justify-between pt-1 border-t border-stone-200/50 dark:border-stone-700/50">
-                            <span className="text-[10px] text-stone-400 font-bold uppercase">{lang === 'bn' ? 'খুচরা দর:' : 'Retail:'}</span>
+                            <span className="text-[11px] text-stone-400 font-bold uppercase">{lang === 'bn' ? 'খুচরা দর:' : 'Retail:'}</span>
                             <span className="text-sm font-black font-mono text-stone-900 dark:text-stone-100">
-                              ৳{sm.pricePerKgBdt} <span className="text-[10px] font-normal text-stone-400">/কেজি</span>
+                              ৳{sm.pricePerKgBdt} <span className="text-[11px] font-normal text-stone-400">/কেজি</span>
                             </span>
                           </div>
                         </div>
@@ -670,12 +670,12 @@ export default function MarketConnect({
                           <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
                             {lang === 'bn' ? 'প্রধান মোকামের পাইকারি রেট ও চালান প্রবাহ' : 'Mainstream Wholesale Mandi Rates & Inflow'}
                           </h4>
-                          <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                          <p className="text-[11px] text-stone-500 dark:text-stone-400">
                             {lang === 'bn' ? 'কারওয়ান বাজার, শ্যামবাজার, খাতুনগঞ্জ ও আঞ্চলিক আড়তের দর' : 'Live wholesale trading bids at Kawran Bazar, Shyambazar & Khatunganj'}
                           </p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                         {lang === 'bn' ? 'পাইকারি মোকাম' : 'Wholesale Mandis'}
                       </span>
                     </div>
@@ -688,7 +688,7 @@ export default function MarketConnect({
                               <span className="text-xs font-bold text-stone-900 dark:text-stone-100">
                                 {hub.mandiName}
                               </span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${
                                 hub.trend === 'উর্ধ্বমুখী' || hub.trend === 'up'
                                   ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
                                   : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
@@ -701,9 +701,9 @@ export default function MarketConnect({
                             </span>
                           </div>
                           <div className="flex items-baseline justify-between pt-1 border-t border-stone-200/50 dark:border-stone-700/50">
-                            <span className="text-[10px] text-stone-400 font-bold uppercase">{lang === 'bn' ? 'পাইকারি দর:' : 'Wholesale:'}</span>
+                            <span className="text-[11px] text-stone-400 font-bold uppercase">{lang === 'bn' ? 'পাইকারি দর:' : 'Wholesale:'}</span>
                             <span className="text-sm font-black font-mono text-emerald-700 dark:text-emerald-400">
-                              ৳{hub.wholesalePriceBdt} <span className="text-[10px] font-normal text-stone-400">/কেজি</span>
+                              ৳{hub.wholesalePriceBdt} <span className="text-[11px] font-normal text-stone-400">/কেজি</span>
                             </span>
                           </div>
                         </div>
@@ -743,7 +743,7 @@ export default function MarketConnect({
                         <div className="flex items-center gap-2">
                           <h3 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">Market Analytics</h3>
                           {marketCacheInfo?.isCached && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[10px] font-medium border border-amber-200 dark:border-amber-800">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-200 dark:border-amber-800">
                               <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                               <span>
                                 {marketCacheInfo.isFallback 
@@ -844,7 +844,7 @@ export default function MarketConnect({
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800">
                     {lang === 'bn' ? '১-ট্যাপ টেস্ট' : '1-Tap Run'}
                   </span>
                 </div>

@@ -212,10 +212,10 @@ export default function MicroclimateRadarSimulator({
                 source="Mathematical Microclimate Simulation (Not Live BMD Radar)"
                 compact={true}
               />
-              <span className="text-[10px] font-bold text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800/50">
+              <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800/50">
                 {lang === 'bn' ? 'গাণিতিক বায়ুমণ্ডলীয় মডেল' : 'Thermodynamic Convective Model'}
               </span>
-              <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800/40">
+              <span className="text-[11px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800/40">
                 {lang === 'bn' ? 'সিমুলেশন পরিধি: ৪৮ ঘণ্টা' : 'Simulation: 48h Window'}
               </span>
             </div>
@@ -285,36 +285,36 @@ export default function MicroclimateRadarSimulator({
 
             {/* 15 km Outer Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[280px] border border-cyan-500/20 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/60 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+              <span className="text-[11px] font-mono text-cyan-400/60 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
                 {lang === 'bn' ? '১৫ কিমি' : '15 km'}
               </span>
             </div>
 
             {/* 10 km Mid Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[190px] h-[190px] border border-cyan-500/30 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/70 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+              <span className="text-[11px] font-mono text-cyan-400/70 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
                 {lang === 'bn' ? '১০ কিমি' : '10 km'}
               </span>
             </div>
 
             {/* 5 km Inner Range Ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] border border-cyan-500/40 rounded-full flex items-start justify-center pt-1">
-              <span className="text-[9px] font-mono text-cyan-400/80 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
+              <span className="text-[11px] font-mono text-cyan-400/80 bg-slate-950/90 px-1.5 py-0.5 rounded -translate-y-2.5">
                 {lang === 'bn' ? '৫ কিমি' : '5 km'}
               </span>
             </div>
 
             {/* Cardinal Direction Markers */}
-            <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
+            <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'উ (N)' : 'N'}
             </span>
-            <span className="absolute bottom-16 left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
+            <span className="absolute bottom-16 left-1/2 -translate-x-1/2 text-[11px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'দ (S)' : 'S'}
             </span>
-            <span className="absolute top-1/2 right-2 -translate-y-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
+            <span className="absolute top-1/2 right-2 -translate-y-1/2 text-[11px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'পূ (E)' : 'E'}
             </span>
-            <span className="absolute top-1/2 left-2 -translate-y-1/2 text-[9px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
+            <span className="absolute top-1/2 left-2 -translate-y-1/2 text-[11px] font-mono font-bold text-cyan-400/50 bg-slate-900/60 px-1 rounded">
               {lang === 'bn' ? 'প (W)' : 'W'}
             </span>
 
@@ -393,11 +393,11 @@ export default function MicroclimateRadarSimulator({
                         <span className={`w-2 h-2 rounded-full ${
                           reflectivityDbz >= 45 ? 'bg-rose-500 ring-2 ring-rose-500/30' : reflectivityDbz >= 30 ? 'bg-amber-400' : 'bg-emerald-400'
                         }`} />
-                        <span className="text-[10px] font-black text-white font-mono">
+                        <span className="text-[11px] font-black text-white font-mono">
                           {reflectivityDbz} dBZ • {rainRateMmPerHour} mm/h
                         </span>
                       </div>
-                      <div className="text-[9px] text-gray-300 flex items-center justify-between gap-3">
+                      <div className="text-[11px] text-gray-300 flex items-center justify-between gap-3">
                         <span className="text-cyan-300 font-bold">
                           {isDirectlyOverFarm 
                             ? (lang === 'bn' ? 'খামারের ওপর সক্রিয়' : 'Over Farm') 
@@ -410,7 +410,7 @@ export default function MicroclimateRadarSimulator({
                   /* Clear Sky (< 20% rain chance) */
                   <div className="flex flex-col items-center justify-center opacity-40">
                     <div className="w-24 h-24 rounded-full bg-cyan-500/15 blur-lg" />
-                    <span className="text-[9px] font-mono text-cyan-300/60 bg-black/50 px-2 py-0.5 rounded-full mt-1">
+                    <span className="text-[11px] font-mono text-cyan-300/60 bg-black/50 px-2 py-0.5 rounded-full mt-1">
                       {lang === 'bn' ? 'পরিষ্কার শান্ত আবহাওয়া (<১৫ dBZ)' : 'Clear Calm Sky (<15 dBZ)'}
                     </span>
                   </div>
@@ -438,7 +438,7 @@ export default function MicroclimateRadarSimulator({
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-xs mb-3">
             <div className="flex items-center gap-1.5 bg-black/75 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/15">
               <Navigation className="w-3 h-3 text-cyan-400 shrink-0" />
-              <span className="font-mono text-[10px] text-cyan-300">
+              <span className="font-mono text-[11px] text-cyan-300">
                 {coords.latitude.toFixed(2)}°N, {coords.longitude.toFixed(2)}°E
               </span>
             </div>
@@ -447,7 +447,7 @@ export default function MicroclimateRadarSimulator({
               <button
                 type="button"
                 onClick={() => setShowEchoGuide(!showEchoGuide)}
-                className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600/50 px-2.5 py-1 rounded-xl text-[10px] font-bold transition-all cursor-pointer shadow-sm"
+                className="flex items-center gap-1 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-600/50 px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer shadow-sm"
               >
                 <HelpCircle className="w-3 h-3 text-cyan-300 shrink-0" />
                 <span>{lang === 'bn' ? 'ডপলার গাইড' : 'Echo Guide'}</span>
@@ -458,7 +458,7 @@ export default function MicroclimateRadarSimulator({
                 <span className={`w-2 h-2 rounded-full ${
                   reflectivityDbz >= 45 ? 'bg-rose-500 ring-2 ring-rose-500/30' : reflectivityDbz >= 30 ? 'bg-amber-400' : 'bg-emerald-400'
                 }`}></span>
-                <span className="font-bold text-[10px]">
+                <span className="font-bold text-[11px]">
                   {reflectivityDbz} dBZ
                 </span>
               </div>
@@ -473,7 +473,7 @@ export default function MicroclimateRadarSimulator({
                 <div className="w-2 h-2 rounded-full bg-slate-900" />
               </div>
             </div>
-            <span className="mt-1.5 text-[9px] font-black uppercase tracking-wider bg-black/85 px-3 py-0.5 rounded-full text-cyan-200 border border-cyan-500/40 shadow-sm backdrop-blur-xs">
+            <span className="mt-1.5 text-[11px] font-black uppercase tracking-wider bg-black/85 px-3 py-0.5 rounded-full text-cyan-200 border border-cyan-500/40 shadow-sm backdrop-blur-xs">
               {lang === 'bn' ? 'আপনার খামার' : 'Your Farm'}
             </span>
           </div>
@@ -493,7 +493,7 @@ export default function MicroclimateRadarSimulator({
               <button
                 type="button"
                 onClick={() => setPlaybackSpeed(playbackSpeed === 1 ? 2 : 1)}
-                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-bold text-gray-200 transition-colors cursor-pointer"
+                className="px-2 py-1 bg-white/10 hover:bg-white/20 rounded-xl text-[11px] font-bold text-gray-200 transition-colors cursor-pointer"
                 title="Toggle Speed"
               >
                 {playbackSpeed}x
@@ -511,15 +511,15 @@ export default function MicroclimateRadarSimulator({
 
             {/* Clear, Labeled dBZ Reflectivity Scale */}
             <div className="flex items-center gap-1.5 bg-black/70 px-2.5 py-1 rounded-xl border border-white/10">
-              <span className="text-[9px] text-gray-400 font-bold uppercase hidden sm:inline">
+              <span className="text-[11px] text-gray-400 font-bold uppercase hidden sm:inline">
                 {lang === 'bn' ? 'তীব্রতা:' : 'Reflectivity:'}
               </span>
-              <div className="flex items-center gap-1 font-mono text-[8px]">
+              <div className="flex items-center gap-1 font-mono text-[11px]">
                 <span className="text-cyan-400">০</span>
                 <div className="w-16 h-2 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 via-amber-400 to-rose-600 shadow-inner" />
                 <span className="text-rose-400">৫৫+</span>
               </div>
-              <span className={`text-[9px] font-bold px-1.5 rounded ${
+              <span className={`text-[11px] font-bold px-1.5 rounded ${
                 reflectivityDbz >= 45 ? 'bg-rose-500/20 text-rose-300' : reflectivityDbz >= 30 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
               }`}>
                 {reflectivityDbz} dBZ
@@ -534,7 +534,7 @@ export default function MicroclimateRadarSimulator({
           <div className="bg-slate-900/90 rounded-3xl p-5 border border-white/10">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${
+                <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${
                   isDay2 
                     ? 'bg-purple-950/80 text-purple-300 border-purple-800/40' 
                     : 'bg-blue-950/80 text-blue-300 border-blue-800/40'
@@ -553,25 +553,25 @@ export default function MicroclimateRadarSimulator({
 
             <div className="grid grid-cols-3 gap-2.5 text-center mb-3">
               <div className="bg-white/5 rounded-2xl p-2.5 border border-white/5">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'তাপমাত্রা' : 'Temp'}</span>
+                <span className="text-[11px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'তাপমাত্রা' : 'Temp'}</span>
                 <span className="text-xl font-black text-white">{activePoint.temp}°C</span>
               </div>
               <div className="bg-white/5 rounded-2xl p-2.5 border border-white/5">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'বৃষ্টির হার' : 'Rain Prob'}</span>
+                <span className="text-[11px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'বৃষ্টির হার' : 'Rain Prob'}</span>
                 <span className={`text-xl font-black ${activePoint.rainProb > 40 ? 'text-cyan-400' : 'text-gray-200'}`}>
                   {activePoint.rainProb}%
                 </span>
               </div>
               <div className="bg-white/5 rounded-2xl p-2.5 border border-white/5">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'বাতাস' : 'Wind'}</span>
-                <span className="text-xl font-black text-white">{activePoint.wind} <span className="text-[10px]">km/h</span></span>
+                <span className="text-[11px] text-gray-400 uppercase font-bold block">{lang === 'bn' ? 'বাতাস' : 'Wind'}</span>
+                <span className="text-xl font-black text-white">{activePoint.wind} <span className="text-[11px]">km/h</span></span>
               </div>
             </div>
 
             {/* Granular Doppler Microclimate Readout */}
             <div className="bg-cyan-950/40 rounded-2xl p-3 border border-cyan-800/30 flex items-center justify-between text-xs">
               <div>
-                <span className="text-[10px] text-cyan-400 font-bold block uppercase tracking-wider">
+                <span className="text-[11px] text-cyan-400 font-bold block uppercase tracking-wider">
                   {lang === 'bn' ? 'ডপলার প্রতিফলন ও বর্ষণ হার' : 'Doppler Echo & Rate'}
                 </span>
                 <span className="text-sm font-black text-white font-mono">
@@ -579,7 +579,7 @@ export default function MicroclimateRadarSimulator({
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">
+                <span className="text-[11px] text-gray-400 font-bold block uppercase tracking-wider">
                   {lang === 'bn' ? 'মেঘপুঞ্জের নৈকট্য' : 'Cloud Proximity'}
                 </span>
                 <span className={`text-xs font-bold ${isDirectlyOverFarm ? 'text-rose-400 animate-pulse' : 'text-cyan-300'}`}>
@@ -598,7 +598,7 @@ export default function MicroclimateRadarSimulator({
                 <Sparkles className="w-4 h-4 text-cyan-400" />
                 {lang === 'bn' ? 'এই ঘণ্টার কৃষি কাজের নির্দেশিকা' : 'Hourly Field Work Advisory'}
               </span>
-              <span className="text-[10px] text-gray-400 font-normal">
+              <span className="text-[11px] text-gray-400 font-normal">
                 {activePoint.time}
               </span>
             </h4>
@@ -615,7 +615,7 @@ export default function MicroclimateRadarSimulator({
                   <span className="font-bold block text-[11px]">
                     {lang === 'bn' ? 'বালাইনাশক স্প্রে' : 'Crop Spraying'}
                   </span>
-                  <span className="text-[10px] opacity-80 leading-tight block">
+                  <span className="text-[11px] opacity-80 leading-tight block">
                     {isSprayingSafe 
                       ? (lang === 'bn' ? 'নিরাপদ উপযুক্ত সময়' : 'Safe window') 
                       : (lang === 'bn' ? 'স্প্রে বন্ধ রাখুন (বৃষ্টি/বাতাস)' : 'Hold spraying')}
@@ -634,7 +634,7 @@ export default function MicroclimateRadarSimulator({
                   <span className="font-bold block text-[11px]">
                     {lang === 'bn' ? 'সেচ ব্যবস্থাপনা' : 'Irrigation'}
                   </span>
-                  <span className="text-[10px] opacity-80 leading-tight block">
+                  <span className="text-[11px] opacity-80 leading-tight block">
                     {isIrrigationNeeded 
                       ? (lang === 'bn' ? 'মাঝারি সেচ প্রয়োজন' : 'Irrigation suited') 
                       : (lang === 'bn' ? 'বৃষ্টির কারণে সেচ স্থগিত' : 'Hold irrigation')}
@@ -653,7 +653,7 @@ export default function MicroclimateRadarSimulator({
                   <span className="font-bold block text-[11px]">
                     {lang === 'bn' ? 'সার প্রয়োগ' : 'Fertilizer'}
                   </span>
-                  <span className="text-[10px] opacity-80 leading-tight block">
+                  <span className="text-[11px] opacity-80 leading-tight block">
                     {isFertilizerSafe 
                       ? (lang === 'bn' ? 'উপযুক্ত সময়' : 'Safe to apply') 
                       : (lang === 'bn' ? 'ধুয়ে যাওয়ার ঝুঁকি' : 'Washout risk')}
@@ -672,7 +672,7 @@ export default function MicroclimateRadarSimulator({
                   <span className="font-bold block text-[11px]">
                     {lang === 'bn' ? 'ফসল তোলা/শুকানো' : 'Harvest / Drying'}
                   </span>
-                  <span className="text-[10px] opacity-80 leading-tight block">
+                  <span className="text-[11px] opacity-80 leading-tight block">
                     {isHarvestingSafe 
                       ? (lang === 'bn' ? 'রোদে শুকানো অনুকূল' : 'Good drying') 
                       : (lang === 'bn' ? 'ফসল ঢেকে রাখুন' : 'Protect harvest')}
@@ -875,7 +875,7 @@ export default function MicroclimateRadarSimulator({
         />
 
         {/* 48-Hour Tick Marks */}
-        <div className="flex justify-between mt-2 text-[10px] text-gray-400 font-mono">
+        <div className="flex justify-between mt-2 text-[11px] text-gray-400 font-mono">
           <span className={selectedHour === 0 ? 'text-cyan-400 font-bold' : ''}>
             {lang === 'bn' ? 'এখন (T+০)' : 'Now (T+0)'}
           </span>

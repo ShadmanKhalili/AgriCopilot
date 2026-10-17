@@ -98,14 +98,14 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
 
                 <div className="flex items-center space-x-4 py-2">
                   <div className="flex-1 h-[1px] bg-gray-100"></div>
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{lang === 'en' ? 'Or use email' : 'অথবা ইমেইল ব্যবহার করুন'}</span>
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{lang === 'en' ? 'Or use email' : 'অথবা ইমেইল ব্যবহার করুন'}</span>
                   <div className="flex-1 h-[1px] bg-gray-100"></div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {mode === 'signup' && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Full Name' : 'পুরো নাম'}</label>
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Full Name' : 'পুরো নাম'}</label>
                       <div className="relative group">
                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors" />
                         <input
@@ -121,7 +121,7 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
                   )}
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Email Address' : 'ইমেইল ঠিকানা'}</label>
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Email Address' : 'ইমেইল ঠিকানা'}</label>
                     <div className="relative group">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors" />
                       <input
@@ -136,7 +136,7 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Secure Password' : 'পাসওয়ার্ড'}</label>
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">{lang === 'en' ? 'Secure Password' : 'পাসওয়ার্ড'}</label>
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-600 transition-colors" />
                       <input

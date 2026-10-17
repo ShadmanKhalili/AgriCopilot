@@ -78,12 +78,12 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
           <div className="p-2 bg-orange-500/20 rounded-lg">
             <UserCheck className="w-4 h-4 text-orange-400" />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-orange-400">{metadata.siteName || 'Official Website'}</span>
+          <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">{metadata.siteName || 'Official Website'}</span>
         </div>
         <h5 className="font-black text-white text-sm leading-snug group-hover/link:text-orange-400 transition-colors line-clamp-2 mb-2">{metadata.title}</h5>
         <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 font-medium mb-3">{metadata.description}</p>
         <div className="flex items-center justify-between">
-           <span className="text-[9px] font-bold text-orange-500/80 uppercase tracking-widest">{lang === 'bn' ? 'পোর্টাল দেখুন' : 'VIEW PORTAL'}</span>
+           <span className="text-[11px] font-bold text-orange-500/80 uppercase tracking-widest">{lang === 'bn' ? 'পোর্টাল দেখুন' : 'VIEW PORTAL'}</span>
            <ExternalLink className="w-3 h-3 text-orange-400" />
         </div>
       </motion.a>
@@ -108,7 +108,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
           <div className="absolute bottom-4 left-4 right-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 truncate">{metadata.siteName || 'Official Website'}</p>
+            <p className="text-[11px] font-black uppercase tracking-widest text-blue-400 truncate">{metadata.siteName || 'Official Website'}</p>
           </div>
         </div>
       )}
@@ -118,7 +118,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
           <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 font-medium">{metadata.description}</p>
         )}
         <div className="pt-2 flex items-center justify-between">
-           <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'দেখুন' : 'VISIT PORTAL'}</span>
+           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'দেখুন' : 'VISIT PORTAL'}</span>
            <ExternalLink className="w-3 h-3 text-blue-400" />
         </div>
       </div>
@@ -305,7 +305,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
           </div>
           <div>
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.govSchemes}</h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.govSchemesDesc}</p>
+            <p className="text-gray-500 text-[11px] md:text-sm font-medium">{t.govSchemesDesc}</p>
           </div>
         </div>
       </div>
@@ -365,7 +365,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                             <motion.span 
                               initial={{ opacity: 0, y: 5 }}
                               animate={{ opacity: 1, y: 0 }}
-                              className="text-[8px] opacity-70 mt-1 lowercase font-mono translate-y-[-2px]"
+                              className="text-[11px] opacity-70 mt-1 lowercase font-mono translate-y-[-2px]"
                             >
                               {syncStatus}
                             </motion.span>
@@ -407,7 +407,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                         <stat.icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">{stat.label}</p>
+                        <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest leading-none mb-1.5">{stat.label}</p>
                         <p className="text-lg font-black text-white tracking-tight">{stat.value}</p>
                       </div>
                     </div>
@@ -440,7 +440,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedTag(tag)}
-                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${
                   selectedTag === tag 
                     ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30' 
                     : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
@@ -470,16 +470,16 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                 <div>
                   <div className="flex flex-wrap gap-2 mb-6">
                     {scheme.tags?.map((tag, tagIdx) => (
-                      <span key={tagIdx} className="text-[9px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+                      <span key={tagIdx} className="text-[11px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
                         {tag}
                       </span>
                     )) || (
-                      <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
                         {lang === 'bn' ? 'কৃষি সেবা' : 'Agri Service'}
                       </span>
                     )}
                     {allSchemes.length === 0 && (
-                      <span className="text-[9px] font-black uppercase tracking-widest text-orange-500 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                      <span className="text-[11px] font-black uppercase tracking-widest text-orange-500 bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
                         {lang === 'bn' ? 'ডিফল্ট ক্যাটালগ' : 'Default Catalog'}
                       </span>
                     )}
@@ -524,7 +524,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-70">{lang === 'bn' ? 'মূল সুবিধাগুলো' : 'Key Benefits'}</h4>
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] mb-4 opacity-70">{lang === 'bn' ? 'মূল সুবিধাগুলো' : 'Key Benefits'}</h4>
                         <p className="text-xl font-black italic tracking-tight">{scheme.benefits[lang]}</p>
                       </div>
                       <motion.button
@@ -534,7 +534,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                         className="bg-white text-blue-600 p-3 rounded-2xl shadow-xl flex items-center gap-2 group/chat cursor-pointer"
                       >
                         <Bot className="w-5 h-5 group-hover/chat:animate-bounce" />
-                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">
+                        <span className="text-[11px] font-black uppercase tracking-widest hidden sm:block">
                           {lang === 'bn' ? 'পরামর্শ' : 'ADVISOR'}
                         </span>
                       </motion.button>
@@ -546,12 +546,12 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
               <div className="w-full lg:w-80 flex flex-col gap-6">
                 <div className="bg-gray-900 text-white p-8 rounded-[2.5rem] flex-1 flex flex-col justify-between shadow-2xl">
                   <div>
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-6">{lang === 'bn' ? 'অফিসিয়াল তথ্য' : 'Official Info'}</h4>
+                    <h4 className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-6">{lang === 'bn' ? 'অফিসিয়াল তথ্য' : 'Official Info'}</h4>
                     
                     <div className="space-y-6">
                       {scheme.provider && (
                         <div>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'প্রদানকারী' : 'Provider'}</p>
+                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'প্রদানকারী' : 'Provider'}</p>
                           <p className="text-sm font-black text-white">{scheme.provider}</p>
                         </div>
                       )}
@@ -564,7 +564,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                           className="w-full bg-blue-600 text-white p-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 group/chat cursor-pointer mb-6"
                         >
                           <Bot className="w-5 h-5 group-hover/chat:animate-bounce" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">
+                          <span className="text-[11px] font-black uppercase tracking-widest">
                             {lang === 'bn' ? 'এআই পরামর্শদাতার সাথে কথা বলুন' : 'CHAT WITH AI ADVISOR'}
                           </span>
                         </motion.button>
@@ -572,14 +572,14 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                       
                       {scheme.deadline && (
                         <div>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'সময়সীমা' : 'Deadline'}</p>
+                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'সময়সীমা' : 'Deadline'}</p>
                           <p className="text-sm font-black text-orange-400">{scheme.deadline[lang]}</p>
                         </div>
                       )}
 
                       {scheme.contactInfo && (
                         <div>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'যোগাযোগ' : 'Contact'}</p>
+                          <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{lang === 'bn' ? 'যোগাযোগ' : 'Contact'}</p>
                           <p className="text-sm font-bold text-gray-300">{scheme.contactInfo[lang]}</p>
                         </div>
                       )}
@@ -587,7 +587,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                   </div>
 
                   <div className="pt-8 space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 px-2">{lang === 'bn' ? 'সরাসরি লিঙ্ক ও প্রিভিউ' : 'Direct Link & Preview'}</h4>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-400 px-2">{lang === 'bn' ? 'সরাসরি লিঙ্ক ও প্রিভিউ' : 'Direct Link & Preview'}</h4>
                     {scheme.sourceLinks?.map((link, linkIdx) => (
                       <LinkPreviewCard key={linkIdx} url={link} lang={lang} />
                     ))}
@@ -595,7 +595,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                 </div>
 
                 <div className="flex items-center justify-center p-4">
-                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                  <p className="text-[11px] font-black text-gray-300 uppercase tracking-[0.2em]">
                     {scheme.lastUpdated ? (lang === 'bn' ? `যাচাইকৃত: ${new Date(scheme.lastUpdated).toLocaleDateString()}` : `Verified: ${new Date(scheme.lastUpdated).toLocaleDateString()}`) : 'TRUSTED'}
                   </p>
                 </div>
@@ -628,7 +628,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                   </div>
                   <div>
                     <h3 className="font-black text-lg leading-tight uppercase tracking-tight">{lang === 'bn' ? 'স্কিম গাইড' : 'Scheme Advisor'}</h3>
-                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{chatScheme.title[lang]}</p>
+                    <p className="text-[11px] font-bold opacity-70 uppercase tracking-widest">{chatScheme.title[lang]}</p>
                   </div>
                 </div>
                 <button 

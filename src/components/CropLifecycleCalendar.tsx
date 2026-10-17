@@ -306,7 +306,7 @@ export default function CropLifecycleCalendar({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[9px] sm:text-[10px] font-mono font-black text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 uppercase tracking-widest">
+              <span className="text-[11px] sm:text-[11px] font-mono font-black text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 uppercase tracking-widest">
                 Seasonal Lifecycle Tracker
               </span>
             </div>
@@ -357,7 +357,7 @@ export default function CropLifecycleCalendar({
             <Sprout className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[9px] sm:text-[10px] font-black text-emerald-800 uppercase tracking-widest block truncate">
+            <span className="text-[11px] sm:text-[11px] font-black text-emerald-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'জীবনকাল' : 'Growth Cycle'}
             </span>
             <div className="text-base sm:text-lg font-black text-emerald-950 truncate">
@@ -371,7 +371,7 @@ export default function CropLifecycleCalendar({
             <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[9px] sm:text-[10px] font-black text-blue-800 uppercase tracking-widest block truncate">
+            <span className="text-[11px] sm:text-[11px] font-black text-blue-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'আনুমানিক কর্তন' : 'Est. Harvest Date'}
             </span>
             <div className="text-sm sm:text-base font-black text-blue-950 truncate">
@@ -385,7 +385,7 @@ export default function CropLifecycleCalendar({
             <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[9px] sm:text-[10px] font-black text-amber-800 uppercase tracking-widest block truncate">
+            <span className="text-[11px] sm:text-[11px] font-black text-amber-800 uppercase tracking-widest block truncate">
               {lang === 'bn' ? 'পরিচর্যা পর্যায়' : 'Key Milestones'}
             </span>
             <div className="text-base sm:text-lg font-black text-amber-950 truncate">
@@ -433,14 +433,14 @@ export default function CropLifecycleCalendar({
                 {isDone ? (
                   <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
                 ) : (
-                  <span className="text-[9px] sm:text-[10px] font-black">{stage.day}d</span>
+                  <span className="text-[11px] sm:text-[11px] font-black">{stage.day}d</span>
                 )}
               </div>
 
               {/* Stage Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 mb-2.5">
                 <div className="flex items-center space-x-2 min-w-0">
-                  <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${typeBadgeColor}`}>
+                  <span className={`text-[11px] sm:text-[11px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${typeBadgeColor}`}>
                     {lang === 'bn' 
                       ? (stage.type === 'fertilizer' ? 'সার' : stage.type === 'irrigation' ? 'সেচ' : stage.type === 'pesticide' ? 'দমন' : 'কর্তন')
                       : stage.type.toUpperCase()

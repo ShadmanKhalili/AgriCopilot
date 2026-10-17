@@ -263,7 +263,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
         {activeItem && (
           <div className="mt-2 p-3 bg-stone-950/90 rounded-xl border border-stone-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
             <div>
-              <span className="text-[10px] text-stone-400 block font-sans">
+              <span className="text-[11px] text-stone-400 block font-sans">
                 {lang === 'bn' ? 'সময় ও তাপমাত্রা' : 'Hour & Temp'}
               </span>
               <span className="font-bold text-white tabular-nums">
@@ -272,7 +272,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[10px] text-stone-400 block font-sans">
+              <span className="text-[11px] text-stone-400 block font-sans">
                 {lang === 'bn' ? 'বৃষ্টিপাত সম্ভাবনা' : 'Rain Prob'}
               </span>
               <span className="font-bold text-cyan-400 tabular-nums">
@@ -281,7 +281,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[10px] text-stone-400 block font-sans">
+              <span className="text-[11px] text-stone-400 block font-sans">
                 {lang === 'bn' ? 'সম্ভাব্য বৃষ্টি বিস্তার' : 'P10 - P90 Spread'}
               </span>
               <span className="font-bold text-sky-300 tabular-nums">
@@ -290,7 +290,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[10px] text-stone-400 block font-sans">
+              <span className="text-[11px] text-stone-400 block font-sans">
                 {lang === 'bn' ? 'স্প্রে নিরাপত্তা অবস্থা' : 'Spray Safety'}
               </span>
               <span className={`font-bold inline-flex items-center gap-1 ${

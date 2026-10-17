@@ -326,10 +326,10 @@ export default function PlantHealthRecoveryTracker({
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+              <span className="text-[11px] font-mono font-black uppercase tracking-widest text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/40">
                 {lang === 'bn' ? 'সম্ভাব্য সুস্থতার নির্দেশিকা' : 'ILLUSTRATIVE RECOVERY GUIDE'}
               </span>
-              <span className="text-[10px] font-mono text-stone-400">
+              <span className="text-[11px] font-mono text-stone-400">
                 {cropName} • {diseaseName}
               </span>
             </div>
@@ -395,14 +395,14 @@ export default function PlantHealthRecoveryTracker({
         {/* Metric 1: Chlorophyll SPAD Index */}
         <div className="bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
           <div className="flex items-center justify-between text-stone-400">
-            <span className="text-[10px] font-mono uppercase tracking-widest">Chlorophyll (SPAD)</span>
+            <span className="text-[11px] font-mono uppercase tracking-widest">Chlorophyll (SPAD)</span>
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-display font-black text-emerald-400 font-mono">
             {currentMilestone.chlorophyllSpad}
             <span className="text-xs text-stone-400 font-sans font-medium"> / 55 SPAD</span>
           </div>
-          <div className="text-[10px] text-stone-300 flex items-center gap-1">
+          <div className="text-[11px] text-stone-300 flex items-center gap-1">
             <span className="text-emerald-400 font-bold">+{currentMilestone.chlorophyllSpad - 22}</span>
             <span>{lang === 'bn' ? 'বেসলাইন থেকে বৃদ্ধি' : 'points above baseline'}</span>
           </div>
@@ -411,13 +411,13 @@ export default function PlantHealthRecoveryTracker({
         {/* Metric 2: Active Pathogen Halting */}
         <div className="bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
           <div className="flex items-center justify-between text-stone-400">
-            <span className="text-[10px] font-mono uppercase tracking-widest">Lesion Arrest</span>
+            <span className="text-[11px] font-mono uppercase tracking-widest">Lesion Arrest</span>
             <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-display font-black text-teal-300 font-mono">
             {currentMilestone.lesionHaltingPct}%
           </div>
-          <div className="text-[10px] text-stone-300">
+          <div className="text-[11px] text-stone-300">
             {lang === 'bn' ? 'ছত্রাক ও ব্যাকটেরিয়া দমন' : 'Pathogen spread neutralized'}
           </div>
         </div>
@@ -425,13 +425,13 @@ export default function PlantHealthRecoveryTracker({
         {/* Metric 3: Foliar Tissue Regeneration */}
         <div className="bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
           <div className="flex items-center justify-between text-stone-400">
-            <span className="text-[10px] font-mono uppercase tracking-widest">Tissue Healing</span>
+            <span className="text-[11px] font-mono uppercase tracking-widest">Tissue Healing</span>
             <Activity className="w-3.5 h-3.5 text-blue-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-display font-black text-blue-300 font-mono">
             {currentMilestone.tissueHealingPct}%
           </div>
-          <div className="text-[10px] text-stone-300">
+          <div className="text-[11px] text-stone-300">
             {lang === 'bn' ? 'নতুন পাতার পুনরুজ্জীবন' : 'Healthy meristem foliage'}
           </div>
         </div>
@@ -439,7 +439,7 @@ export default function PlantHealthRecoveryTracker({
         {/* Metric 4: Pre-Harvest Interval (PHI) Countdown */}
         <div className="bg-white/5 p-4 rounded-2xl border border-white/10 backdrop-blur-sm space-y-1">
           <div className="flex items-center justify-between text-stone-400">
-            <span className="text-[10px] font-mono uppercase tracking-widest">Harvest Safety (PHI)</span>
+            <span className="text-[11px] font-mono uppercase tracking-widest">Harvest Safety (PHI)</span>
             <Clock className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-2xl sm:text-3xl font-display font-black text-amber-300 font-mono">
@@ -449,7 +449,7 @@ export default function PlantHealthRecoveryTracker({
               <span>{Math.max(harvestIntervalDays - currentMilestone.day, 0)} Days</span>
             )}
           </div>
-          <div className="text-[10px] text-stone-300">
+          <div className="text-[11px] text-stone-300">
             {pathway === 'organic' 
               ? (lang === 'bn' ? 'জৈব পদ্ধতি • রাসায়নিক অবশিষ্টাংশ নেই' : 'Organic pathway • No synthetic residue')
               : (lang === 'bn' ? 'স্ট্যান্ডার্ড পিএইচআই নির্দেশিকা' : 'Standard Pre-Harvest Interval (PHI)')}
@@ -485,7 +485,7 @@ export default function PlantHealthRecoveryTracker({
                     : 'bg-white/5 text-stone-300 border-white/5 hover:bg-white/10'
                 }`}
               >
-                <div className="text-[10px] uppercase font-mono tracking-wider opacity-80">
+                <div className="text-[11px] uppercase font-mono tracking-wider opacity-80">
                   {lang === 'bn' ? `${milestone.day}ম দিন` : `Day ${milestone.day}`}
                 </div>
                 <div className="text-xs sm:text-sm font-bold mt-0.5 truncate">
@@ -577,7 +577,7 @@ export default function PlantHealthRecoveryTracker({
             <div>
               <h4 className="font-display font-bold text-sm text-white flex items-center gap-2">
                 <span>{lang === 'bn' ? 'মাঠের পর্যবেক্ষণ খতিয়ান (বাস্তব ফলাফল)' : 'Farmer Field Observation Log (Empirical Outcomes)'}</span>
-                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                   {observations.length} {lang === 'bn' ? 'রেকর্ড' : 'Entries'}
                 </span>
               </h4>
@@ -612,7 +612,7 @@ export default function PlantHealthRecoveryTracker({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] font-mono text-stone-300 uppercase mb-1">
+                <label className="block text-[11px] font-mono text-stone-300 uppercase mb-1">
                   {lang === 'bn' ? 'কী পদক্ষেপ নিয়েছেন? (Action Taken)' : 'Action Taken'}
                 </label>
                 <input
@@ -626,7 +626,7 @@ export default function PlantHealthRecoveryTracker({
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-stone-300 uppercase mb-1">
+                <label className="block text-[11px] font-mono text-stone-300 uppercase mb-1">
                   {lang === 'bn' ? 'তারিখ (Date)' : 'Date'}
                 </label>
                 <input
@@ -640,7 +640,7 @@ export default function PlantHealthRecoveryTracker({
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono text-stone-300 uppercase mb-1">
+              <label className="block text-[11px] font-mono text-stone-300 uppercase mb-1">
                 {lang === 'bn' ? 'কী দৃশ্যমান পরিবর্তন দেখেছেন? (Visual Symptoms Observed)' : 'Visual Symptom Change Observed'}
               </label>
               <textarea
@@ -704,7 +704,7 @@ export default function PlantHealthRecoveryTracker({
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-stone-400 bg-stone-900 px-2 py-0.5 rounded-md border border-stone-800">
+                      <span className="font-mono text-[11px] text-stone-400 bg-stone-900 px-2 py-0.5 rounded-md border border-stone-800">
                         {obs.actionDate}
                       </span>
                       <strong className="text-white text-xs">{obs.actionTaken}</strong>
@@ -719,7 +719,7 @@ export default function PlantHealthRecoveryTracker({
                       type="button"
                       onClick={() => handleToggleExpertReview(obs.id)}
                       title={lang === 'bn' ? 'বিশেষজ্ঞ যাচাই স্ট্যাটাস টগল করুন' : 'Toggle expert review'}
-                      className={`px-2 py-0.5 rounded-lg border text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                         obs.expertReviewed
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
                           : 'bg-stone-800/80 text-stone-400 border-white/10 hover:text-stone-200'
@@ -743,7 +743,7 @@ export default function PlantHealthRecoveryTracker({
                 {/* Optional Attached Follow-up Photo */}
                 {obs.photoUrl && (
                   <div className="pt-1 flex items-center gap-2">
-                    <span className="text-[10px] text-stone-400 font-mono flex items-center gap-1">
+                    <span className="text-[11px] text-stone-400 font-mono flex items-center gap-1">
                       <ImageIcon className="w-3 h-3 text-emerald-400" />
                       {lang === 'bn' ? 'সংযুক্ত ছবি:' : 'Follow-up Photo:'}
                     </span>
@@ -759,7 +759,7 @@ export default function PlantHealthRecoveryTracker({
                 )}
 
                 {obs.expertNotes && (
-                  <div className="text-[10px] text-emerald-300 bg-emerald-950/60 border border-emerald-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                  <div className="text-[11px] text-emerald-300 bg-emerald-950/60 border border-emerald-500/20 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
                     <Check className="w-3 h-3 text-emerald-400 shrink-0" />
                     <span>{obs.expertNotes}</span>
                   </div>

@@ -1857,14 +1857,14 @@ Return a JSON object with this exact structure:
             <div className="absolute top-16 left-4 z-20 bg-black/80 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-emerald-500/40 text-left shadow-xl max-w-[260px] sm:max-w-xs">
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300">
                   {lang === 'bn' ? '💼 ইনভেস্টর ডেমো স্পেসিমেন' : '💼 Investor Pitch Specimen'}
                 </span>
               </div>
               <p className="text-xs font-bold text-white mt-0.5 leading-snug">
                 {lang === 'bn' ? activeDemoPreset.cropBn : activeDemoPreset.cropEn} • {lang === 'bn' ? activeDemoPreset.diseaseBn : activeDemoPreset.diseaseEn}
               </p>
-              <p className="text-[10px] text-emerald-300/80 font-mono mt-0.5 truncate">
+              <p className="text-[11px] text-emerald-300/80 font-mono mt-0.5 truncate">
                 {activeDemoPreset.pathogen}
               </p>
             </div>
@@ -1883,7 +1883,7 @@ Return a JSON object with this exact structure:
               className="absolute w-12 h-12 border-2 border-emerald-400 rounded-xl pointer-events-none z-30 shadow-[0_0_12px_rgba(52,211,153,0.8)]"
             >
               <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full absolute inset-0 m-auto" />
-              <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold text-emerald-300 bg-black/80 px-1.5 py-0.5 rounded backdrop-blur-xs pointer-events-none">
+              <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold text-emerald-300 bg-black/80 px-1.5 py-0.5 rounded backdrop-blur-xs pointer-events-none">
                 {lang === 'bn' ? 'ফোকাস এরিয়া' : 'Target area'}
               </span>
             </motion.div>
@@ -1923,7 +1923,7 @@ Return a JSON object with this exact structure:
             <button
               type="button"
               onClick={() => setIsExtendedThinking(!isExtendedThinking)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md text-left transition-colors cursor-pointer ${
+              className={`w-full flex items-center justify-between gap-2 px-3 min-h-[44px] py-1.5 rounded-xl border backdrop-blur-md text-left transition-colors cursor-pointer ${
                 isExtendedThinking
                   ? 'bg-purple-950/40 border-purple-500/30 hover:bg-purple-950/60'
                   : 'bg-gray-900/60 border-gray-800/80 hover:bg-gray-800/60'
@@ -1990,7 +1990,7 @@ Return a JSON object with this exact structure:
                       <span className="text-xs font-black text-amber-200 uppercase tracking-wider block truncate">
                         {lang === 'bn' ? 'ইনভেস্টর ডেমো প্রিসেট (বোর্ডরুম ব্যাকআপ)' : 'Investor Demo Presets (Pitch Backup)'}
                       </span>
-                      <p className="text-[10px] text-stone-300 truncate">
+                      <p className="text-[11px] text-stone-300 truncate">
                         {lang === 'bn' ? 'মিটিং রুমে বাস্তব ফসল না থাকলেও ১০০% নির্ভরযোগ্য লাইভ এআই ডেমো' : 'Foolproof live AI demo without real crops in meeting room'}
                       </p>
                     </div>
@@ -2000,7 +2000,7 @@ Return a JSON object with this exact structure:
                     <button
                       type="button"
                       onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
-                      className="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all cursor-pointer"
+                      className="text-[11px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all cursor-pointer"
                     >
                       {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
                     </button>
@@ -2060,13 +2060,13 @@ Return a JSON object with this exact structure:
                       >
                         <div className="space-y-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="text-[9px] font-black uppercase tracking-wider text-amber-400">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
                               {preset.category === 'staple' ? '🌾 Staple' : 
                                preset.category === 'cash_crop' ? '🍅 Cash Crop' : 
                                preset.category === 'rooftop' ? '🍋 Rooftop' : '🪴 Indoor'}
                             </span>
                             {isSelected && (
-                              <span className="text-[8px] bg-emerald-500 text-gray-950 px-1 py-0.2 rounded font-black">
+                              <span className="text-[11px] bg-emerald-500 text-gray-950 px-1 py-0.2 rounded font-black">
                                 ACTIVE
                               </span>
                             )}
@@ -2074,7 +2074,7 @@ Return a JSON object with this exact structure:
                           <p className="text-xs font-bold leading-tight line-clamp-1">
                             {lang === 'bn' ? preset.cropBn : preset.cropEn}
                           </p>
-                          <p className="text-[10px] text-stone-400 line-clamp-1">
+                          <p className="text-[11px] text-stone-400 line-clamp-1">
                             {lang === 'bn' ? preset.diseaseBn : preset.diseaseEn}
                           </p>
                         </div>
@@ -2083,7 +2083,7 @@ Return a JSON object with this exact structure:
                           <button
                             type="button"
                             onClick={() => handleSelectPreset(isSelected ? null : preset)}
-                            className={`flex-1 py-1 px-2 rounded-lg text-[10px] font-bold text-center transition-all cursor-pointer ${
+                            className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-emerald-500 text-gray-950 hover:bg-emerald-400'
                                 : 'bg-white/10 hover:bg-white/20 text-white'
@@ -2116,7 +2116,7 @@ Return a JSON object with this exact structure:
                   onClick={() => setShowInvestorPanel(true)}
                   aria-label={lang === 'bn' ? 'ইনভেস্টর ডেমো প্যানেল খুলুন' : 'Open investor demo panel'}
                   title={lang === 'bn' ? 'ইনভেস্টর ডেমো' : 'Investor demo'}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-stone-500/60 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer select-none"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-stone-500/60 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer select-none"
                 >
                   <Briefcase className="w-3 h-3" aria-hidden="true" />
                   <span>{lang === 'bn' ? 'ডেমো' : 'Demo'}</span>
@@ -2175,14 +2175,14 @@ Return a JSON object with this exact structure:
                 : 'pt-4 px-4'
             }`}>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-red-600/90 text-white text-[10px] font-black font-mono px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
+                <div className="flex items-center gap-1.5 bg-red-600/90 text-white text-[11px] font-black font-mono px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                   <span>LIVE 1 FPS</span>
                 </div>
-                <div className="bg-gray-900/80 backdrop-blur-md text-emerald-400 text-[10px] font-mono font-bold px-3 py-1 rounded-full border border-emerald-500/30">
+                <div className="bg-gray-900/80 backdrop-blur-md text-emerald-400 text-[11px] font-mono font-bold px-3 py-1 rounded-full border border-emerald-500/30">
                   ⏱️ {formatDuration(callDuration)}
                 </div>
-                <div className={`hidden sm:flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md ${
+                <div className={`hidden sm:flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md ${
                   isExtendedThinking 
                     ? 'bg-purple-900/70 border-purple-500/40 text-purple-200'
                     : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
@@ -2201,7 +2201,7 @@ Return a JSON object with this exact structure:
                       e.stopPropagation();
                       setShowInvestorPresetsBar(!showInvestorPresetsBar);
                     }}
-                    className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md transition-all cursor-pointer ${
+                    className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-md transition-all cursor-pointer ${
                       activeDemoPreset 
                         ? 'bg-amber-500/90 text-gray-950 border-amber-300 shadow-amber-500/30'
                         : 'bg-gray-900/80 text-amber-300 border-amber-500/30 hover:bg-gray-800'
@@ -2224,7 +2224,7 @@ Return a JSON object with this exact structure:
                         exit={{ opacity: 0, y: -8, scale: 0.95 }}
                         className="absolute right-0 top-8 z-40 bg-gray-950/95 border border-amber-500/40 p-2 rounded-2xl shadow-2xl backdrop-blur-md min-w-[220px] space-y-1"
                       >
-                        <div className="px-2 py-1 text-[9px] font-black uppercase text-amber-300 border-b border-gray-800">
+                        <div className="px-2 py-1 text-[11px] font-black uppercase text-amber-300 border-b border-gray-800">
                           {lang === 'bn' ? 'লাইভ স্যাম্পল পরিবর্তন' : 'Switch Live Specimen'}
                         </div>
                         <button
@@ -2252,7 +2252,7 @@ Return a JSON object with this exact structure:
                             }`}
                           >
                             <span className="truncate">{lang === 'bn' ? p.cropBn : p.cropEn}</span>
-                            <span className="text-[9px] opacity-75 font-mono ml-1">{p.severityEn}</span>
+                            <span className="text-[11px] opacity-75 font-mono ml-1">{p.severityEn}</span>
                           </button>
                         ))}
                       </motion.div>
@@ -2296,7 +2296,7 @@ Return a JSON object with this exact structure:
 
                         toast(lang === 'bn' ? 'এআই উত্তর বাতিল করা হয়েছে' : 'AI speech response cancelled', { duration: 1200, icon: '✋' });
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse"
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse"
                       title={lang === 'bn' ? 'এআই উত্তর বাতিল করুন' : 'Cancel AI Response'}
                     >
                       <Square className="w-3 h-3 fill-current" />
@@ -2305,7 +2305,7 @@ Return a JSON object with this exact structure:
                   )}
                 </AnimatePresence>
 
-                <div className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg ${
+                <div className={`text-[11px] font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-md shadow-lg ${
                   liveState === 'speaking' ? 'bg-emerald-500 text-gray-950 animate-pulse' :
                   liveState === 'analyzing' ? 'bg-purple-600 text-white animate-pulse' :
                   liveState === 'listening' ? 'bg-blue-500 text-white' : 'bg-gray-900/80 text-gray-300'
@@ -2380,7 +2380,7 @@ Return a JSON object with this exact structure:
                   >
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                       <span className={`inline-block w-2 h-2 rounded-full ${latestSubtitle.role === 'user' ? 'bg-sky-400 animate-pulse' : 'bg-emerald-400 animate-pulse'}`} />
-                      <span className={`text-[10px] uppercase tracking-wider font-black ${latestSubtitle.role === 'user' ? 'text-sky-300' : 'text-emerald-400'}`}>
+                      <span className={`text-[11px] uppercase tracking-wider font-black ${latestSubtitle.role === 'user' ? 'text-sky-300' : 'text-emerald-400'}`}>
                         {latestSubtitle.role === 'user' 
                           ? (lang === 'bn' ? '🗣️ কৃষক' : '🗣️ Farmer') 
                           : (lang === 'bn' ? '🤖 এআই কৃষিবিদ' : '🤖 AI Agronomist')}
@@ -2467,7 +2467,7 @@ Return a JSON object with this exact structure:
                     <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-gray-950" />
                   </div>
                   {isFullscreen && (
-                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md">
+                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[11px] font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md">
                       {lang === 'bn' ? 'ক্যাপচার' : 'Capture'}
                     </span>
                   )}
@@ -2538,14 +2538,14 @@ Return a JSON object with this exact structure:
                 {lang === 'bn' ? '৩টি প্রশ্নের উত্তর দিন (ট্যাপ করুন)' : 'Answer 3 quick questions (tap)'}
               </span>
               {memoryLoaded && (
-                <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
+                <span className="hidden sm:inline-flex text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
                   🧠 {lang === 'bn' ? 'খামার-স্মৃতি যুক্ত' : 'Farm memory on'}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {Object.keys(chipAnswers).length > 0 && (
-                <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300">
+                <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-300">
                   {Object.keys(chipAnswers).length}/3 ✓
                 </span>
               )}
@@ -2594,7 +2594,7 @@ Return a JSON object with this exact structure:
                       </div>
                     </div>
                   ))}
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
                     💡 {lang === 'bn'
                       ? 'ট্যাপ করলেই এআই আপনার উত্তর জেনে নেবে — টাইপ করার দরকার নেই। চাইলে মুখেও উত্তর দিতে পারেন।'
                       : 'Tapping tells the AI instantly — no typing needed. You can also answer by speaking.'}
@@ -2647,7 +2647,7 @@ Return a JSON object with this exact structure:
                 </p>
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-black uppercase tracking-wider">
               {lang === 'bn' ? 'সংরক্ষিত' : 'Saved'}
             </span>
           </div>
@@ -2686,7 +2686,7 @@ Return a JSON object with this exact structure:
                   type="button"
                   onClick={handleSpeakActionCard}
                   disabled={isActionAudioLoading}
-                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 ${
                     isActionAudioPlaying
                       ? 'bg-emerald-600 text-white border-emerald-500'
                       : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800/60'

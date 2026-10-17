@@ -698,7 +698,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
                       ? (lang === 'bn' ? 'গভীর রোগ ও প্যাথলজি মোড' : 'Deep Clinical Pathology Mode')
                       : (lang === 'bn' ? 'দ্রুত ভয়েস কল (বাগান, ইনডোর ও সার্বিক উদ্ভিদ)' : 'Fast Voice Call (Gardens, Houseplants & Plants)')}
                   </span>
-                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
                     {isExtendedThinking 
                       ? (lang === 'bn' ? 'সুপার স্পেশালাইজড: জটিল ফসলি রোগের বিশদ বৈজ্ঞানিক ব্যবচ্ছেদ ও নিখুঁত সমাধান' : 'Super specialized: Clinical plant pathology & precision differential diagnosis')
                       : (lang === 'bn' ? 'বিস্তৃত পরিধি: ছাদ বাগান, ইনডোর গাছ বাছাই, টবের মাটি ও তাৎক্ষণিক সহজ পরামর্শ' : 'Broad scope: Rooftop gardens, indoor plant buying, potting mix & instant tips')}
@@ -725,16 +725,16 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
 
             {/* Quick Topic Guide Chips */}
             <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-slate-800">
-              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
                 {lang === 'bn' ? '🌱 ছাদ ও বারান্দা বাগান' : '🌱 Rooftop & Balcony'}
               </span>
-              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
                 {lang === 'bn' ? '🪴 ইনডোর গাছ বাছাই' : '🪴 Indoor Plants to Buy'}
               </span>
-              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
                 {lang === 'bn' ? '🌿 টবের মাটি ও সার' : '🌿 Potting Mix & Care'}
               </span>
-              <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
+              <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-emerald-300 border border-slate-700/60">
                 {lang === 'bn' ? '🌾 ফসলি রোগবালাই' : '🌾 Crop Advisory'}
               </span>
             </div>
@@ -1100,14 +1100,14 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
                 </div>
 
                 <div className="flex flex-col items-center">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-gray-500">
+                  <span className="text-[11px] uppercase font-black tracking-widest text-gray-500">
                     {isMuted ? (lang === 'bn' ? 'আনমিউট' : 'Unmute') : (lang === 'bn' ? 'মিউট' : 'Mute')}
                   </span>
                   {!isMuted && (callStatus === 'listening' || callStatus === 'thinking') && (
                     <motion.span 
                       initial={{ opacity: 0, y: 2 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`text-[9px] font-bold tracking-wider uppercase mt-1 flex items-center gap-1.5 ${
+                      className={`text-[11px] font-bold tracking-wider uppercase mt-1 flex items-center gap-1.5 ${
                         callStatus === 'listening' ? 'text-emerald-400' : 'text-teal-300'
                       }`}
                     >
@@ -1128,7 +1128,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
                 >
                   <PhoneOff className="w-10 h-10" />
                 </button>
-                <span className="text-[10px] uppercase font-black tracking-widest text-red-500/70">
+                <span className="text-[11px] uppercase font-black tracking-widest text-red-500/70">
                   {lang === 'bn' ? 'কল কাটুন' : 'End Call'}
                 </span>
               </div>

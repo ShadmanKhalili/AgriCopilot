@@ -262,7 +262,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">
               {lang === 'bn' ? 'স্মার্ট প্ল্যানার' : 'Smart Planner'}
             </h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium">
+            <p className="text-gray-500 text-[11px] md:text-sm font-medium">
               {lang === 'bn' ? 'পরবর্তী মৌসুমে কী চাষ করবেন তার এআই ভিত্তিক পরামর্শ' : 'AI-driven recommendations for your next crop cycle'}
             </p>
           </div>
@@ -582,7 +582,7 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
               </div>
 
               {/* Data Integrity Pipeline Stages Indicator */}
-              <div className="flex items-center gap-1 text-[10px] font-mono font-bold bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl text-gray-600">
+              <div className="flex items-center gap-1 text-[11px] font-mono font-bold bg-gray-50 border border-gray-200 px-2.5 py-1 rounded-xl text-gray-600">
                 <span className="text-emerald-700">1. {lang === 'bn' ? 'সুপারিশ' : 'Rec'}</span>
                 <span className="text-gray-300">→</span>
                 <span className={confirmedCropIntent ? "text-emerald-700 font-black" : "text-gray-400"}>
@@ -604,7 +604,7 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                     <div>
                       <h4 className="text-lg font-bold text-gray-900">{rec.crop}</h4>
                       {confirmedCropIntent === rec.crop && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md mt-1">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md mt-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                           {lang === 'bn' ? 'আপনার নির্বাচিত রোপণ পরিকল্পনা' : 'Farmer Confirmed Intent'}
                         </span>
@@ -719,7 +719,7 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                           <button
                             type="button"
                             onClick={() => handleRecordObservedOutcome(rec.crop)}
-                            className={`w-full py-1.5 px-3 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
+                            className={`w-full py-1.5 px-3 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
                               observedOutcomes[rec.crop]
                                 ? 'bg-stone-800 text-emerald-300'
                                 : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300'
@@ -780,7 +780,7 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                 <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                   <div className="flex justify-between items-start mb-3">
                     <h4 className="text-base font-bold text-blue-900">{results.diversification.crop}</h4>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${getRiskColor(results.diversification.riskLevel)}`}>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg border ${getRiskColor(results.diversification.riskLevel)}`}>
                       Risk: {results.diversification.riskLevel}
                     </span>
                   </div>
@@ -794,15 +794,15 @@ ${results.avoid?.map((r:any) => `- ${r.crop}: ${r.evidence}`).join('\n')}`}
                   </div>
                   
                   <div className="mt-3 pt-3 border-t border-blue-200">
-                    <h5 className="text-[10px] font-bold text-blue-900 uppercase tracking-wider mb-1.5">
+                    <h5 className="text-[11px] font-bold text-blue-900 uppercase tracking-wider mb-1.5">
                       {lang === 'bn' ? 'বিকল্প হিসেবে কেন?' : 'Why as an alternative?'}
                     </h5>
-                    <p className="text-[10px] text-blue-800 leading-relaxed italic">
+                    <p className="text-[11px] text-blue-800 leading-relaxed italic">
                       {results.diversification.detailedAnalysis}
                     </p>
                   </div>
 
-                  <div className="mt-3 bg-white/60 p-2.5 rounded-xl border border-blue-200 text-[10px] text-blue-900">
+                  <div className="mt-3 bg-white/60 p-2.5 rounded-xl border border-blue-200 text-[11px] text-blue-900">
                     <span className="font-bold">{lang === 'bn' ? 'ঝুঁকির কারণ:' : 'Risk Reason:'}</span> {results.diversification.riskReason}
                   </div>
                 </div>

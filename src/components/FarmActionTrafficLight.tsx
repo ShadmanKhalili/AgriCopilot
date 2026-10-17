@@ -261,7 +261,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 <Wind className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
                   {lang === 'bn' ? 'সিদ্ধান্ত ১' : 'Decision 1'}
                 </span>
                 <h4 className="text-sm font-black text-gray-900">
@@ -269,7 +269,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 </h4>
               </div>
             </div>
-            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${sprayBadge.color}`}>
+            <span className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-full ${sprayBadge.color}`}>
               {sprayBadge.text}
             </span>
           </div>
@@ -303,7 +303,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 <Droplets className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
                   {lang === 'bn' ? 'সিদ্ধান্ত ২' : 'Decision 2'}
                 </span>
                 <h4 className="text-sm font-black text-gray-900">
@@ -311,7 +311,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 </h4>
               </div>
             </div>
-            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${irrigateBadge.color}`}>
+            <span className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-full ${irrigateBadge.color}`}>
               {irrigateBadge.text}
             </span>
           </div>
@@ -347,7 +347,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 <Sun className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
                   {lang === 'bn' ? 'সিদ্ধান্ত ৩' : 'Decision 3'}
                 </span>
                 <h4 className="text-sm font-black text-gray-900">
@@ -355,7 +355,7 @@ export default function FarmActionTrafficLight({ lang, weather }: Props) {
                 </h4>
               </div>
             </div>
-            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full ${harvestBadge.color}`}>
+            <span className={`text-[11px] font-black uppercase px-2.5 py-1 rounded-full ${harvestBadge.color}`}>
               {harvestBadge.text}
             </span>
           </div>

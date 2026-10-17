@@ -141,7 +141,7 @@ export default function SmartGrade({ lang }: Props) {
           </div>
           <div>
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.smartGrade}</h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.smartGradeDesc}</p>
+            <p className="text-gray-500 text-[11px] md:text-sm font-medium">{t.smartGradeDesc}</p>
           </div>
         </div>
       </div>
@@ -236,12 +236,12 @@ export default function SmartGrade({ lang }: Props) {
             <div className="pt-1">
               <div className="flex justify-between items-center mb-1.5">
                 <div className="flex items-center space-x-1">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
+                  <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{t.usage} (Daily)</span>
                   <Tooltip content={t.tooltips.usage}>
                     <HelpCircle className="w-3 h-3 text-gray-300" />
                   </Tooltip>
                 </div>
-                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
+                <span className="text-[11px] font-black text-blue-600 uppercase tracking-widest">{currentUsage} / {limit}</span>
               </div>
               <div className="w-full bg-blue-100/50 rounded-full h-2 overflow-hidden shadow-inner">
                 <motion.div 
@@ -297,13 +297,13 @@ export default function SmartGrade({ lang }: Props) {
                           <h3 className="text-base sm:text-lg md:text-xl font-black text-gray-900 tracking-tight">{t.certTitle}</h3>
                           <div className="flex items-center mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verified by Agri-AI</span>
+                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Verified by Agri-AI</span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Issue Date</p>
-                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Issue Date</p>
+                        <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-widest">
                           {new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       </div>
@@ -312,18 +312,18 @@ export default function SmartGrade({ lang }: Props) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6 border-b border-gray-100 pb-4 sm:pb-6">
                       <div className="space-y-3">
                         <div>
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.produceType}</p>
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.produceType}</p>
                           <p className="text-xl sm:text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">{t.produce[produce as keyof typeof t.produce]}</p>
                         </div>
                         <div className="flex items-center space-x-4">
                           <div className="bg-green-50 px-3 py-1.5 rounded-xl border border-green-100 flex items-center space-x-2">
                             <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                            <span className="text-sm font-black text-gray-900">৳ {result.estimatedPriceBdt} <span className="text-[9px] text-gray-400">/ {t.perKg}</span></span>
+                            <span className="text-sm font-black text-gray-900">৳ {result.estimatedPriceBdt} <span className="text-[11px] text-gray-400">/ {t.perKg}</span></span>
                           </div>
                         </div>
                       </div>
                       <div className="flex flex-col items-start sm:items-end justify-center">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.assignedGrade}</p>
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">{t.assignedGrade}</p>
                         <motion.div 
                           initial={{ scale: 0.5, rotate: -10 }}
                           animate={{ scale: 1, rotate: 0 }}
@@ -338,7 +338,7 @@ export default function SmartGrade({ lang }: Props) {
 
                     <div className="space-y-4 sm:space-y-6 flex-1">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{t.justification}</p>
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">{t.justification}</p>
                         <motion.div 
                           initial={{ opacity: 0, y: 15 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -355,7 +355,7 @@ export default function SmartGrade({ lang }: Props) {
                           whileHover={{ y: -2 }}
                           className="bg-gradient-to-br from-white to-blue-50/30 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-100 shadow-xs"
                         >
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex items-center">
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex items-center">
                             <Calendar className="w-3 h-3 mr-2 text-blue-500" />
                             {t.shelfLife}
                           </p>
@@ -365,7 +365,7 @@ export default function SmartGrade({ lang }: Props) {
                           whileHover={{ y: -3 }}
                           className="bg-gradient-to-br from-white to-indigo-50/30 p-4 md:p-5 rounded-[24px] border border-indigo-100 shadow-sm"
                         >
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex items-center">
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex items-center">
                             <Award className="w-3 h-3 mr-2 text-indigo-500" />
                             {t.bestMarket}
                           </p>
@@ -376,11 +376,11 @@ export default function SmartGrade({ lang }: Props) {
 
                     <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                       <div className="flex flex-col space-y-0.5">
-                        <div className="flex items-center space-x-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                        <div className="flex items-center space-x-2 text-[11px] font-black text-gray-500 uppercase tracking-widest">
                           <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                           <span>AI Indicative Pre-Grading Assessment</span>
                         </div>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[11px] text-gray-400">
                           {lang === 'bn' 
                             ? 'বাজার দরকষাকষির সহায়ক প্রাক-বাছাই • সংবিধিবদ্ধ BSTI/DAM সনদ নয়' 
                             : 'Farmgate price bargaining aid • Non-statutory BSTI/DAM certificate'}
@@ -439,7 +439,7 @@ export default function SmartGrade({ lang }: Props) {
                     <h3 className="font-bold text-stone-900 dark:text-white text-base">
                       {lang === 'bn' ? 'পাইকারি ক্রেতাকে বিবরণ পাঠান' : 'Send Offer to Buyer'}
                     </h3>
-                    <p className="text-[10px] text-stone-500">
+                    <p className="text-[11px] text-stone-500">
                       {lang === 'bn' ? 'প্রাক-বাছাই গ্রেড ও প্রস্তাবিত দর শেয়ার করুন' : 'Share indicative grade & target price'}
                     </p>
                   </div>

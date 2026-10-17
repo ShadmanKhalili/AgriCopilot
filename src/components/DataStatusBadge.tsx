@@ -102,7 +102,7 @@ export default function DataStatusBadge({
   if (compact) {
     return (
       <span 
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border tracking-wider ${config.bg} ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold border tracking-wider ${config.bg} ${className}`}
         title={`${label}${source ? ` • ${source}` : ''}${cacheAge ? ` • ${cacheAge}` : ''}`}
       >
         <Icon className="w-3 h-3 shrink-0" />
@@ -128,7 +128,7 @@ export default function DataStatusBadge({
       {cacheAge && (
         <>
           <span aria-hidden="true" className="opacity-40">•</span>
-          <span className="flex items-center gap-0.5 font-mono text-[10px]">
+          <span className="flex items-center gap-0.5 font-mono text-[11px]">
             <Clock className="w-2.5 h-2.5" />
             {cacheAge}
           </span>
@@ -138,14 +138,14 @@ export default function DataStatusBadge({
       {timestamp && !cacheAge && (
         <>
           <span aria-hidden="true" className="opacity-40">•</span>
-          <span className="text-[10px]">{timestamp}</span>
+          <span className="text-[11px]">{timestamp}</span>
         </>
       )}
 
       {location && (
         <>
           <span aria-hidden="true" className="opacity-40">•</span>
-          <span className="flex items-center gap-0.5 text-[10px]">
+          <span className="flex items-center gap-0.5 text-[11px]">
             <MapPin className="w-2.5 h-2.5" />
             {location}
           </span>

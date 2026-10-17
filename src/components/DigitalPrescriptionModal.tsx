@@ -313,7 +313,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               <span className="text-xs font-black uppercase tracking-wider text-emerald-950 dark:text-emerald-300">
                 {lang === 'bn' ? 'ডিজিটাল কৃষি ব্যবস্থাপত্র (Rx)' : 'Digital Krishi Prescription (Rx)'}
               </span>
-              <p className="text-[10px] text-stone-500 font-mono">ID: {rxId}</p>
+              <p className="text-[11px] text-stone-500 font-mono">ID: {rxId}</p>
             </div>
           </div>
 
@@ -421,7 +421,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                         ? 'স্মার্ট কৃষি কপিলট • এআই রোগনির্ণয় ও কৃষি সিদ্ধান্ত সহায়তা নেটওয়ার্ক' 
                         : 'Smart Agri-Copilot Multimodal AI • Decision-Support Advisory Network'}
                     </p>
-                    <p className="text-[10px] text-stone-500 mt-0.5">
+                    <p className="text-[11px] text-stone-500 mt-0.5">
                       Govt. of Bangladesh Agricultural Services Protocol • Toll Free 16123
                     </p>
                   </div>
@@ -435,7 +435,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                       {rxId}
                     </span>
                   </div>
-                  <div className="text-[10px] font-medium text-stone-500">
+                  <div className="text-[11px] font-medium text-stone-500">
                     <span>{currentDate} • {currentTime}</span>
                   </div>
                 </div>
@@ -445,7 +445,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             {/* Farmer & Plot Details Grid */}
             <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-50/90 rounded-2xl p-4 border border-stone-200 mb-6 text-xs">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
                   {lang === 'bn' ? 'কৃষক / গ্রাহক' : 'Grower / User'}
                 </span>
                 <span className="font-bold text-stone-900 truncate block">
@@ -454,7 +454,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               </div>
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
                   {lang === 'bn' ? 'এলাকা / প্লট' : 'Location / Plot'}
                 </span>
                 <span className="font-semibold text-stone-900 flex items-center gap-1 truncate">
@@ -464,19 +464,19 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               </div>
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
                   {lang === 'bn' ? 'আক্রান্ত ফসল' : 'Host Plant / Crop'}
                 </span>
                 <span className="font-bold text-emerald-950 truncate block">
                   {data.crop}
                 </span>
                 {data.cropStage && (
-                  <span className="text-[10px] text-stone-500 block truncate">{data.cropStage}</span>
+                  <span className="text-[11px] text-stone-500 block truncate">{data.cropStage}</span>
                 )}
               </div>
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
                   {lang === 'bn' ? 'আবহাওয়া পরিস্থিতি' : 'Microclimate'}
                 </span>
                 <span className="text-[11px] font-medium text-stone-800 flex items-center gap-1.5">
@@ -494,7 +494,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl font-serif font-black text-amber-400">℞</span>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-300">
                       {lang === 'bn' ? 'শনাক্তকৃত রোগ / সমস্যা' : 'Primary Pathological Diagnosis'}
                     </span>
                   </div>
@@ -537,7 +537,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Observed Symptoms */}
               {data.symptoms && data.symptoms.length > 0 && (
                 <div className="mt-3.5 pt-3 border-t border-emerald-800/80">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
                     {lang === 'bn' ? 'প্রাথমিক দৃশ্যমান পর্যবেক্ষণ (Visual Symptoms):' : 'Preliminary Visual Observations:'}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -558,7 +558,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {data.investigationSteps && data.investigationSteps.length > 0 && (
                 <div className="border border-amber-300/80 rounded-2xl p-4 bg-amber-50/60 shadow-2xs">
                   <div className="flex items-center space-x-2 text-amber-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-amber-200">
-                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px] font-black">🔬</span>
+                    <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[11px] font-black">🔬</span>
                     <span>{lang === 'bn' ? 'সুপারিশকৃত সরেজমিন অনুসন্ধান ও ল্যাব পরীক্ষা' : 'Recommended Field Investigations & Lab Diagnostics'}</span>
                   </div>
                   <ul className="space-y-1.5 text-xs text-amber-950 pl-2">
@@ -575,7 +575,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Section 1: Immediate Field Cultural & Mechanical Action */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
                 <div className="flex items-center space-x-2 text-stone-900 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-stone-100">
-                  <span className="w-5 h-5 rounded-full bg-stone-800 text-white flex items-center justify-center text-[10px] font-black">1</span>
+                  <span className="w-5 h-5 rounded-full bg-stone-800 text-white flex items-center justify-center text-[11px] font-black">1</span>
                   <span>{lang === 'bn' ? 'তাৎক্ষণিক জমি/টব স্যানিটেশন ও নন-কেমিক্যাল পরিচর্যা' : 'Immediate Cultural & Sanitation Protocols'}</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
@@ -593,10 +593,10 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 <div className="border-2 border-rose-500/40 rounded-2xl p-4 bg-rose-50/70 shadow-2xs">
                   <div className="flex items-center justify-between text-rose-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-rose-200">
                     <div className="flex items-center space-x-2">
-                      <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-[10px] font-black">🔒</span>
+                      <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-[11px] font-black">🔒</span>
                       <span>{lang === 'bn' ? 'রাসায়নিক চিকিৎসা স্থগিত • বিশেষজ্ঞ অনুমোদন আবশ্যক' : 'Chemical Rx Withheld • Agronomic Review Required'}</span>
                     </div>
-                    <span className="text-[10px] bg-rose-700 text-white px-2.5 py-0.5 rounded-full font-bold">
+                    <span className="text-[11px] bg-rose-700 text-white px-2.5 py-0.5 rounded-full font-bold">
                       {lang === 'bn' ? 'অনুমোদন পেন্ডিং' : 'Review Required'}
                     </span>
                   </div>
@@ -618,11 +618,11 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 <div className="border-2 border-emerald-600/30 rounded-2xl p-4 bg-emerald-50/40 shadow-2xs">
                   <div className="flex items-center justify-between text-emerald-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-emerald-200">
                     <div className="flex items-center space-x-2">
-                      <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-black">2</span>
+                      <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[11px] font-black">2</span>
                       <span>{lang === 'bn' ? 'অনুমোদিত রাসায়নিক চিকিৎসা ও সুনির্দিষ্ট মাত্রা' : 'Precision Chemical Treatment & Exact Dilution'}</span>
                     </div>
                     {data.harvestIntervalDays && (
-                      <span className="text-[10px] bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
+                      <span className="text-[11px] bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
                         {lang === 'bn' ? `ফসল তোলার বিরতি (PHI): ${data.harvestIntervalDays} দিন` : `Pre-Harvest Interval (PHI): ${data.harvestIntervalDays} Days`}
                       </span>
                     )}
@@ -635,7 +635,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                       </li>
                     ))}
                   </ul>
-                  <p className="text-[10px] text-emerald-800/80 italic mt-2.5 pl-6">
+                  <p className="text-[11px] text-emerald-800/80 italic mt-2.5 pl-6">
                     {lang === 'bn' 
                       ? '⚠️ সতর্কতা: তীব্র রোদে বা বৃষ্টির সম্ভাবনায় স্প্রে করবেন না। স্প্রে করার সময় মাস্ক ও গ্লাভস পরিধান করুন।' 
                       : '⚠️ Caution: Do not spray under direct scorching midday sun or pending rainfall. Wear safety mask and gloves.'}
@@ -646,7 +646,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Section 3: Organic & Eco-Friendly Alternative */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
                 <div className="flex items-center space-x-2 text-stone-900 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-stone-100">
-                  <span className="w-5 h-5 rounded-full bg-teal-700 text-white flex items-center justify-center text-[10px] font-black">3</span>
+                  <span className="w-5 h-5 rounded-full bg-teal-700 text-white flex items-center justify-center text-[11px] font-black">3</span>
                   <span>{lang === 'bn' ? 'জৈব ও পরিবেশবান্ধব বিকল্প সমাধান' : 'Bio-Control & Organic Alternatives'}</span>
                 </div>
                 <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
@@ -673,7 +673,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     <span className="text-emerald-400 font-mono font-bold">📈</span>
                     <span>{lang === 'bn' ? '৭-১৪ দিনের উদ্ভিদ নিরাময় ও ক্লোরোফিল ট্র্যাকার' : '7-Day Plant Health Recovery Tracker (Apple Health for Crops)'}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
                     {showRecoveryTracker ? (lang === 'bn' ? 'সংকোচন করুন ▲' : 'Hide ▲') : (lang === 'bn' ? 'ট্র্যাকার খুলুন ▼' : 'Open Tracker ▼')}
                   </span>
                 </button>
@@ -708,12 +708,12 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   <p className="font-bold text-stone-900 leading-snug">
                     {lang === 'bn' ? 'ডিজিটাল কৃষি সিদ্ধান্ত সহায়তা পরামর্শপত্র' : 'Digital Agri Decision-Support Advisory'}
                   </p>
-                  <p className="text-[10px] text-stone-500 mt-0.5">
+                  <p className="text-[11px] text-stone-500 mt-0.5">
                     {lang === 'bn' 
                       ? 'কৃষি জ্ঞানভিত্তিক সিদ্ধান্ত সহায়তা মডেল • রাসায়নিক চিকিৎসার পূর্বে মাঠের বিশেষজ্ঞ যাচাই আবশ্যক।' 
                       : 'Agronomic decision-support model • Recorded expert review required before chemical application.'}
                   </p>
-                  <p className="text-[10px] text-emerald-800 font-semibold mt-1">
+                  <p className="text-[11px] text-emerald-800 font-semibold mt-1">
                     📞 Helpline: 16123 (Krishi Call Centre) • Free Farmer Support
                   </p>
                 </div>
@@ -726,12 +726,12 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     KrishiVip AI Advisory
                   </div>
                 </div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-900">
+                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
                   {data.expertVerified 
                     ? (lang === 'bn' ? 'বিশেষজ্ঞ কর্তৃক যাচাইকৃত' : 'Expert Verified') 
                     : (lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা • রিভিউ পেন্ডিং' : 'AI Decision Support • Review Pending')}
                 </p>
-                <p className="text-[9px] text-stone-400 font-mono">
+                <p className="text-[11px] text-stone-400 font-mono">
                   SHA256: {rxId.replace(/-/g, '').slice(0, 16)}
                 </p>
               </div>

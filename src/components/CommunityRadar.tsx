@@ -90,7 +90,7 @@ export default function CommunityRadar({ lang }: Props) {
           </div>
           <div>
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.communityRadar}</h2>
-            <p className="text-gray-500 text-[10px] md:text-sm font-medium">{t.communityRadarDesc}</p>
+            <p className="text-gray-500 text-[11px] md:text-sm font-medium">{t.communityRadarDesc}</p>
           </div>
         </div>
       </div>
@@ -150,7 +150,7 @@ export default function CommunityRadar({ lang }: Props) {
                       <h3 className="font-black text-gray-900 text-base sm:text-lg capitalize truncate">
                         {t.crops[alert.crop as keyof typeof t.crops] || alert.crop}
                       </h3>
-                      <span className="text-[10px] font-black text-red-600 uppercase tracking-widest block truncate">
+                      <span className="text-[11px] font-black text-red-600 uppercase tracking-widest block truncate">
                         {alert.analysisType === 'disease' ? t.disease : alert.analysisType === 'pest' ? t.pest : t.abiotic}
                       </span>
                     </div>

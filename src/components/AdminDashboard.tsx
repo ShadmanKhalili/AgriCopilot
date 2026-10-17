@@ -673,10 +673,10 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
                     {lang === 'bn' ? 'জাতীয় কৃষি প্রশাসন' : 'DAE & BARI Agro-Grid Protocol'}
                   </span>
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-emerald-400">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
                     <span>ASIA-EAST1 • 99.98% SLA</span>
                   </div>
@@ -760,12 +760,12 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   <Users className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black text-emerald-400 font-mono">+18% Weekly</span>
+                <span className="text-[11px] font-black text-emerald-400 font-mono">+18% Weekly</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
                 {stats.totalUsers.toLocaleString()}
               </div>
-              <div className="text-[10px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
+              <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'মোট নিবন্ধিত কৃষক' : 'Registered Farmers & Users'}
               </div>
             </div>
@@ -776,12 +776,12 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   <Leaf className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black text-emerald-400 font-mono">Live Stream</span>
+                <span className="text-[11px] font-black text-emerald-400 font-mono">Live Stream</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
                 {stats.totalDiagnoses.toLocaleString()}
               </div>
-              <div className="text-[10px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
+              <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'মোট এআই রোগনির্ণয়' : 'Multimodal Consultations'}
               </div>
             </div>
@@ -792,12 +792,12 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   <FileText className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black text-purple-300 font-mono">Certified Rx</span>
+                <span className="text-[11px] font-black text-purple-300 font-mono">Certified Rx</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
                 {stats.totalPrescriptions.toLocaleString()}
               </div>
-              <div className="text-[10px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
+              <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'ইস্যুকৃত ডিজিটাল প্রেসক্রিপশন' : 'Certified Krishi Rx Cards'}
               </div>
             </div>
@@ -808,12 +808,12 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black text-emerald-300 font-mono">{lang === 'bn' ? 'মাঠ মূল্যায়ন' : 'Field Evaluated'}</span>
+                <span className="text-[11px] font-black text-emerald-300 font-mono">{lang === 'bn' ? 'মাঠ মূল্যায়ন' : 'Field Evaluated'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
                 {stats.helpfulRatio.toFixed(1)}%
               </div>
-              <div className="text-[10px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
+              <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'মডেল নির্ভুলতা সন্তুষ্টি' : 'Pathology Accuracy Score'}
               </div>
             </div>
@@ -846,7 +846,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                             toast.success(`Edge Ping: ${Math.round(performance.now() - t0 + 200)}ms to ASIA-EAST1`);
                           }, 150);
                         }}
-                        className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold border border-emerald-500/40 cursor-pointer"
+                        className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold border border-emerald-500/40 cursor-pointer"
                       >
                         Ping Edge
                       </button>
@@ -855,24 +855,24 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
                     <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-widest">Protocol & Ingestion</span>
+                      <span className="text-[11px] text-stone-400 uppercase tracking-widest">Protocol & Ingestion</span>
                       <div className="font-bold text-white text-sm">WebSocket (1 FPS)</div>
-                      <div className="text-[10px] text-emerald-400">640x480 JPEG @ 0.5 Quality</div>
+                      <div className="text-[11px] text-emerald-400">640x480 JPEG @ 0.5 Quality</div>
                     </div>
                     <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-widest">Voice Audio Pipeline</span>
+                      <span className="text-[11px] text-stone-400 uppercase tracking-widest">Voice Audio Pipeline</span>
                       <div className="font-bold text-white text-sm">24kHz PCM Bi-Dir</div>
-                      <div className="text-[10px] text-emerald-400">Low-latency Streaming Chunk</div>
+                      <div className="text-[11px] text-emerald-400">Low-latency Streaming Chunk</div>
                     </div>
                     <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-widest">Model Engine</span>
+                      <span className="text-[11px] text-stone-400 uppercase tracking-widest">Model Engine</span>
                       <div className="font-bold text-white text-sm">Gemini 2.5 Flash</div>
-                      <div className="text-[10px] text-emerald-400">Deep Agronomic Grounding</div>
+                      <div className="text-[11px] text-emerald-400">Deep Agronomic Grounding</div>
                     </div>
                     <div className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                      <span className="text-[10px] text-stone-400 uppercase tracking-widest">Active Channels</span>
+                      <span className="text-[11px] text-stone-400 uppercase tracking-widest">Active Channels</span>
                       <div className="font-bold text-white text-sm">86 Concurrent</div>
-                      <div className="text-[10px] text-emerald-400">Zero Buffer Drop Rate</div>
+                      <div className="text-[11px] text-emerald-400">Zero Buffer Drop Rate</div>
                     </div>
                   </div>
                 </div>
@@ -980,7 +980,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-2xl font-black text-white">45%</span>
-                    <span className="text-[8px] font-mono uppercase tracking-widest text-emerald-300">Live Video</span>
+                    <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-300">Live Video</span>
                   </div>
                 </div>
 
@@ -1022,7 +1022,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     {lang === 'bn' ? 'সারাদেশ থেকে কৃষকদের পাঠানো ছবি ও ভিডিও স্ক্যান ফলাফল' : 'Live incoming diagnostic turns from field farmers and gardeners'}
                   </p>
                 </div>
-                <div className="flex items-center space-x-2 text-[10px] font-mono text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-center space-x-2 text-[11px] font-mono text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>STREAMING</span>
                 </div>
@@ -1031,7 +1031,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-stone-50 dark:bg-stone-800/50 text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                    <tr className="bg-stone-50 dark:bg-stone-800/50 text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                       <th className="px-6 py-3.5">Session / District</th>
                       <th className="px-6 py-3.5">Host Crop</th>
                       <th className="px-6 py-3.5">AI Clinical Finding</th>
@@ -1047,7 +1047,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           <div className="font-mono text-stone-900 dark:text-stone-200 font-bold">
                             {diag.district || 'Bogura'}
                           </div>
-                          <div className="text-[10px] text-stone-400 font-mono">
+                          <div className="text-[11px] text-stone-400 font-mono">
                             {diag.createdAt ? (typeof diag.createdAt === 'string' ? new Date(diag.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now') : 'Just now'}
                           </div>
                         </td>
@@ -1062,7 +1062,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           </p>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
                             diag.qualitativeSeverity === 'Critical' 
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' 
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
@@ -1159,7 +1159,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono font-bold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2.5 py-1 rounded-lg shrink-0">
+                <span className="text-[11px] font-mono font-bold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2.5 py-1 rounded-lg shrink-0">
                   Relative Humidity: 94%
                 </span>
               </div>
@@ -1216,11 +1216,11 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider font-mono text-stone-500 flex items-center gap-1">
+                        <span className="text-[11px] font-black uppercase tracking-wider font-mono text-stone-500 flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-rose-600" />
                           {lang === 'bn' ? hotspot.districtBn : hotspot.district} District
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-widest ${
                           hotspot.threatLevel === 'Critical'
                             ? 'bg-rose-600 text-white'
                             : hotspot.threatLevel === 'Moderate'
@@ -1400,7 +1400,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-stone-50 dark:bg-stone-800/50 text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                  <tr className="bg-stone-50 dark:bg-stone-800/50 text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                     <th className="px-6 py-4">Serial Rx ID</th>
                     <th className="px-6 py-4">Farmer / Grower</th>
                     <th className="px-6 py-4">Host Crop</th>
@@ -1433,7 +1433,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         {rx.location || 'Bangladesh'}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
                           rx.severity === 'Critical' || rx.severity === 'মারাত্মক'
                             ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
@@ -1444,18 +1444,18 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                       <td className="px-6 py-4">
                         {rx.isDemoData ? (
                           <span
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded-full border border-stone-300 dark:border-stone-700"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-600 dark:text-stone-300 bg-stone-100 dark:bg-stone-800/60 px-2 py-0.5 rounded-full border border-stone-300 dark:border-stone-700"
                             title="Synthesized demo record — not certified"
                           >
                             DEMO
                           </span>
                         ) : rx.verified ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
                             <Check className="w-3 h-3 text-emerald-600" />
                             SAAO Certified
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
                             Pending Review
                           </span>
                         )}
@@ -1586,7 +1586,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-stone-50 dark:bg-stone-800/50 text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                  <tr className="bg-stone-50 dark:bg-stone-800/50 text-[11px] font-bold text-stone-500 uppercase tracking-wider">
                     <th className="px-6 py-4">User Details</th>
                     <th className="px-6 py-4">Assigned Role</th>
                     <th className="px-6 py-4">Access Tier</th>
@@ -1616,7 +1616,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-black uppercase tracking-wider border ${
                           u.role === 'admin' 
                             ? 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300' 
                             : u.role === 'hub-manager'
@@ -1630,7 +1630,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         <button
                           type="button"
                           onClick={() => handleToggleUserTier(u.id, u.tier)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-bold cursor-pointer active:scale-95 transition-all ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold cursor-pointer active:scale-95 transition-all ${
                             u.tier === 'premium'
                               ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300'
                               : 'bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300'
@@ -1655,14 +1655,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           <button
                             type="button"
                             onClick={() => handleUpdateUserRole(u.id, 'hub-manager')}
-                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-blue-50 text-stone-700 hover:text-blue-700 text-[10px] font-bold border border-stone-200 transition-all cursor-pointer"
+                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-blue-50 text-stone-700 hover:text-blue-700 text-[11px] font-bold border border-stone-200 transition-all cursor-pointer"
                           >
                             + SAAO
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUpdateUserRole(u.id, 'agri-preneur')}
-                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-stone-700 hover:text-emerald-700 text-[10px] font-bold border border-stone-200 transition-all cursor-pointer"
+                            className="px-2 py-1 rounded-lg bg-stone-100 hover:bg-emerald-50 text-stone-700 hover:text-emerald-700 text-[11px] font-bold border border-stone-200 transition-all cursor-pointer"
                           >
                             Farmer
                           </button>
@@ -1693,7 +1693,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     <DollarSign className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-300 uppercase tracking-widest bg-emerald-900/60 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono text-emerald-300 uppercase tracking-widest bg-emerald-900/60 px-2 py-0.5 rounded-full">
                     99.8% Cost Savings
                   </span>
                 </div>
@@ -1712,7 +1712,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
                     <TrendingUp className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-mono text-blue-300 uppercase tracking-widest bg-blue-900/60 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono text-blue-300 uppercase tracking-widest bg-blue-900/60 px-2 py-0.5 rounded-full">
                     $450M Loss Shield
                   </span>
                 </div>
@@ -1731,7 +1731,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
                     <Globe className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-mono text-purple-300 uppercase tracking-widest bg-purple-900/60 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-mono text-purple-300 uppercase tracking-widest bg-purple-900/60 px-2 py-0.5 rounded-full">
                     Total Addressable Market
                   </span>
                 </div>
@@ -1756,19 +1756,19 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 space-y-1.5">
-                  <span className="text-[10px] font-black uppercase text-amber-600 font-mono">SDG 2: Zero Hunger</span>
+                  <span className="text-[11px] font-black uppercase text-amber-600 font-mono">SDG 2: Zero Hunger</span>
                   <p className="text-xs font-bold text-stone-900 dark:text-stone-100">Smallholder Food Security</p>
                   <p className="text-[11px] text-stone-500">Safeguards national grain reserves through early warning bacterial/fungal alerts.</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 space-y-1.5">
-                  <span className="text-[10px] font-black uppercase text-emerald-600 font-mono">SDG 12: Responsible Consumption</span>
+                  <span className="text-[11px] font-black uppercase text-emerald-600 font-mono">SDG 12: Responsible Consumption</span>
                   <p className="text-xs font-bold text-stone-900 dark:text-stone-100">Chemical Reduction & Safety</p>
                   <p className="text-[11px] text-stone-500">Enforces pre-harvest intervals (PHI) and prohibits banned persistent agrochemicals.</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 space-y-1.5">
-                  <span className="text-[10px] font-black uppercase text-blue-600 font-mono">SDG 13: Climate Action</span>
+                  <span className="text-[11px] font-black uppercase text-blue-600 font-mono">SDG 13: Climate Action</span>
                   <p className="text-xs font-bold text-stone-900 dark:text-stone-100">Climate Resilience & Soil Care</p>
                   <p className="text-[11px] text-stone-500">AgroCast AI microclimate forecasting avoids futile chemical washouts.</p>
                 </div>
@@ -1792,7 +1792,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   </div>
                 </div>
 
-                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/40">
+                <span className="text-[11px] font-mono text-emerald-300 bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-500/40">
                   SaaS Model: ৳99/mo ($0.85 USD)
                 </span>
               </div>
@@ -1813,7 +1813,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     onChange={(e) => setInvestorFarmersCount(Number(e.target.value))}
                     className="w-full accent-emerald-500 cursor-pointer"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-stone-500">
+                  <div className="flex justify-between text-[11px] font-mono text-stone-500">
                     <span>50K</span>
                     <span>1.0M</span>
                     <span>2.0M</span>
@@ -1834,7 +1834,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     onChange={(e) => setInvestorConversionRate(Number(e.target.value))}
                     className="w-full accent-emerald-500 cursor-pointer"
                   />
-                  <div className="flex justify-between text-[10px] font-mono text-stone-500">
+                  <div className="flex justify-between text-[11px] font-mono text-stone-500">
                     <span>1.0% (Organic)</span>
                     <span>5.0%</span>
                     <span>10.0% (DAE Mandate)</span>
@@ -1854,27 +1854,27 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 return (
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
                     <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                      <span className="text-[10px] font-mono uppercase text-stone-400">Paying Pro Farmers</span>
+                      <span className="text-[11px] font-mono uppercase text-stone-400">Paying Pro Farmers</span>
                       <div className="text-xl sm:text-2xl font-black font-display text-white">{payingUsers.toLocaleString()}</div>
-                      <span className="text-[10px] text-emerald-400 font-mono">B2C Subs + SAAO</span>
+                      <span className="text-[11px] text-emerald-400 font-mono">B2C Subs + SAAO</span>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1">
-                      <span className="text-[10px] font-mono uppercase text-emerald-300">Projected ARR</span>
+                      <span className="text-[11px] font-mono uppercase text-emerald-300">Projected ARR</span>
                       <div className="text-xl sm:text-2xl font-black font-display text-emerald-400">৳{(annualRevenueBDT / 1000000).toFixed(1)}M</div>
-                      <span className="text-[10px] text-stone-300 font-mono">${annualRevenueUSD.toLocaleString()} USD</span>
+                      <span className="text-[11px] text-stone-300 font-mono">${annualRevenueUSD.toLocaleString()} USD</span>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-1">
-                      <span className="text-[10px] font-mono uppercase text-stone-400">Gross Margin</span>
+                      <span className="text-[11px] font-mono uppercase text-stone-400">Gross Margin</span>
                       <div className="text-xl sm:text-2xl font-black font-display text-emerald-300">{Math.max(grossMargin, 91)}%</div>
-                      <span className="text-[10px] text-stone-400 font-mono">Inference: &lt;${annualAiInferenceCostUSD.toLocaleString()}/yr</span>
+                      <span className="text-[11px] text-stone-400 font-mono">Inference: &lt;${annualAiInferenceCostUSD.toLocaleString()}/yr</span>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-1">
-                      <span className="text-[10px] font-mono uppercase text-blue-300">Farmer Yield Shield</span>
+                      <span className="text-[11px] font-mono uppercase text-blue-300">Farmer Yield Shield</span>
                       <div className="text-xl sm:text-2xl font-black font-display text-blue-400">${economicLossPreventedUSD}M</div>
-                      <span className="text-[10px] text-stone-300 font-mono">National Food Security</span>
+                      <span className="text-[11px] text-stone-300 font-mono">National Food Security</span>
                     </div>
                   </div>
                 );

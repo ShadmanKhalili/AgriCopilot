@@ -378,7 +378,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
             <div className="text-2xl font-black text-white font-mono tracking-wider">
               16123 / 333
             </div>
-            <p className="text-[10px] text-emerald-200/80 font-medium">
+            <p className="text-[11px] text-emerald-200/80 font-medium">
               {lang === 'bn' ? 'সকাল ৯টা - বিকাল ৫টা (বিনামূল্যে)' : 'Toll-Free Agricultural Support'}
             </p>
           </div>
@@ -540,7 +540,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                         </motion.div>
                       </div>
                       
-                      <div className="flex items-center justify-between text-[10px] text-stone-500 font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-stone-500 font-mono">
                         <span>0</span>
                         <span>{percent}% {lang === 'bn' ? 'সহনশীলতা ধারণক্ষমতা' : 'Capacity'}</span>
                         <span>{variety.toleranceGauge.max} {lang === 'bn' ? variety.toleranceGauge.unitBn.split(' ')[0] : variety.toleranceGauge.unitEn.split(' ')[0]}</span>
@@ -645,7 +645,7 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                   return (
                     <div key={variety.id} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 space-y-4">
                       <div>
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border mb-2 ${theme.colorBadge}`}>
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold border mb-2 ${theme.colorBadge}`}>
                           {lang === 'bn' ? theme.labelBn : theme.labelEn}
                         </span>
                         <h4 className="text-lg font-black text-stone-900">{variety.name}</h4>
@@ -661,29 +661,29 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
                         <div className="w-full bg-stone-200 h-2 rounded-full overflow-hidden">
                           <div className={`h-full ${theme.barColor} rounded-full`} style={{ width: `${percent}%` }} />
                         </div>
-                        <div className="text-[10px] text-stone-600 font-medium">
+                        <div className="text-[11px] text-stone-600 font-medium">
                           {lang === 'bn' ? variety.toleranceGauge.labelBn : variety.toleranceGauge.labelEn}
                         </div>
                       </div>
 
                       <div className="space-y-2 pt-2 border-t border-stone-200 text-xs">
                         <div>
-                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'সহনশীলতা' : 'Tolerance'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[11px]">{lang === 'bn' ? 'সহনশীলতা' : 'Tolerance'}</div>
                           <div className="font-bold text-stone-900">{lang === 'bn' ? variety.toleranceLevelBn : variety.toleranceLevelEn}</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'জীবনকাল' : 'Duration'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[11px]">{lang === 'bn' ? 'জীবনকাল' : 'Duration'}</div>
                           <div className="font-black text-stone-900 font-mono text-base">{variety.durationDays} দিন (Days)</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[11px]">{lang === 'bn' ? 'সম্ভাব্য ফলন' : 'Yield'}</div>
                           <div className="font-black text-emerald-800 font-mono text-base">{lang === 'bn' ? variety.yieldPotentialBn : variety.yieldPotentialEn}</div>
                         </div>
 
                         <div>
-                          <div className="font-bold text-stone-500 uppercase text-[10px]">{lang === 'bn' ? 'মাঠ পরামর্শ' : 'Tips'}</div>
+                          <div className="font-bold text-stone-500 uppercase text-[11px]">{lang === 'bn' ? 'মাঠ পরামর্শ' : 'Tips'}</div>
                           <div className="text-stone-700">{lang === 'bn' ? variety.managementTipsBn : variety.managementTipsEn}</div>
                         </div>
                       </div>

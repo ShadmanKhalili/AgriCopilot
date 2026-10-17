@@ -90,7 +90,7 @@ export default function MobileBottomNav({
                 <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
               </div>
 
-              <span className="text-[10px] leading-tight tracking-tight truncate max-w-[70px] text-center">
+              <span className="text-[11px] leading-tight tracking-tight truncate max-w-[70px] text-center">
                 {item.label}
               </span>
             </button>
@@ -121,7 +121,7 @@ export default function MobileBottomNav({
           <div className="p-1">
             <Grid className={`w-5 h-5 transition-colors ${isSpecialistToolActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
           </div>
-          <span className="text-[10px] leading-tight tracking-tight truncate max-w-[70px] text-center">
+          <span className="text-[11px] leading-tight tracking-tight truncate max-w-[70px] text-center">
             {lang === 'bn' ? 'আরও সেবা' : 'More'}
           </span>
         </button>

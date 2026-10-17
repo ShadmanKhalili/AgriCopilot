@@ -170,7 +170,7 @@ export default function RegionModal({
                       }`}
                     >
                       <span>{lang === 'bn' ? district.bn_name : district.name}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-emerald-700 text-emerald-100' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-emerald-700 text-emerald-100' : 'bg-gray-100 text-gray-500'}`}>
                         {district.upazilas.length}
                       </span>
                     </button>
@@ -195,7 +195,7 @@ export default function RegionModal({
                       <div className="w-2 h-2 rounded-full bg-emerald-500 opacity-60 group-hover:opacity-100" />
                       <span>{lang === 'bn' ? upazila.bn_name : upazila.name}</span>
                     </div>
-                    <span className="text-[10px] text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
+                    <span className="text-[11px] text-emerald-700 font-semibold opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
                       <span>{lang === 'bn' ? 'সেট করুন' : 'Select'}</span>
                       <Check className="w-3 h-3" />
                     </span>

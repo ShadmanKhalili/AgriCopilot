@@ -272,7 +272,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
       {/* Observation Channel Route: Direct Smartphone vs SAAO Assisted Route for Non-Smartphone Farmers */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {lang === 'bn' ? 'তথ্য সংগ্রহ ও পর্যবেক্ষণ চ্যানেল' : 'Observation Collection Route'}
           </p>
           <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
@@ -403,10 +403,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                     <QrCode className="w-9 h-9 text-slate-900" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-emerald-200 font-mono">
+                    <p className="text-[11px] text-emerald-200 font-mono">
                       ENCRYPTED AGRICULTURAL DOSSIER
                     </p>
-                    <p className="text-[10px] text-emerald-300/70">
+                    <p className="text-[11px] text-emerald-300/70">
                       {lang === 'bn' ? 'ব্যবহার-ভিত্তিক যাচাইকৃত' : 'Usage Verified Profile'}
                     </p>
                   </div>
@@ -645,7 +645,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
                   {lang === 'bn' ? '৪টি পৃথক বুদ্ধিমত্তা স্তর (Trustworthy Evidence System)' : '4 Separated Evidence Pillars'}
                 </span>
-                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                   {lang === 'bn' ? 'স্বচ্ছ ও যাচাইযোগ্য' : 'Transparent & Verifiable'}
                 </span>
               </div>

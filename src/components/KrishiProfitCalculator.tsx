@@ -384,7 +384,7 @@ ${tenureNote}
             </div>
             {/* Inline Quick Presets (Rank 6) */}
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <span className="text-[10px] text-stone-400">{lang === 'bn' ? 'দ্রুত:' : 'Quick:'}</span>
+              <span className="text-[11px] text-stone-400">{lang === 'bn' ? 'দ্রুত:' : 'Quick:'}</span>
               {[
                 { label: lang === 'bn' ? '১ বিঘা' : '1 Bigha', val: 1, unit: 'bigha' },
                 { label: lang === 'bn' ? '৫০ শতক' : '50 Dec', val: 50, unit: 'decimal' },
@@ -394,7 +394,7 @@ ${tenureNote}
                   key={preset.label}
                   type="button"
                   onClick={() => { setLandSize(preset.val); setLandUnit(preset.unit as any); }}
-                  className="text-[10px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
+                  className="text-[11px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
                 >
                   {preset.label}
                 </button>
@@ -408,7 +408,7 @@ ${tenureNote}
               <label className="block text-xs font-bold text-stone-700 dark:text-stone-300">
                 {lang === 'bn' ? '৩. আনুমানিক মোট ফলন' : '3. Expected Harvest'}
               </label>
-              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">
+              <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-mono">
                 {lang === 'bn' ? '১ মণ = ৪০ কেজি' : '1 Mon = 40kg'}
               </span>
             </div>
@@ -608,7 +608,7 @@ ${tenureNote}
                   <button
                     type="button"
                     onClick={() => updateCostItem('lease' as any, 0)}
-                    className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    className={`text-[11px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                       costs.lease === 0 ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300' : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
                     }`}
                   >
@@ -617,7 +617,7 @@ ${tenureNote}
                   <button
                     type="button"
                     onClick={() => updateCostItem('lease' as any, Math.round(5000 * landRatio))}
-                    className={`text-[10px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    className={`text-[11px] font-medium px-2 py-0.5 rounded border transition-colors cursor-pointer ${
                       costs.lease > 0 ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300' : 'bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400'
                     }`}
                   >
@@ -706,7 +706,7 @@ ${tenureNote}
                   <span>{lang === 'bn' ? 'পাইকারি বাজারদর দেখুন' : 'Live Mandi Prices'}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="text-[10px] text-amber-200 mt-0.5 truncate font-medium">
+                <div className="text-[11px] text-amber-200 mt-0.5 truncate font-medium">
                   {lang === 'bn' ? 'শ্যামবাজার ও আড়তের লাইভ রেট' : 'Check wholesale trends'}
                 </div>
               </div>
@@ -726,7 +726,7 @@ ${tenureNote}
                   <span>{lang === 'bn' ? 'এআই রোগ নির্ণয় ও স্প্রে' : 'AI Crop Doctor'}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="text-[10px] text-emerald-200 mt-0.5 truncate font-medium">
+                <div className="text-[11px] text-emerald-200 mt-0.5 truncate font-medium">
                   {lang === 'bn' ? 'পাতার ছবি দিয়ে চিকিৎসা' : 'Instant diagnosis & doses'}
                 </div>
               </div>
@@ -746,7 +746,7 @@ ${tenureNote}
                   <span>{lang === 'bn' ? 'দুর্যোগসহনশীল জাত গাইড' : 'Resilience Guide'}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-sky-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="text-[10px] text-sky-200 mt-0.5 truncate font-medium">
+                <div className="text-[11px] text-sky-200 mt-0.5 truncate font-medium">
                   {lang === 'bn' ? 'বন্যা ও খরা সহনশীল বীজ' : 'Flood/saline tolerant seeds'}
                 </div>
               </div>

@@ -225,7 +225,7 @@ export default function UserGuide({ lang }: Props) {
                 <CheckCircle2 className="w-6 h-6 text-gray-400" />
               </div>
               <div>
-                <p className="font-black text-gray-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'গেস্ট' : 'Guest'}</p>
+                <p className="font-black text-gray-900 uppercase tracking-widest text-[11px]">{lang === 'bn' ? 'গেস্ট' : 'Guest'}</p>
                 <p className="text-sm font-black text-gray-400 tracking-tight">{lang === 'bn' ? '১০ বার প্রতি ট্যাব/দিন' : '10 uses / tab / day'}</p>
               </div>
             </motion.div>
@@ -239,7 +239,7 @@ export default function UserGuide({ lang }: Props) {
                 <CheckCircle2 className="w-6 h-6 text-green-500" />
               </div>
               <div>
-                <p className="font-black text-green-900 uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'ফ্রি' : 'Standard'}</p>
+                <p className="font-black text-green-900 uppercase tracking-widest text-[11px]">{lang === 'bn' ? 'ফ্রি' : 'Standard'}</p>
                 <p className="text-sm font-black text-green-600 tracking-tight">{lang === 'bn' ? '১০০ বার/দিন + ১ প্রিমিয়াম/ট্যাব' : '100 queries/day + 1 Premium/tab'}</p>
               </div>
             </motion.div>
@@ -253,7 +253,7 @@ export default function UserGuide({ lang }: Props) {
                 <Crown className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="font-black text-white uppercase tracking-widest text-[10px]">{lang === 'bn' ? 'প্রো ও এন্টারপ্রাইজ' : 'Pro & Enterprise'}</p>
+                <p className="font-black text-white uppercase tracking-widest text-[11px]">{lang === 'bn' ? 'প্রো ও এন্টারপ্রাইজ' : 'Pro & Enterprise'}</p>
                 <p className="text-sm font-black text-white tracking-tight">{lang === 'bn' ? 'আনলিমিটেড প্রিমিয়াম' : 'Unlimited Premium'}</p>
               </div>
             </motion.div>
@@ -270,7 +270,7 @@ export default function UserGuide({ lang }: Props) {
               <PhoneCall className="w-8 h-8 text-emerald-300 animate-pulse" />
             </div>
             <div>
-              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-300">
+              <div className="text-[11px] font-black uppercase tracking-widest text-emerald-300">
                 {lang === 'bn' ? 'কৃষি সম্প্রসারণ অধিদপ্তর (DAE)' : 'Department of Agricultural Extension'}
               </div>
               <h3 className="text-2xl md:text-3xl font-black tracking-tight mt-0.5">

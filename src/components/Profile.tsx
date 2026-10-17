@@ -243,20 +243,20 @@ export default function Profile({ lang, onUpgrade }: Props) {
             
             <div className="space-y-8 relative z-10">
               <div className="group/item">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.email}</p>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.email}</p>
                 <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
               </div>
               <div className="group/item">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.role}</p>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.role}</p>
                 <div className="flex items-center space-x-2">
                   <p className="text-lg font-black text-gray-900 capitalize tracking-tight">{userProfile?.role || 'User'}</p>
                   {userProfile?.tier === 'premium' && (
-                    <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest shadow-md">Premium</span>
+                    <span className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-[11px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest shadow-md">Premium</span>
                   )}
                 </div>
               </div>
               <div className="group/item">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.memberSince}</p>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.memberSince}</p>
                 <p className="text-lg font-black text-gray-900 tracking-tight">
                   {userProfile?.createdAt ? new Date(userProfile.createdAt).toLocaleDateString() : 'N/A'}
                 </p>
@@ -267,12 +267,12 @@ export default function Profile({ lang, onUpgrade }: Props) {
                 <div className="bg-indigo-50 rounded-[32px] p-6 border border-indigo-100 shadow-sm">
                   <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center space-x-2">
-                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{t.usage}</span>
+                      <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">{t.usage}</span>
                       <Tooltip content={t.tooltips.usage} position="top">
                         <HelpCircle className="w-3.5 h-3.5 text-indigo-400 cursor-help" />
                       </Tooltip>
                     </div>
-                    <span className="text-[10px] font-black text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-100">
+                    <span className="text-[11px] font-black text-indigo-700 bg-white px-2.5 py-1 rounded-lg border border-indigo-100">
                       {currentUsage} / {usageLimit === Infinity ? '∞' : usageLimit}
                     </span>
                   </div>
@@ -285,13 +285,13 @@ export default function Profile({ lang, onUpgrade }: Props) {
                     />
                   </div>
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{getTierName()}</span>
+                    <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">{getTierName()}</span>
                     {tier !== 'premium' && (
                       <motion.button 
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={onUpgrade}
-                        className="flex items-center space-x-1.5 text-[10px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black px-4 py-2 rounded-full shadow-lg shadow-orange-900/10 transition-all border border-yellow-400/20"
+                        className="flex items-center space-x-1.5 text-[11px] bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-black px-4 py-2 rounded-full shadow-lg shadow-orange-900/10 transition-all border border-yellow-400/20"
                       >
                         <Crown className="w-3 h-3" />
                         <span className="uppercase tracking-widest font-black">{t.upgrade}</span>
@@ -303,7 +303,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
 
               {(userProfile?.role === 'admin' || user?.email === 'sadmankhalili@gmail.com') && (
                 <div className="pt-6 border-t border-indigo-50">
-                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Admin Controls</p>
+                  <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest mb-4">Admin Controls</p>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -358,7 +358,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-black text-green-700 bg-green-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                      <span className="text-[11px] font-black text-green-700 bg-green-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
                         {diag.analysisType}
                       </span>
                     </div>
@@ -386,7 +386,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                 </div>
                 {lang === 'bn' ? 'ফসল প্রাক-বাছাই ও গুণমান মূল্যায়ন' : 'Indicative Grading Assessments'}
               </h3>
-              <p className="text-[10px] text-gray-400 mt-1 pl-11">
+              <p className="text-[11px] text-gray-400 mt-1 pl-11">
                 {lang === 'bn' 
                   ? 'বাজার দরকষাকষির সহায়ক প্রাক-বাছাই • সংবিধিবদ্ধ সরকারি সনদ নয়' 
                   : 'Farmgate trade bargaining aids • Non-statutory indicative assessments'}
@@ -415,7 +415,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className={`text-[10px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm ${
+                      <span className={`text-[11px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm ${
                         cert.grade.includes('A') ? 'text-green-700 bg-green-100' : 
                         cert.grade.includes('B') ? 'text-yellow-700 bg-yellow-100' : 'text-red-700 bg-red-100'
                       }`}>
@@ -469,7 +469,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                     </div>
                     <div className="text-right">
                       {mq.isAdvanced && (
-                        <span className="text-[10px] font-black text-yellow-700 bg-yellow-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                        <span className="text-[11px] font-black text-yellow-700 bg-yellow-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
                           Premium
                         </span>
                       )}
@@ -520,7 +520,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
+                      <span className="text-[11px] font-black text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl uppercase tracking-widest shadow-sm">
                         {intent.landSize}
                       </span>
                     </div>
@@ -550,13 +550,13 @@ export default function Profile({ lang, onUpgrade }: Props) {
                     <span className="text-xs font-semibold text-stone-700 dark:text-stone-300 block">
                       {lang === 'bn' ? 'সিস্টেম ক্যাশ ও অফলাইন মেমরি ফাংশন' : 'System Cache & Offline Storage'}
                     </span>
-                    <span className="text-[10px] text-stone-400 dark:text-stone-500 block">
+                    <span className="text-[11px] text-stone-400 dark:text-stone-500 block">
                       {lang === 'bn' ? 'প্রয়োজনে স্থানীয় মেমরি রিফ্রেশ বা ক্যাশ দেখতে ট্যাপ করুন' : 'Tap to view or manage local device storage'}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-stone-400 font-bold">
+                  <span className="text-[11px] text-stone-400 font-bold">
                     {isSyncSettingsOpen ? (lang === 'bn' ? 'বন্ধ করুন' : 'Hide') : (lang === 'bn' ? 'দেখুন' : 'Show')}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 text-stone-400 transition-transform ${isSyncSettingsOpen ? 'rotate-180' : ''}`} />

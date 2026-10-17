@@ -119,7 +119,7 @@ export default function PricingModal({ isOpen, onClose, lang, onOpenAuth }: Prop
                     <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3 opacity-50"></div>
                     
                     <div className="absolute top-4 right-4">
-                      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center">
+                      <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg flex items-center">
                         <Check className="w-3 h-3 mr-1.5" /> Most Popular
                       </div>
                     </div>
@@ -130,7 +130,7 @@ export default function PricingModal({ isOpen, onClose, lang, onOpenAuth }: Prop
                     </div>
                     <div className="mb-8 flex items-baseline relative z-10">
                       <span className="text-5xl font-black text-gray-900 tracking-tighter">৳0</span>
-                      <span className="text-gray-400 font-bold ml-1 uppercase tracking-widest text-[10px]">/mo</span>
+                      <span className="text-gray-400 font-bold ml-1 uppercase tracking-widest text-[11px]">/mo</span>
                     </div>
                     <ul className="space-y-4 mb-8 flex-1 relative z-10">
                       {[

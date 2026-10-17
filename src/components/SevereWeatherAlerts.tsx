@@ -182,7 +182,7 @@ export default function SevereWeatherAlerts({ alerts, lang }: Props) {
                   <span>Google Maps Platform Weather Alerts</span>
                 )}
               </div>
-              <div className="font-mono text-[10px] text-stone-400">
+              <div className="font-mono text-[11px] text-stone-400">
                 Google Maps
               </div>
             </div>

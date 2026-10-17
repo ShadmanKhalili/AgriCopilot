@@ -116,7 +116,7 @@ export const DataStatusCard: React.FC<Props> = ({
               <span className="text-[11px] font-bold text-stone-900 dark:text-stone-100 block truncate">
                 {lang === 'bn' ? 'তথ্য সিঙ্ক স্ট্যাটাস' : 'Data Status'}
               </span>
-              <span className="text-[10px] text-stone-500 dark:text-stone-400 block truncate">
+              <span className="text-[11px] text-stone-500 dark:text-stone-400 block truncate">
                 {relativeAge || (lang === 'bn' ? 'সিঙ্ক সক্রিয়' : 'Sync Active')}
               </span>
             </div>
@@ -173,7 +173,7 @@ export const DataStatusCard: React.FC<Props> = ({
 
         {/* Network & Persistence Status Badge */}
         <div className="flex items-center space-x-1.5 shrink-0">
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
             isOnline 
               ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800'
               : 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200/80 dark:border-amber-800'
@@ -199,7 +199,7 @@ export const DataStatusCard: React.FC<Props> = ({
               {syncTimeFormatted}
             </div>
             {relativeAge && (
-              <div className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">
+              <div className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
                 {relativeAge}
               </div>
             )}
