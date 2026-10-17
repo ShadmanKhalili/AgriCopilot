@@ -3,13 +3,14 @@ import {
   Calculator, DollarSign, TrendingUp, TrendingDown, Scale, 
   Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Copy, 
   RotateCcw, Download, Info, ShieldCheck, PieChart, Coins,
-  Waves, Bot, Cloud, Satellite
+  Waves, Bot, Cloud, Satellite, Mic
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { AgriCurrency } from '../utils/currency';
 import { TactileStepper } from './TactileStepper';
+import { toBn } from '../utils/banglaNum';
 
 interface CropBenchmark {
   nameBn: string;
@@ -27,6 +28,109 @@ interface CropBenchmark {
     transport: number;
   };
 }
+
+/**
+ * Parse a spoken amount into a number. Accepts plain digits / Bangla digits and
+ * common spoken Bangla forms (word-digits 0-99 combined with hajar/likkho/koti
+ * multipliers). Returns null when nothing amount-like was heard.
+ */
+const parseSpokenAmount = (raw: string): number | null => {
+  const t = String(raw || '').replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
+  const WORDS: Record<string, number> = {
+    'শূন্য': 0, 'ইক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4,
+    'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9,
+    'দশ': 10, 'ইগারো': 11, 'বারো': 12, 'তেরো': 13, 'চৌদ্দ': 14,
+    'পনেরো': 15, 'ষোলো': 16, 'সতেরো': 17, 'আঠারো': 18, 'ঊনিশ': 19,
+    'বিশ': 20, 'ত্রিশ': 30, 'চল্লিশ': 40, 'পঞ্চাশ': 50,
+    'ষাট': 60, 'সত্তর': 70, 'আশি': 80, 'নব্বই': 90,
+    'ইকশ': 100, 'শ': 100, 'শত': 100,
+  };
+  const MULT: Record<string, number> = {
+    'কোটি': 10000000, 'লক্ষ': 100000, 'হাজার': 1000,
+  };
+  const tokens = t.split(/[\s,]+/).filter(Boolean);
+  let total = 0;
+  let current = 0;
+  let found = false;
+  for (const tok of tokens) {
+    const w = tok.replace(/[\u0964.,]/g, '');
+    if (/^\d+(?:\.\d+)?$/.test(w)) { current += parseFloat(w); found = true; continue; }
+    // hundreds compounds like "panch sho" (500)
+    if (w.endsWith('শ') || w.endsWith('শো')) {
+      const base = w.replace(/(?:\u200b|শ|শো)$/, '');
+      if (base && base in WORDS) { current += WORDS[base] * 100; found = true; continue; }
+    }
+    if (w in WORDS) { current += WORDS[w]; found = true; continue; }
+    if (w in MULT) { total += (current === 0 ? 1 : current) * MULT[w]; current = 0; found = true; continue; }
+  }
+  return found ? Math.round(total + current) : null;
+};
+
+// Voice-first money input: tap the mic, say the amount, the row updates.
+const VoiceAmountButton: React.FC<{
+  lang: Language;
+  label: string;
+  onAmount: (amount: number) => void;
+}> = ({ lang, label, onAmount }) => {
+  const [listening, setListening] = useState(false);
+  const recRef = React.useRef<any>(null);
+
+  const startListening = () => {
+    if (listening) {
+      try { recRef.current?.stop(); } catch {}
+      setListening(false);
+      return;
+    }
+    const SRClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SRClass) {
+      toast.error(lang === 'bn' ? 'আপনার ব্রাউজারে স্পিচ রিকগনিশন সমর্থিত নয়' : 'Voice input is not supported in this browser');
+      return;
+    }
+    try {
+      const rec = new SRClass();
+      recRef.current = rec;
+      rec.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.onstart = () => setListening(true);
+      rec.onend = () => setListening(false);
+      rec.onerror = () => setListening(false);
+      rec.onresult = (event: any) => {
+        const transcript = (event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript) || '';
+        const amount = parseSpokenAmount(transcript);
+        if (amount !== null) {
+          const clean = Math.max(0, Math.round(amount));
+          onAmount(clean);
+          const shown = '৳' + toBn(clean.toLocaleString('en-IN'));
+          toast.success(lang === 'bn' ? shown + ' সেট করা হয়েছে' : shown + ' set');
+        } else {
+          toast.error(lang === 'bn' ? 'টাকার পরিমাণ বোঝা যায়নি; আবার চেষ্টা করুন' : 'Amount not understood - try saying it again');
+        }
+      };
+      rec.start();
+    } catch {
+      setListening(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={startListening}
+      aria-label={lang === 'bn' ? label + ' (মাইক)' : (label + ' - speak the amount')}
+      title={lang === 'bn' ? 'মাইক - মাইক চেপে টাকার পরিমাণ বলুন' : 'Speak the amount'}
+      className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl border transition-all active:scale-95 cursor-pointer shrink-0 ${
+        listening
+          ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 shadow-xs animate-pulse'
+          : 'bg-stone-50 dark:bg-stone-800/80 border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-300 hover:text-emerald-700 hover:border-emerald-300'
+      }`}
+    >
+      <Mic className="w-4 h-4" aria-hidden="true" />
+    </button>
+  );
+};
+
 
 const CROP_BENCHMARKS: Record<string, CropBenchmark> = {
   'paddy_boro': {
@@ -555,6 +659,10 @@ ${tenureNote}
             <p className="text-xs text-stone-500 dark:text-stone-400">
               {lang === 'bn' ? 'আঞ্চলিক গড় খরচের খসড়া; আপনার ভাউচার অনুযায়ী টাকার পরিমাণ পরিবর্তন করুন।' : 'Pre-filled with regional averages; click to update based on your vouchers.'}
             </p>
+            <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400/90 font-medium mt-1 flex items-center gap-1">
+              <Mic className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              {lang === 'bn' ? 'মাইক চেপে টাকার পরিমাণ বলুন' : 'Tap the mic and say the amount, or use + / - to adjust'}
+            </p>
           </div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 font-mono text-xs font-bold shrink-0">
             <span>{lang === 'bn' ? 'মোট খরচ:' : 'Total Cost:'}</span>
@@ -583,15 +691,18 @@ ${tenureNote}
               </div>
 
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                <span className="text-xs text-stone-400 font-mono">৳</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="100"
-                  aria-label={item.title}
+                <TactileStepper
                   value={costs[item.key as keyof typeof costs]}
-                  onChange={(e) => updateCostItem(item.key as any, parseFloat(e.target.value) || 0)}
-                  className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"
+                  onChange={(v) => updateCostItem(item.key as any, v)}
+                  min={0}
+                  step={100}
+                  unit="৳"
+                  label={item.title.replace(/^\s*[০-৯\d]+\.\s*/, '')}
+                />
+                <VoiceAmountButton
+                  lang={lang}
+                  label={item.title}
+                  onAmount={(n) => updateCostItem(item.key as any, n)}
                 />
               </div>
             </div>
@@ -631,15 +742,18 @@ ${tenureNote}
             </div>
 
             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-              <span className="text-xs text-stone-400 font-mono">৳</span>
-              <input
-                type="number"
-                min="0"
-                step="500"
-                aria-label={lang === 'bn' ? '\u099C\u09AE\u09BF \u09B2\u09BF\u099C \u09AB\u09BF' : 'Land lease fee'}
+              <TactileStepper
                 value={costs.lease}
-                onChange={(e) => updateCostItem('lease' as any, parseFloat(e.target.value) || 0)}
-                className="w-32 sm:w-36 bg-stone-50 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-mono font-bold text-right text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-emerald-500 outline-none tabular-nums"
+                onChange={(v) => updateCostItem('lease' as any, v)}
+                min={0}
+                step={500}
+                unit="৳"
+                label={lang === 'bn' ? 'জমি লিজ ফি' : 'Land lease fee'}
+              />
+              <VoiceAmountButton
+                lang={lang}
+                label={lang === 'bn' ? 'জমি লিজ ফি' : 'Land lease fee'}
+                onAmount={(n) => updateCostItem('lease' as any, n)}
               />
             </div>
           </div>

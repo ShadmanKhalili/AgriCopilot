@@ -127,7 +127,7 @@ export const DataStatusCard: React.FC<Props> = ({
             id="force-refresh-btn-compact"
             onClick={handleForceRefresh}
             disabled={isRefreshing}
-            className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-[10.5px] font-semibold transition-all cursor-pointer ${
+            className={`inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold transition-all cursor-pointer ${
               justRefreshed
                 ? 'bg-emerald-700 text-white dark:bg-emerald-600'
                 : 'bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-700 active:scale-95'
@@ -165,7 +165,7 @@ export const DataStatusCard: React.FC<Props> = ({
                 {lang === 'bn' ? 'তথ্য সিঙ্ক ও লোকাল ক্যাশ' : 'Data Status & Cache'}
               </h4>
             </div>
-            <p className="text-[10.5px] text-stone-500 dark:text-stone-400 truncate">
+            <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
               {lang === 'bn' ? 'অফলাইন সহনশীল কৃষি মেমরি' : 'Offline-Resilient Farm Storage'}
             </p>
           </div>
@@ -226,7 +226,7 @@ export const DataStatusCard: React.FC<Props> = ({
 
       {/* Actions: Force Refresh */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10.5px] text-stone-500 dark:text-stone-400">
+        <span className="text-[11px] text-stone-500 dark:text-stone-400">
           {lang === 'bn' ? 'স্থানীয় মেমরি শূন্য করে রি-সিঙ্ক করুন' : 'Flush and re-query network data'}
         </span>
 

@@ -28,6 +28,12 @@ import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
 
+// Visual language: crop emoji for the 20 sample scenario cards (no typing needed)
+const SAMPLE_CROP_EMOJI: Record<string, string> = {
+  paddy: '🌾', potato: '🥔', tomato: '🍅', brinjal: '🍆', chili: '🌶️', watermelon: '🍉',
+  betelLeaf: '🍃', onion: '🧅', maize: '🌽', mustard: '🌼', cucumber: '🥒', jute: '🌿', pulse: '🥣',
+};
+
 const SAMPLE_DIAGNOSIS_CASES = [
   {
     crop: 'paddy',
@@ -615,6 +621,8 @@ export default function AgriCopilot({
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
   const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
+  // Which sample scenario card is currently loaded (visual selection ring)
+  const [activeSampleIdx, setActiveSampleIdx] = useState<number | null>(null);
   const [customContextText, setCustomContextText] = useState('');
   const [isRxModalOpen, setIsRxModalOpen] = useState(false);
   const [rxModalData, setRxModalData] = useState<PrescriptionData | null>(null);
@@ -3189,50 +3197,51 @@ export default function AgriCopilot({
 
       {/* Sample Crop Disease Diagnosis & Symptoms Dropdown (Last item of tab) */}
       <div className="mt-4 pt-3 border-t border-stone-200/60 dark:border-stone-800 w-full">
-        <div className="bg-stone-50/90 dark:bg-stone-900/90 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="bg-stone-50/90 dark:bg-stone-900/90 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-3 sm:p-3.5 flex flex-col gap-3 shadow-2xs">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="p-1.5 rounded-xl bg-emerald-100/70 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 shrink-0">
               <Leaf className="w-3.5 h-3.5" />
             </div>
             <div className="min-w-0">
-              <label htmlFor="sample-scenarios-select" className="text-xs font-bold text-stone-800 dark:text-stone-200 block truncate cursor-pointer">
+              <p className="text-xs font-bold text-stone-800 dark:text-stone-200 block truncate">
                 {lang === 'bn' ? 'নমুনা ফসল রোগ নির্ণয় ও লক্ষণ পরিস্থিতি' : 'Sample Crop Disease Scenarios'}
-              </label>
+              </p>
               <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
-                {lang === 'bn' ? 'ড্রপডাউন থেকে নমুনা রোগ বেছে নিয়ে পরীক্ষা করুন' : 'Select a sample scenario from the dropdown menu'}
+                {lang === 'bn' ? 'নিচের কার্ডে চাপ দিন ( ২০ টি আঞ্চ্লিক রোগ )' : 'Tap a sample card below (20 regional cases)'}
               </p>
             </div>
           </div>
 
-          <div className="w-full sm:w-80 shrink-0">
-            <select
-              id="sample-scenarios-select"
-              defaultValue=""
-              onChange={(e) => {
-                const idx = parseInt(e.target.value, 10);
-                if (!isNaN(idx) && SAMPLE_DIAGNOSIS_CASES[idx]) {
-                  handleSelectSampleDiagnosis(SAMPLE_DIAGNOSIS_CASES[idx]);
-                  setCopilotMode('static_upload');
-                }
-              }}
-              className="w-full text-sm sm:text-base font-semibold tracking-wide bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-600 rounded-xl px-3.5 py-2.5 text-stone-800 dark:text-stone-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-xs"
-            >
-              <option value="" disabled className="text-sm font-semibold tracking-wider">
-                {lang === 'bn' ? 'নমুনা নির্বাচন করুন ( ২০ টি আঞ্চলিক রোগ )...' : 'Select sample scenario (20 regional cases)...'}
-              </option>
-              {Array.from(new Set(SAMPLE_DIAGNOSIS_CASES.map(s => lang === 'bn' ? s.categoryBn : s.categoryEn))).map(cat => (
-                <optgroup key={cat} label={`— ${cat} —`}>
-                  {SAMPLE_DIAGNOSIS_CASES
-                    .map((sc, originalIdx) => ({ sc, originalIdx }))
-                    .filter(({ sc }) => (lang === 'bn' ? sc.categoryBn : sc.categoryEn) === cat)
-                    .map(({ sc, originalIdx }) => (
-                      <option key={originalIdx} value={originalIdx}>
-                        {lang === 'bn' ? `${sc.titleBn} (${sc.descBn})` : `${sc.titleEn} (${sc.descEn})`}
-                      </option>
-                    ))}
-                </optgroup>
+          <div className="w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" aria-label="Sample disease scenario cards (20)">
+              {SAMPLE_DIAGNOSIS_CASES.map((sc, originalIdx) => (
+                <button
+                  key={originalIdx}
+                  type="button"
+                  onClick={() => {
+                    setActiveSampleIdx(originalIdx);
+                    handleSelectSampleDiagnosis(sc);
+                    setCopilotMode('static_upload');
+                  }}
+                  title={lang === 'bn' ? sc.descBn : sc.descEn}
+                  aria-label={(lang === 'bn' ? sc.titleBn : sc.titleEn) + '. ' + (lang === 'bn' ? sc.categoryBn : sc.categoryEn)}
+                  className={`flex items-center gap-2 w-full p-2.5 min-h-[64px] rounded-xl border text-left transition-all active:scale-[0.98] cursor-pointer ${
+                    activeSampleIdx === originalIdx
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-400 dark:border-emerald-600 shadow-xs'
+                      : 'bg-white dark:bg-stone-800 border-stone-200/90 dark:border-stone-700 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:bg-stone-700/60'
+                  }`}
+                >
+                  <span aria-hidden="true" className="text-xl leading-none shrink-0 w-8 text-center">{SAMPLE_CROP_EMOJI[sc.crop] || '🌱'}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 leading-none truncate">{lang === 'bn' ? sc.categoryBn : sc.categoryEn}</span>
+                    <span className="block text-[11px] font-bold text-stone-800 dark:text-stone-100 leading-snug line-clamp-2 mt-0.5">{lang === 'bn' ? sc.titleBn : sc.titleEn}</span>
+                  </span>
+                  {activeSampleIdx === originalIdx && (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
+                  )}
+                </button>
               ))}
-            </select>
+            </div>
           </div>
         </div>
       </div>

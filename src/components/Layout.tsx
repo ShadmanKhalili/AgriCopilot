@@ -578,7 +578,7 @@ export default function Layout() {
                         {pillarTabs.length}
                       </span>
                     </div>
-                    <div className="text-[10.5px] text-emerald-800 dark:text-emerald-300 pl-7 leading-tight mb-1 truncate">
+                    <div className="text-[11px] text-emerald-800 dark:text-emerald-300 pl-7 leading-tight mb-1 truncate">
                       {pillar.subtitle}
                     </div>
 
@@ -633,7 +633,7 @@ export default function Layout() {
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1.5 mt-0.5">
-                                  <span className={`text-[9.5px] font-medium px-1.5 py-0.5 rounded-md tracking-tight shrink-0 ${
+                                  <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-md tracking-tight shrink-0 ${
                                     isActive 
                                       ? 'bg-emerald-800/90 text-emerald-100 border border-emerald-600 dark:bg-emerald-100 dark:text-emerald-900 dark:border-emerald-300/80 font-semibold' 
                                       : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-emerald-950/80 dark:text-emerald-300/90 dark:border-emerald-700/50'
@@ -871,7 +871,7 @@ export default function Layout() {
 
             <div className="relative z-10 min-h-full flex flex-col w-full max-w-7xl mx-auto">
               {/* Simplified First Experience Quick Action Bar */}
-              <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
+              <div className="mb-3 sm:mb-4 hidden md:flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     onClick={() => setActiveTab('agri-copilot')}
