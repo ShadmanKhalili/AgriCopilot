@@ -2751,7 +2751,7 @@ Return a JSON object with this exact structure:
               <button
                 type="button"
                 onClick={handleOpenCurrentLivePrescription}
-                className="w-full sm:w-auto sm:ml-auto px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                className="w-full sm:w-auto sm:ml-auto px-4 py-2 bg-gradient-to-r from-emerald-700 to-teal-800 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
               >
                 <FileText className="w-4 h-4" />
                 <span>{lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন (Rx Card)' : 'Open Digital Rx Prescription'}</span>

@@ -338,7 +338,7 @@ export default function MarketConnect({
                     id="produce-select"
                     value={produce} 
                     onChange={(e) => setProduce(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80 p-2.5 sm:p-3 pr-10 text-xs sm:text-sm font-semibold text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-orange-500 outline-none transition-colors cursor-pointer"
+                    className="w-full appearance-none rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80 p-2.5 sm:p-3 pr-10 min-h-[44px] text-xs sm:text-sm font-semibold text-stone-900 dark:text-stone-100 focus:ring-1 focus:ring-orange-500 outline-none transition-colors cursor-pointer"
                   >
                     {PRODUCE_TYPES.map(p => (
                       <option key={p} value={p}>
@@ -388,7 +388,7 @@ export default function MarketConnect({
                       key={m.nameEn}
                       type="button"
                       onClick={() => handleSelectMarketPreset(m.lat, m.lng)}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition-colors cursor-pointer"
+                      className="px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition-colors cursor-pointer"
                     >
                       {lang === 'bn' ? m.nameBn : m.nameEn}
                     </button>

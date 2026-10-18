@@ -699,7 +699,7 @@ export default function Layout() {
             ) : (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="w-full flex items-center justify-center space-x-2 bg-emerald-800 hover:bg-emerald-900 text-white dark:bg-white dark:text-emerald-950 dark:hover:bg-emerald-50 font-black py-2.5 px-4 rounded-xl active:scale-95 transition-all shadow-md text-xs uppercase tracking-wider cursor-pointer"
+                className="w-full flex items-center justify-center space-x-2 bg-emerald-800 hover:bg-emerald-900 text-white dark:bg-white dark:text-emerald-950 dark:hover:bg-emerald-50 font-black min-h-[44px] py-2.5 px-4 rounded-xl active:scale-95 transition-all shadow-md text-xs uppercase tracking-wider cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
                 <span>{t.signIn}</span>
@@ -844,6 +844,8 @@ export default function Layout() {
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
+                  aria-label={t.signIn}
+                  title={t.signIn}
                   className="inline-flex items-center min-h-[44px] space-x-1 sm:space-x-1.5 text-xs font-black bg-emerald-700 hover:bg-emerald-800 text-white px-2 py-1.5 sm:px-3 rounded-xl transition-all shadow-xs active:scale-95 shrink-0 cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />

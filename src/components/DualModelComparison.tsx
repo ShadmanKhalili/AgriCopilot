@@ -56,7 +56,7 @@ export default function DualModelComparison({
           <button
             type="button"
             onClick={() => onModelChange('weathernext3')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeModel === 'weathernext3'
                 ? 'bg-cyan-500 text-white shadow-xs'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white'
@@ -69,7 +69,7 @@ export default function DualModelComparison({
           <button
             type="button"
             onClick={() => onModelChange('standard')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeModel === 'standard'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white'
@@ -85,7 +85,7 @@ export default function DualModelComparison({
         <button
           type="button"
           onClick={() => setShowDiffInspector(!showDiffInspector)}
-          className="text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+          className="text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 min-h-[44px] py-2 font-semibold cursor-pointer"
         >
           <ArrowRightLeft className="w-3.5 h-3.5" />
           <span>

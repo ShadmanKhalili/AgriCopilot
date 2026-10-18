@@ -219,7 +219,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={openEditModal}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold text-xs sm:text-sm backdrop-blur-md transition-all cursor-pointer active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold text-xs sm:text-sm backdrop-blur-md transition-all cursor-pointer active:scale-95 shadow-sm"
               title={lang === 'bn' ? 'খামারের তথ্য সম্পাদনা করুন' : 'Edit Farm Profile'}
             >
               <Edit3 className="w-4 h-4 text-emerald-300" />
@@ -227,7 +227,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             </button>
             <button
               onClick={handleResetProfile}
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-xs sm:text-sm transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-xs sm:text-sm transition-all cursor-pointer active:scale-95"
               title={lang === 'bn' ? 'সকল রেকর্ড মুছে খালি করুন' : 'Reset All Records'}
             >
               <Trash2 className="w-4 h-4 text-rose-400" />
@@ -236,14 +236,14 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer active:scale-95"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
-              {lang === 'bn' ? 'ডেমো লোড' : 'Demo Load'}
+              {lang === 'bn' ? 'নমুনা লোড' : 'Demo Load'}
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-sm transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               {lang === 'bn' ? 'প্রিন্ট' : 'Print'}
@@ -286,7 +286,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           <button
             type="button"
             onClick={() => setAssistedRouteMode('self')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
               assistedRouteMode === 'self'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
@@ -297,7 +297,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           <button
             type="button"
             onClick={() => setAssistedRouteMode('saao')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
               assistedRouteMode === 'saao'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
@@ -325,7 +325,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                   🌾
                 </div>
                 <div>
-                  <h2 className="text-xs uppercase tracking-widest text-emerald-300 font-semibold">
+                  <h2 className="text-sm uppercase tracking-wider text-emerald-300 font-semibold">
                     {lang === 'bn' ? 'সম্মতিভিত্তিক ডিজিটাল কৃষি ডসিয়ার' : 'Farmer-Consented Activity Dossier'}
                   </h2>
                   <p className="text-base font-bold text-white tracking-wide">
@@ -503,12 +503,12 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowAuditFramework(!showAuditFramework)}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 min-h-[44px] cursor-pointer"
                 >
                   <HelpCircle className="w-3.5 h-3.5" />
                   {showAuditFramework 
                     ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Audit Details') 
-                    : (lang === 'bn' ? 'অডিট ফ্রেমওয়ার্ক দেখুন' : 'View Audit Framework')}
+                    : (lang === 'bn' ? 'যাচাই পদ্ধতি দেখুন' : 'View Audit Framework')}
                 </button>
               </div>
 
@@ -711,7 +711,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 <button
                   type="button"
                   onClick={() => setIsAppealModalOpen(true)}
-                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline shrink-0 cursor-pointer"
+                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline shrink-0 inline-flex items-center min-h-[44px] cursor-pointer"
                 >
                   {lang === 'bn' ? 'তথ্য সংশোধন বা আপিল আবেদন ↗' : 'Request Correction or Appeal ↗'}
                 </button>
@@ -782,10 +782,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              {lang === 'bn' ? 'ডেমো ইতিহাস লোড করুন' : 'Load Demo History'}
+              {lang === 'bn' ? 'নমুনা তথ্য লোড করুন' : 'Load Demo History'}
             </button>
           </div>
         ) : (

@@ -1477,7 +1477,7 @@ export default function AgriCopilot({
           onClick={() => setCopilotMode('live_stream')}
           className={`flex-1 min-w-0 min-h-[46px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl font-display font-bold text-[11px] sm:text-xs uppercase tracking-wide transition-all cursor-pointer relative whitespace-nowrap ${
             copilotMode === 'live_stream'
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-sm shadow-emerald-600/30'
+              ? 'bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-sm shadow-emerald-600/30'
               : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
@@ -1955,7 +1955,7 @@ export default function AgriCopilot({
                                   <button
                                     type="button"
                                     onClick={handleOpenPrescriptionModal}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 active:scale-95 transition-all cursor-pointer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-700 to-teal-800 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-900/20 active:scale-95 transition-all cursor-pointer"
                                     title={lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন ডাউনলোড বা প্রিন্ট করুন' : 'Generate & Download Digital Krishi Rx Card'}
                                   >
                                     <FileText className="w-3.5 h-3.5" />

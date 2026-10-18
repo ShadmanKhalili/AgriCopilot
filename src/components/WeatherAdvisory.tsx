@@ -719,7 +719,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 <button 
                   onClick={() => fetchWeatherAndAdvisory(forecastModel, true)} 
                   disabled={isLoading || isRefreshingLive}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
                   title={lang === 'bn' ? 'লাইভ আবহাওয়া পূর্বাভাস আপডেট করুন' : 'Force Refresh Live Weather Data'}
                   aria-label="Refresh Live Weather"
                 >
@@ -730,7 +730,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 <button 
                   onClick={handleDetectLocation} 
                   disabled={isDetecting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-xl transition-all cursor-pointer text-xs font-semibold shadow-xs"
                   title={lang === 'bn' ? 'জিপিএস অবস্থান রিফ্রেশ করুন' : 'Refresh GPS Location'}
                   aria-label="Refresh GPS Location"
                 >
