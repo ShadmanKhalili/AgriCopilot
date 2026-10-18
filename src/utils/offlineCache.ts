@@ -493,18 +493,20 @@ export function getMarketOfflineFallback(cropKey: string): CacheEntry<any> | nul
  */
 export function formatCacheAge(timestamp: number, lang: 'bn' | 'en'): string {
   const diffMinutes = Math.max(1, Math.floor((Date.now() - timestamp) / (1000 * 60)));
+  const date = new Date(timestamp);
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   
   if (diffMinutes < 60) {
     return lang === 'bn' 
-      ? `${toBengaliDigits(diffMinutes)} মিনিট আগের ক্যাশ` 
-      : `Cached ${diffMinutes}m ago`;
+      ? `${toBengaliDigits(diffMinutes)} মিনিট আগের ক্যাশ (${timeStr})` 
+      : `Cached ${diffMinutes}m ago (${timeStr})`;
   }
   
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) {
     return lang === 'bn' 
-      ? `${toBengaliDigits(diffHours)} ঘণ্টা আগের ক্যাশ` 
-      : `Cached ${diffHours}h ago`;
+      ? `${toBengaliDigits(diffHours)} ঘণ্টা আগের ক্যাশ (${timeStr})` 
+      : `Cached ${diffHours}h ago (${timeStr})`;
   }
   
   const diffDays = Math.floor(diffHours / 24);

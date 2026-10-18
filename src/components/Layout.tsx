@@ -494,7 +494,7 @@ export default function Layout() {
                     onClick={() => {
                       setSelectedPillarFilter(cat.key);
                     }}
-                    className={`py-2.5 px-0.5 text-[11px] font-black rounded-xl transition-all truncate text-center cursor-pointer ${
+                    className={`py-2 px-1 text-[11px] font-black rounded-xl transition-all truncate text-center cursor-pointer min-h-[44px] flex items-center justify-center ${
                       isCatActive
                         ? 'bg-emerald-700 text-white shadow-xs dark:bg-emerald-300 dark:text-emerald-950'
                         : 'text-emerald-800 hover:text-emerald-950 hover:bg-emerald-100/70 dark:text-emerald-300 dark:hover:text-white dark:hover:bg-white/5'

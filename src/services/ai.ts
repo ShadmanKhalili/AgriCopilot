@@ -142,14 +142,14 @@ export { Type };
 
 // Advanced (Premium) analysis uses the larger model; standard requests use flash-lite.
 // Keep in sync with the server-side failover cascade in server.ts.
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
+const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.8-flash' : 'gemini-3.1-flash-lite';
 const BACKUP_MODEL = 'gemini-3.1-flash-lite';
-const SEARCH_MODEL = 'gemini-3.5-flash-lite';
+const SEARCH_MODEL = 'gemini-3.1-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
 const TTS_BACKUP_MODEL = 'gemini-3.8-flash-tts'; 
 export const LIVE_API_MODEL = 'gemini-3.8-live';
 export const LIVE_EXTENDED_THINKING_MODEL = 'gemini-3.8-live-extended-thinking';
-const CHAT_MODEL = 'gemini-3.5-flash-lite';
+const CHAT_MODEL = 'gemini-3.1-flash-lite';
 
 const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500) => {
   for (let i = 0; i < retries; i++) {
@@ -206,11 +206,10 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
     ? [primaryModel, customBackupModel || TTS_BACKUP_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']
     : [
         primaryModel,
-        'gemini-3.5-flash-lite',
-        customBackupModel || BACKUP_MODEL,
         'gemini-3.1-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-3.8-flash'
+        customBackupModel || BACKUP_MODEL,
+        'gemini-3.8-flash',
+        'gemini-2.5-flash'
       ];
   
   // Try models in sequence until one works

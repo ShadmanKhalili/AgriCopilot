@@ -67,12 +67,12 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
     }
   };
 
-  const btnPad = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10 sm:w-11 sm:h-11';
-  const textPad = size === 'sm' ? 'py-1 px-2 text-xs' : 'py-1.5 px-3 text-sm';
+  const btnPad = size === 'sm' ? 'w-9 h-9 sm:w-10 sm:h-10 min-w-[36px] min-h-[36px]' : 'w-11 h-11 min-w-[44px] min-h-[44px]';
+  const textPad = size === 'sm' ? 'py-1 px-2 text-xs min-h-[36px]' : 'py-1.5 px-3 text-sm min-h-[44px]';
 
   return (
     <div
-      className={`inline-flex items-center rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80 shadow-xs select-none transition-colors focus-within:border-emerald-500/80 focus-within:ring-1 focus-within:ring-emerald-500/20 ${className}`}
+      className={`inline-flex items-center rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/80 shadow-xs select-none transition-colors focus-within:border-emerald-500/80 focus-within:ring-1 focus-within:ring-emerald-500/20 touch-manipulation ${className}`}
     >
       <button
         type="button"
@@ -80,7 +80,7 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
         disabled={value <= min}
         aria-label={lang === 'bn' ? `${label ? label + ' ' : ''}মান কমান` : `Decrease ${label || 'value'}`}
         title={lang === 'bn' ? 'কমান' : 'Decrease'}
-        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-l-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
+        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-l-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0 touch-manipulation`}
       >
         <Minus className="w-4 h-4 stroke-[2.5]" />
       </button>
@@ -124,7 +124,7 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
         disabled={value >= max}
         aria-label={lang === 'bn' ? `${label ? label + ' ' : ''}মান বাড়ান` : `Increase ${label || 'value'}`}
         title={lang === 'bn' ? 'বাড়ান' : 'Increase'}
-        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-r-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0`}
+        className={`${btnPad} flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-200/80 dark:hover:bg-stone-700 rounded-r-xl transition-colors disabled:opacity-30 disabled:pointer-events-none active:scale-95 cursor-pointer shrink-0 touch-manipulation`}
       >
         <Plus className="w-4 h-4 stroke-[2.5]" />
       </button>

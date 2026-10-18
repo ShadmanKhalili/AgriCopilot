@@ -156,22 +156,31 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         }
       };
 
-      // 1. Fetch Forecast Data based on activeModel
-      if (activeModel === 'weathernext3') {
-        const wnRes = await fetch(
-          `/api/weathernext-3?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&timezone=auto${cacheBustParam}`,
-          liveFetchOptions
-        );
-        if (!wnRes.ok) {
-          const errJson = await wnRes.json().catch(() => ({}));
-          console.error("Weather API Error Response:", wnRes.status, errJson);
-          throw new Error(errJson.error || `Weather service returned ${wnRes.status}`);
-        }
-        const wnData = await wnRes.json();
-        if (!wnData.current) {
-          throw new Error("Invalid weather data structure received");
-        }
+      // 1. Fetch Forecast Data based on activeModel with multi-tier failover
+      let wnData: any = null;
+      let usedFallbackStandard = false;
 
+      if (activeModel === 'weathernext3') {
+        try {
+          const wnRes = await fetch(
+            `/api/weathernext-3?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&timezone=auto${cacheBustParam}`,
+            liveFetchOptions
+          );
+          if (wnRes.ok) {
+            wnData = await wnRes.json();
+            if (!wnData?.current) {
+              console.warn("WeatherNext-3 returned incomplete data structure, engaging daily-forecast fallback");
+              wnData = null;
+            }
+          } else {
+            console.warn(`WeatherNext-3 returned status ${wnRes.status}, switching to multi-model backup`);
+          }
+        } catch (wnFetchErr) {
+          console.warn("WeatherNext-3 network error, switching to multi-model backup:", wnFetchErr);
+        }
+      }
+
+      if (activeModel === 'weathernext3' && wnData && wnData.current) {
         const code = wnData.current?.weather_code || 0;
         let condition = 'Sunny';
         if (code >= 1 && code <= 3) condition = 'Partly Cloudy';
@@ -249,6 +258,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           hourlyForecast: hourlyItems
         };
       } else {
+        if (activeModel === 'weathernext3') {
+          usedFallbackStandard = true;
+        }
         // Standard Multi-Model Open-Meteo
         const weatherRes = await fetch(
           `/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto${cacheBustParam}`,
@@ -379,8 +391,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           isWeatherNext3: false,
           hourlyForecast: standardHourlyItems,
           hourlySpread: stdHourlySpread,
-          source: 'open_meteo_standard',
-          provider: 'ECMWF / GFS Multi-Model Ensemble (9km NWP)'
+          source: usedFallbackStandard ? 'open_meteo_client_fallback' : 'open_meteo_standard',
+          provider: usedFallbackStandard 
+            ? 'ECMWF / GFS Ensemble (AgroCast AI Failover)' 
+            : 'ECMWF / GFS Multi-Model Ensemble (9km NWP)'
         };
       }
       
@@ -475,7 +489,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       saveCachedWeather(locKey, newWeather, activeModel);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-      if (forceFresh) {
+      if (usedFallbackStandard) {
+        toast(
+          lang === 'bn' 
+            ? 'AgroCast AI সংযোগ বিলম্বিত হওয়ায় ECMWF/GFS ব্যাকআপ থেকে তথ্য দেখানো হচ্ছে' 
+            : 'AgroCast AI delayed; loaded forecast via ECMWF/GFS multi-model backup',
+          { icon: '🛡️', id: 'weather-fallback-active', duration: 3000 }
+        );
+      } else if (forceFresh) {
         toast.success(
           lang === 'bn' ? 'সরাসরি আবহাওয়া তথ্য আপডেট হয়েছে' : 'Live weather forecast updated',
           { id: 'live-weather-updated', duration: 2500 }
