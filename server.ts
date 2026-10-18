@@ -247,10 +247,10 @@ async function startServer() {
     if (requestedModel.includes("-tts")) {
       return Array.from(new Set([requestedModel, "gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"]));
     }
-    // High-availability cascade with gemini-3.1-flash-lite as primary
+    // High-availability cascade with gemini-3.5-flash-lite as primary
     return Array.from(new Set([
       requestedModel,
-      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash-lite",
       "gemini-3.8-flash",
       "gemini-2.5-flash"
     ]));
@@ -305,7 +305,7 @@ async function startServer() {
       }
 
       const {
-        model: requestedModel = "gemini-3.1-flash-lite",
+        model: requestedModel = "gemini-3.5-flash-lite",
         contents,
         config,
         tools,

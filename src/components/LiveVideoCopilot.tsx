@@ -579,7 +579,7 @@ export default function LiveVideoCopilot({
     animFrameRef.current = requestAnimationFrame(updateVisualizer);
   };
 
-  // Play incoming 24kHz audio chunk from Gemini 3.8 Live
+  // Play incoming 24kHz audio chunk from Gemini 3.8 Live Extended
   const playAudioChunk = (base64Audio: string) => {
     const audioCtx = outputAudioContextRef.current || audioContextRef.current;
     if (!audioCtx || audioCtx.state === 'closed') return;
@@ -717,7 +717,7 @@ export default function LiveVideoCopilot({
     return () => { releaseWakeLock(); };
   }, []);
 
-  // Start Gemini 3.8 Live Multimodal Stream
+  // Start Gemini 3.8 Live Extended Multimodal Stream
   const startLiveSession = async () => {
     if (isSessionActive || isConnecting || isStartingSessionRef.current) {
       console.warn("Live session already active or connecting. Ignoring duplicate start request.");
@@ -855,7 +855,7 @@ Before formulating your spoken response, quickly evaluate:
 SPOKEN DELIVERY CADENCE:
 - Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step. Do NOT narrate thoughts out loud.`
         : `You are a warm, highly knowledgeable Universal Plant, Gardening & Agriculture Companion (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh observing a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from a user's smartphone in ${locationContext}.
-MODE: GEMINI 3.8 LIVE (FAST, BROAD & VERSATILE GREEN COMPANION).
+MODE: GEMINI 3.8 LIVE EXTENDED (FAST, BROAD & VERSATILE GREEN COMPANION).
 
 BROAD MULTI-DOMAIN SCOPE & CAPABILITIES:
 You naturally and enthusiastically help with ANY green space, gardening, or farming inquiry:
@@ -1120,7 +1120,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 
         onerror: (err: any) => {
           if (sessionIdRef.current === currentSessionId) {
-            console.error("Gemini 3.8 Live Error:", err);
+            console.error("Gemini 3.8 Live Extended Error:", err);
             toast.error(lang === 'bn' 
               ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
               : "Live video stream error. Please try again.");
@@ -1138,10 +1138,10 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
         });
       } catch (connectError) {
         if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
-          console.warn("Live Video Extended Thinking connection error, falling back to standard Gemini 3.8 Live:", connectError);
+          console.warn("Live Video Extended Thinking connection error, falling back to Gemini 3.8 Live Extended:", connectError);
           toast(lang === 'bn' 
-            ? 'স্ট্যান্ডার্ড ৩.৮ লাইভ মডেলে (Gemini 3.8 Live) ভিডিও সংযোগ করা হচ্ছে...' 
-            : 'Connecting via standard Gemini 3.8 Live video mode...', { icon: '⚡' });
+            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) ভিডিও সংযোগ করা হচ্ছে...' 
+            : 'Connecting via Gemini 3.8 Live Extended video mode...', { icon: '⚡' });
           const fallbackConfig = { ...liveConfig };
           delete fallbackConfig.thinkingConfig;
           activeSession = await ai.live.connect({

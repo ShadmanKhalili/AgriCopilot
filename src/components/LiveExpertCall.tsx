@@ -291,7 +291,7 @@ CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 3. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic phrases like "আমি সরাসরি শুনছি", "উপায়গুলো দেখছি", "আমি এআই", "আসুন বিস্তারিত জানি", or announce call systems. Speak directly like an expert mentor on the line.
 4. Switch to English only if the caller explicitly says "Speak in English" or "ইংরেজিতে বলুন".
 
-LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
+LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
 - Ultra-low latency spoken turns: Keep responses short, punchy, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human expert on the phone.
 - Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু জানতে চান?", "গাছের বয়স কত?"). Never deliver long lectures.
 - IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or interrupts by speaking, immediately cease previous points and answer their new topic directly.
@@ -516,10 +516,10 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE):
         });
       } catch (connectError) {
         if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
-          console.warn("Live Extended Thinking connection error, falling back to standard Gemini 3.8 Live:", connectError);
+          console.warn("Live Extended Thinking connection error, falling back to Gemini 3.8 Live Extended:", connectError);
           toast(lang === 'bn' 
-            ? 'স্ট্যান্ডার্ড ৩.৮ লাইভ মডেলে (Gemini 3.8 Live) কল সংযোগ করা হচ্ছে...' 
-            : 'Connecting via standard Gemini 3.8 Live mode...', { icon: '⚡' });
+            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) কল সংযোগ করা হচ্ছে...' 
+            : 'Connecting via Gemini 3.8 Live Extended mode...', { icon: '⚡' });
           const fallbackConfig = { ...liveConfig };
           delete fallbackConfig.thinkingConfig;
           activeSession = await ai.live.connect({
