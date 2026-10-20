@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { 
   Camera, Mic, MicOff, PhoneOff, Video, VideoOff, RefreshCw, Zap, ZapOff, 
   Sparkles, AlertCircle, AlertTriangle, ShieldCheck, Activity, Volume2, 
@@ -9,14 +9,22 @@ import {
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
+import type { LiveServerMessage } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
+
+// Inline the two enum values used by the live config. Importing the SDK for
+// its runtime enums would pull ~280 KB into the first screen; the SDK itself
+// is loaded on demand by getLiveAiClient() when a session actually starts.
+const Modality = { AUDIO: 'AUDIO' } as const;
+const ThinkingLevel = { LOW: 'LOW' } as const;
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
-import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
+import type { PrescriptionData } from './DigitalPrescriptionModal';
+
+const DigitalPrescriptionModal = lazy(() => import('./DigitalPrescriptionModal'));
 
 interface LiveVideoCopilotProps {
   lang: Language;
@@ -2766,12 +2774,14 @@ Return a JSON object with this exact structure:
 
       {/* 1-Click Certified Digital Krishi Prescription Modal */}
       {currentRxData && (
+        <Suspense fallback={null}>
         <DigitalPrescriptionModal
           isOpen={isRxModalOpen}
           onClose={() => setIsRxModalOpen(false)}
           data={currentRxData}
           lang={lang}
         />
+        </Suspense>
       )}
     </div>
   );
