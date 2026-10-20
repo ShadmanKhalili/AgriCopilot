@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firestore';
@@ -16,15 +15,21 @@ import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
-import { LiveExpertCall } from './LiveExpertCall';
-import LiveVideoCopilot from './LiveVideoCopilot';
 import DosageCalculator from './DosageCalculator';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
-import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
-import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
+import type { PrescriptionData } from './DigitalPrescriptionModal';
+
+// Heavy, action-triggered panels are split out so the first screen only ships
+// what a farmer needs before they interact.
+const LiveExpertCall = lazy(() =>
+  import('./LiveExpertCall').then((m) => ({ default: m.LiveExpertCall }))
+);
+const LiveVideoCopilot = lazy(() => import('./LiveVideoCopilot'));
+const DigitalPrescriptionModal = lazy(() => import('./DigitalPrescriptionModal'));
+const PlantHealthRecoveryTracker = lazy(() => import('./PlantHealthRecoveryTracker'));
 
 const CROPS = ['tomato', 'brinjal', 'paddy', 'chili', 'watermelon', 'potato', 'onion', 'cucumber', 'betelLeaf', 'wheat', 'maize', 'jute', 'sugarcane', 'tea', 'pulse', 'mustard'];
 
@@ -1505,6 +1510,7 @@ export default function AgriCopilot({
 
       {copilotMode === 'live_stream' ? (
         <div className="w-full">
+          <Suspense fallback={null}>
           <LiveVideoCopilot 
             lang={lang} 
             locationContext={activeDistrict ? `${lang === 'bn' ? activeDistrict.bn_name : activeDistrict.name}, Bangladesh` : "Bangladesh"}
@@ -1529,6 +1535,7 @@ export default function AgriCopilot({
               }
             }}
           />
+          </Suspense>
         </div>
       ) : (
         <div className="flex flex-col space-y-4 md:space-y-6 w-full">
@@ -2208,6 +2215,7 @@ export default function AgriCopilot({
 
                           {/* 7-Day Plant Health Recovery Tracker (Like Apple Health for Crops) */}
                           <div className="mt-6 relative z-10">
+                            <Suspense fallback={null}>
                             <PlantHealthRecoveryTracker
                               lang={lang}
                               cropName={crop || 'Crop'}
@@ -2216,6 +2224,7 @@ export default function AgriCopilot({
                               harvestIntervalDays={14}
                               initialPathway="organic"
                             />
+                            </Suspense>
                           </div>
 
                           {/* Deep Analysis Result or Button */}
@@ -2441,11 +2450,13 @@ export default function AgriCopilot({
 
                               {diagnosis && (
                                 <div className="space-y-4 mb-6">
+                                  <Suspense fallback={null}>
                                   <LiveExpertCall 
                                     diagnosisContext={`Crop: ${crop}. Stage: ${cropStage}. Diagnosis: ${diagnosis.diagnosis}. Symptoms recognized: ${diagnosis.symptomsBreakdown?.join(', ')}. Action plan: ${diagnosis.verificationAdvice}`} 
                                     lang={lang} 
                                     locationContext={globalLocation ? `GPS: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh"} 
                                   />
+                                  </Suspense>
 
                                    {/* Quick Field Context Injector */}
                                   <div 
@@ -3248,12 +3259,14 @@ export default function AgriCopilot({
 
       {/* 1-Click Certified Digital Krishi Prescription Modal */}
       {rxModalData && (
+        <Suspense fallback={null}>
         <DigitalPrescriptionModal
           isOpen={isRxModalOpen}
           onClose={() => setIsRxModalOpen(false)}
           data={rxModalData}
           lang={lang}
         />
+        </Suspense>
       )}
     </motion.div>
   );

@@ -1,7 +1,27 @@
-import { Type, GoogleGenAI, Modality } from '@google/genai';
+import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
+// The GenAI SDK is ~280 KB. Inline the few enum values used at module scope and
+// load the SDK dynamically on the first AI call so the home screen stays light.
+const Type = {
+  STRING: 'STRING',
+  NUMBER: 'NUMBER',
+  OBJECT: 'OBJECT',
+  ARRAY: 'ARRAY'
+} as const;
+const Modality = { AUDIO: 'AUDIO' } as const;
+
+type GoogleGenAIConstructor = typeof import('@google/genai').GoogleGenAI;
+let genAIClass: GoogleGenAIConstructor | null = null;
+const loadGoogleGenAI = async (): Promise<GoogleGenAIConstructor> => {
+  if (!genAIClass) {
+    const sdk = await import('@google/genai');
+    genAIClass = sdk.GoogleGenAI;
+  }
+  return genAIClass;
+};
 
 // Helper to call AI via backend proxy
 const callAiProxy = async (params: any) => {
@@ -65,16 +85,17 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
 export const getLiveAiClient = async (): Promise<GoogleGenAI> => {
   try {
     const token = await getEphemeralLiveToken();
-    return new GoogleGenAI({ apiKey: token });
+    const GenAI = await loadGoogleGenAI();
+    return new GenAI({ apiKey: token });
   } catch (err) {
     console.warn("Ephemeral Live token acquisition failed, attempting fallback if available:", err);
-    const directAi = getAi(true);
+    const directAi = await getAi(true);
     if (directAi) return directAi;
     throw err;
   }
 };
 
-export const getAi = (ignoreBlocked: boolean = false) => {
+export const getAi = async (ignoreBlocked: boolean = false): Promise<GoogleGenAI | null> => {
   if (directSdkBlocked && !ignoreBlocked) {
     return null;
   }
@@ -84,14 +105,15 @@ export const getAi = (ignoreBlocked: boolean = false) => {
   const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
   
   if (apiKey && !aiInstance) {
-    aiInstance = new GoogleGenAI({ apiKey });
+    const GenAI = await loadGoogleGenAI();
+    aiInstance = new GenAI({ apiKey });
   }
   return aiInstance;
 };
 
 // Generic wrapper for AI calls that handles Proxy vs Direct SDK
 const generateContent = async (params: any) => {
-  const ai = getAi();
+  const ai = await getAi();
   if (!ai || directSdkBlocked) {
     // Proxy through server route
     return await callAiProxy(params);
