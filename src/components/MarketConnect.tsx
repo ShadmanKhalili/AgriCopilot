@@ -471,7 +471,7 @@ export default function MarketConnect({
                 transition={{ duration: 0.1 }}
                 onClick={() => handleGetInsights()}
                 disabled={isLoading}
-                className="w-full bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-bold py-2.5 sm:py-3 px-4 rounded-xl hover:bg-stone-800 dark:hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors text-xs sm:text-sm min-h-[42px] cursor-pointer"
+                className="w-full bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 font-bold py-2.5 sm:py-3 px-4 rounded-xl hover:bg-stone-800 dark:hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 transition-colors text-xs sm:text-sm min-h-[44px] cursor-pointer"
               >
                 {isLoading ? (
                   <>

@@ -207,22 +207,29 @@ const cleanFullName = (fullName?: string): string => {
   return sanitized || DEFAULT_FARMER_NAME;
 };
 
+// Guest/demo sessions are deliberately excluded from Firestore (same policy as the write path).
+// Reading them would always be denied by the zero-trust rules and only add console noise.
+const isGuestProfileId = (userId: string): boolean =>
+  userId === 'guest_farmer_demo' || userId.startsWith('guest_');
+
 export async function fetchFarmerProfile(userId: string): Promise<FarmerProfileData | null> {
   if (!userId) return null;
 
-  try {
-    const docRef = doc(db, 'farmer_profiles', userId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data() as FarmerProfileData;
-      // Sync local cache
-      try {
-        localStorage.setItem(LOCAL_PROFILE_KEY(userId), JSON.stringify(data));
-      } catch (e) {}
-      return data;
+  if (!isGuestProfileId(userId)) {
+    try {
+      const docRef = doc(db, 'farmer_profiles', userId);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as FarmerProfileData;
+        // Sync local cache
+        try {
+          localStorage.setItem(LOCAL_PROFILE_KEY(userId), JSON.stringify(data));
+        } catch (e) {}
+        return data;
+      }
+    } catch (error) {
+      console.warn("Firestore profile fetch error, checking local storage:", error);
     }
-  } catch (error) {
-    console.warn("Firestore profile fetch error, checking local storage:", error);
   }
 
   // Fallback to localStorage
@@ -237,27 +244,29 @@ export async function fetchFarmerProfile(userId: string): Promise<FarmerProfileD
 export async function fetchFarmerTimeline(userId: string): Promise<FarmerTimelineEventData[]> {
   if (!userId) return [];
 
-  try {
-    const q = query(
-      collection(db, 'farmer_timeline_events'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(25)
-    );
-    const snap = await getDocs(q);
-    const events: FarmerTimelineEventData[] = [];
-    snap.forEach(docSnap => {
-      events.push({ id: docSnap.id, ...docSnap.data() } as FarmerTimelineEventData);
-    });
+  if (!isGuestProfileId(userId)) {
+    try {
+      const q = query(
+        collection(db, 'farmer_timeline_events'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(25)
+      );
+      const snap = await getDocs(q);
+      const events: FarmerTimelineEventData[] = [];
+      snap.forEach(docSnap => {
+        events.push({ id: docSnap.id, ...docSnap.data() } as FarmerTimelineEventData);
+      });
 
-    if (events.length > 0) {
-      try {
-        localStorage.setItem(LOCAL_EVENTS_KEY(userId), JSON.stringify(events));
-      } catch (e) {}
-      return events;
+      if (events.length > 0) {
+        try {
+          localStorage.setItem(LOCAL_EVENTS_KEY(userId), JSON.stringify(events));
+        } catch (e) {}
+        return events;
+      }
+    } catch (error) {
+      console.warn("Firestore timeline fetch error, checking local storage:", error);
     }
-  } catch (error) {
-    console.warn("Firestore timeline fetch error, checking local storage:", error);
   }
 
   // Fallback to localStorage

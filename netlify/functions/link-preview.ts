@@ -58,8 +58,21 @@ export const handler: Handler = async (event) => {
 
     const title = getMeta('og:title') || getMeta('title') || html.match(/<title>([^<]*)<\/title>/i)?.[1];
     const description = getMeta('og:description') || getMeta('description');
-    const image = getMeta('og:image') || getMeta('twitter:image');
     const siteName = getMeta('og:site_name');
+
+    // Resolve relative image paths and upgrade insecure http:// images to https://.
+    // Our page is served over HTTPS, so the browser blocks http:// images as mixed content.
+    const rawImage = getMeta('og:image') || getMeta('twitter:image');
+    let image: string | null = rawImage;
+    if (image) {
+      try {
+        const imageUrl = new URL(image, urlObj);
+        if (imageUrl.protocol === 'http:') imageUrl.protocol = 'https:';
+        image = imageUrl.toString();
+      } catch {
+        // Keep the original value if it cannot be parsed.
+      }
+    }
 
     return {
       statusCode: 200,
