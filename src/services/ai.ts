@@ -3,8 +3,9 @@ import { db } from '../firestore';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
-// The GenAI SDK is ~280 KB. Inline the few enum values used at module scope and
-// load the SDK dynamically on the first AI call so the home screen stays light.
+// The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
+// Text generation always goes through the server proxy, so no provider key is
+// ever bundled into the client.
 const Type = {
   STRING: 'STRING',
   NUMBER: 'NUMBER',
@@ -52,10 +53,6 @@ const callAiProxy = async (params: any) => {
   }
 };
 
-// Singleton AI instance using platform-injected key
-let aiInstance: GoogleGenAI | null = null;
-let directSdkBlocked = false; // Flag if direct client SDK is blocked by referrer or 403
-
 // Ephemeral Live API Token retrieval for direct WebSocket sessions
 export const getEphemeralLiveToken = async (): Promise<string> => {
   const response = await fetchWithTimeout('/api/gemini/live-token', {
@@ -81,88 +78,18 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
   return data.token;
 };
 
-// Returns a fresh GoogleGenAI instance initialized with a single-use ephemeral token
+// Returns a fresh GoogleGenAI instance initialized with a single-use ephemeral token.
+// The token is minted server-side; no long-lived provider key reaches the browser.
 export const getLiveAiClient = async (): Promise<GoogleGenAI> => {
-  try {
-    const token = await getEphemeralLiveToken();
-    const GenAI = await loadGoogleGenAI();
-    return new GenAI({ apiKey: token });
-  } catch (err) {
-    console.warn("Ephemeral Live token acquisition failed, attempting fallback if available:", err);
-    const directAi = await getAi(true);
-    if (directAi) return directAi;
-    throw err;
-  }
+  const token = await getEphemeralLiveToken();
+  const GenAI = await loadGoogleGenAI();
+  return new GenAI({ apiKey: token });
 };
 
-export const getAi = async (ignoreBlocked: boolean = false): Promise<GoogleGenAI | null> => {
-  if (directSdkBlocked && !ignoreBlocked) {
-    return null;
-  }
-  // SECURITY: no server secret is bundled into the client. The direct SDK path is
-  // only enabled when an operator explicitly opts in via VITE_GEMINI_API_KEY (a
-  // public build-time value); otherwise every AI call is proxied through the server.
-  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || '';
-  
-  if (apiKey && !aiInstance) {
-    const GenAI = await loadGoogleGenAI();
-    aiInstance = new GenAI({ apiKey });
-  }
-  return aiInstance;
-};
-
-// Generic wrapper for AI calls that handles Proxy vs Direct SDK
+// All text generation is proxied through the server. This keeps GEMINI_API_KEY
+// server-side and lets the server enforce its own failover cascade.
 const generateContent = async (params: any) => {
-  const ai = await getAi();
-  if (!ai || directSdkBlocked) {
-    // Proxy through server route
-    return await callAiProxy(params);
-  }
-  
-  const { model, contents, config, tools, toolConfig, responseModalities, speechConfig, generationConfig } = params;
-
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents,
-      config: {
-        ...(config || {}),
-        tools,
-        toolConfig,
-        responseModalities,
-        speechConfig,
-        generationConfig
-      }
-    });
-    
-    return {
-      text: response.text,
-      candidates: response.candidates,
-      promptFeedback: response.promptFeedback
-    };
-  } catch (error: any) {
-    const errStr = String(error?.message || error || '');
-    const isPermissionOrReferrer = error?.status === 403 || 
-                                   errStr.includes('403') || 
-                                   errStr.includes('PERMISSION_DENIED') || 
-                                   errStr.includes('REFERRER') || 
-                                   errStr.includes('referer') ||
-                                   errStr.includes('caller does not have permission');
-
-    if (isPermissionOrReferrer) {
-      console.warn("Direct client Gemini SDK call blocked (403/Referrer restriction). Falling back to backend AI proxy:", error?.message);
-      directSdkBlocked = true;
-      try {
-        return await callAiProxy(params);
-      } catch (proxyError) {
-        console.error("Backend AI Proxy also failed:", proxyError);
-        throw proxyError;
-      }
-    }
-
-    console.error("Direct AI Call Failed:", error);
-    throw error;
-  }
+  return callAiProxy(params);
 };
 
 export { Type };
