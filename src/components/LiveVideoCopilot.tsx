@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
@@ -1223,7 +1224,7 @@ Return a JSON object with this exact structure:
 }`;
 
       try {
-        const proxyResp = await fetch('/api/ai-proxy', {
+        const proxyResp = await fetchWithTimeout('/api/ai-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1232,7 +1233,9 @@ Return a JSON object with this exact structure:
             config: {
               responseMimeType: 'application/json'
             }
-          })
+          }),
+          timeoutMs: 45000,
+          retries: 0
         });
 
         if (proxyResp.ok) {

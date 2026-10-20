@@ -11,6 +11,7 @@ import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import toast from 'react-hot-toast';
 import { LiveExpertCall } from './LiveExpertCall';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
@@ -106,11 +107,13 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
       // Fetch Weather Data (strictly fresh, bypass cache)
       let weatherData = null;
       try {
-        const weatherRes = await fetch(
+        const weatherRes = await fetchWithTimeout(
           `/api/daily-forecast?latitude=${activeLocation.latitude}&longitude=${activeLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation&timezone=auto&_t=${Date.now()}`,
           {
             cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' }
+            headers: { 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' },
+            timeoutMs: 12000,
+            retries: 1
           }
         );
         weatherData = await weatherRes.json();
@@ -121,10 +124,11 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
       // Fetch Satellite Data
       let satelliteData = null;
       try {
-        const satRes = await fetch('/.netlify/functions/sentinel', {
+        const satRes = await fetchWithTimeout('/.netlify/functions/sentinel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: activeLocation.latitude, lng: activeLocation.longitude })
+          body: JSON.stringify({ lat: activeLocation.latitude, lng: activeLocation.longitude }),
+          timeoutMs: 30000
         });
         satelliteData = await satRes.json();
       } catch (e) {

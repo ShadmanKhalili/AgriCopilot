@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
 
 interface Props {
@@ -79,10 +80,11 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/.netlify/functions/sentinel', {
+      const response = await fetchWithTimeout('/.netlify/functions/sentinel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: globalLocation.latitude, lng: globalLocation.longitude })
+        body: JSON.stringify({ lat: globalLocation.latitude, lng: globalLocation.longitude }),
+        timeoutMs: 30000
       });
       const data = await response.json();
       if (data.error) {

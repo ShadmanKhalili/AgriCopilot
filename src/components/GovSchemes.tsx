@@ -10,6 +10,7 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface LinkMetadata {
   title?: string;
@@ -27,7 +28,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
+        const res = await fetchWithTimeout(`/api/link-preview?url=${encodeURIComponent(url)}`, { timeoutMs: 10000, retries: 1 });
         const data = await res.json();
         if (!data.error) setMetadata(data);
       } catch (err) {

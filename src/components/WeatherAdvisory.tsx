@@ -8,6 +8,7 @@ import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
 import { saveCachedWeather, getCachedWeather, formatCacheAge, formatExactSyncTime } from '../utils/offlineCache';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
 import toast from 'react-hot-toast';
 import SevereWeatherAlerts, { WeatherAlertItem } from './SevereWeatherAlerts';
@@ -91,7 +92,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const t = translations[lang];
 
   useEffect(() => {
-    fetch('/api/config-status')
+    fetchWithTimeout('/api/config-status', { timeoutMs: 8000, retries: 0 })
       .then(res => res.json())
       .then(data => setConfigStatus(data))
       .catch(() => {});
@@ -162,9 +163,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
       if (activeModel === 'weathernext3') {
         try {
-          const wnRes = await fetch(
+          const wnRes = await fetchWithTimeout(
             `/api/weathernext-3?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&timezone=auto${cacheBustParam}`,
-            liveFetchOptions
+            { ...liveFetchOptions, timeoutMs: 10000, retries: 0 }
           );
           if (wnRes.ok) {
             wnData = await wnRes.json();
@@ -262,9 +263,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           usedFallbackStandard = true;
         }
         // Standard Multi-Model Open-Meteo
-        const weatherRes = await fetch(
+        const weatherRes = await fetchWithTimeout(
           `/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto${cacheBustParam}`,
-          liveFetchOptions
+          { ...liveFetchOptions, timeoutMs: 12000, retries: 1 }
         );
         
         if (!weatherRes.ok) {
@@ -417,7 +418,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       let historicalToday = undefined;
 
       try {
-        const climateRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`);
+        const climateRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`, { timeoutMs: 8000, retries: 0 });
         
         if (climateRes.ok) {
           const climateData = await climateRes.json();
@@ -443,7 +444,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       }
 
       try {
-        const lastYearRes = await fetch(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);
+        const lastYearRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`, { timeoutMs: 8000, retries: 0 });
         
         if (lastYearRes.ok) {
           const lastYearData = await lastYearRes.json();
@@ -462,7 +463,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       // 3. Fetch SoilGrids Data
       let soilPH, soilNitrogen, soilCarbon;
       try {
-        const soilRes = await fetch(`/api/soil-properties?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`);
+        const soilRes = await fetchWithTimeout(`/api/soil-properties?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`, { timeoutMs: 8000, retries: 0 });
         const soilData = await soilRes.json();
         
         const layers = soilData.properties?.layers || [];

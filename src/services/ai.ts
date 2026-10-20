@@ -1,14 +1,17 @@
 import { Type, GoogleGenAI, Modality } from '@google/genai';
 import { db } from '../firestore';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 // Helper to call AI via backend proxy
 const callAiProxy = async (params: any) => {
   try {
-    const response = await fetch('/api/ai-proxy', {
+    const response = await fetchWithTimeout('/api/ai-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify(params),
+      timeoutMs: 90000,
+      retries: 0
     });
     
     if (!response.ok) {
@@ -35,9 +38,11 @@ let directSdkBlocked = false; // Flag if direct client SDK is blocked by referre
 
 // Ephemeral Live API Token retrieval for direct WebSocket sessions
 export const getEphemeralLiveToken = async (): Promise<string> => {
-  const response = await fetch('/api/gemini/live-token', {
+  const response = await fetchWithTimeout('/api/gemini/live-token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' },
+    timeoutMs: 15000,
+    retries: 0
   });
   if (!response.ok) {
     let errMsg = `Live Token Request Failed (Status: ${response.status})`;
