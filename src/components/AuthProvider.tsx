@@ -12,6 +12,9 @@ export interface UserProfile {
   usageCount: number;
   lastUsedDate?: string;
   createdAt: string;
+  /** Human expert layer (Phase 1): set by the admin approval flow. */
+  expertLevel?: 'provisional' | 'verified' | 'senior';
+  orgId?: string;
 }
 
 interface AuthContextType {
@@ -19,6 +22,10 @@ interface AuthContextType {
   userRole: string | null;
   userProfile: UserProfile | null;
   isAuthReady: boolean;
+  /** True for the platform superadmin role. */
+  isAdmin: boolean;
+  /** True for verified human experts (expert / org_admin roles). */
+  isExpert: boolean;
   signIn: () => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
@@ -31,6 +38,8 @@ const AuthContext = createContext<AuthContextType>({
   userRole: null,
   userProfile: null,
   isAuthReady: false,
+  isAdmin: false,
+  isExpert: false,
   signIn: async () => {},
   signUpWithEmail: async () => {},
   loginWithEmail: async () => {},
@@ -195,6 +204,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userRole, 
       userProfile, 
       isAuthReady, 
+      isAdmin: userRole === 'admin',
+      isExpert: userRole === 'expert' || userRole === 'org_admin',
       signIn: signInWithGoogle, 
       signUpWithEmail: handleSignUp,
       loginWithEmail: handleLogin,

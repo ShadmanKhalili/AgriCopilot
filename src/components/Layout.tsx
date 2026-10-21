@@ -3,7 +3,7 @@ import {
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
   ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown,
-  Search, Sun, Moon, Sparkles, Grid
+  Search, Sun, Moon, Sparkles, Grid, HeartHandshake
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -24,6 +24,7 @@ const UserGuide = lazy(() => import('./UserGuide'));
 const Profile = lazy(() => import('./Profile'));
 const FarmerDossier = lazy(() => import('./FarmerDossier'));
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
+const ExpertHub = lazy(() => import('./ExpertHub'));
 
 import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
@@ -40,7 +41,7 @@ import InAppBrowserBanner from './InAppBrowserBanner';
 import { useLocationName } from '../hooks/useLocationName';
 import { detectUserLocation } from '../utils/geolocation';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'user-guide' | 'profile' | 'admin-dashboard';
+type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
 
 type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
 
@@ -109,6 +110,10 @@ export default function Layout() {
   const [agriCropStage, setAgriCropStage] = useState<string>('');
   const [agriCrop, setAgriCrop] = useState<string>('');
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
+
+  // Human Expert Layer: a diagnosis screen can hand a pre-filled request seed
+  // to the Expert Hub (which opens the consent wizard).
+  const [expertRequestSeed, setExpertRequestSeed] = useState<any | null>(null);
 
   // Profit Calculator State Persistence & Cross-Navigation
   const [profitCrop, setProfitCrop] = useState<string>('paddy_boro');
@@ -287,12 +292,21 @@ export default function Layout() {
     },
 
     // Pillar 4: Support & Farm Settings (সহায়তা ও প্রোফাইল)
-    { 
-      id: 'farmer-dossier', 
-      name: lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card & Loans', 
-      icon: ShieldCheck, 
-      description: lang === 'bn' ? 'ডিজিটাল ক্রেডিট স্কোর, ফসল বীমা ও লাইভ ইতিহাস' : 'Digital credit score, crop insurance & history', 
-      pillar: 'support', 
+    {
+      id: 'expert-hub',
+      name: lang === 'bn' ? 'মানুষ বিশেষজ্ঞ সহায়তা' : 'Human Expert Help',
+      icon: HeartHandshake,
+      description: lang === 'bn' ? 'যাচাইকৃত কৃষি বিশেষজ্ঞের সাথে পরামর্শ ও সম্মতিভিত্তিক তথ্য শেয়ার' : 'Consult verified agri experts with consent-first data sharing',
+      pillar: 'support',
+      subcategory: lang === 'bn' ? 'কৃষি অফিসার ও বিশেষজ্ঞ' : 'Officers & Experts',
+      badge: userRole === 'expert' ? (lang === 'bn' ? 'Expert Desk' : 'Expert Desk') : undefined
+    },
+    {
+      id: 'farmer-dossier',
+      name: lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card & Loans',
+      icon: ShieldCheck,
+      description: lang === 'bn' ? 'ডিজিটাল ক্রেডিট স্কোর, ফসল বীমা ও লাইভ ইতিহাস' : 'Digital credit score, crop insurance & history',
+      pillar: 'support',
       subcategory: lang === 'bn' ? 'ডিজিটাল প্রোফাইল ও ঋণ' : 'Credit & Insurance Dossier'
     },
     { 
@@ -960,6 +974,20 @@ export default function Layout() {
                           persistedAnalysisType={agriAnalysisType}
                           setPersistedAnalysisType={setAgriAnalysisType}
                           onNavigateTab={handleNavigateTab}
+                          onRequestExpert={(seed: any) => {
+                            setExpertRequestSeed(seed);
+                            setActiveTab('expert-hub');
+                            setIsMobileMenuOpen(false);
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div id="panel-expert-hub" role="tabpanel" aria-labelledby="tab-expert-hub" className={activeTab === 'expert-hub' ? 'block flex-1' : 'hidden'}>
+                      {visitedTabs.has('expert-hub') && (
+                        <ExpertHub
+                          lang={lang}
+                          requestSeed={expertRequestSeed}
+                          onClearRequestSeed={() => setExpertRequestSeed(null)}
                         />
                       )}
                     </div>

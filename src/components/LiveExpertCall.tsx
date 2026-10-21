@@ -680,7 +680,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
   };
 
   return (
-    <div className="w-full mt-6 mb-4 space-y-3" role="region" aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞ কল সার্ভিস' : 'AI Expert Call Service'}>
+    <div className="w-full mt-6 mb-4 space-y-3" role="region" aria-label={lang === 'bn' ? 'এআই সহায়ক কল সার্ভিস' : 'AI Assistant Call Service'}>
       {!isConnected && !isCalling ? (
         <div className="space-y-3">
           {/* Simplified Consultation Mode Switch */}
@@ -745,7 +745,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={startCall}
-            aria-label={lang === 'bn' ? 'এআই বিশেষজ্ঞের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Expert'}
+            aria-label={lang === 'bn' ? 'এআই সহায়কের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Assistant'}
             className={`w-full flex flex-col items-center justify-center space-y-2 p-6 rounded-3xl shadow-xl transition-all cursor-pointer relative overflow-hidden group focus:ring-4 outline-none ${
               isExtendedThinking
                 ? 'bg-gradient-to-br from-purple-700 via-indigo-800 to-emerald-900 text-white shadow-purple-950/30 border border-purple-500/40 focus:ring-purple-400'
@@ -824,7 +824,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             
             <div className="text-center">
               <h4 id="expert-call-title" className="text-white font-black text-3xl tracking-tight mb-1">
-                {lang === 'bn' ? 'এআই কৃষি বিশেষজ্ঞ' : 'AI Agri-Expert'}
+                {lang === 'bn' ? 'এআই কৃষি সহায়ক' : 'AI Agri Assistant'}
               </h4>
               <p className="text-green-500/80 text-sm font-medium tracking-widest uppercase flex items-center justify-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -901,7 +901,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
                   )}
                   {liveTranscription && (
                     <div className="text-left bg-emerald-950/60 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-200 flex items-start gap-1.5">
-                      <span className="font-bold shrink-0 text-emerald-300">{lang === 'bn' ? '🤖 বিশেষজ্ঞ:' : '🤖 Expert:'}</span>
+                      <span className="font-bold shrink-0 text-emerald-300">{lang === 'bn' ? '🤖 এআই:' : '🤖 AI:'}</span>
                       <span>{liveTranscription}</span>
                     </div>
                   )}
@@ -963,13 +963,13 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
 
               <p className={`text-xs uppercase tracking-[0.2em] font-black transition-colors duration-500 ${isCalling || callStatus === 'thinking' ? 'text-green-400 animate-pulse' : 'text-gray-400'}`}>
                 {isRinging
-                  ? (lang === 'bn' ? 'বিশেষজ্ঞকে কল করা হচ্ছে...' : 'Ringing Expert...')
+                  ? (lang === 'bn' ? 'এআই সহায়ককে কল করা হচ্ছে...' : 'Ringing AI Assistant...')
                   : isCalling 
                     ? (lang === 'bn' ? 'রাউটিং কল...' : 'Routing Call...') 
                     : callStatus === 'thinking' 
                       ? (lang === 'bn' ? 'সারাংশ খোঁজা হচ্ছে...' : 'Consulting Database...') 
                       : callStatus === 'speaking' 
-                        ? (lang === 'bn' ? 'বিশেষজ্ঞ কথা বলছেন' : 'Expert Speaking') 
+                        ? (lang === 'bn' ? 'এআই সহায়ক কথা বলছেন' : 'AI Assistant Speaking')
                         : callStatus === 'listening' 
                           ? (lang === 'bn' ? 'আপনার কথা শোনা হচ্ছে' : 'Listening to you') 
                           : (lang === 'bn' ? 'সংযুক্ত' : 'Connected')}

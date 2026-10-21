@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer, HeartHandshake } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
@@ -567,6 +567,16 @@ interface Props {
   persistedDescription?: string;
   setPersistedDescription?: (desc: string) => void;
   onNavigateTab?: (tab: any, payload?: any) => void;
+  /** Human expert layer: hand a pre-filled request seed to the Expert Hub. */
+  onRequestExpert?: (seed: {
+    category?: string;
+    crop?: string;
+    cropStage?: string;
+    diagnosisSummary?: string;
+    severity?: string;
+    confidence?: number;
+    photosCount?: number;
+  }) => void;
 }
 
 export default function AgriCopilot({ 
@@ -593,7 +603,8 @@ export default function AgriCopilot({
   setPersistedAnalysisType,
   persistedDescription,
   setPersistedDescription,
-  onNavigateTab
+  onNavigateTab,
+  onRequestExpert
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
   const [cropStage, setCropStage] = useState(persistedCropStage || '');
@@ -2180,6 +2191,66 @@ export default function AgriCopilot({
                             </motion.div>
                           </div>
 
+                          {/* Human Expert Layer — the step after AI advice.
+                              Consent-first: opens the expert request wizard with
+                              everything the farmer already diagnosed prefilled. */}
+                          {onRequestExpert && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="rounded-[28px] border-2 border-emerald-300 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/60 dark:to-stone-900 p-5 shadow-sm relative z-10"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-700 dark:bg-emerald-300 text-white dark:text-emerald-950 flex items-center justify-center shrink-0">
+                                  <HeartHandshake className="w-6 h-6" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="font-black text-base text-slate-900 dark:text-white tracking-tight">
+                                      {lang === 'bn' ? 'মানুষ বিশেষজ্ঞের সাথে কথা বলুন' : 'Talk to a human expert'}
+                                    </h4>
+                                    {(diagnosis.qualitativeSeverity === 'High' || (diagnosis.confidence || 100) < 70) && (
+                                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800">
+                                        {lang === 'bn' ? 'প্রস্তাবিত' : 'Recommended'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                    {lang === 'bn'
+                                      ? 'এআই-এর পরের ধাপ — উপজেলা কৃষি অফিসার বা যাচাইকৃত বিশেষজ্ঞ। আপনি ঠিক করবেন তিনি কী কী তথ্য দেখতে পাবেন, আর যেকোনো সময় সম্মতি বাতিল করতে পারবেন।'
+                                      : 'The layer after AI — a verified Upazila officer or agronomist. You decide what they see, and you can revoke consent any time.'}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const category =
+                                      analysisType === 'soil' || analysisType === 'nutrient'
+                                        ? 'soil_fertilizer'
+                                        : analysisType === 'market' || analysisType === 'yield'
+                                        ? 'market_credit'
+                                        : 'crop_disease';
+                                    onRequestExpert({
+                                      category,
+                                      crop,
+                                      cropStage,
+                                      diagnosisSummary: String(
+                                        diagnosis.disease || diagnosis.diagnosis || ''
+                                      ).slice(0, 600),
+                                      severity: diagnosis.qualitativeSeverity || diagnosis.severity,
+                                      confidence: diagnosis.confidence,
+                                      photosCount: images.length,
+                                    });
+                                  }}
+                                  className="w-full sm:w-auto min-h-[52px] px-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shrink-0"
+                                >
+                                  <HeartHandshake className="w-5 h-5" />
+                                  {lang === 'bn' ? 'বিশেষজ্ঞ চাই' : 'Request expert'}
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+
                           {/* Differential Diagnosis (Chain of Thought Output) */}
                           {(diagnosis.possibleDiseases?.length > 0 || diagnosis.differentialDiagnosis) && (
                             <motion.div 
@@ -2223,6 +2294,7 @@ export default function AgriCopilot({
                               severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Critical'}
                               harvestIntervalDays={14}
                               initialPathway="organic"
+                              onRequestExpert={onRequestExpert}
                             />
                             </Suspense>
                           </div>
@@ -2438,7 +2510,7 @@ export default function AgriCopilot({
                                     <MessageSquare className="w-5 h-5 text-green-600" />
                                   </div>
                                   <div>
-                                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'কৃষি বিশেষজ্ঞের সাথে কথা বলুন' : 'Chat with Expert AI'}</h4>
+                                    <h4 className="font-black text-gray-900 text-lg tracking-tight">{lang === 'bn' ? 'এআই কৃষি সহায়কের সাথে কথা বলুন' : 'Chat with AI Agri Assistant'}</h4>
                                     <p className="text-[11px] text-gray-400 uppercase tracking-widest font-black mt-0.5">{lang === 'bn' ? 'এই রোগ সম্পর্কে আরও কিছু জানতে চান?' : 'Want to know more about this disease?'}</p>
                                   </div>
                                 </div>
@@ -2588,7 +2660,7 @@ export default function AgriCopilot({
                                       }`}>
                                         <div className={`flex items-center space-x-1.5 mb-1.5 opacity-70 text-[11px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-green-100' : 'text-gray-400'}`}>
                                           {msg.role === 'user' ? <User className="w-3 h-3" aria-hidden="true" /> : <Bot className="w-3 h-3" aria-hidden="true" />}
-                                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'বিশেষজ্ঞ এআই' : 'Expert AI')}</span>
+                                          <span>{msg.role === 'user' ? (lang === 'bn' ? 'আপনি' : 'You') : (lang === 'bn' ? 'এআই সহায়ক' : 'AI Assistant')}</span>
                                           {msg.role !== 'user' && (
                                             <button
                                               type="button"

@@ -51,7 +51,7 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
              isStr(data.uid, 1, 128) &&
              isStr(data.email, 3, 128) &&
-             data.role in ['agri-preneur', 'hub-manager', 'admin'] &&
+             data.role in ['agri-preneur', 'hub-manager', 'admin', 'expert_pending', 'expert', 'org_admin'] &&
              data.tier in ['free', 'premium', 'anon'] &&
              data.usageCount is number && data.usageCount >= 0 &&
              isTimestamp(data.createdAt);
@@ -149,7 +149,7 @@ service cloud.firestore {
                     incoming().uid == request.auth.uid &&
                     userId == request.auth.uid &&
                     isValidId(userId) &&
-                    (incoming().role != 'admin' || isAdmin()); // Prevent Privilege Escalation
+                    (incoming().role == 'agri-preneur' || isAdmin()); // Prevent Privilege Escalation
       allow update: if isSignedIn() && isValidUser(incoming()) &&
                     (
                       // Admins may manage any profile (role/tier included)
@@ -293,6 +293,290 @@ service cloud.firestore {
                     isValidId(eventId);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Human Expert Layer (Phase 1 MVP)
+    //
+    // Farmers escalate from AI advice to a verified human expert. Privacy
+    // is consent-first: an expert can only read a consultation (and its
+    // messages) while the farmer's consent is valid, and loses access the
+    // instant it is revoked or expires.
+    // ===============================================================
+
+    function isActiveExpert(expertId) {
+      return get(/databases/$(database)/documents/experts_public/$(expertId)).data.status == 'active';
+    }
+
+    function isConsultationParticipant(consultationId) {
+      let c = get(/databases/$(database)/documents/consultations/$(consultationId)).data;
+      return isSignedIn() &&
+        (c.farmerId == request.auth.uid ||
+         (c.expertId == request.auth.uid &&
+          c.consentRevoked == false &&
+          c.consentExpiresAtMs > request.time.toMillis()));
+    }
+
+    function isConsultationFarmer(consultationId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/consultations/$(consultationId)).data.farmerId == request.auth.uid;
+    }
+
+    function isConsultationExpert(consultationId) {
+      let c = get(/databases/$(database)/documents/consultations/$(consultationId)).data;
+      return isSignedIn() &&
+        c.expertId == request.auth.uid &&
+        c.consentRevoked == false &&
+        c.consentExpiresAtMs > request.time.toMillis();
+    }
+
+    function isValidExpertPublic(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'affiliationType', 'affiliationName', 'roleTitle', 'districts', 'upazilas', 'specializations', 'languages', 'verificationLevel', 'status', 'ratingAverage', 'ratingCount', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'affiliationType', 'affiliationName', 'roleTitle', 'districts', 'upazilas', 'specializations', 'languages', 'bio', 'verificationLevel', 'status', 'ratingAverage', 'ratingCount', 'responseTimeMins', 'isDemo', 'createdAt', 'updatedAt']) &&
+             isStr(data.uid, 1, 128) &&
+             isStr(data.displayName, 1, 128) &&
+             data.affiliationType in ['government', 'ngo', 'private', 'peer'] &&
+             isStr(data.affiliationName, 0, 128) &&
+             isStr(data.roleTitle, 1, 128) &&
+             data.districts is list && data.districts.size() <= 64 &&
+             data.upazilas is list && data.upazilas.size() <= 128 &&
+             data.specializations is list && data.specializations.size() >= 1 && data.specializations.size() <= 16 &&
+             data.languages is list && data.languages.size() <= 8 &&
+             data.verificationLevel in ['provisional', 'verified', 'senior'] &&
+             data.status in ['active', 'paused', 'suspended'] &&
+             data.ratingAverage is number && data.ratingAverage >= 0 && data.ratingAverage <= 5 &&
+             data.ratingCount is number && data.ratingCount >= 0 &&
+             (!data.keys().hasAny(['bio']) || isStr(data.bio, 0, 1000)) &&
+             (!data.keys().hasAny(['photoURL']) || isStr(data.photoURL, 0, 2000)) &&
+             (!data.keys().hasAny(['responseTimeMins']) || (data.responseTimeMins is number && data.responseTimeMins >= 0 && data.responseTimeMins <= 10080)) &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    function isValidExpertPrivate(data) {
+      return data.keys().hasAll(['uid', 'updatedAt']) &&
+             isStr(data.uid, 1, 128) &&
+             isTimestamp(data.updatedAt) &&
+             (!data.keys().hasAny(['phone']) || isStr(data.phone, 0, 24)) &&
+             (!data.keys().hasAny(['email']) || isStr(data.email, 0, 128)) &&
+             (!data.keys().hasAny(['availability']) || data.availability in ['online', 'offline', 'busy']);
+    }
+
+    function isValidExpertApplication(data) {
+      return data.keys().hasAll(['applicantId', 'fullName', 'phone', 'affiliationType', 'affiliationName', 'roleTitle', 'districts', 'specializations', 'languages', 'yearsExperience', 'motivation', 'status', 'createdAt', 'updatedAt']) &&
+             isStr(data.applicantId, 1, 128) &&
+             isStr(data.fullName, 2, 128) &&
+             isStr(data.phone, 6, 24) &&
+             data.affiliationType in ['government', 'ngo', 'private', 'peer'] &&
+             isStr(data.affiliationName, 0, 128) &&
+             isStr(data.roleTitle, 2, 128) &&
+             data.districts is list && data.districts.size() <= 64 &&
+             data.specializations is list && data.specializations.size() >= 1 && data.specializations.size() <= 16 &&
+             data.languages is list && data.languages.size() >= 1 && data.languages.size() <= 8 &&
+             data.yearsExperience is number && data.yearsExperience >= 0 && data.yearsExperience <= 70 &&
+             isStr(data.motivation, 10, 2000) &&
+             (!data.keys().hasAny(['publicBio']) || isStr(data.publicBio, 0, 600)) &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    function isValidConsultation(data) {
+      return data.keys().hasAll(['farmerId', 'farmerName', 'expertId', 'expertName', 'status', 'urgency', 'category', 'lang', 'district', 'upazila', 'consentScope', 'consentGrantedAt', 'consentExpiresAt', 'consentExpiresAtMs', 'consentRevoked', 'requestedAt', 'slaDueAt', 'slaDueAtMs', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['farmerId', 'farmerName', 'expertId', 'expertName', 'status', 'urgency', 'category', 'crop', 'lang', 'district', 'upazila', 'consentScope', 'consentGrantedAt', 'consentExpiresAt', 'consentExpiresAtMs', 'consentRevoked', 'requestedAt', 'slaDueAt', 'slaDueAtMs', 'createdAt', 'updatedAt']) &&
+             isStr(data.farmerId, 1, 128) &&
+             isStr(data.farmerName, 0, 128) &&
+             isStr(data.expertId, 1, 128) &&
+             isStr(data.expertName, 0, 128) &&
+             data.status == 'requested' &&
+             data.urgency in ['emergency', 'urgent', 'general'] &&
+             isStr(data.category, 1, 64) &&
+             data.lang in ['bn', 'en'] &&
+             isStr(data.district, 0, 64) &&
+             isStr(data.upazila, 0, 64) &&
+             data.consentScope is list && data.consentScope.size() <= 12 &&
+             isTimestamp(data.consentGrantedAt) &&
+             isTimestamp(data.consentExpiresAt) &&
+             data.consentExpiresAtMs is number && data.consentExpiresAtMs > request.time.toMillis() &&
+             data.consentRevoked == false &&
+             isTimestamp(data.requestedAt) &&
+             isTimestamp(data.slaDueAt) &&
+             data.slaDueAtMs is number &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    function isValidConsultationCase(data) {
+      return data.keys().hasAll(['symptoms', 'consentSnapshot', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['symptoms', 'consentSnapshot', 'gps', 'createdAt', 'updatedAt']) &&
+             isStr(data.symptoms, 1, 4000) &&
+             data.consentSnapshot is map &&
+             (!data.keys().hasAny(['gps']) ||
+              (data.gps is map &&
+               data.gps.lat is number && data.gps.lat >= -90 && data.gps.lat <= 90 &&
+               data.gps.lng is number && data.gps.lng >= -180 && data.gps.lng <= 180)) &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderId', 'senderRole', 'type', 'createdAt']) &&
+             isStr(data.senderId, 1, 128) &&
+             data.senderRole in ['farmer', 'expert'] &&
+             data.type in ['text', 'voice', 'photo', 'advisory', 'system'] &&
+             isTimestamp(data.createdAt) &&
+             (!data.keys().hasAny(['text']) || isStr(data.text, 1, 4000)) &&
+             (!data.keys().hasAny(['audioUrl']) || (data.audioUrl is string && data.audioUrl.size() <= 420000)) &&
+             (!data.keys().hasAny(['imageUrl']) || (data.imageUrl is string && data.imageUrl.size() <= 420000)) &&
+             (!data.keys().hasAny(['advisory']) || data.advisory is map);
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['type', 'actorId', 'actorRole', 'createdAt']) &&
+             isStr(data.type, 1, 64) &&
+             isStr(data.actorId, 1, 128) &&
+             data.actorRole in ['farmer', 'expert', 'system'] &&
+             isTimestamp(data.createdAt);
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['consultationId', 'expertId', 'farmerId', 'rating', 'createdAt']) &&
+             isStr(data.consultationId, 1, 128) &&
+             isStr(data.expertId, 1, 128) &&
+             isStr(data.farmerId, 1, 128) &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             isTimestamp(data.createdAt);
+    }
+
+    // Public expert directory (sanitised fields only). Signed-in users may
+    // browse and match; only the expert themself or an admin may write.
+    match /experts_public/{expertId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // Only the admin approval flow may publish/verify an expert.
+      allow create: if isAdmin() &&
+                    isValidExpertPublic(incoming()) &&
+                    isValidId(expertId);
+      // An approved expert may pause/resume, edit their bio/photo; never
+      // their own verification level or affiliation.
+      allow update: if isSignedIn() &&
+                    isValidId(expertId) &&
+                    isValidExpertPublic(incoming()) &&
+                    (
+                      isAdmin() ||
+                      (isOwner(expertId) &&
+                       existing().status in ['active', 'paused'] &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'bio', 'photoURL', 'responseTimeMins', 'updatedAt']) &&
+                       incoming().status in ['active', 'paused'])
+                    );
+      allow delete: if isAdmin();
+    }
+
+    // Private expert details: phone, documents, availability, admin notes.
+    match /experts_private/{expertId} {
+      allow get: if isAdmin() || isOwner(expertId);
+      allow list: if isAdmin();
+      allow create, update: if (isAdmin() || isOwner(expertId)) && isValidExpertPrivate(incoming()) && isValidId(expertId);
+      allow delete: if isAdmin();
+    }
+
+    match /expert_applications/{applicationId} {
+      allow get: if isSignedIn() && (isAdmin() || resource.data.applicantId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.applicantId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                    isValidExpertApplication(incoming()) &&
+                    incoming().applicantId == request.auth.uid &&
+                    incoming().status == 'pending' &&
+                    isValidId(applicationId);
+      allow update: if isAdmin() && isValidExpertApplication(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /consultations/{consultationId} {
+      allow get: if isAdmin() ||
+                    (isSignedIn() &&
+                     (resource.data.farmerId == request.auth.uid ||
+                      (resource.data.expertId == request.auth.uid &&
+                       resource.data.consentRevoked == false &&
+                       resource.data.consentExpiresAtMs > request.time.toMillis())));
+      allow list: if isAdmin() ||
+                    (isSignedIn() &&
+                     (resource.data.farmerId == request.auth.uid ||
+                      (resource.data.expertId == request.auth.uid &&
+                       resource.data.consentRevoked == false)));
+      allow create: if isSignedIn() &&
+                    isValidConsultation(incoming()) &&
+                    incoming().farmerId == request.auth.uid &&
+                    incoming().farmerId != incoming().expertId &&
+                    isValidId(consultationId) &&
+                    isActiveExpert(incoming().expertId);
+      allow update: if isSignedIn() &&
+                    isValidId(consultationId) &&
+                    (
+                      isAdmin() ||
+                      // Farmer: cancel, revoke consent, rate/close, refresh counters.
+                      (existing().farmerId == request.auth.uid &&
+                       incoming().farmerId == existing().farmerId &&
+                       incoming().expertId == existing().expertId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().status in ['requested', 'cancelled', 'closed', 'resolved', 'in_progress'] &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'consentRevoked', 'consentRevokedAt', 'farmerRating', 'farmerFeedback', 'closedAt', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastFarmerMessageAt'])) ||
+                      // Expert: accept, progress, resolve, refresh counters.
+                      (existing().expertId == request.auth.uid &&
+                       incoming().farmerId == existing().farmerId &&
+                       incoming().expertId == existing().expertId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().status in ['requested', 'accepted', 'in_progress', 'awaiting_farmer', 'resolved', 'closed', 'escalated'] &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'firstResponseAt', 'closedAt', 'outcome', 'expertNotes', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastExpertMessageAt']))
+                    );
+      allow delete: if isAdmin();
+
+      // Sensitive case details. Expert reads are gated by the parent's consent
+      // state via isConsultationParticipant; the farmer owns create/update.
+      match /case/{caseId} {
+        allow get, list: if isConsultationParticipant(consultationId);
+        allow create, update: if isConsultationFarmer(consultationId) &&
+                      isValidConsultationCase(incoming()) &&
+                      caseId == 'current';
+        allow delete: if false;
+      }
+
+      match /messages/{messageId} {
+        allow read: if isConsultationParticipant(consultationId);
+        allow create: if ((incoming().senderRole == 'farmer' && isConsultationFarmer(consultationId)) ||
+                         (incoming().senderRole == 'expert' && isConsultationExpert(consultationId))) &&
+                      isValidMessage(incoming()) &&
+                      incoming().senderId == request.auth.uid &&
+                      isValidId(messageId);
+        allow update: if isConsultationParticipant(consultationId) &&
+                      existing().senderId != request.auth.uid &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['readAt']);
+        allow delete: if false;
+      }
+
+      match /events/{eventId} {
+        allow read: if isConsultationParticipant(consultationId);
+        allow create: if ((incoming().actorRole == 'farmer' && isConsultationFarmer(consultationId)) ||
+                         (incoming().actorRole == 'expert' && isConsultationExpert(consultationId))) &&
+                      isValidEvent(incoming()) &&
+                      incoming().actorId == request.auth.uid &&
+                      isValidId(eventId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /expert_reviews/{reviewId} {
+      allow get: if isSignedIn() && (isAdmin() || resource.data.farmerId == request.auth.uid || resource.data.expertId == request.auth.uid);
+      allow list: if isSignedIn() && (isAdmin() || resource.data.farmerId == request.auth.uid || resource.data.expertId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                    isValidReview(incoming()) &&
+                    incoming().farmerId == request.auth.uid &&
+                    incoming().consultationId == reviewId &&
+                    get(/databases/$(database)/documents/consultations/$(incoming().consultationId)).data.farmerId == request.auth.uid &&
+                    get(/databases/$(database)/documents/consultations/$(incoming().consultationId)).data.expertId == incoming().expertId &&
+                    get(/databases/$(database)/documents/consultations/$(incoming().consultationId)).data.status in ['resolved', 'closed'] &&
+                    isValidId(reviewId);
+      allow update, delete: if isAdmin();
     }
 
     match /test/{testId} {

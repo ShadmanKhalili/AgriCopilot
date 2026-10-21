@@ -44,6 +44,17 @@ interface PlantHealthRecoveryTrackerProps {
   harvestIntervalDays?: number;
   initialPathway?: 'organic' | 'chemical';
   compact?: boolean;
+  /**
+   * Human expert layer: when provided, the (previously fake) "expert review"
+   * toggle becomes an honest request that opens the consent wizard with this
+   * observation's context.
+   */
+  onRequestExpert?: (seed: {
+    category?: string;
+    crop?: string;
+    diagnosisSummary?: string;
+    severity?: string;
+  }) => void;
 }
 
 interface DayMilestone {
@@ -217,7 +228,8 @@ export default function PlantHealthRecoveryTracker({
   severity = 'Critical',
   harvestIntervalDays = 14,
   initialPathway = 'organic',
-  compact = false
+  compact = false,
+  onRequestExpert
 }: PlantHealthRecoveryTrackerProps) {
   const [pathway, setPathway] = useState<'organic' | 'chemical'>(initialPathway);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(1); // Default Day 3
@@ -297,18 +309,15 @@ export default function PlantHealthRecoveryTracker({
     setObservations(prev => prev.filter(o => o.id !== id));
   };
 
-  const handleToggleExpertReview = (id: string) => {
+  const handleRequestExpertReview = (id: string) => {
     audioFeedback.playTactileClick();
-    setObservations(prev => prev.map(o => {
-      if (o.id === id) {
-        return {
-          ...o,
-          expertReviewed: !o.expertReviewed,
-          expertNotes: !o.expertReviewed ? (lang === 'bn' ? 'উপ-সহকারী কৃষি কর্মকর্তা কর্তৃক সরেজমিনে পর্যবেক্ষিত' : 'Verified by Sub-Assistant Agriculture Officer') : undefined
-        };
-      }
-      return o;
-    }));
+    const obs = observations.find((o) => o.id === id);
+    onRequestExpert?.({
+      category: 'crop_disease',
+      crop: cropName,
+      diagnosisSummary: obs ? `${obs.actionTaken} — ${obs.whatChanged}` : diseaseName,
+      severity,
+    });
   };
 
   return (
@@ -715,19 +724,25 @@ export default function PlantHealthRecoveryTracker({
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleExpertReview(obs.id)}
-                      title={lang === 'bn' ? 'বিশেষজ্ঞ যাচাই স্ট্যাটাস টগল করুন' : 'Toggle expert review'}
-                      className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                        obs.expertReviewed
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
-                          : 'bg-stone-800/80 text-stone-400 border-white/10 hover:text-stone-200'
-                      }`}
-                    >
-                      <UserCheck className="w-3 h-3" />
-                      <span>{obs.expertReviewed ? (lang === 'bn' ? 'বিশেষজ্ঞ পর্যালোচিত' : 'Expert Reviewed') : (lang === 'bn' ? 'পর্যালোচনা পেন্ডিং' : 'Review Pending')}</span>
-                    </button>
+                    {obs.expertReviewed ? (
+                      <span
+                        className="px-2 py-0.5 rounded-lg border border-emerald-500/40 bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center gap-1"
+                        title={lang === 'bn' ? 'বিশেষজ্ঞ পর্যালোচিত' : 'Expert reviewed'}
+                      >
+                        <UserCheck className="w-3 h-3" />
+                        {lang === 'bn' ? 'বিশেষজ্ঞ পর্যালোচিত' : 'Expert Reviewed'}
+                      </span>
+                    ) : onRequestExpert ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestExpertReview(obs.id)}
+                        title={lang === 'bn' ? 'এই পর্যবেক্ষণে বিশেষজ্ঞের মত নিন' : 'Ask an expert about this observation'}
+                        className="px-2 py-0.5 rounded-lg border border-white/10 bg-stone-800/80 text-stone-300 text-[11px] font-bold flex items-center gap-1 hover:text-white transition-all cursor-pointer"
+                      >
+                        <UserCheck className="w-3 h-3" />
+                        {lang === 'bn' ? 'বিশেষজ্ঞ মত' : 'Expert view'}
+                      </button>
+                    ) : null}
 
                     <button
                       type="button"
