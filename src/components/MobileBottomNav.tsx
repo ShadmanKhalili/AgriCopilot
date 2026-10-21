@@ -1,7 +1,8 @@
 import React from 'react';
-import { Sprout, Cloud, FileText, Grid } from 'lucide-react';
+import { Sprout, Cloud, FileText, Grid, HeartHandshake } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../utils/translations';
+import toBn from '../utils/banglaNum';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
 
@@ -21,6 +22,8 @@ interface Props {
   lang: Language;
   onOpenAllTools: () => void;
   onSelectPillar?: (pillar: PillarKey) => void;
+  /** Live count of experts accepting requests; `null` when unknown (guest / loading). */
+  onlineExpertCount?: number | null;
 }
 
 export default function MobileBottomNav({ 
@@ -28,11 +31,12 @@ export default function MobileBottomNav({
   setActiveTab, 
   lang, 
   onOpenAllTools,
-  onSelectPillar 
+  onSelectPillar,
+  onlineExpertCount
 }: Props) {
   const t = translations[lang];
 
-  // Simplified First Experience: Ask about my crop, Check weather, My farm record. Specialist tools under "More".
+  // Simplified First Experience: Ask about my crop, Weather, Expert help, My farm record. Specialist tools under "More".
   const primaryNavItems: PrimaryNavItem[] = [
     {
       id: 'ask-crop',
@@ -47,6 +51,15 @@ export default function MobileBottomNav({
       label: lang === 'bn' ? 'আবহাওয়া' : 'Weather',
       sublabel: lang === 'bn' ? 'বৃষ্টি ও রাডার' : 'Rain & Radar',
       icon: Cloud,
+    },
+    {
+      // Human expert support promoted to the primary bar: expert help must be
+      // reachable in one tap, not hidden behind "More".
+      id: 'expert-help',
+      targetTab: 'expert-hub',
+      label: lang === 'bn' ? 'বিশেষজ্ঞ' : 'Expert',
+      sublabel: lang === 'bn' ? 'মানুষের পরামর্শ' : 'Human advice',
+      icon: HeartHandshake,
     },
     {
       id: 'farm-record',
@@ -93,6 +106,17 @@ export default function MobileBottomNav({
               <span className="text-[11px] leading-tight tracking-tight truncate max-w-[70px] text-center">
                 {item.label}
               </span>
+
+              {/* Live availability badge — only shown when the Firestore count
+                  confirms experts are actually accepting requests. Never a
+                  fake "online" claim for guests or failures. */}
+              {item.id === 'expert-help' &&
+                onlineExpertCount != null &&
+                onlineExpertCount > 0 && (
+                  <span className="absolute top-0 right-[10%] inline-flex items-center h-4 min-w-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-black ring-2 ring-white dark:ring-[#0c1c13] shadow-xs">
+                    {lang === 'bn' ? toBn(onlineExpertCount) : onlineExpertCount}
+                  </span>
+                )}
             </button>
           );
         })}

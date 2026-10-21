@@ -14,6 +14,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   setDoc,
   updateDoc,
   addDoc,
@@ -77,6 +78,18 @@ export const fetchActiveExperts = async (): Promise<ExpertPublic[]> => {
   );
   const experts = snap.docs.map((d) => ({ ...(d.data() as ExpertPublic), uid: d.id }));
   return experts.sort((a, b) => (b.ratingAverage || 0) - (a.ratingAverage || 0));
+};
+
+/**
+ * Cheap live count of experts currently accepting requests (`status == 'active'`).
+ * Uses an aggregate count query so we never download the expert list just to
+ * light up the global availability badge. Requires signed-in list permission.
+ */
+export const fetchActiveExpertCount = async (): Promise<number> => {
+  const snap = await getCountFromServer(
+    query(collection(db, 'experts_public'), where('status', '==', 'active'))
+  );
+  return snap.data().count || 0;
 };
 
 export const fetchExpertProfile = async (uid: string): Promise<ExpertPublic | null> => {

@@ -20,6 +20,7 @@ import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
+import toBn from '../utils/banglaNum';
 import type { PrescriptionData } from './DigitalPrescriptionModal';
 
 // Heavy, action-triggered panels are split out so the first screen only ships
@@ -567,6 +568,8 @@ interface Props {
   persistedDescription?: string;
   setPersistedDescription?: (desc: string) => void;
   onNavigateTab?: (tab: any, payload?: any) => void;
+  /** Live count of experts accepting requests (null = unknown, e.g. guest). */
+  onlineExpertCount?: number | null;
   /** Human expert layer: hand a pre-filled request seed to the Expert Hub. */
   onRequestExpert?: (seed: {
     category?: string;
@@ -604,6 +607,7 @@ export default function AgriCopilot({
   persistedDescription,
   setPersistedDescription,
   onNavigateTab,
+  onlineExpertCount,
   onRequestExpert
 }: Props) {
   const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
@@ -2248,6 +2252,27 @@ export default function AgriCopilot({
                                   {lang === 'bn' ? 'বিশেষজ্ঞ চাই' : 'Request expert'}
                                 </button>
                               </div>
+                              {/* Live availability line — honest: only claims
+                                  experts are online when the count confirms it. */}
+                              <p className="mt-3 text-[11px] font-bold flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                                <span className="relative flex h-2 w-2 shrink-0">
+                                  {onlineExpertCount != null && onlineExpertCount > 0 ? (
+                                    <>
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                    </>
+                                  ) : (
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                                  )}
+                                </span>
+                                {onlineExpertCount != null && onlineExpertCount > 0
+                                  ? lang === 'bn'
+                                    ? `এখন ${toBn(onlineExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — সাধারণ প্রশ্নে ২৪ ঘণ্টার মধ্যে উত্তর`
+                                    : `${onlineExpertCount} expert${onlineExpertCount > 1 ? 's' : ''} accepting requests now — general answers within 24h`
+                                  : lang === 'bn'
+                                    ? 'যাচাইকৃত বিশেষজ্ঞ উপলব্ধ — সাধারণত ২৪ ঘণ্টার মধ্যে উত্তর'
+                                    : 'Verified experts available — usually within 24h'}
+                              </p>
                             </motion.div>
                           )}
 

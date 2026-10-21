@@ -38,6 +38,8 @@ import {
   categoryLabel,
   statusColor,
   statusLabel,
+  SLA_CHIPS,
+  urgencyLabel,
   type Consultation,
   type ExpertApplication,
   type ExpertPublic,
@@ -303,6 +305,27 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 <BadgeCheck className="w-3.5 h-3.5" />
                 {bn ? 'যাচাইকৃত বিশেষজ্ঞ' : 'Verified experts'}
               </span>
+              {/* Live availability — only for signed-in farmers whose expert
+                  list has actually loaded. Never a fake claim for guests. */}
+              {user && !isExpert && experts.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-lime-400/25 text-lime-100 border border-lime-300/40">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-300 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-300" />
+                  </span>
+                  {bn
+                    ? `এখন ${toBn(experts.length)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন`
+                    : `${experts.length} experts accepting requests now`}
+                </span>
+              )}
+              {user && !isExpert && experts.length === 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400/20 text-amber-100 border border-amber-300/40">
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+                  {bn
+                    ? 'এখন কেউ অনলাইনে নেই • সাধারণত ২৪ ঘণ্টায় উত্তর'
+                    : 'No one online now • Usually answers within 24h'}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -405,7 +428,35 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                   <HeartHandshake className="w-5 h-5" />
                   {bn ? 'বিশেষজ্ঞের সাথে কথা বলুন' : 'Talk to an expert'}
                 </button>
-                {experts.length === 0 && (
+                {experts.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      {bn
+                        ? `এখন ${toBn(experts.length)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — ফ্রি পাইলট সেবা`
+                        : `${experts.length} experts accepting requests now — free during the pilot`}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black">
+                      {SLA_CHIPS.map(({ urgency }) => (
+                        <span
+                          key={urgency}
+                          className={`px-2 py-1 rounded-lg border ${
+                            urgency === 'emergency'
+                              ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900'
+                              : urgency === 'urgent'
+                                ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-900'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-900'
+                          }`}
+                        >
+                          {urgencyLabel(urgency, lang)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                   <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {bn

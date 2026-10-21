@@ -205,6 +205,13 @@ export const SLA_MINUTES: Record<ConsultationUrgency, number> = {
   general: 24 * 60,
 };
 
+/** Response-time expectations shown wherever expert availability is promoted. */
+export const SLA_CHIPS: { urgency: ConsultationUrgency; labelBn: string; labelEn: string }[] = [
+  { urgency: 'emergency', labelBn: 'জরুরি: ১৫ মিনিট', labelEn: 'Emergency: 15 min' },
+  { urgency: 'urgent', labelBn: 'দ্রুত: ২ ঘণ্টা', labelEn: 'Urgent: 2 hours' },
+  { urgency: 'general', labelBn: 'সাধারণ: ২৪ ঘণ্টা', labelEn: 'General: 24 hours' },
+];
+
 /** Consent stays valid for 7 days unless the farmer revokes it earlier. */
 export const CONSENT_VALIDITY_DAYS = 7;
 

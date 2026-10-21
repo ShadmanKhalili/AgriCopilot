@@ -39,6 +39,8 @@ import RegionModal from './RegionModal';
 import MobileBottomNav from './MobileBottomNav';
 import InAppBrowserBanner from './InAppBrowserBanner';
 import { useLocationName } from '../hooks/useLocationName';
+import { useExpertAvailability } from '../hooks/useExpertAvailability';
+import toBn from '../utils/banglaNum';
 import { detectUserLocation } from '../utils/geolocation';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
@@ -202,6 +204,8 @@ export default function Layout() {
 
   const { locationName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
   const { user, userRole, isAuthReady, signOut } = useAuth();
+  // Live "experts accepting requests" count for the global availability badges.
+  const { onlineCount: expertOnlineCount } = useExpertAvailability();
   const t = translations[lang];
 
   const allTabs: TabItem[] = [
@@ -299,7 +303,14 @@ export default function Layout() {
       description: lang === 'bn' ? 'যাচাইকৃত কৃষি বিশেষজ্ঞের সাথে পরামর্শ ও সম্মতিভিত্তিক তথ্য শেয়ার' : 'Consult verified agri experts with consent-first data sharing',
       pillar: 'support',
       subcategory: lang === 'bn' ? 'কৃষি অফিসার ও বিশেষজ্ঞ' : 'Officers & Experts',
-      badge: userRole === 'expert' ? (lang === 'bn' ? 'Expert Desk' : 'Expert Desk') : undefined
+      badge:
+        userRole === 'expert'
+          ? 'Expert Desk'
+          : expertOnlineCount && expertOnlineCount > 0
+            ? lang === 'bn'
+              ? `${toBn(expertOnlineCount)} জন অনলাইন`
+              : `${expertOnlineCount} online`
+            : undefined
     },
     {
       id: 'farmer-dossier',
@@ -924,6 +935,30 @@ export default function Layout() {
                     <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />
                     <span>{lang === 'bn' ? 'খামার রেকর্ড' : 'My farm record'}</span>
                   </button>
+
+                  {/* Human expert support — always one visible click away.
+                      Emerald on purpose: it must read as a live service, not
+                      another tool. Shows the honest live count only when known. */}
+                  <button
+                    onClick={() => setActiveTab('expert-hub')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                      activeTab === 'expert-hub'
+                        ? 'bg-emerald-700 text-white shadow-emerald-900/20'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-500 shadow-emerald-900/10'
+                    }`}
+                  >
+                    <HeartHandshake className="w-3.5 h-3.5 text-white" />
+                    <span>{lang === 'bn' ? 'বিশেষজ্ঞ সহায়তা' : 'Expert help'}</span>
+                    {expertOnlineCount != null && expertOnlineCount > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-black">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-200" />
+                        </span>
+                        {lang === 'bn' ? `${toBn(expertOnlineCount)} জন` : `${expertOnlineCount}`}
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 <button
@@ -974,6 +1009,7 @@ export default function Layout() {
                           persistedAnalysisType={agriAnalysisType}
                           setPersistedAnalysisType={setAgriAnalysisType}
                           onNavigateTab={handleNavigateTab}
+                          onlineExpertCount={expertOnlineCount}
                           onRequestExpert={(seed: any) => {
                             setExpertRequestSeed(seed);
                             setActiveTab('expert-hub');
@@ -1086,6 +1122,7 @@ export default function Layout() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             lang={lang}
+            onlineExpertCount={expertOnlineCount}
             onOpenAllTools={() => {
               setSelectedPillarFilter('all');
               setIsMobileMenuOpen(true);
