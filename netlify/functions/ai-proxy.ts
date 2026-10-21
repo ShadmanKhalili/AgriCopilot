@@ -169,6 +169,59 @@ const streamText = (
   });
 };
 
+/**
+ * Buffered text path for clients loaded before streaming shipped. Pages that
+ * are already open during a deploy keep sending requests without `stream`, so
+ * they must continue receiving a single JSON body instead of NDJSON.
+ */
+const bufferText = async (
+  apiKey: string,
+  contents: unknown,
+  config: Record<string, unknown>,
+  requestedModel: string
+): Promise<Response> => {
+  const models = getCandidateModels(requestedModel, false).slice(0, 3);
+  const deadline = Date.now() + STREAM_BUDGET_MS;
+  let lastError: any = null;
+
+  for (const model of models) {
+    const remaining = deadline - Date.now();
+    if (remaining < 3_000) break;
+
+    const timeout = Math.min(MODEL_TIMEOUT_MS, remaining);
+    const abortController = new AbortController();
+    const timer = setTimeout(() => abortController.abort(), timeout);
+
+    try {
+      const client = new GoogleGenAI({
+        apiKey,
+        httpOptions: { timeout },
+      });
+      const response = await client.models.generateContent({
+        model,
+        contents: contents as any,
+        config: { ...config, abortSignal: abortController.signal },
+      });
+
+      return jsonResponse(200, {
+        text: response.text || "",
+        candidates: response.candidates || [],
+        promptFeedback: response.promptFeedback || null,
+        modelUsed: model,
+      });
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`[AI Proxy] Model ${model} failed:`, errorMessage(error));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return jsonResponse(502, {
+    error: `AI is temporarily unavailable. ${errorMessage(lastError)}`,
+  });
+};
+
 const generateAudio = async (
   apiKey: string,
   contents: unknown,
@@ -246,5 +299,10 @@ export default async (request: Request, _context: any): Promise<Response> => {
   if (isAudio) {
     return generateAudio(apiKey, contents, config, requestedModel);
   }
-  return streamText(apiKey, contents, config, requestedModel);
+  // Streaming is opt-in so an old page loaded before a deploy still gets the
+  // buffered JSON shape it understands.
+  if (body?.stream === true) {
+    return streamText(apiKey, contents, config, requestedModel);
+  }
+  return bufferText(apiKey, contents, config, requestedModel);
 };

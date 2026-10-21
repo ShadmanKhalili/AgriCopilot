@@ -44,7 +44,9 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
     const response = await fetchWithTimeout('/api/ai-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
+      // Opt in to NDJSON. Without this flag the proxy returns buffered JSON so
+      // pages loaded before a deploy keep working against the new function.
+      body: JSON.stringify({ ...params, stream: true }),
       timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
       retries: 0
     });
