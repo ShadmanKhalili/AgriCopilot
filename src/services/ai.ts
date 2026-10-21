@@ -2,6 +2,7 @@ import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { readAiNdjsonStream } from '../utils/ndjsonStream';
 
 // The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
 // Text generation always goes through the server proxy, so no provider key is
@@ -24,14 +25,27 @@ const loadGoogleGenAI = async (): Promise<GoogleGenAIConstructor> => {
   return genAIClass;
 };
 
+// The proxy streams text as NDJSON. A dead connection is detected by silence,
+// not by total elapsed time, because a slow model can legitimately take a while.
+// The header timeout covers the worst case before the first byte (two model
+// attempts inside the server's 50 s stream budget).
+const AI_PROXY_HEADER_TIMEOUT_MS = 65000;
+
+type AiProxyResult = {
+  text: string;
+  candidates?: any[];
+  promptFeedback?: any;
+  modelUsed?: string;
+};
+
 // Helper to call AI via backend proxy
-const callAiProxy = async (params: any) => {
+const callAiProxy = async (params: any): Promise<AiProxyResult> => {
   try {
     const response = await fetchWithTimeout('/api/ai-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
-      timeoutMs: 90000,
+      timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
       retries: 0
     });
     
@@ -45,7 +59,13 @@ const callAiProxy = async (params: any) => {
       }
       throw new Error(errorMessage);
     }
-    
+
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/x-ndjson')) {
+      return await readAiNdjsonStream(response);
+    }
+
+    // Buffered JSON path: audio/TTS responses and older/local proxies.
     return await response.json();
   } catch (err: any) {
     console.error("Critical AI Proxy Error:", err);
@@ -156,15 +176,16 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   const isAudio = params?.responseModalities?.includes?.(Modality.AUDIO) || 
                   params?.responseModalities?.includes?.('AUDIO');
 
-  const fallbacks = isAudio
-    ? [primaryModel, customBackupModel || TTS_BACKUP_MODEL, 'gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']
-    : [
-        primaryModel,
-        'gemini-3.5-flash-lite',
-        customBackupModel || BACKUP_MODEL,
-        'gemini-3.8-flash',
-        'gemini-2.5-flash'
-      ];
+  // Text generation is streamed through the proxy, which owns the model
+  // cascade. Re-looping over models here would multiply every failed attempt
+  // by the server's own fallbacks and stall the UI for minutes.
+  if (!isAudio) {
+    return await generateContent({ ...params, model: primaryModel });
+  }
+
+  // Audio responses are buffered, and the proxy only tries two voice models
+  // per request, so keep a short client-side list for TTS resilience.
+  const fallbacks = [primaryModel, customBackupModel || TTS_BACKUP_MODEL];
   
   // Try models in sequence until one works
   let lastError = null;
