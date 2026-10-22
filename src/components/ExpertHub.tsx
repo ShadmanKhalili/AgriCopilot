@@ -56,7 +56,7 @@ interface ExpertHubProps {
 
 export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: ExpertHubProps) {
   const bn = lang === 'bn';
-  const { user, userRole, isAdmin, isExpert, signIn } = useAuth();
+  const { user, userRole, isAdmin, isExpert, signIn, isGuest, signInAsGuest, saveGuestAccount } = useAuth();
 
   const [experts, setExperts] = useState<ExpertPublic[]>([]);
   const [consultations, setConsultations] = useState<Consultation[]>([]);
@@ -73,6 +73,59 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
 
   const [adminApps, setAdminApps] = useState<ExpertApplication[]>([]);
   const [adminBusy, setAdminBusy] = useState(false);
+
+  const [guestBusy, setGuestBusy] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
+  const [savingGuest, setSavingGuest] = useState(false);
+
+  const guestErrorText = (error: any) => {
+    const code = String(error?.code || '');
+    if (code.includes('operation-not-allowed') || code.includes('admin-restricted-operation')) {
+      return bn
+        ? 'গেস্ট মোড এখনো চালু হয়নি। Google দিয়ে সাইন ইন করুন।'
+        : 'Guest mode is not enabled yet. Please sign in with Google.';
+    }
+    if (code.includes('network-request-failed')) {
+      return bn ? 'ইন্টারনেট সংযোগ নেই। আবার চেষ্টা করুন।' : 'No internet connection. Please retry.';
+    }
+    return error?.message || (bn ? 'গেস্ট মোড শুরু করা যায়নি।' : 'Could not start guest mode.');
+  };
+
+  const handleGuestStart = async () => {
+    setGuestBusy(true);
+    setGuestError(null);
+    try {
+      await signInAsGuest();
+    } catch (error: any) {
+      console.error('Guest sign-in failed:', error?.code || error);
+      setGuestError(guestErrorText(error));
+    } finally {
+      setGuestBusy(false);
+    }
+  };
+
+  const handleSaveGuest = async () => {
+    setSavingGuest(true);
+    try {
+      await saveGuestAccount();
+      toast.success(bn ? 'অ্যাকাউন্ট সংরক্ষিত হয়েছে।' : 'Account saved.');
+    } catch (error: any) {
+      const code = String(error?.code || '');
+      if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return;
+      if (code.includes('credential-already-in-use')) {
+        toast.error(
+          bn
+            ? 'এই Google অ্যাকাউন্ট আগেই ব্যবহার করা হয়েছে। অন্য Google অ্যাকাউন্ট ব্যবহার করুন, অথবা সেটি দিয়ে সাইন ইন করুন।'
+            : 'That Google account is already in use. Use another Google account, or sign in with it.',
+          { duration: 7000 }
+        );
+        return;
+      }
+      toast.error(error?.message || (bn ? 'অ্যাকাউন্ট সংরক্ষণ করা যায়নি।' : 'Could not save the account.'));
+    } finally {
+      setSavingGuest(false);
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid || isExpert) {
@@ -336,29 +389,48 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
         <div className="rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 p-6 text-center space-y-3">
           <Users className="w-9 h-9 mx-auto text-emerald-600" />
           <p className="font-black text-slate-900 dark:text-white">
-            {bn ? 'বিশেষজ্ঞের সাথে যুক্ত হতে সাইন ইন করুন' : 'Sign in to connect with an expert'}
+            {bn ? 'এক ট্যাপে বিশেষজ্ঞের সাথে যুক্ত হন' : 'Connect with an expert in one tap'}
           </p>
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             {bn
-              ? 'আপনার পরিচয় ও খামারের তথ্য সুরক্ষিত রাখতে সাইন ইন দরকার। চাইলে আগে বিনামূল্যে ১৬১২৩ নম্বরে সরকারি কৃষি কল সেন্টারে ফোন করতে পারেন।'
-              : 'Sign-in protects your identity and farm data. You can also call the free government Krishi Call Centre at 16123.'}
+              ? 'সাইন ইন বা পাসওয়ার্ড লাগবে না। গেস্ট হিসেবে শুরু করুন — পরে Google যুক্ত করলে আপনার অনুরোধ ও চ্যাট একই অ্যাকাউন্টে সংরক্ষিত থাকবে।'
+              : 'No sign-in or password needed. Start as a guest — link Google later and your requests and chats stay on the same account.'}
           </p>
+          {guestError && (
+            <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2 max-w-md mx-auto">
+              {guestError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleGuestStart}
+            disabled={guestBusy}
+            className="w-full sm:w-auto sm:min-w-[320px] min-h-[56px] px-6 rounded-2xl bg-gradient-to-r from-emerald-700 to-green-600 hover:from-emerald-800 hover:to-green-700 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+          >
+            {guestBusy ? <Loader2 className="w-5 h-5 animate-spin" /> : <HeartHandshake className="w-5 h-5" />}
+            {bn ? 'গেস্ট হিসেবে শুরু করুন' : 'Start as a guest'}
+          </button>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
               type="button"
               onClick={() => signIn().catch(() => {})}
-              className="min-h-[52px] px-6 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm active:scale-95 transition-all"
+              className="min-h-[48px] px-5 rounded-2xl bg-white dark:bg-stone-800 border-2 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-200 font-black text-xs active:scale-95 transition-all"
             >
-              {bn ? 'সাইন ইন করুন' : 'Sign in'}
+              {bn ? 'Google দিয়ে সাইন ইন' : 'Sign in with Google'}
             </button>
             <a
               href="tel:16123"
-              className="min-h-[52px] px-6 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-black text-sm flex items-center gap-2 active:scale-95 transition-all"
+              className="min-h-[48px] px-5 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-black text-xs flex items-center gap-2 active:scale-95 transition-all"
             >
               <PhoneCall className="w-4 h-4" />
               {bn ? '১৬১২৩ কল করুন' : 'Call 16123'}
             </a>
           </div>
+          <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+            {bn
+              ? 'গেস্ট অ্যাকাউন্ট এই ডিভাইসে সংরক্ষিত থাকে। ব্রাউজার ডেটা মুছলে অনুরোধ হারাতে পারে — তাই পরে অ্যাকাউন্ট সংরক্ষণ করুন।'
+              : 'A guest account is stored on this device. Clearing browser data can lose requests — save your account later.'}
+          </p>
         </div>
       )}
 
@@ -368,6 +440,34 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
       {/* Farmer / applicant view */}
       {user && !isExpert && (
         <>
+          {/* Guest accounts live only on this device — make saving explicit
+              before the farmer invests in a consultation. */}
+          {isGuest && (
+            <div className="rounded-2xl border-2 border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+                    {bn ? 'আপনি গেস্ট হিসেবে আছেন' : 'You are using a guest account'}
+                  </p>
+                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-0.5">
+                    {bn
+                      ? 'ব্রাউজার ডেটা মুছলে অনুরোধ ও চ্যাট হারাতে পারে। Google যুক্ত করলে সব একই অ্যাকাউন্টে সংরক্ষিত থাকবে।'
+                      : 'Clearing browser data can lose your requests and chats. Link Google to keep everything on one account.'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveGuest}
+                disabled={savingGuest}
+                className="min-h-[48px] px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black shrink-0 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {savingGuest && <Loader2 className="w-4 h-4 animate-spin" />}
+                {bn ? 'Google যুক্ত করুন' : 'Link Google'}
+              </button>
+            </div>
+          )}
           {isLoading ? (
             <div className="py-10 flex flex-col items-center gap-2 text-emerald-700 dark:text-emerald-300">
               <Loader2 className="w-7 h-7 animate-spin" />

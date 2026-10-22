@@ -49,8 +49,9 @@ interface PlantingIntentRecord {
 }
 
 export default function Profile({ lang, onUpgrade }: Props) {
-  const { user, userProfile, signIn } = useAuth();
+  const { user, userProfile, signIn, isGuest, saveGuestAccount } = useAuth();
   const { currentUsage, limit: usageLimit, tier } = useUsageTracking();
+  const [savingGuest, setSavingGuest] = useState(false);
   const [viewMode, setViewMode] = useState<'dossier' | 'account'>('dossier');
   const [diagnoses, setDiagnoses] = useState<DiagnosisRecord[]>([]);
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
@@ -244,7 +245,50 @@ export default function Profile({ lang, onUpgrade }: Props) {
             <div className="space-y-8 relative z-10">
               <div className="group/item">
                 <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.email}</p>
-                <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
+                {isGuest ? (
+                  <div className="space-y-2">
+                    <p className="text-lg font-black text-gray-900 tracking-tight">
+                      {lang === 'bn' ? 'গেস্ট অ্যাকাউন্ট (সাইন-ইন ছাড়া)' : 'Guest account (no sign-in)'}
+                    </p>
+                    <p className="text-[11px] font-medium text-gray-500">
+                      {lang === 'bn'
+                        ? 'Google যুক্ত করলে এই ডিভাইসের অনুরোধ ও চ্যাট একই অ্যাকাউন্টে সংরক্ষিত থাকবে।'
+                        : 'Link Google to keep this device’s requests and chats on one account.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setSavingGuest(true);
+                        try {
+                          await saveGuestAccount();
+                          toast.success(lang === 'bn' ? 'অ্যাকাউন্ট সংরক্ষিত হয়েছে।' : 'Account saved.');
+                        } catch (error: any) {
+                          const code = String(error?.code || '');
+                          if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return;
+                          if (code.includes('credential-already-in-use')) {
+                            toast.error(
+                              lang === 'bn'
+                                ? 'এই Google অ্যাকাউন্ট আগেই ব্যবহার করা হয়েছে। অন্য Google অ্যাকাউন্ট ব্যবহার করুন।'
+                                : 'That Google account is already in use. Try another Google account.',
+                              { duration: 7000 }
+                            );
+                            return;
+                          }
+                          toast.error(error?.message || (lang === 'bn' ? 'অ্যাকাউন্ট সংরক্ষণ করা যায়নি।' : 'Could not save the account.'));
+                        } finally {
+                          setSavingGuest(false);
+                        }
+                      }}
+                      disabled={savingGuest}
+                      className="min-h-[44px] px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black inline-flex items-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                    >
+                      {savingGuest && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {lang === 'bn' ? 'Google যুক্ত করুন' : 'Link Google'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
+                )}
               </div>
               <div className="group/item">
                 <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 group-hover/item:text-indigo-500 transition-colors">{t.role}</p>

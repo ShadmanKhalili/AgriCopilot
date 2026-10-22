@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, signUpWithEmail, loginWithEmail } from '../firebase';
+import { auth, signInWithGoogle, logout, signUpWithEmail, loginWithEmail, signInAsGuest as startGuestSession, linkGuestWithGoogle } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 export interface UserProfile {
@@ -26,7 +26,13 @@ interface AuthContextType {
   isAdmin: boolean;
   /** True for verified human experts (expert / org_admin roles). */
   isExpert: boolean;
+  /** True while the signed-in user is an anonymous guest (no email/Google yet). */
+  isGuest: boolean;
   signIn: () => Promise<void>;
+  /** One-tap anonymous session — no email, password or Google account. */
+  signInAsGuest: () => Promise<void>;
+  /** Convert the current guest into a Google account without losing data. */
+  saveGuestAccount: () => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -40,7 +46,10 @@ const AuthContext = createContext<AuthContextType>({
   isAuthReady: false,
   isAdmin: false,
   isExpert: false,
+  isGuest: false,
   signIn: async () => {},
+  signInAsGuest: async () => {},
+  saveGuestAccount: async () => {},
   signUpWithEmail: async () => {},
   loginWithEmail: async () => {},
   signOut: async () => {},
@@ -99,10 +108,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (userDoc && !userDoc.exists()) {
             // Must match firestore.rules isAdmin(): owner email AND verified email
             const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com' && currentUser.emailVerified === true;
+            const isGuest = currentUser.isAnonymous;
+            const guestId = currentUser.uid.slice(0, 6).toLowerCase();
+            // firestore.rules requires a 3+ character email string. Anonymous
+            // users have no email, so use a clearly-labelled local placeholder
+            // that is never used for mail. Real email is added if they link Google.
+            const emailForRules =
+              currentUser.email || (isGuest ? `guest-${guestId}@agri.local` : '');
+            const guestName = `অতিথি কৃষক #${guestId.slice(0, 4).toUpperCase()}`;
             const newProfile: UserProfile = {
               uid: currentUser.uid,
-              email: currentUser.email || '',
-              name: currentUser.displayName || '',
+              email: emailForRules,
+              name: currentUser.displayName || (isGuest ? guestName : ''),
               role: isAdminEmail ? 'admin' : 'agri-preneur',
               tier: isAdminEmail ? 'premium' : 'free',
               usageCount: 0,
@@ -117,6 +134,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentUser.email === 'sadmankhalili@gmail.com' && currentUser.emailVerified === true && data.role !== 'admin') {
               console.log("Promoting established user to admin...");
               await updateDoc(userDocRef, { role: 'admin', tier: 'premium' });
+            }
+            // A guest who linked Google should stop appearing as "অতিথি কৃষক"
+            // in expert queues. Email is immutable under the rules, but name is
+            // an allowed self-service field.
+            if (
+              !currentUser.isAnonymous &&
+              data.name?.startsWith('অতিথি কৃষক') &&
+              currentUser.displayName &&
+              currentUser.displayName !== data.name
+            ) {
+              await updateDoc(userDocRef, {
+                name: currentUser.displayName,
+                updatedAt: new Date().toISOString(),
+              });
             }
           }
           
@@ -183,6 +214,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const handleSignInAsGuest = async () => {
+    await startGuestSession();
+  };
+
+  const handleSaveGuest = async () => {
+    await linkGuestWithGoogle();
+  };
+
+  const handleSignOut = async () => {
+    // Anonymous accounts are unrecoverable once signed out. Make that explicit
+    // so a farmer cannot accidentally destroy open expert requests.
+    if (auth.currentUser?.isAnonymous) {
+      const confirmed = window.confirm(
+        'আপনি গেস্ট হিসেবে আছেন। সাইন আউট করলে এই ডিভাইসের অনুরোধ, চ্যাট ও পরামর্শ আর ফিরে পাওয়া যাবে না।\n\nYou are using a guest account. Signing out permanently loses this device\'s requests and chats.'
+      );
+      if (!confirmed) return;
+    }
+    await logout();
+  };
+
   const upgradeToPremium = async () => {
     if (user) {
       try {
@@ -206,10 +257,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthReady, 
       isAdmin: userRole === 'admin',
       isExpert: userRole === 'expert' || userRole === 'org_admin',
+      isGuest: !!user?.isAnonymous,
       signIn: signInWithGoogle, 
+      signInAsGuest: handleSignInAsGuest,
+      saveGuestAccount: handleSaveGuest,
       signUpWithEmail: handleSignUp,
       loginWithEmail: handleLogin,
-      signOut: logout, 
+      signOut: handleSignOut, 
       upgradeToPremium 
     }}>
       {children}

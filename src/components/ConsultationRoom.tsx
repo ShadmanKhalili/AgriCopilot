@@ -47,6 +47,7 @@ import {
   type ConsultationMessage,
 } from '../utils/expertTypes';
 import toBn from '../utils/banglaNum';
+import { markConsultationRead } from '../utils/expertReadState';
 import { audioFeedback } from '../utils/audioFeedback';
 
 interface ConsultationRoomProps {
@@ -139,6 +140,15 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
       }
     });
   }, [messages, user, consultation]);
+
+  // Clear the global "new expert reply" badge for this case. Re-runs whenever
+  // the expert sends something while the room is open. Only the farmer side
+  // updates the marker; experts never see the farmer badge.
+  useEffect(() => {
+    if (!user || !consultation || consultation.farmerId !== user.uid) return;
+    const parsed = consultation.lastMessageAt ? Date.parse(consultation.lastMessageAt) : NaN;
+    markConsultationRead(consultation.id, Number.isFinite(parsed) ? parsed : Date.now());
+  }, [user, consultation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });

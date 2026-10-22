@@ -16,7 +16,35 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUpWithEmail, loginWithEmail } = useAuth();
+  const { signIn, signInAsGuest, signUpWithEmail, loginWithEmail } = useAuth();
+
+  const guestErrorText = (error: any) => {
+    const code = String(error?.code || '');
+    if (code.includes('operation-not-allowed') || code.includes('admin-restricted-operation')) {
+      return lang === 'en'
+        ? 'Guest mode is not enabled yet. Please continue with Google.'
+        : 'গেস্ট মোড এখনো চালু হয়নি। অনুগ্রহ করে Google দিয়ে চালিয়ে যান।';
+    }
+    if (code.includes('network-request-failed')) {
+      return lang === 'en'
+        ? 'No internet connection. Please retry.'
+        : 'ইন্টারনেট সংযোগ পাওয়া যাচ্ছে না। আবার চেষ্টা করুন।';
+    }
+    return error?.message || (lang === 'en' ? 'Could not start guest mode.' : 'গেস্ট মোড শুরু করা যায়নি।');
+  };
+
+  const handleGuestSignIn = async () => {
+    setLoading(true);
+    try {
+      await signInAsGuest();
+      onClose();
+    } catch (error: any) {
+      console.error('Guest sign-in failed:', error?.code || error);
+      toast.error(guestErrorText(error), { duration: 6000 });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +114,36 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
             </button>
 
             <div className="p-8 space-y-6">
+              {/* Guest-first: one tap, no email, password or Google account.
+                  Any data written stays under a real anonymous uid, so the
+                  expert request flow works unchanged. */}
+              <button
+                type="button"
+                onClick={handleGuestSignIn}
+                disabled={loading}
+                className="w-full min-h-[56px] flex items-center justify-between gap-3 bg-gradient-to-r from-emerald-700 to-green-600 text-white rounded-2xl px-4 py-3 shadow-lg shadow-emerald-900/15 hover:from-emerald-800 hover:to-green-700 active:scale-[0.99] transition-all disabled:opacity-50"
+              >
+                <span className="text-left">
+                  <span className="block text-sm font-black">
+                    {lang === 'en' ? 'Start without signing in' : 'সাইন ইন ছাড়াই শুরু করুন'}
+                  </span>
+                  <span className="block text-[11px] font-bold text-emerald-100/90 mt-0.5">
+                    {lang === 'en'
+                      ? 'Guest mode · save your account later'
+                      : 'গেস্ট মোড · পরে অ্যাকাউন্ট সংরক্ষণ করতে পারবেন'}
+                  </span>
+                </span>
+                <ArrowRight className="w-5 h-5 shrink-0" />
+              </button>
+
+              <div className="flex items-center space-x-4">
+                <div className="flex-1 h-[1px] bg-gray-100"></div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                  {lang === 'en' ? 'Or use an account' : 'অথবা অ্যাকাউন্ট দিয়ে'}
+                </span>
+                <div className="flex-1 h-[1px] bg-gray-100"></div>
+              </div>
+
               <div className="space-y-4">
                 <button
                   onClick={handleGoogleSignIn}

@@ -40,6 +40,7 @@ import MobileBottomNav from './MobileBottomNav';
 import InAppBrowserBanner from './InAppBrowserBanner';
 import { useLocationName } from '../hooks/useLocationName';
 import { useExpertAvailability } from '../hooks/useExpertAvailability';
+import { useExpertUnread } from '../hooks/useExpertUnread';
 import toBn from '../utils/banglaNum';
 import { detectUserLocation } from '../utils/geolocation';
 
@@ -206,6 +207,8 @@ export default function Layout() {
   const { user, userRole, isAuthReady, signOut } = useAuth();
   // Live "experts accepting requests" count for the global availability badges.
   const { onlineCount: expertOnlineCount } = useExpertAvailability();
+  // Unread expert replies (per-device read markers) for the nav badge.
+  const unreadExpertCount = useExpertUnread();
   const t = translations[lang];
 
   const allTabs: TabItem[] = [
@@ -306,11 +309,15 @@ export default function Layout() {
       badge:
         userRole === 'expert'
           ? 'Expert Desk'
-          : expertOnlineCount && expertOnlineCount > 0
+          : unreadExpertCount > 0
             ? lang === 'bn'
-              ? `${toBn(expertOnlineCount)} জন অনলাইন`
-              : `${expertOnlineCount} online`
-            : undefined
+              ? `${toBn(unreadExpertCount)} নতুন`
+              : `${unreadExpertCount} new`
+            : expertOnlineCount && expertOnlineCount > 0
+              ? lang === 'bn'
+                ? `${toBn(expertOnlineCount)} জন অনলাইন`
+                : `${expertOnlineCount} online`
+              : undefined
     },
     {
       id: 'farmer-dossier',
@@ -704,13 +711,15 @@ export default function Layout() {
                   className="flex items-center space-x-2.5 text-left flex-1 hover:bg-emerald-50 dark:hover:bg-white/5 p-1 rounded-xl transition-all cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center font-black text-white text-xs shadow-md">
-                    {user.displayName?.charAt(0) || 'U'}
+                    {user.displayName?.charAt(0) || (user.isAnonymous ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
                   </div>
                   <div className="text-xs truncate">
                     <div className="font-black tracking-tight truncate max-w-[90px] text-slate-900 dark:text-white">
-                      {user.displayName}
+                      {user.displayName || (user.isAnonymous ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest farmer') : '')}
                     </div>
-                    <div className="text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wider">{userRole}</div>
+                    <div className="text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wider">
+                      {user.isAnonymous ? (lang === 'bn' ? 'গেস্ট' : 'Guest') : userRole}
+                    </div>
                   </div>
                 </button>
                 <button 
@@ -863,7 +872,7 @@ export default function Layout() {
                   title="Profile"
                 >
                   <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center">
-                    {user.displayName?.charAt(0) || 'U'}
+                    {user.displayName?.charAt(0) || (user.isAnonymous ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
                   </div>
                 </button>
               ) : (
@@ -991,7 +1000,15 @@ export default function Layout() {
                   >
                     <HeartHandshake className="w-3.5 h-3.5 text-white" />
                     <span>{lang === 'bn' ? 'বিশেষজ্ঞ সহায়তা' : 'Expert help'}</span>
-                    {expertOnlineCount != null && expertOnlineCount > 0 && (
+                    {unreadExpertCount > 0 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black text-red-600 shadow-xs">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
+                        </span>
+                        {lang === 'bn' ? `${toBn(unreadExpertCount)} নতুন` : `${unreadExpertCount} new`}
+                      </span>
+                    ) : expertOnlineCount != null && expertOnlineCount > 0 && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-black">
                         <span className="relative flex h-1.5 w-1.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75" />
@@ -1165,6 +1182,7 @@ export default function Layout() {
             setActiveTab={setActiveTab}
             lang={lang}
             onlineExpertCount={expertOnlineCount}
+            unreadExpertCount={unreadExpertCount}
             onOpenAllTools={() => {
               setSelectedPillarFilter('all');
               setIsMobileMenuOpen(true);

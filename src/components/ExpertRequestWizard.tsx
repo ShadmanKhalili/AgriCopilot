@@ -78,7 +78,7 @@ export default function ExpertRequestWizard({
   onCreated,
 }: ExpertRequestWizardProps) {
   const bn = lang === 'bn';
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState(seed?.category || 'crop_disease');
@@ -248,7 +248,7 @@ export default function ExpertRequestWizard({
       });
       const id = await createConsultation({
         farmerId: user.uid,
-        farmerName: profile?.fullName || user.displayName || (bn ? 'কৃষক' : 'Farmer'),
+        farmerName: profile?.fullName || userProfile?.name || user.displayName || (bn ? 'কৃষক' : 'Farmer'),
         expert: selectedExpert,
         urgency,
         category,

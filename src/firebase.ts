@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, linkWithPopup, signInAnonymously } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -58,6 +58,42 @@ export const loginWithEmail = async (email: string, password: string) => {
     console.error("Error logging in with email", error);
     throw error;
   }
+};
+
+/**
+ * Guest-first entry: one tap, no email or password. Firebase creates an
+ * anonymous account with a real uid, so Firestore rules work unchanged.
+ * Anonymous sign-in must be enabled in the Firebase console
+ * (Authentication → Sign-in method → Anonymous); until then Firebase throws
+ * `auth/operation-not-allowed` and callers show the Google fallback.
+ */
+export const signInAsGuest = async () => {
+  if (isSigningIn) {
+    console.warn("Sign-in already in progress.");
+    return;
+  }
+  isSigningIn = true;
+  try {
+    const credential = await signInAnonymously(auth);
+    return credential.user;
+  } catch (error) {
+    console.error("Error starting guest session", error);
+    throw error;
+  } finally {
+    isSigningIn = false;
+  }
+};
+
+/**
+ * Preserve a guest's requests by converting the anonymous account in place.
+ * `linkWithPopup` keeps the same uid, so consultation docs stay attached.
+ */
+export const linkGuestWithGoogle = async () => {
+  const current = auth.currentUser;
+  if (!current || !current.isAnonymous) {
+    throw new Error('No guest session to save.');
+  }
+  return linkWithPopup(current, googleProvider);
 };
 
 export const logout = async () => {

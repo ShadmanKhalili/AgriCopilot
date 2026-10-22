@@ -24,6 +24,8 @@ interface Props {
   onSelectPillar?: (pillar: PillarKey) => void;
   /** Live count of experts accepting requests; `null` when unknown (guest / loading). */
   onlineExpertCount?: number | null;
+  /** Number of cases with an unread expert reply (per-device read markers). */
+  unreadExpertCount?: number;
 }
 
 export default function MobileBottomNav({ 
@@ -32,7 +34,8 @@ export default function MobileBottomNav({
   lang, 
   onOpenAllTools,
   onSelectPillar,
-  onlineExpertCount
+  onlineExpertCount,
+  unreadExpertCount = 0
 }: Props) {
   const t = translations[lang];
 
@@ -107,16 +110,20 @@ export default function MobileBottomNav({
                 {item.label}
               </span>
 
-              {/* Live availability badge — only shown when the Firestore count
-                  confirms experts are actually accepting requests. Never a
-                  fake "online" claim for guests or failures. */}
-              {item.id === 'expert-help' &&
+              {/* Badge precedence: a red unread-reply count beats the green
+                  availability count. The red badge means "someone answered
+                  you" — the strongest reason to open the tab. */}
+              {item.id === 'expert-help' && unreadExpertCount > 0 ? (
+                <span className="absolute top-0 right-[10%] inline-flex items-center h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black ring-2 ring-white dark:ring-[#0c1c13] shadow-xs">
+                  {lang === 'bn' ? toBn(unreadExpertCount) : unreadExpertCount}
+                </span>
+              ) : item.id === 'expert-help' &&
                 onlineExpertCount != null &&
-                onlineExpertCount > 0 && (
-                  <span className="absolute top-0 right-[10%] inline-flex items-center h-4 min-w-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-black ring-2 ring-white dark:ring-[#0c1c13] shadow-xs">
-                    {lang === 'bn' ? toBn(onlineExpertCount) : onlineExpertCount}
-                  </span>
-                )}
+                onlineExpertCount > 0 ? (
+                <span className="absolute top-0 right-[10%] inline-flex items-center h-4 min-w-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] font-black ring-2 ring-white dark:ring-[#0c1c13] shadow-xs">
+                  {lang === 'bn' ? toBn(onlineExpertCount) : onlineExpertCount}
+                </span>
+              ) : null}
             </button>
           );
         })}
