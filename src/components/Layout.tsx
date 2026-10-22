@@ -897,6 +897,48 @@ export default function Layout() {
             </div>
 
             <div className="relative z-10 min-h-full flex flex-col w-full max-w-7xl mx-auto">
+              {/* Mobile expert-availability strip, pinned to the top of the home
+                  tab. The human layer must be visible BEFORE any AI diagnosis —
+                  not only in the post-diagnosis CTA. Desktop skips it because
+                  the quick-action bar above already carries the expert button.
+                  Honest wording: claims "live now" only when the count says so. */}
+              {activeTab === 'agri-copilot' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('expert-hub')}
+                  className="md:hidden relative z-10 mb-3 w-full flex items-center gap-3 rounded-2xl border-2 border-emerald-500/70 bg-gradient-to-r from-emerald-700 via-emerald-600 to-green-600 text-white px-3.5 py-2.5 shadow-lg shadow-emerald-900/20 active:scale-[0.99] transition-all cursor-pointer text-left"
+                >
+                  <span className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                    <HeartHandshake className="w-5 h-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-black tracking-tight">
+                      {expertOnlineCount != null && expertOnlineCount > 0
+                        ? (lang === 'bn' ? 'মানুষ বিশেষজ্ঞ এখনই উপলব্ধ — ফ্রি পাইলট' : 'Human experts are live now — free pilot')
+                        : (lang === 'bn' ? 'মানুষ বিশেষজ্ঞ সহায়তা — ফ্রি পাইলট' : 'Human expert support — free pilot')}
+                    </span>
+                    <span className="block text-[11px] font-bold text-emerald-100/90 truncate">
+                      {expertOnlineCount != null && expertOnlineCount > 0
+                        ? (lang === 'bn'
+                            ? `এখন ${toBn(expertOnlineCount)} জন অনুরোধ নিচ্ছেন • জরুরি হলে ১৫ মিনিট`
+                            : `${expertOnlineCount} accepting requests now • emergency in 15 min`)
+                        : (lang === 'bn'
+                            ? 'যাচাইকৃত কৃষি অফিসার ও কৃষিবিদ • সাধারণত ২৪ ঘণ্টায় উত্তর'
+                            : 'Verified agri officers & experts • usually within 24h')}
+                    </span>
+                  </span>
+                  {expertOnlineCount != null && expertOnlineCount > 0 && (
+                    <span className="relative flex h-3 w-3 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-300 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-lime-300" />
+                    </span>
+                  )}
+                  <span className="hidden sm:inline-flex items-center min-h-[40px] px-3.5 rounded-xl bg-white text-emerald-800 text-xs font-black shrink-0">
+                    {lang === 'bn' ? 'এখনই কথা বলুন' : 'Talk now'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 sm:hidden shrink-0" />
+                </button>
+              )}
               {/* Simplified First Experience Quick Action Bar */}
               <div className="mb-3 sm:mb-4 hidden md:flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
