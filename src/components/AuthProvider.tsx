@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, signUpWithEmail, loginWithEmail, signInAsGuest as startGuestSession, linkGuestWithGoogle } from '../firebase';
+import { auth, signInWithGoogle, logout, signUpWithEmail, loginWithEmail, signInAsGuest as startGuestSession, linkGuestWithGoogle, isGuestUser } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 
 export interface UserProfile {
@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (userDoc && !userDoc.exists()) {
             // Must match firestore.rules isAdmin(): owner email AND verified email
             const isAdminEmail = currentUser.email === 'sadmankhalili@gmail.com' && currentUser.emailVerified === true;
-            const isGuest = currentUser.isAnonymous;
+            const isGuest = isGuestUser(currentUser);
             const guestId = currentUser.uid.slice(0, 6).toLowerCase();
             // firestore.rules requires a 3+ character email string. Anonymous
             // users have no email, so use a clearly-labelled local placeholder
@@ -139,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // in expert queues. Email is immutable under the rules, but name is
             // an allowed self-service field.
             if (
-              !currentUser.isAnonymous &&
+              !isGuestUser(currentUser) &&
               data.name?.startsWith('অতিথি কৃষক') &&
               currentUser.displayName &&
               currentUser.displayName !== data.name
@@ -225,7 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleSignOut = async () => {
     // Anonymous accounts are unrecoverable once signed out. Make that explicit
     // so a farmer cannot accidentally destroy open expert requests.
-    if (auth.currentUser?.isAnonymous) {
+    if (isGuestUser(auth.currentUser)) {
       const confirmed = window.confirm(
         'আপনি গেস্ট হিসেবে আছেন। সাইন আউট করলে এই ডিভাইসের অনুরোধ, চ্যাট ও পরামর্শ আর ফিরে পাওয়া যাবে না।\n\nYou are using a guest account. Signing out permanently loses this device\'s requests and chats.'
       );
@@ -257,7 +257,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAuthReady, 
       isAdmin: userRole === 'admin',
       isExpert: userRole === 'expert' || userRole === 'org_admin',
-      isGuest: !!user?.isAnonymous,
+      isGuest: isGuestUser(user),
       signIn: signInWithGoogle, 
       signInAsGuest: handleSignInAsGuest,
       saveGuestAccount: handleSaveGuest,

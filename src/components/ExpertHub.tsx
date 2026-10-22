@@ -82,8 +82,8 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
     const code = String(error?.code || '');
     if (code.includes('operation-not-allowed') || code.includes('admin-restricted-operation')) {
       return bn
-        ? 'গেস্ট মোড এখনো চালু হয়নি। Google দিয়ে সাইন ইন করুন।'
-        : 'Guest mode is not enabled yet. Please sign in with Google.';
+        ? 'গেস্ট মোড এখন পাওয়া যাচ্ছে না। Google দিয়ে সাইন ইন করুন।'
+        : 'Guest mode is unavailable right now. Please sign in with Google.';
     }
     if (code.includes('network-request-failed')) {
       return bn ? 'ইন্টারনেট সংযোগ নেই। আবার চেষ্টা করুন।' : 'No internet connection. Please retry.';
@@ -112,7 +112,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
     } catch (error: any) {
       const code = String(error?.code || '');
       if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return;
-      if (code.includes('credential-already-in-use')) {
+      if (code.includes('credential-already-in-use') || code.includes('email-already-in-use')) {
         toast.error(
           bn
             ? 'এই Google অ্যাকাউন্ট আগেই ব্যবহার করা হয়েছে। অন্য Google অ্যাকাউন্ট ব্যবহার করুন, অথবা সেটি দিয়ে সাইন ইন করুন।'

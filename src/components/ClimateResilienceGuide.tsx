@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Waves, Sun, Droplets, Sprout, 
   PhoneCall, CheckCircle2, AlertCircle, ArrowRight,
-  ThermometerSnowflake, Scale, X, Activity, Gauge
+  ThermometerSnowflake, Scale, X, Activity, Gauge, MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language } from '../utils/translations';
+import { findNearestLocation } from '../utils/geoData';
+import { getDistrictClimateRisks, type StressType } from '../utils/climateZones';
 
 export interface StressVariety {
   id: string;
@@ -255,18 +257,69 @@ export const STRESS_VARIETIES: StressVariety[] = [
 interface Props {
   lang: Language;
   onNavigateTab?: (tab: any, payload?: any) => void;
+  /** Current GPS / manually selected district-centre coordinates. */
+  globalLocation?: { latitude: number; longitude: number } | null;
+  /** Opens the app-wide district/upazila picker. */
+  onSetLocation?: () => void;
 }
 
-export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
-  const [selectedStress, setSelectedStress] = useState<'all' | 'flood' | 'salinity' | 'drought' | 'cold'>('all');
+type StressFilter = 'auto' | 'all' | StressType;
+
+export default function ClimateResilienceGuide({ lang, onNavigateTab, globalLocation, onSetLocation }: Props) {
+  const bn = lang === 'bn';
+  // "auto" = show the risks that matter in the farmer's district. It is the
+  // default so a coastal farmer never lands on drought-zone varieties first.
+  const [selectedStress, setSelectedStress] = useState<StressFilter>('auto');
 
   // Multi-variety comparison selection
   const [comparisonIds, setComparisonIds] = useState<string[]>(['brri-51', 'bina-11']);
   const [showComparisonModal, setShowComparisonModal] = useState<boolean>(false);
 
-  const filteredVarieties = selectedStress === 'all'
-    ? STRESS_VARIETIES
-    : STRESS_VARIETIES.filter(v => v.stressType === selectedStress);
+  const locationInfo = useMemo(() => {
+    if (!globalLocation) return null;
+    return findNearestLocation(globalLocation.latitude, globalLocation.longitude, lang);
+  }, [globalLocation, lang]);
+
+  const localRisks = useMemo(
+    () => (locationInfo?.isWithinBangladesh ? getDistrictClimateRisks(locationInfo.district.name) : []),
+    [locationInfo]
+  );
+
+  const districtName = locationInfo
+    ? bn
+      ? locationInfo.district.bn_name
+      : locationInfo.district.name
+    : '';
+
+  const isAuto = selectedStress === 'auto';
+  const primaryRisk = localRisks[0] ?? null;
+
+  const filteredVarieties = useMemo(() => {
+    if (selectedStress === 'auto') {
+      if (!primaryRisk) return STRESS_VARIETIES;
+      const local = STRESS_VARIETIES.filter((v) => v.stressType === primaryRisk);
+      const terms = locationInfo
+        ? [locationInfo.district.name.toLowerCase(), locationInfo.district.bn_name]
+        : [];
+      const mentionScore = (v: StressVariety) => {
+        const text = `${v.suitableRegionsEn} ${v.suitableRegionsBn}`.toLowerCase();
+        return terms.some((t) => t && text.includes(t.toLowerCase())) ? 0 : 1;
+      };
+      return [...local].sort((a, b) => mentionScore(a) - mentionScore(b));
+    }
+    if (selectedStress === 'all') return STRESS_VARIETIES;
+    return STRESS_VARIETIES.filter((v) => v.stressType === selectedStress);
+  }, [selectedStress, primaryRisk, locationInfo]);
+
+  // Escape closes the comparison sheet, matching the rest of the app.
+  useEffect(() => {
+    if (!showComparisonModal) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowComparisonModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showComparisonModal]);
 
   const toggleComparison = (id: string) => {
     if (comparisonIds.includes(id)) {
@@ -347,6 +400,29 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
     }
   };
 
+  const riskLabel = (risk: StressType): string => {
+    const theme = getStressTheme(risk);
+    return bn ? theme.labelBn : theme.labelEn;
+  };
+
+  // Describe the currently visible slice honestly: the auto view shows only the
+  // district's primary risk, while manual filters show exactly what was chosen.
+  const filterSummary = primaryRisk
+    ? selectedStress === 'all'
+      ? bn
+        ? 'সব ঝুঁকির জাত দেখানো হচ্ছে। আপনার এলাকার প্রধান ঝুঁকি আগে দেখতে "আমার এলাকার জাত" বেছে নিন।'
+        : 'Showing varieties for all stresses. Choose "My area" to return to your district’s main risk.'
+      : selectedStress === 'auto'
+        ? bn
+          ? `এই প্রধান ঝুঁকির (${riskLabel(primaryRisk)}) জাত দেখানো হচ্ছে। অন্য ঝুঁকির জাত দেখতে নিচের ফিল্টার বদলান।`
+          : `Showing varieties for the main local risk (${riskLabel(primaryRisk)}). Change the filter below to see other stresses.`
+        : bn
+          ? `আপনি ${riskLabel(selectedStress)}-এর জাত দেখছেন। "আমার এলাকার জাত" চাপলে এলাকার প্রধান ঝুঁকিতে ফিরবেন।`
+          : `You are viewing ${riskLabel(selectedStress)} varieties. Choose "My area" to return to your district’s main risk.`
+    : bn
+      ? 'এই জেলার জন্য নির্দিষ্ট ঝুঁকি ম্যাপিং নেই — সব জাত দেখানো হচ্ছে।'
+      : 'No district-specific risk mapping for this area — showing all varieties.';
+
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 pb-12">
       {/* Header Banner */}
@@ -363,9 +439,9 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
               {lang === 'bn' ? 'প্রতিকূল পরিবেশ সহনশীল শস্য নির্দেশিকা' : 'Climate-Smart Crop Resilience Index'}
             </h1>
             <p className="text-emerald-100/80 text-sm max-w-2xl leading-relaxed">
-              {lang === 'bn'
-                ? 'বন্যা, উপকূলের লবণাক্ততা ও বরেন্দ্রের খরার ঝুঁকি মোকাবিলার জন্য বৈজ্ঞানিকভাবে প্রমাণিত ফসলের জাত এবং পানির স্তর ও লবণাক্ততার পরিমাপক।'
-                : 'Scientifically validated cultivars engineered for submerged floodplains, coastal saline belts, and drought zones with dynamic environmental metrics.'}
+              {bn
+                ? 'আপনার এলাকার লবণাক্ততা, বন্যা, খরা ও শৈত্যপ্রবাহের ঝুঁকির সঙ্গে মিলিয়ে ব্রি, বারি ও বিনা উদ্ভাবিত জাত — সহনশীলতার পরিমাপ ও মাঠপর্যায়ের পরামর্শসহ।'
+                : 'Validated BRRI, BARI and BINA cultivars matched to your area’s salinity, flood, drought and cold-wave risks — with tolerance gauges and field guidance.'}
             </p>
           </div>
 
@@ -385,20 +461,127 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
         </div>
       </div>
 
+      {/* Location-aware risk context: district-level, honest about uncertainty. */}
+      <div className={`rounded-2xl border p-4 ${
+        localRisks.length > 0
+          ? 'bg-emerald-50/80 border-emerald-200'
+          : 'bg-amber-50/80 border-amber-200'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className={`p-2 rounded-xl shrink-0 ${
+              localRisks.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              {locationInfo && locationInfo.isWithinBangladesh ? (
+                <>
+                  <p className="text-sm font-black text-stone-900">
+                    {bn ? `আপনার এলাকা: ${districtName}` : `Your area: ${districtName}`}
+                    {primaryRisk && (
+                      <span className="font-bold text-emerald-800">
+                        {' '}• {bn ? 'প্রধান ঝুঁকি:' : 'Main risk:'}{' '}
+                        {riskLabel(primaryRisk)}
+                      </span>
+                    )}
+                  </p>
+                  {localRisks.length > 1 && (
+                    <p className="text-[11px] font-bold text-amber-800 mt-0.5">
+                      {bn
+                        ? `এছাড়াও এই এলাকায় আছে: ${localRisks.slice(1).map(riskLabel).join(', ')}`
+                        : `Also relevant here: ${localRisks.slice(1).map(riskLabel).join(', ')}`}
+                    </p>
+                  )}
+                  <p className="text-xs text-stone-600 mt-0.5">{filterSummary}</p>
+                  <p className="text-[10px] text-stone-500 mt-1">
+                    {bn
+                      ? 'জেলা-ভিত্তিক ঝুঁকি অনুমান; মাটির লবণাক্ততা পরীক্ষা বা স্থানীয় কৃষি অফিসের পরামর্শ দিয়ে নিশ্চিত করুন।'
+                      : 'District-level risk estimate; confirm with a soil salinity test or your local agriculture office.'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-black text-stone-900">
+                    {bn
+                      ? 'এলাকাভিত্তিক জাত দেখতে আপনার জেলা/উপজেলা নির্বাচন করুন'
+                      : 'Set your district/upazila to see area-specific varieties'}
+                  </p>
+                  <p className="text-xs text-stone-600 mt-0.5">
+                    {bn
+                      ? 'GPS বা জেলা নির্বাচন করলে উপকূলীয় লবণাক্ততা, বন্যা, খরা ও শৈত্যপ্রবাহের মধ্যে আপনার এলাকার ঝুঁকি আগে দেখানো হবে।'
+                      : 'With GPS or a selected district, risks relevant to your area (salinity, flood, drought, cold) are prioritised.'}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {onSetLocation && (
+              <button
+                type="button"
+                onClick={onSetLocation}
+                className="min-h-[44px] px-4 rounded-xl bg-white border border-stone-200 text-xs font-black text-stone-700 hover:border-emerald-300 hover:text-emerald-800 transition-colors"
+              >
+                {bn ? 'এলাকা নির্বাচন' : 'Set location'}
+              </button>
+            )}
+            {localRisks.length > 0 && !isAuto && (
+              <button
+                type="button"
+                onClick={() => setSelectedStress('auto')}
+                className="min-h-[44px] px-4 rounded-xl bg-emerald-700 text-white text-xs font-black transition-colors"
+              >
+                {bn ? 'আমার এলাকার জাত' : 'My area'}
+              </button>
+            )}
+            {localRisks.length > 0 && selectedStress !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedStress('all')}
+                className="min-h-[44px] px-4 rounded-xl bg-white border border-stone-200 text-xs font-black text-stone-700 hover:border-emerald-300 hover:text-emerald-800 transition-colors"
+              >
+                {bn ? 'সব জাত' : 'All varieties'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Stress Category Filter Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-stone-200 shadow-xs">
         <div className="flex flex-wrap items-center gap-1.5">
           <motion.button
             type="button"
             whileTap={{ scale: 0.96 }}
+            onClick={() => setSelectedStress('auto')}
+            aria-pressed={isAuto}
+            className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              isAuto
+                ? 'bg-emerald-700 text-white shadow-xs'
+                : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span>
+              {locationInfo?.isWithinBangladesh
+                ? `${districtName}${bn ? ' • আমার এলাকা' : ' • My area'}`
+                : bn ? 'আমার এলাকা' : 'My area'}
+            </span>
+          </motion.button>
+
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.96 }}
             onClick={() => setSelectedStress('all')}
+            aria-pressed={selectedStress === 'all'}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               selectedStress === 'all'
                 ? 'bg-stone-900 text-white shadow-xs'
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            {lang === 'bn' ? 'সকল জাত' : 'All Varieties'} ({STRESS_VARIETIES.length})
+            {bn ? 'সব জাত' : 'All Varieties'} ({STRESS_VARIETIES.length})
           </motion.button>
 
           <motion.button
@@ -611,24 +794,32 @@ export default function ClimateResilienceGuide({ lang, onNavigateTab }: Props) {
       {/* Comparison Drawer / Modal */}
       <AnimatePresence>
         {showComparisonModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setShowComparisonModal(false);
+            }}
+          >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto space-y-6"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-stone-100">
-                <div className="flex items-center space-x-2">
-                  <Scale className="w-5 h-5 text-emerald-700" />
-                  <h3 className="text-xl font-black text-stone-900">
+              <div className="sticky top-0 z-10 bg-white flex items-center justify-between gap-3 pb-4 border-b border-stone-100">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Scale className="w-5 h-5 text-emerald-700 shrink-0" />
+                  <h3 className="text-lg sm:text-xl font-black text-stone-900 truncate">
                     {lang === 'bn' ? 'জাতের সরাসরি তুলনা (Comparison Matrix)' : 'Side-by-Side Variety Comparison'}
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowComparisonModal(false)}
-                  className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer"
+                  aria-label={lang === 'bn' ? 'তুলনা বন্ধ করুন' : 'Close comparison'}
+                  className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 cursor-pointer shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>

@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, linkWithPopup, signInAnonymously } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -61,11 +62,14 @@ export const loginWithEmail = async (email: string, password: string) => {
 };
 
 /**
- * Guest-first entry: one tap, no email or password. Firebase creates an
- * anonymous account with a real uid, so Firestore rules work unchanged.
- * Anonymous sign-in must be enabled in the Firebase console
- * (Authentication → Sign-in method → Anonymous); until then Firebase throws
- * `auth/operation-not-allowed` and callers show the Google fallback.
+ * Guest-first entry: one tap, no email, password or Google account.
+ *
+ * Preferred path is a Firebase anonymous account. When the Anonymous provider
+ * is not enabled in the Firebase project, we fall back to a throwaway
+ * email/password account with 128 bits of random entropy. The credentials are
+ * never shown or stored; Firebase's own session persistence keeps the guest
+ * signed in on this device. Both paths produce a real uid, so Firestore rules
+ * and the expert consultation flow work unchanged.
  */
 export const signInAsGuest = async () => {
   if (isSigningIn) {
@@ -74,8 +78,17 @@ export const signInAsGuest = async () => {
   }
   isSigningIn = true;
   try {
-    const credential = await signInAnonymously(auth);
-    return credential.user;
+    try {
+      const credential = await signInAnonymously(auth);
+      return credential.user;
+    } catch (error: any) {
+      const code = String(error?.code || '');
+      const providerDisabled =
+        code.includes('operation-not-allowed') || code.includes('admin-restricted-operation');
+      if (!providerDisabled) throw error;
+      console.warn('Anonymous auth is disabled — using a throwaway password guest account.');
+      return await createPasswordGuest();
+    }
   } catch (error) {
     console.error("Error starting guest session", error);
     throw error;
@@ -85,15 +98,49 @@ export const signInAsGuest = async () => {
 };
 
 /**
- * Preserve a guest's requests by converting the anonymous account in place.
+ * A guest account is either a true Firebase anonymous user or a throwaway
+ * password account created by the fallback above. Once Google is linked, the
+ * account is considered saved even if the local guest email remains.
+ */
+export const isGuestUser = (user: User | null): boolean => {
+  if (!user) return false;
+  if (user.isAnonymous) return true;
+  const hasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
+  return isGuestEmail(user.email) && !hasGoogle;
+};
+
+const isGuestEmail = (email?: string | null): boolean =>
+  !!email && email.endsWith('@agri.local');
+
+const guestDisplayName = (uid: string): string =>
+  `অতিথি কৃষক #${uid.slice(0, 4).toUpperCase()}`;
+
+const createPasswordGuest = async () => {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const entropy = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const email = `guest-${entropy}@agri.local`;
+  const password = `G!${entropy}${entropy.split('').reverse().join('')}`;
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  try {
+    await updateProfile(credential.user, { displayName: guestDisplayName(credential.user.uid) });
+  } catch (error) {
+    // Display name is cosmetic; the AuthProvider also derives one from the uid.
+    console.warn('Could not set guest display name', error);
+  }
+  return credential.user;
+};
+
+/**
+ * Preserve a guest's requests by converting the guest account in place.
  * `linkWithPopup` keeps the same uid, so consultation docs stay attached.
  */
 export const linkGuestWithGoogle = async () => {
   const current = auth.currentUser;
-  if (!current || !current.isAnonymous) {
+  if (!isGuestUser(current)) {
     throw new Error('No guest session to save.');
   }
-  return linkWithPopup(current, googleProvider);
+  return linkWithPopup(current as User, googleProvider);
 };
 
 export const logout = async () => {

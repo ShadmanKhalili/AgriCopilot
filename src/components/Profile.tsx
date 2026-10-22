@@ -265,7 +265,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
                         } catch (error: any) {
                           const code = String(error?.code || '');
                           if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request')) return;
-                          if (code.includes('credential-already-in-use')) {
+                          if (code.includes('credential-already-in-use') || code.includes('email-already-in-use')) {
                             toast.error(
                               lang === 'bn'
                                 ? 'এই Google অ্যাকাউন্ট আগেই ব্যবহার করা হয়েছে। অন্য Google অ্যাকাউন্ট ব্যবহার করুন।'

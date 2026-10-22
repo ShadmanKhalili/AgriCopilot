@@ -22,8 +22,8 @@ export default function AuthModal({ isOpen, onClose, lang }: AuthModalProps) {
     const code = String(error?.code || '');
     if (code.includes('operation-not-allowed') || code.includes('admin-restricted-operation')) {
       return lang === 'en'
-        ? 'Guest mode is not enabled yet. Please continue with Google.'
-        : 'গেস্ট মোড এখনো চালু হয়নি। অনুগ্রহ করে Google দিয়ে চালিয়ে যান।';
+        ? 'Guest mode is unavailable right now. Please continue with Google.'
+        : 'গেস্ট মোড এখন পাওয়া যাচ্ছে না। অনুগ্রহ করে Google দিয়ে চালিয়ে যান।';
     }
     if (code.includes('network-request-failed')) {
       return lang === 'en'

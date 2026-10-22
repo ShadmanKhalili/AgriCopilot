@@ -103,6 +103,22 @@ export default function DigitalPrescriptionModal({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    // Escape must always be able to close a prescription; the close control is
+    // pinned in the header below. Lock background scroll while open.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const rxId = data.rxId || `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -300,16 +316,25 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 print:p-0 print:bg-white print:static">
-      <div className="relative w-full max-w-3xl bg-stone-100 dark:bg-stone-900 rounded-3xl shadow-2xl border border-stone-200 dark:border-stone-800 overflow-hidden my-auto print:border-none print:shadow-none print:max-w-none">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-5 print:p-0 print:bg-white print:static"
+      role="dialog"
+      aria-modal="true"
+      aria-label={lang === 'bn' ? 'ডিজিটাল কৃষি প্রেসক্রিপশন' : 'Digital krishi prescription'}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="relative w-full max-w-3xl max-h-[95dvh] bg-stone-100 dark:bg-stone-900 rounded-3xl shadow-2xl border border-stone-200 dark:border-stone-800 overflow-hidden my-auto flex flex-col print:border-none print:shadow-none print:max-w-none">
         
-        {/* Top Control Bar (Hidden in Print) */}
-        <div className="bg-white dark:bg-stone-900 px-5 py-3.5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between print:hidden">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-xs">
+        {/* Top Control Bar (Hidden in Print). The header never scrolls away; only
+            the prescription body below scrolls, so close is always reachable. */}
+        <div className="bg-white dark:bg-stone-900 px-4 sm:px-5 py-3 border-b border-stone-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="p-1.5 rounded-lg bg-emerald-600 text-white shadow-xs shrink-0">
               <FileText className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-xs font-black uppercase tracking-wider text-emerald-950 dark:text-emerald-300">
                 {lang === 'bn' ? 'ডিজিটাল কৃষি ব্যবস্থাপত্র (Rx)' : 'Digital Krishi Prescription (Rx)'}
               </span>
@@ -317,7 +342,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
             <button
               type="button"
               onClick={handleSaveToDossier}
@@ -385,7 +410,9 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors ml-1 cursor-pointer"
+              aria-label={lang === 'bn' ? 'প্রেসক্রিপশন বন্ধ করুন' : 'Close prescription'}
+              title={lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100 rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -393,7 +420,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
         </div>
 
         {/* Printable & Exportable Prescription Card Canvas */}
-        <div className="p-3 sm:p-6 overflow-y-auto max-h-[82vh] print:max-h-none print:overflow-visible">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 min-h-0 print:flex-none print:max-h-none print:overflow-visible">
           <div 
             ref={cardRef} 
             className="bg-white text-stone-900 rounded-2xl p-6 sm:p-9 shadow-md border-2 border-emerald-900/15 relative overflow-hidden font-sans print:shadow-none print:border-stone-800"

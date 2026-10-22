@@ -204,7 +204,7 @@ export default function Layout() {
   };
 
   const { locationName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
-  const { user, userRole, isAuthReady, signOut } = useAuth();
+  const { user, userRole, isAuthReady, isGuest, signOut } = useAuth();
   // Live "experts accepting requests" count for the global availability badges.
   const { onlineCount: expertOnlineCount } = useExpertAvailability();
   // Unread expert replies (per-device read markers) for the nav badge.
@@ -711,14 +711,14 @@ export default function Layout() {
                   className="flex items-center space-x-2.5 text-left flex-1 hover:bg-emerald-50 dark:hover:bg-white/5 p-1 rounded-xl transition-all cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center font-black text-white text-xs shadow-md">
-                    {user.displayName?.charAt(0) || (user.isAnonymous ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
+                    {user.displayName?.charAt(0) || (isGuest ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
                   </div>
                   <div className="text-xs truncate">
                     <div className="font-black tracking-tight truncate max-w-[90px] text-slate-900 dark:text-white">
-                      {user.displayName || (user.isAnonymous ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest farmer') : '')}
+                      {user.displayName || (isGuest ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest farmer') : '')}
                     </div>
                     <div className="text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase tracking-wider">
-                      {user.isAnonymous ? (lang === 'bn' ? 'গেস্ট' : 'Guest') : userRole}
+                      {isGuest ? (lang === 'bn' ? 'গেস্ট' : 'Guest') : userRole}
                     </div>
                   </div>
                 </button>
@@ -872,7 +872,7 @@ export default function Layout() {
                   title="Profile"
                 >
                   <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[11px] flex items-center justify-center">
-                    {user.displayName?.charAt(0) || (user.isAnonymous ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
+                    {user.displayName?.charAt(0) || (isGuest ? (lang === 'bn' ? 'অ' : 'G') : 'U')}
                   </div>
                 </button>
               ) : (
@@ -1110,6 +1110,8 @@ export default function Layout() {
                         <ClimateResilienceGuide 
                           lang={lang} 
                           onNavigateTab={handleNavigateTab}
+                          globalLocation={globalLocation}
+                          onSetLocation={() => setIsRegionModalOpen(true)}
                         />
                       )}
                     </div>
