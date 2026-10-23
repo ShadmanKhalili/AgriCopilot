@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetchWithTimeout';
+
 export interface DetectedCoordinates {
   latitude: number;
   longitude: number;
@@ -24,7 +26,7 @@ export function isInsideBangladesh(lat: number, lon: number): boolean {
 
 export async function getFallbackLocation(): Promise<DetectedCoordinates> {
   try {
-    const response = await fetch('/api/ip-location');
+    const response = await fetchWithTimeout('/api/ip-location', { timeoutMs: 5000, retries: 1 });
     if (!response.ok) throw new Error('IP location failed');
     const data = await response.json();
     const lat = parseFloat(data.latitude);

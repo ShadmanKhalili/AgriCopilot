@@ -77,6 +77,10 @@ export async function readAiNdjsonStream(
     for (;;) {
       // Stop reading as soon as the server reports a terminal error.
       if (streamError) break;
+      // `done` is the terminal success event: the answer is complete. Keep
+      // reading after it and the socket may sit idle until the watchdog fires,
+      // which would discard an answer we already have.
+      if (finalEvent) break;
 
       const { value, done } = await reader.read();
       if (done) break;
@@ -99,13 +103,15 @@ export async function readAiNdjsonStream(
   if (buffer.trim()) handleLine(buffer);
 
   if (streamError) throw streamError;
-  if (stalled) throw new Error('The AI connection stalled. Please try again.');
   if (!finalEvent) {
+    if (stalled) throw new Error('The AI connection stalled. Please try again.');
     // A stream that closes without `done` was cut short (proxy timeout,
     // dropped mobile connection, or a killed function). Falling back to the
     // partial text would hand truncated JSON to the caller.
     throw new Error('The AI response ended before it was complete. Please try again.');
   }
+  // `finalEvent` is present: the server delivered a complete answer. A stall
+  // after that point must not throw away the answer we already received.
   if (!streamedText) {
     throw new Error('AI returned an empty response.');
   }
