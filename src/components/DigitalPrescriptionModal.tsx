@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, Download, Printer, Share2, Check, ShieldCheck, QrCode, 
   MapPin, Calendar, Clock, AlertTriangle, Leaf, Award, 
@@ -315,9 +316,9 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center p-3 sm:p-5 print:p-0 print:bg-white print:static"
+      className="fixed inset-0 z-[100] overflow-y-auto bg-black/75 backdrop-blur-sm flex items-start sm:items-center justify-center px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:p-5 print:p-0 print:bg-white print:static"
       role="dialog"
       aria-modal="true"
       aria-label={lang === 'bn' ? 'ডিজিটাল কৃষি প্রেসক্রিপশন' : 'Digital krishi prescription'}
@@ -788,6 +789,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
