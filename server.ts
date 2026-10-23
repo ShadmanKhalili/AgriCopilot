@@ -10,6 +10,8 @@ import { rateLimit } from 'express-rate-limit';
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
+import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
+import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
 
 dotenv.config();
 
@@ -243,17 +245,27 @@ async function startServer() {
     return serverAiClient;
   };
 
+  // The model list is a SERVER decision. The caller may ask for a model, but
+  // it only ever selects from this list. `gemini-3.8-flash` and
+  // `gemini-2.5-flash` are deliberately absent: on this project's key they
+  // answer 404 "This model is no longer available to new users", so every
+  // failure used to burn two extra pointless upstream calls.
+  // Keep in sync with `AI_TEXT_MODELS` / `AI_AUDIO_MODELS` in
+  // netlify/functions/ai-proxy.ts — these two copies drifted apart before.
+  const TEXT_MODEL_ALLOWLIST = (process.env.AI_TEXT_MODELS || "gemini-3.5-flash-lite")
+    .split(",").map(m => m.trim()).filter(m => /^gemini-[a-z0-9.\-]+$/i.test(m));
+  const AUDIO_MODEL_ALLOWLIST = (process.env.AI_AUDIO_MODELS || "gemini-3.8-flash-lite-tts,gemini-3.8-flash-tts")
+    .split(",").map(m => m.trim()).filter(m => /^gemini-[a-z0-9.\-]+$/i.test(m));
+
   const getCandidateModels = (requestedModel: string): string[] => {
     // If audio/TTS model requested
     if (requestedModel.includes("-tts")) {
-      return Array.from(new Set([requestedModel, "gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"]));
+      return Array.from(new Set([requestedModel, ...AUDIO_MODEL_ALLOWLIST]));
     }
-    // High-availability cascade with gemini-3.5-flash-lite as primary
+    // Server-owned cascade with gemini-3.5-flash-lite as primary
     return Array.from(new Set([
-      requestedModel,
-      "gemini-3.5-flash-lite",
-      "gemini-3.8-flash",
-      "gemini-2.5-flash"
+      ...(TEXT_MODEL_ALLOWLIST.includes(requestedModel) ? [requestedModel] : []),
+      ...TEXT_MODEL_ALLOWLIST,
     ]));
   };
 
@@ -293,6 +305,19 @@ async function startServer() {
 
   app.post("/api/ai-proxy", aiLimiter, async (req, res) => {
     try {
+      // ── Authentication ────────────────────────────────────────────────────
+      // An open endpoint is an open relay to a paid Gemini key. The token is
+      // verified by Google, not decoded locally. This runs before anything
+      // else so an unauthenticated caller learns nothing about the server.
+      const idToken = extractBearerTokenFromHeader(req.headers.authorization);
+      if (!idToken) {
+        return res.status(401).json({ error: "Sign in to use the AI features." });
+      }
+      const user = await verifyIdToken(idToken);
+      if (!user) {
+        return res.status(401).json({ error: "Your session has expired. Please sign in again." });
+      }
+
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(503).json({
@@ -303,6 +328,26 @@ async function startServer() {
       const client = getServerAi();
       if (!client) {
         return res.status(500).json({ error: "Failed to initialize Gemini AI client." });
+      }
+
+      // ── Daily allowance ───────────────────────────────────────────────────
+      const dayNumber = utcDayNumber();
+      const plan = await getUserPlan(user.uid, idToken);
+      const limit = plan === "premium"
+        ? Number(process.env.AI_PREMIUM_DAILY_LIMIT || 1000)
+        : Number(process.env.AI_FREE_DAILY_LIMIT || 100);
+      const used = await countAiUsageToday(user.uid, idToken, dayNumber);
+      if (used === null) {
+        return res.status(503).json({ error: "The AI service is busy. Please try again in a moment." });
+      }
+      if (used >= limit) {
+        return res.status(429).json({
+          error: plan === "premium"
+            ? "You have reached your daily AI limit. It resets tomorrow."
+            : "You have used all of today's free AI advice. It resets tomorrow.",
+          limit,
+          used,
+        });
       }
 
       const {
@@ -320,9 +365,26 @@ async function startServer() {
         return res.status(400).json({ error: "Missing 'contents' in request body." });
       }
 
-      // Input Validation: Ensure contents payload doesn't exceed memory safety boundaries
-      if (typeof contents === 'string' && contents.length > 50000) {
-        return res.status(400).json({ error: "Contents payload exceeds safe size limit (50,000 characters)." });
+      // Input Validation: Ensure contents payload doesn't exceed memory safety boundaries.
+      // The limit has to cover the ARRAY form too — the Gemini contract makes
+      // `contents` an array, so a string-only check never fired.
+      const measureContents = (node: any, depth = 0): { chars: number; images: number } => {
+        let chars = 0, images = 0;
+        if (!node || depth > 8) return { chars, images };
+        if (Array.isArray(node)) { node.forEach(n => { const r = measureContents(n, depth + 1); chars += r.chars; images += r.images; }); return { chars, images }; }
+        if (typeof node === "string") return { chars: node.length, images };
+        if (typeof node !== "object") return { chars, images };
+        if (typeof node.text === "string") chars += node.text.length;
+        if (node.inlineData) images += 1;
+        if (node.parts) { const r = measureContents(node.parts, depth + 1); chars += r.chars; images += r.images; }
+        return { chars, images };
+      };
+      const measured = measureContents(contents);
+      if (measured.chars > 40000) {
+        return res.status(413).json({ error: "That request contains too much text." });
+      }
+      if (measured.images > 4) {
+        return res.status(413).json({ error: "You can send at most 4 images at a time." });
       }
       if (Array.isArray(contents) && contents.length > 100) {
         return res.status(400).json({ error: "Too many conversation turns in single request (max 100)." });
@@ -336,6 +398,22 @@ async function startServer() {
         ...(speechConfig ? { speechConfig } : {}),
         ...(generationConfig ? { generationConfig } : {})
       };
+      // The caller does not get to choose how many tokens the answer may use,
+      // and safety settings are the server's decision.
+      const maxOutputTokens = Math.min(
+        Math.max(Number(mergedConfig.maxOutputTokens) || 8192, 256),
+        16384
+      );
+      mergedConfig.maxOutputTokens = maxOutputTokens;
+      delete mergedConfig.safetySettings;
+      // Only Google Search may be requested, and only when the caller asked.
+      if (Array.isArray(mergedConfig.tools)) {
+        const allowed = mergedConfig.tools.filter((t: any) =>
+          t && typeof t === "object" && Object.keys(t).length === 1 && "googleSearch" in t);
+        if (allowed.length) mergedConfig.tools = allowed;
+        else delete mergedConfig.tools;
+      }
+      delete mergedConfig.toolConfig;
 
       const candidateModels = getCandidateModels(requestedModel);
       let lastError: any = null;
@@ -349,6 +427,7 @@ async function startServer() {
             config: mergedConfig
           });
 
+          await recordAiUsage(user.uid, idToken, dayNumber, "text");
           return res.json({
             text: aiResponse.text || "",
             candidates: aiResponse.candidates || [],
