@@ -8,17 +8,18 @@
  * This module keeps the counter on the server instead, using the caller's own
  * Firebase ID token so no Admin SDK / service account is needed:
  *
- *   users/{uid}/aiUsage/{dayKey}/{eventId}
+ *   users/{uid}/aiUsage/{eventId}
  *
- * `dayKey` is a `YYYYMMDD` string. The Firestore rules pin it to the *server*
- * clock (`request.time`), so a caller cannot file yesterday's usage against
- * today's allowance, and the day can never be rolled forward by hand.
- * The event documents are create-only and cannot be updated or deleted, so the
- * count only ever goes up. A caller can therefore only ever make their own
+ * Each event carries the day it belongs to as a `YYYYMMDD` number. The
+ * Firestore rules compare it against `request.time` — the server clock — so
+ * the day cannot be forged, rolled back or rolled forward. The event
+ * documents are create-only and cannot be updated or deleted, so the count
+ * only ever goes up. A caller can therefore only ever make their own
  * allowance smaller.
  *
- * The count is read with a `documents.list` on the day's collection, which is
- * one read for the whole day regardless of how many calls were made.
+ * The count is read with a `runQuery` on the day's events, filtered to this
+ * account. The Firestore REST `documents.list` endpoint cannot reach a
+ * collection that lives under a document, so `runQuery` is used instead.
  */
 
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'studio-1309545077-89018';
@@ -28,8 +29,12 @@ const DATABASE_ID =
 const DOCUMENTS_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents`;
 
 const FIRESTORE_TIMEOUT_MS = 8000;
-/** A day cannot hold more than this many calls, so one list page is enough. */
+/** A day cannot hold more than this many calls, so one query page is enough. */
 const MAX_EVENTS_PER_DAY = 1000;
+
+/** The collection that holds one account's usage events. */
+const eventsCollection = (uid: string) =>
+  `${DOCUMENTS_BASE}/users/${encodeURIComponent(uid)}/aiUsage`;
 
 const bearer = (idToken: string) => ({ Authorization: `Bearer ${idToken}` });
 
@@ -47,6 +52,10 @@ export const utcDayKey = (when: Date = new Date()): string => {
   return `${year}${month}${day}`;
 };
 
+/** The same day as the number the Firestore rules compute. */
+export const utcDayNumber = (when: Date = new Date()): number =>
+  when.getUTCFullYear() * 10000 + (when.getUTCMonth() + 1) * 100 + when.getUTCDate();
+
 const randomEventId = (): string => {
   const bytes = new Uint8Array(12);
   crypto.getRandomValues(bytes);
@@ -61,20 +70,54 @@ const randomEventId = (): string => {
 export const countAiUsageToday = async (
   uid: string,
   idToken: string,
-  dayKey: string
+  dayNumber: number
 ): Promise<number | null> => {
   try {
-    const url =
-      `${DOCUMENTS_BASE}/users/${encodeURIComponent(uid)}/aiUsage/${encodeURIComponent(dayKey)}` +
-      `?pageSize=${MAX_EVENTS_PER_DAY}&mask.fieldPaths=kind`;
-    const response = await fetch(url, {
-      headers: bearer(idToken),
+    const body = {
+      structuredQuery: {
+        from: [{ collectionId: 'aiUsage' }],
+        where: {
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'uid' },
+                  op: 'EQUAL',
+                  value: { stringValue: uid },
+                },
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'day' },
+                  op: 'EQUAL',
+                  value: { integerValue: String(dayNumber) },
+                },
+              },
+            ],
+          },
+        },
+        limit: MAX_EVENTS_PER_DAY,
+      },
+    };
+    const response = await fetch(`${DOCUMENTS_BASE}/users/${encodeURIComponent(uid)}:runQuery`, {
+      method: 'POST',
+      headers: { ...bearer(idToken), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(FIRESTORE_TIMEOUT_MS),
     });
     if (!response.ok) return null;
-    const data: any = await response.json();
-    const docs = Array.isArray(data?.documents) ? data.documents : [];
-    return docs.length;
+    const raw = await response.text();
+    let rows: unknown[] = [];
+    try {
+      const parsed = JSON.parse(raw);
+      rows = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      // The endpoint can stream newline-delimited objects.
+      rows = raw.split('\n').filter((line) => line.trim().length > 0);
+    }
+    // Rows that carry no document are metadata (e.g. an explain-metrics row).
+    return rows.filter((row: any) => row && row.document).length;
   } catch {
     return null;
   }
@@ -88,16 +131,16 @@ export const countAiUsageToday = async (
 export const recordAiUsage = async (
   uid: string,
   idToken: string,
-  dayKey: string,
+  dayNumber: number,
   kind: 'text' | 'audio'
 ): Promise<void> => {
   try {
     const eventId = randomEventId();
-    const url =
-      `${DOCUMENTS_BASE}/users/${encodeURIComponent(uid)}/aiUsage/${encodeURIComponent(dayKey)}` +
-      `?documentId=${eventId}`;
+    const url = `${eventsCollection(uid)}?documentId=${eventId}`;
     const body = {
       fields: {
+        uid: { stringValue: uid },
+        day: { integerValue: String(dayNumber) },
         kind: { stringValue: kind },
         at: { integerValue: String(Date.now()) },
       },

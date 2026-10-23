@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
-import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayKey } from "./_shared/usage-quota.ts";
+import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
 
 /**
  * Netlify AI proxy.
@@ -227,7 +227,7 @@ const streamText = async (
   config: Record<string, unknown>,
   requestedModel: string,
   requestedTools: any[] | undefined,
-  quota: { uid: string; idToken: string; dayKey: string }
+  quota: { uid: string; idToken: string; dayNumber: number }
 ): Promise<Response> => {
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
@@ -285,7 +285,7 @@ const streamText = async (
           });
           close();
           // The call produced a billable answer: charge it to the allowance.
-          await recordAiUsage(quota.uid, quota.idToken, quota.dayKey, "text");
+          await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
           return;
         }
 
@@ -331,7 +331,7 @@ const bufferText = async (
   config: Record<string, unknown>,
   requestedModel: string,
   requestedTools: any[] | undefined,
-  quota: { uid: string; idToken: string; dayKey: string }
+  quota: { uid: string; idToken: string; dayNumber: number }
 ): Promise<Response> => {
   const model = resolveModel(requestedModel, false);
   const wantsTools =
@@ -343,7 +343,7 @@ const bufferText = async (
   for (const attemptConfig of attempts) {
     const outcome = await runModel(apiKey, model, contents, attemptConfig, () => {});
     if (outcome.status === "ok") {
-      await recordAiUsage(quota.uid, quota.idToken, quota.dayKey, "text");
+      await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
       return jsonResponse(200, {
         text: outcome.text,
         modelUsed: outcome.model,
@@ -363,7 +363,7 @@ const generateAudio = async (
   contents: unknown,
   config: Record<string, unknown>,
   requestedModel: string,
-  quota: { uid: string; idToken: string; dayKey: string }
+  quota: { uid: string; idToken: string; dayNumber: number }
 ): Promise<Response> => {
   const model = resolveModel(requestedModel, true);
 
@@ -377,7 +377,7 @@ const generateAudio = async (
         contents: contents as any,
         config: { ...config, abortSignal: abortController.signal },
       });
-      await recordAiUsage(quota.uid, quota.idToken, quota.dayKey, "audio");
+      await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
       return jsonResponse(200, {
         text: response.text || "",
         candidates: response.candidates || [],
@@ -420,10 +420,10 @@ export default async (request: Request, _context: any): Promise<Response> => {
     .trim();
 
   // ── 2. Enforce the daily allowance ──────────────────────────────────────
-  const dayKey = utcDayKey();
+  const dayNumber = utcDayNumber();
   const plan = await getUserPlan(user.uid, idToken);
   const limit = plan === "premium" ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
-  const used = await countAiUsageToday(user.uid, idToken, dayKey);
+  const used = await countAiUsageToday(user.uid, idToken, dayNumber);
   if (used === null) {
     // Fail closed: if the counter cannot be read we cannot know whether the
     // allowance is spent, and the paid key is on the other side of the door.
@@ -499,7 +499,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
   const isAudio = Array.isArray(modalities) && modalities.includes("AUDIO");
   const requestedModel = body?.model;
 
-  const quota = { uid: user.uid, idToken, dayKey };
+  const quota = { uid: user.uid, idToken, dayNumber };
 
   if (isAudio) {
     return generateAudio(apiKey, contents, config, requestedModel, quota);
