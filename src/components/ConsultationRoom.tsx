@@ -25,7 +25,7 @@ import {
   cancelConsultation,
   describeError,
   getConsultationCase,
-  markMessagesRead,
+  markMessagesReadBatch,
   resolveConsultation,
   revokeConsent,
   sendMessage,
@@ -74,6 +74,7 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
   const [caseData, setCaseData] = useState<ConsultationCase | null>(null);
   const [caseUnavailable, setCaseUnavailable] = useState(false);
   const [messages, setMessages] = useState<ConsultationMessage[]>([]);
+  const [messagesReady, setMessagesReady] = useState(false);
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -98,7 +99,14 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
 
   useEffect(() => {
     const unsubC = watchConsultation(consultationId, setConsultation, () => setAccessLost(true));
-    const unsubM = watchMessages(consultationId, setMessages, () => setAccessLost(true));
+    const unsubM = watchMessages(
+      consultationId,
+      (items) => {
+        setMessages(items);
+        setMessagesReady(true);
+      },
+      () => setAccessLost(true)
+    );
     return () => {
       unsubC();
       unsubM();
@@ -131,15 +139,19 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
     return () => window.clearInterval(interval);
   }, []);
 
+  // Mark the incoming messages as read — ONE batched commit for the whole set.
+  // Writing each message on its own cost N writes and re-read the whole
+  // subcollection on every snapshot. The guard below keeps a message that was
+  // already marked from being written twice.
   useEffect(() => {
-    if (!user || !consultation) return;
-    messages.forEach((m) => {
-      if (m.senderId !== user.uid && !m.readAt && !readSetRef.current.has(m.id)) {
-        readSetRef.current.add(m.id);
-        void markMessagesRead(consultation.id, m, user.uid);
-      }
-    });
-  }, [messages, user, consultation]);
+    if (!user || !consultation || !messagesReady) return;
+    const unread = messages.filter(
+      (m) => m.senderId !== user.uid && !m.readAt && !readSetRef.current.has(m.id)
+    );
+    if (unread.length === 0) return;
+    unread.forEach((m) => readSetRef.current.add(m.id));
+    void markMessagesReadBatch(consultation.id, unread, user.uid);
+  }, [messages, messagesReady, user, consultation]);
 
   // Clear the global "new expert reply" badge for this case. Re-runs whenever
   // the expert sends something while the room is open. Only the farmer side

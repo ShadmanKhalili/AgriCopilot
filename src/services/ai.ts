@@ -1,5 +1,6 @@
 import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
+import { ensureAiSession } from '../firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { readAiNdjsonStream } from '../utils/ndjsonStream';
@@ -41,9 +42,16 @@ type AiProxyResult = {
 // Helper to call AI via backend proxy
 const callAiProxy = async (params: any): Promise<AiProxyResult> => {
   try {
+    // The proxy only serves signed-in callers: it is the only thing that
+    // keeps the paid Gemini key from being an open relay. A farmer who never
+    // signed in gets a guest session created for them here.
+    const idToken = await ensureAiSession();
     const response = await fetchWithTimeout('/api/ai-proxy', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
       // Opt in to NDJSON. Without this flag the proxy returns buffered JSON so
       // pages loaded before a deploy keep working against the new function.
       body: JSON.stringify({ ...params, stream: true }),
@@ -79,9 +87,13 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
 
 // Ephemeral Live API Token retrieval for direct WebSocket sessions
 export const getEphemeralLiveToken = async (): Promise<string> => {
+  const idToken = await ensureAiSession();
   const response = await fetchWithTimeout('/api/gemini/live-token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${idToken}`,
+    },
     timeoutMs: 15000,
     retries: 0
   });
