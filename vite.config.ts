@@ -58,9 +58,36 @@ export default defineConfig(({mode}) => {
             : ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           globIgnores: ['**/node_modules/**'],
           maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
-          navigateFallback: 'index.html',
+          // NOTE: `navigateFallback` is deliberately disabled (vite-plugin-pwa
+          // defaults it to 'index.html'). It registers a cache-first
+          // NavigationRoute, so after a deploy the service worker keeps
+          // serving the *old* index.html from its precache — and that old HTML
+          // points at hashed chunks that the deploy has already deleted. The
+          // browser then asks for a chunk that no longer exists, Netlify's SPA
+          // fallback answers with `index.html` and `text/html`, and the browser
+          // tries to execute HTML as JavaScript: a blank white screen, no
+          // error, for the farmer. Navigations are handled network-first
+          // below, so a farmer always gets the HTML that matches the deployed
+          // chunks.
+          navigateFallback: null,
           cleanupOutdatedCaches: true,
           runtimeCaching: [
+            {
+              // App-shell navigations: always prefer the fresh HTML from the
+              // network, and fall back to the cached copy when the farmer is
+              // offline or the network is too slow. A generous timeout keeps
+              // a slow rural connection on the *fresh* shell rather than
+              // falling back to a stale one.
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'agri-app-shell',
+                networkTimeoutSeconds: 10,
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               // Hashed build assets (index-BI9RNHtI.js) are immutable, so cache them
               // on first use. This keeps the app offline-capable without making the
