@@ -266,7 +266,10 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
       // 1. Fetch Users (admin-only list per firestore.rules)
       let users: any[] = [];
       try {
-        const usersSnap = await getDocs(collection(db, 'users'));
+        // Bound the read: an unbounded users query bills every user document.
+        const usersSnap = await getDocs(
+          query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200))
+        );
         users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
         console.warn("Could not fetch users collection, using base:", err);

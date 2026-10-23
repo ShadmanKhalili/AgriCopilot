@@ -22,6 +22,7 @@ import {
   onSnapshot,
   query,
   where,
+  orderBy,
   limit,
 } from 'firebase/firestore';
 import { db } from '../firestore';
@@ -46,6 +47,11 @@ import {
 } from '../utils/expertTypes';
 
 const nowIso = () => new Date().toISOString();
+
+// Read budgets. A Firestore listener bills one read per document in the
+// result set on every snapshot, so every list query below is bounded.
+const FARMER_CONSULTATION_LIMIT = 50;
+const MESSAGE_PAGE_LIMIT = 200;
 
 export const describeError = (error: any, lang: string): string => {
   const code = String(error?.code || '');
@@ -469,7 +475,14 @@ export const watchFarmerConsultations = (
   cb: (items: Consultation[]) => void
 ): (() => void) =>
   onSnapshot(
-    query(collection(db, 'consultations'), where('farmerId', '==', farmerId)),
+    query(
+      collection(db, 'consultations'),
+      where('farmerId', '==', farmerId),
+      // Bound the result set: a farmer with a long history must not make the
+      // listener bill every consultation on every snapshot. Newest first.
+      orderBy('createdAt', 'desc'),
+      limit(FARMER_CONSULTATION_LIMIT)
+    ),
     (snap) => cb(sortConsultations(snap.docs.map((d) => ({ ...(d.data() as Consultation), id: d.id })))),
     (err) => console.warn('Consultation watch (farmer) failed:', err?.code || err)
   );
@@ -613,13 +626,27 @@ export const watchMessages = (
   consultationId: string,
   cb: (items: ConsultationMessage[]) => void,
   onError?: (error: any) => void
-): (() => void) =>
-  onSnapshot(
-    collection(db, 'consultations', consultationId, 'messages'),
+): (() => void) => {
+  // A snapshot of the whole subcollection bills one read per message on every
+  // event. Bound it to the newest page and let the server do the sorting.
+  let lastSignature = '';
+  return onSnapshot(
+    query(
+      collection(db, 'consultations', consultationId, 'messages'),
+      orderBy('createdAt', 'desc'),
+      limit(MESSAGE_PAGE_LIMIT)
+    ),
     (snap) => {
-      const items = snap.docs
-        .map((d) => ({ ...(d.data() as ConsultationMessage), id: d.id }))
-        .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      const items = snap.docs.map((d) => ({ ...(d.data() as ConsultationMessage), id: d.id }));
+      // Firestore returns the newest page first; the chat renders oldest → newest.
+      items.reverse();
+      // Messages are immutable apart from `readAt` (see firestore.rules), so an
+      // id + readAt signature detects every change the UI can observe. Keeping
+      // the array identity stable avoids re-rendering the whole thread when
+      // nothing actually changed.
+      const signature = items.map((m) => `${m.id}:${m.readAt || ''}`).join('|');
+      if (signature === lastSignature) return;
+      lastSignature = signature;
       cb(items);
     },
     (err) => {
@@ -627,6 +654,7 @@ export const watchMessages = (
       onError?.(err);
     }
   );
+};
 
 export const sendMessage = async (
   consultationId: string,
@@ -675,20 +703,45 @@ export const sendMessage = async (
   return ref.id;
 };
 
+/**
+ * Mark a set of incoming messages as read in ONE batched commit.
+ *
+ * Writing each message separately made every mark-as-read cost N writes and
+ * re-read the whole subcollection; the batch keeps the per-document `readAt`
+ * field (the rules allow exactly that update) but ships it in a single
+ * round-trip.
+ */
+export const markMessagesReadBatch = async (
+  consultationId: string,
+  messages: ConsultationMessage[],
+  readerId: string
+): Promise<void> => {
+  const targets = messages.filter((m) => m.senderId !== readerId && !m.readAt);
+  if (targets.length === 0) return;
+
+  const readAt = nowIso();
+  // Firestore caps a batch at 500 operations; chunk so a very long thread
+  // still commits without hitting the cap.
+  const CHUNK_SIZE = 400;
+  for (let i = 0; i < targets.length; i += CHUNK_SIZE) {
+    const chunk = targets.slice(i, i + CHUNK_SIZE);
+    try {
+      const batch = writeBatch(db);
+      chunk.forEach((m) => {
+        batch.update(doc(db, 'consultations', consultationId, 'messages', m.id), { readAt });
+      });
+      await batch.commit();
+    } catch (e) {
+      console.warn('Mark read failed:', e);
+    }
+  }
+};
+
 export const markMessagesRead = async (
   consultationId: string,
   message: ConsultationMessage,
   readerId: string
-): Promise<void> => {
-  if (message.senderId === readerId || message.readAt) return;
-  try {
-    await updateDoc(doc(db, 'consultations', consultationId, 'messages', message.id), {
-      readAt: nowIso(),
-    });
-  } catch (e) {
-    console.warn('Mark read failed:', e);
-  }
-};
+): Promise<void> => markMessagesReadBatch(consultationId, [message], readerId);
 
 // ---------------------------------------------------------------
 // Reviews
