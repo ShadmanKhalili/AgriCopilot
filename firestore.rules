@@ -155,6 +155,38 @@ service cloud.firestore {
     // Collection Rules & Attribute-Based Access Control (ABAC)
     // ===============================================================
 
+    // ===============================================================
+    // Server-owned AI usage ledger
+    //
+    // The daily AI allowance used to be counted in the user's own profile
+    // document, which the user can rewrite. It is now counted here, in
+    // immutable event documents that only the account holder may append to.
+    //
+    //   users/{uid}/aiUsage/{dayKey}/{eventId}
+    //
+    // `dayKey` is a `YYYYMMDD` string derived from `request.time` — the
+    // server clock — so it cannot be forged, rolled back or rolled forward.
+    // The events cannot be updated or deleted, so the count only ever goes
+    // up: a caller can make their own allowance smaller, never larger.
+    // ===============================================================
+
+    function serverDayKey() {
+      return (request.time.year() * 10000 + request.time.month() * 100 + request.time.day()).toString();
+    }
+
+    match /users/{userId}/aiUsage/{dayKey}/{eventId} {
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    dayKey == serverDayKey() &&
+                    isValidId(dayKey) &&
+                    isValidId(eventId) &&
+                    request.resource.data.keys().hasOnly(['kind', 'at']) &&
+                    request.resource.data.kind in ['text', 'audio'] &&
+                    request.resource.data.at is number;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if false;
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();

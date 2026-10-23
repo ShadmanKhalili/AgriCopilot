@@ -98,6 +98,33 @@ export const signInAsGuest = async () => {
 };
 
 /**
+ * Make sure there is a signed-in account, and return a fresh ID token for it.
+ *
+ * The AI proxy requires a valid Firebase ID token: an open endpoint would let
+ * anyone on the internet spend the project's paid Gemini key. A farmer who
+ * has never signed in still gets a working session — a throwaway guest
+ * account is created for them the first time they use an AI feature, which is
+ * exactly the account model the app already uses for guests.
+ */
+export const ensureAiSession = async (): Promise<string> => {
+  if (auth.currentUser) {
+    return await auth.currentUser.getIdToken();
+  }
+
+  await signInAsGuest();
+
+  // `signInAsGuest` returns early when a sign-in is already in flight, so the
+  // session may not be ready yet. Give it a moment to land.
+  for (let attempt = 0; attempt < 20 && !auth.currentUser; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (!auth.currentUser) {
+    throw new Error('Could not start an AI session on this device.');
+  }
+  return await auth.currentUser.getIdToken();
+};
+
+/**
  * A guest account is either a true Firebase anonymous user or a throwaway
  * password account created by the fallback above. Once Google is linked, the
  * account is considered saved even if the local guest email remains.
