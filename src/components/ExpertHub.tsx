@@ -31,8 +31,8 @@ import {
   listApplications,
   rejectApplication,
   seedDemoExperts,
-  watchFarmerConsultations,
 } from '../services/expertService';
+import { useFarmerConsultations } from '../hooks/useFarmerConsultations';
 import { isConsultationUnread } from '../utils/expertReadState';
 import {
   affiliationLabel,
@@ -59,11 +59,14 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
   const bn = lang === 'bn';
   const { user, userRole, isAdmin, isExpert, signIn, isGuest, signInAsGuest, saveGuestAccount } = useAuth();
 
+  // The farmer's own consultations come from the shared listener, so opening
+  // Expert Hub does not add a second live query on the same collection.
+  const consultations = useFarmerConsultations(!!user?.uid && !isExpert);
+
   const [experts, setExperts] = useState<ExpertPublic[]>([]);
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [application, setApplication] = useState<ExpertApplication | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<any>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -133,7 +136,6 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
       setIsLoading(!user ? false : !isExpert);
       return;
     }
-    let unsub: (() => void) | null = null;
     setIsLoading(true);
     setLoadError(null);
     Promise.allSettled([
@@ -145,15 +147,13 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
       .then((results) => {
         const expertResult = results[0];
         if (expertResult.status === 'rejected') {
-          setLoadError(describeError(expertResult.reason, lang));
+          // Keep the raw error: the message is rendered with the current
+          // language, so a language switch no longer re-reads the directory.
+          setLoadError(expertResult.reason);
         }
       })
       .finally(() => setIsLoading(false));
-    unsub = watchFarmerConsultations(user.uid, setConsultations);
-    return () => {
-      if (unsub) unsub();
-    };
-  }, [user?.uid, isExpert, userRole, reloadKey, lang]);
+  }, [user?.uid, isExpert, userRole, reloadKey]);
 
   // Signing out on a shared phone must not leave a case or request form open.
   useEffect(() => {
@@ -163,7 +163,6 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
     setWizardSeed(null);
     setOnboardingOpen(false);
     setExperts([]);
-    setConsultations([]);
     setApplication(null);
     setAdminApps([]);
   }, [user?.uid]);
@@ -488,7 +487,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                       {bn ? 'বিশেষজ্ঞ তালিকা এখন পাওয়া যাচ্ছে না' : 'Expert directory is unavailable'}
                     </p>
                     <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-0.5">
-                      {loadError}
+                      {describeError(loadError, lang)}
                     </p>
                   </div>
                   <button
