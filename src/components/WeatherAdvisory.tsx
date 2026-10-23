@@ -89,6 +89,17 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [isRefreshingLive, setIsRefreshingLive] = useState(false);
   const [configStatus, setConfigStatus] = useState<{ googleMapsConfigured: boolean; weatherNextConfigured: boolean; activeProviders?: any } | null>(null);
   const prevCoordsRef = React.useRef<string | null>(null);
+  // Monotonic id of the latest weather request. The farmer can move the map
+  // pin (or the GPS can resolve again) while a request is still in flight.
+  // Without this guard a slower response for the previous location can land
+  // last and overwrite the newer one, so the card would show one district's
+  // weather and spray window while the map shows another.
+  const weatherRequestRef = React.useRef(0);
+  // The active forecast model, readable from callbacks that outlive the render
+  // that created them — the force-refresh listener is registered once, so it
+  // would otherwise keep using whichever model was active back then.
+  const forecastModelRef = React.useRef(forecastModel);
+  forecastModelRef.current = forecastModel;
   const t = translations[lang];
 
   useEffect(() => {
@@ -134,7 +145,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
   const fetchWeatherAndAdvisory = async (overrideModel?: 'weathernext3' | 'standard', forceFresh: boolean = false) => {
     if (!globalLocation) return;
-    const activeModel = overrideModel || forecastModel;
+    const requestId = ++weatherRequestRef.current;
+    const activeModel = overrideModel || forecastModelRef.current;
     setIsLoading(true);
     if (forceFresh) {
       setIsRefreshingLive(true);
@@ -484,6 +496,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       if (soilNitrogen !== undefined) newWeather.soilNitrogen = soilNitrogen;
       if (soilCarbon !== undefined) newWeather.soilCarbon = soilCarbon;
       
+      // A newer request superseded this one while it was in flight. Applying
+      // its result would show the wrong district's weather and spray window.
+      if (requestId !== weatherRequestRef.current) return;
+
       setWeather(newWeather);
       setCacheInfo(null);
       const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
@@ -504,6 +520,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         );
       }
     } catch (error: any) {
+      // A superseded request must not overwrite the newer result, nor raise an
+      // error about a location the farmer has already moved away from.
+      if (requestId !== weatherRequestRef.current) return;
       console.error("Weather data fetch error, retrieving offline cache:", error);
       const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
       const cached = getCachedWeather(locKey, activeModel, true);
@@ -524,8 +543,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         );
       }
     } finally {
-      setIsLoading(false);
-      setIsRefreshingLive(false);
+      // Only the newest request may clear the loading state; a superseded one
+      // would hide the spinner while the newer request is still running.
+      if (requestId === weatherRequestRef.current) {
+        setIsLoading(false);
+        setIsRefreshingLive(false);
+      }
     }
   };
 

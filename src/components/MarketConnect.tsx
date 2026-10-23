@@ -109,24 +109,74 @@ export default function MarketConnect({
     if (setPersistedInsights) setPersistedInsights(insights);
   }, [insights, setPersistedInsights]);
 
+  // Crop synchronisation.
+  //
+  // `produce` is the crop the farmer has selected; `persistedProduce` is the
+  // parent's copy, which the AI doctor can change ("check the market for
+  // brinjal"). The two used to overwrite each other: this component pushed
+  // `produce` up on every run, so an externally-set crop was reverted before
+  // the farmer ever saw it.
+  //
+  // `lastPushedProduce` records what this component last published, which is
+  // what lets an external change be told apart from the farmer's own choice.
+  const lastPushedProduce = React.useRef<string | null>(null);
+  // Monotonic id of the latest market request, so a slow response for the
+  // previous crop cannot land after a newer one.
+  const marketRequestRef = React.useRef(0);
+
   React.useEffect(() => {
-    if (setPersistedProduce) setPersistedProduce(produce);
-    if (!insights) {
-      const locKey = `${coords?.latitude?.toFixed(2) || 'default'}_${coords?.longitude?.toFixed(2) || 'default'}`;
-      const cached = getCachedMarket(produce, locKey);
-      if (cached) {
-        setInsights(cached.data);
-        setMarketCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
-        setLastUpdated(new Date(cached.timestamp).toLocaleString());
-      } else if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        // Genuinely offline with no cache: restore the labelled regional baseline
-        const offlineBaseline = getMarketOfflineFallback(produce);
-        if (offlineBaseline) {
-          setInsights(offlineBaseline.data);
-          setMarketCacheInfo({ isCached: true, timestamp: offlineBaseline.timestamp, isFallback: true });
-          setLastUpdated(new Date(offlineBaseline.timestamp).toLocaleString());
-        }
+    const parentCrop = persistedProduce || PRODUCE_TYPES[0];
+
+    if (lastPushedProduce.current === null) {
+      // First run: publish the crop we started with so both sides agree.
+      lastPushedProduce.current = produce;
+      setPersistedProduce?.(produce);
+      return;
+    }
+
+    if (parentCrop !== lastPushedProduce.current) {
+      // The parent holds a crop we did not publish — adopt it.
+      lastPushedProduce.current = parentCrop;
+      setProduce(parentCrop);
+      return;
+    }
+
+    if (produce !== lastPushedProduce.current) {
+      // The farmer picked a different crop — publish it.
+      lastPushedProduce.current = produce;
+      setPersistedProduce?.(produce);
+    }
+  }, [produce, persistedProduce, setPersistedProduce]);
+
+  React.useEffect(() => {
+    // Mandi rates belong to one crop in one place. Reload whenever the crop
+    // or the location changes. Previously the previous crop's rates stayed on
+    // screen under the new crop's name, so the farmer could read tomato
+    // prices while the card was labelled brinjal.
+    const locKey = `${coords?.latitude?.toFixed(2) || 'default'}_${coords?.longitude?.toFixed(2) || 'default'}`;
+    const cached = getCachedMarket(produce, locKey);
+    if (cached) {
+      setInsights(cached.data);
+      setMarketCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
+      setLastUpdated(new Date(cached.timestamp).toLocaleString());
+    } else if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      // Genuinely offline with no cache: restore the labelled regional baseline
+      const offlineBaseline = getMarketOfflineFallback(produce);
+      if (offlineBaseline) {
+        setInsights(offlineBaseline.data);
+        setMarketCacheInfo({ isCached: true, timestamp: offlineBaseline.timestamp, isFallback: true });
+        setLastUpdated(new Date(offlineBaseline.timestamp).toLocaleString());
+      } else {
+        setInsights(null);
+        setMarketCacheInfo(null);
+        setLastUpdated(null);
       }
+    } else {
+      // Nothing cached for this crop and location: show nothing rather than
+      // the previous crop's prices. The farmer taps "get insights" to fetch.
+      setInsights(null);
+      setMarketCacheInfo(null);
+      setLastUpdated(null);
     }
 
     const handleForceRefresh = () => {
@@ -136,7 +186,7 @@ export default function MarketConnect({
     return () => {
       window.removeEventListener('agri:force-refresh-cache', handleForceRefresh);
     };
-  }, [produce, setPersistedProduce, coords]);
+  }, [produce, coords]);
 
   const handleDetectLocation = async () => {
     setIsDetectingLocation(true);
@@ -181,6 +231,7 @@ export default function MarketConnect({
 
     const targetProduce = overrideProduce || produce;
     const targetCoords = overrideCoords || coords;
+    const requestId = ++marketRequestRef.current;
 
     setIsLoading(true);
     setInsights(null);
@@ -191,14 +242,22 @@ export default function MarketConnect({
       
       const isPremiumAnalysis = usePremium || tier === 'premium';
       result = await getMarketInsights(produceName, lang, isPremiumAnalysis, targetCoords || undefined);
-      setInsights(result);
-      if (setPersistedInsights) {
-        setPersistedInsights(result);
+
+      // The farmer can change the crop (or the location) while this request is
+      // in flight. A newer request then supersedes this one, and applying its
+      // result would put one crop's prices under another crop's name.
+      const superseded = requestId !== marketRequestRef.current;
+
+      if (!superseded) {
+        setInsights(result);
+        if (setPersistedInsights) {
+          setPersistedInsights(result);
+        }
+        setLastUpdated(new Date().toLocaleString());
+        setMarketCacheInfo(null);
       }
-      setLastUpdated(new Date().toLocaleString());
       const locKey = `${targetCoords?.latitude?.toFixed(2) || 'default'}_${targetCoords?.longitude?.toFixed(2) || 'default'}`;
       saveCachedMarket(targetProduce, locKey, result);
-      setMarketCacheInfo(null);
 
       // Save query if user is logged in
       if (user) {
@@ -215,6 +274,9 @@ export default function MarketConnect({
         }
       }
     } catch (error: any) {
+      // A superseded request must not put the previous crop's cache or error
+      // back on screen.
+      if (requestId !== marketRequestRef.current) return;
       console.warn("Market insights API failed, retrieving local storage cache:", error);
       const locKey = `${targetCoords?.latitude?.toFixed(2) || 'default'}_${targetCoords?.longitude?.toFixed(2) || 'default'}`;
       const cached = getCachedMarket(targetProduce, locKey);
@@ -269,7 +331,9 @@ export default function MarketConnect({
       console.error("Usage increment failed:", error);
       // We don't overwrite insights here, just log the error
     } finally {
-      setIsLoading(false);
+      // Only the newest request may clear the loading state; a superseded one
+      // would hide the spinner while the newer request is still running.
+      if (requestId === marketRequestRef.current) setIsLoading(false);
     }
   };
 
