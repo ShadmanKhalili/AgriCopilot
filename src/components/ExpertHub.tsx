@@ -33,6 +33,7 @@ import {
   seedDemoExperts,
   watchFarmerConsultations,
 } from '../services/expertService';
+import { isConsultationUnread } from '../utils/expertReadState';
 import {
   affiliationLabel,
   categoryLabel,
@@ -273,10 +274,12 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
   };
 
   const consultationCard = (c: Consultation, isPast: boolean) => {
-    const unread =
-      c.lastMessageSenderRole === 'expert' &&
-      c.lastExpertMessageAt &&
-      (!c.lastFarmerMessageAt || c.lastExpertMessageAt > c.lastFarmerMessageAt);
+    // Use the same per-device read marker as the nav badge (useExpertUnread),
+    // so the card pill and the badge can never disagree: the pill used to be
+    // driven by server timestamps and stayed lit after the farmer had already
+    // opened the case, and it never cleared when the farmer replied because
+    // `lastFarmerMessageAt` was not written on every send.
+    const unread = isConsultationUnread(c);
     return (
       <motion.button
         key={c.id}

@@ -661,7 +661,16 @@ export const sendMessage = async (
   if (message.senderRole === 'farmer') updates.lastFarmerMessageAt = createdAt;
   else updates.lastExpertMessageAt = createdAt;
   if (message.senderRole === 'expert' && message.type !== 'system') updates.firstResponseAt = createdAt;
-  await updateDoc(doc(db, 'consultations', consultationId), updates);
+
+  // The message itself is already stored — the parent counters are only a
+  // convenience for the unread badge. If this write fails the farmer must not
+  // be told the message failed: they would retype and resend it, creating a
+  // duplicate. Log it and move on.
+  try {
+    await updateDoc(doc(db, 'consultations', consultationId), updates);
+  } catch (error) {
+    console.warn('Consultation counters were not refreshed:', error);
+  }
 
   return ref.id;
 };

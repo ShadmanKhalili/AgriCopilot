@@ -104,9 +104,13 @@ export const signInAsGuest = async () => {
  */
 export const isGuestUser = (user: User | null): boolean => {
   if (!user) return false;
-  if (user.isAnonymous) return true;
+  // Google linked means the account is saved — check this first, because the
+  // `isAnonymous` flag is not cleared consistently across SDK versions when a
+  // provider is linked onto an anonymous account.
   const hasGoogle = user.providerData.some((p) => p.providerId === 'google.com');
-  return isGuestEmail(user.email) && !hasGoogle;
+  if (hasGoogle) return false;
+  if (user.isAnonymous) return true;
+  return isGuestEmail(user.email);
 };
 
 const isGuestEmail = (email?: string | null): boolean =>
