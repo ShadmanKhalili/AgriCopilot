@@ -66,12 +66,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let unsubSnapshot: (() => void) | null = null;
+    // uid the currently loaded profile belongs to, so a profile from a previous
+    // account is never shown for a different one.
+    let profileUid: string | null = null;
+    // Monotonic id of the latest auth-state change. An auth change can arrive
+    // while an earlier one is still awaiting Firestore (the profile fetch does
+    // one or more network round trips). Only the newest change may install a
+    // profile listener — see the guard before `onSnapshot` below.
+    let authChangeId = 0;
 
     const handleAuthStateChanged = async (currentUser: User | null) => {
+      const changeId = ++authChangeId;
+
       // Cleanup previous snapshot if it exists
       if (unsubSnapshot) {
         unsubSnapshot();
         unsubSnapshot = null;
+      }
+
+      // The signed-in account changed: drop the previous account's profile so
+      // its role (e.g. admin) and usage counter are never carried over.
+      if (profileUid !== (currentUser?.uid ?? null)) {
+        setUserProfile(null);
+        setUserRole(null);
+        profileUid = null;
       }
 
       setUser(currentUser);
@@ -82,8 +100,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             import('firebase/firestore'),
             import('../firestore'),
           ]);
+
+          // A newer auth change already started while we were loading Firestore.
+          // Abandon this one so it cannot write a stale profile or install a
+          // listener that the newer change will orphan.
+          if (changeId !== authChangeId) return;
+
           const userDocRef = doc(db, 'users', currentUser.uid);
-          
+
           // Initial check for profile
           let userDoc;
           try {
@@ -152,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           
           // Listen for profile updates
-          unsubSnapshot = onSnapshot(userDocRef, (snapshot) => {
+          const listener = onSnapshot(userDocRef, (snapshot) => {
             if (snapshot.exists()) {
               const data = snapshot.data() as UserProfile;
               setUserProfile(data);
@@ -164,6 +188,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
             }
           });
+
+          // If a newer auth change started while we were awaiting Firestore,
+          // installing this listener would orphan it: it would overwrite
+          // `unsubSnapshot` and would never be unsubscribed, so it could keep
+          // restoring the previous account's profile after sign-out.
+          // Tear it down immediately instead.
+          if (changeId !== authChangeId) {
+            listener();
+            return;
+          }
+
+          unsubSnapshot = listener;
+          profileUid = currentUser.uid;
 
         } catch (error: any) {
           if (auth.currentUser) {
@@ -179,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setUserRole(null);
         setUserProfile(null);
+        profileUid = null;
         setIsAuthReady(true);
       }
     };
