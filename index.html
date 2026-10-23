@@ -76,6 +76,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // A build asset that cannot be loaded means this page is a stale copy of
+      // the app shell — a cached index.html from before a deploy, pointing at a
+      // hashed chunk that no longer exists. Without this, the farmer gets a
+      // blank white screen with no idea what happened.
+      window.addEventListener('error', function (event) {
+        var el = event && event.target;
+        if (!el || el.tagName !== 'SCRIPT' || !el.src) return;
+        if (el.src.indexOf('/assets/') === -1) return;
+        var root = document.getElementById('root');
+        if (!root || root.childElementCount > 0) return;
+        root.innerHTML =
+          '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+          'padding:24px;text-align:center;font-family:system-ui,sans-serif;background:#f8fafc;color:#064e3b">' +
+          '<div><div style="font-size:28px;font-weight:800;margin-bottom:8px">&#127807;</div>' +
+          '<div style="font-weight:700;margin-bottom:6px">অ্যাপটি আপডেট হয়েছে।</div>' +
+          '<div style="font-size:14px;opacity:0.8;margin-bottom:18px">The app has been updated. Please reopen it.</div>' +
+          '<button onclick="location.reload()" ' +
+          'style="background:#064e3b;color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:700;cursor:pointer">' +
+          'রিলোড / Reload</button></div></div>';
+      }, true);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

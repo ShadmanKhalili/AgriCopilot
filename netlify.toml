@@ -25,6 +25,16 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Build assets are content-hashed and immutable. If one is missing, it means
+# the visitor is holding a stale copy of index.html from before a deploy.
+# Answering with the SPA fallback (`index.html`, `text/html`) in that case
+# makes the browser execute HTML as JavaScript and the app dies on a blank
+# white screen. A real 404 is the honest answer.
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 404
+
 # SPA fallback
 [[redirects]]
   from = "/*"
