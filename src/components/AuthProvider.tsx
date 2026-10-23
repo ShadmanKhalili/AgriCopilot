@@ -36,7 +36,6 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  upgradeToPremium: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -53,7 +52,6 @@ const AuthContext = createContext<AuthContextType>({
   signUpWithEmail: async () => {},
   loginWithEmail: async () => {},
   signOut: async () => {},
-  upgradeToPremium: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -272,20 +270,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await logout();
   };
 
-  const upgradeToPremium = async () => {
-    if (user) {
-      try {
-        const [{ doc, updateDoc }, { db }] = await Promise.all([
-          import('firebase/firestore'),
-          import('../firestore'),
-        ]);
-        const userDocRef = doc(db, 'users', user.uid);
-        await updateDoc(userDocRef, { tier: 'premium' });
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
-      }
-    }
-  };
+  // NOTE: there used to be an `upgradeToPremium()` helper here that PATCHed the
+  // caller's own profile to `tier: 'premium'`. The Firestore rules never
+  // blocked that write, so every signed-in account could mint itself an
+  // unlimited paid tier. Tier changes are now an admin-only operation.
 
   return (
     <AuthContext.Provider value={{ 
@@ -301,8 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       saveGuestAccount: handleSaveGuest,
       signUpWithEmail: handleSignUp,
       loginWithEmail: handleLogin,
-      signOut: handleSignOut, 
-      upgradeToPremium 
+      signOut: handleSignOut,
     }}>
       {children}
     </AuthContext.Provider>

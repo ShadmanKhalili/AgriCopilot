@@ -43,12 +43,25 @@ service cloud.firestore {
       return val is string && val.size() >= 19 && val.size() <= 50;
     }
 
+    // The email stored on a profile must be the one the Firebase ID token
+    // carries, so a user cannot write somebody else's address onto their own
+    // profile. Anonymous sessions have no `email` claim at all; their only
+    // accepted value is the local `guest-…@agri.local` placeholder.
+    function isEmailBoundToAuth(email) {
+      return (request.auth.token.email != null && email == request.auth.token.email) ||
+             (request.auth.token.email == null && isStr(email, 1, 128) && email.matches('^guest-[a-z0-9]{1,64}@agri\\.local$'));
+    }
+
     // ===============================================================
     // Entity Schema Validators
     // ===============================================================
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email', 'role', 'tier', 'usageCount', 'createdAt']) &&
+             // Close the schema: without this a write could smuggle in extra
+             // fields (custom claims, flags, anything) that later code might
+             // start trusting.
+             data.keys().hasOnly(['uid', 'email', 'name', 'role', 'tier', 'usageCount', 'lastUsedDate', 'createdAt', 'updatedAt', 'expertLevel', 'orgId']) &&
              isStr(data.uid, 1, 128) &&
              isStr(data.email, 3, 128) &&
              data.role in ['agri-preneur', 'hub-manager', 'admin', 'expert_pending', 'expert', 'org_admin'] &&
@@ -145,22 +158,33 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isSignedIn() && isValidUser(incoming()) && 
+      // A profile is created exactly once, by its owner, with the free tier and
+      // the farmer role baked in. `tier` used to be a self-service field, which
+      // let any signed-in account PATCH itself to 'premium'.
+      allow create: if isSignedIn() && isValidUser(incoming()) &&
                     incoming().uid == request.auth.uid &&
                     userId == request.auth.uid &&
                     isValidId(userId) &&
-                    (incoming().role == 'agri-preneur' || isAdmin()); // Prevent Privilege Escalation
+                    isEmailBoundToAuth(incoming().email) &&
+                    (
+                      (incoming().role == 'agri-preneur' && incoming().tier == 'free') ||
+                      (isAdmin() && incoming().role == 'admin' && incoming().tier == 'premium')
+                    );
       allow update: if isSignedIn() && isValidUser(incoming()) &&
                     (
                       // Admins may manage any profile (role/tier included)
                       (isAdmin() && incoming().uid == existing().uid) ||
-                      // Users may update only their own non-privileged fields
+                      // Users may update only their own non-privileged fields.
+                      // `tier` and `role` are pinned to their current value:
+                      // promoting an account to premium is a paid entitlement
+                      // and must never be a self-service write.
                       (isOwner(userId) &&
                        incoming().uid == existing().uid &&
                        incoming().email == existing().email &&
                        incoming().createdAt == existing().createdAt &&
                        incoming().role == existing().role &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'usageCount', 'lastUsedDate', 'name', 'updatedAt']))
+                       incoming().tier == existing().tier &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['usageCount', 'lastUsedDate', 'name', 'updatedAt']))
                     );
       allow delete: if isAdmin();
     }
@@ -187,12 +211,12 @@ service cloud.firestore {
       // Farmers read their own Rx history; admins read the national audit registry.
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(prescriptionId);
-      // Signed-in users write prescriptions owned by themselves; guests may write anonymous ones.
-      allow create: if isValidPrescription(incoming()) &&
-                    (
-                      (isSignedIn() && incoming().userId == request.auth.uid) ||
-                      (incoming().userId == 'anonymous')
-                    );
+      // Only a signed-in owner may file a prescription. The old rule also
+      // accepted `userId == 'anonymous'` with no `isSignedIn()` check, which
+      // let any anonymous caller inject rows into the national audit registry.
+      allow create: if isSignedIn() &&
+                    isValidPrescription(incoming()) &&
+                    incoming().userId == request.auth.uid;
       allow update: if isAdmin() && isValidPrescription(incoming());
       allow delete: if isAdmin();
     }
