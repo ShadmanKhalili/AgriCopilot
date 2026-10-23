@@ -11,7 +11,7 @@ import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import toast from 'react-hot-toast';
 import { LiveExpertCall } from './LiveExpertCall';
 import CropLifecycleCalendar from './CropLifecycleCalendar';
@@ -116,7 +116,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
             retries: 1
           }
         );
-        weatherData = await weatherRes.json();
+        weatherData = await readJsonWithTimeout<any>(weatherRes, 12000);
       } catch (e) {
         console.warn("Failed to fetch weather data", e);
       }
@@ -130,7 +130,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
           body: JSON.stringify({ lat: activeLocation.latitude, lng: activeLocation.longitude }),
           timeoutMs: 30000
         });
-        satelliteData = await satRes.json();
+        satelliteData = await readJsonWithTimeout<any>(satRes, 30000);
       } catch (e) {
         console.warn("Failed to fetch satellite data", e);
       }

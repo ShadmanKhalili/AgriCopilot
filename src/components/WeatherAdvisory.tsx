@@ -8,7 +8,7 @@ import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
 import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
 import { saveCachedWeather, getCachedWeather, formatCacheAge, formatExactSyncTime } from '../utils/offlineCache';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
 import toast from 'react-hot-toast';
 import SevereWeatherAlerts, { WeatherAlertItem } from './SevereWeatherAlerts';
@@ -104,7 +104,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
   useEffect(() => {
     fetchWithTimeout('/api/config-status', { timeoutMs: 8000, retries: 0 })
-      .then(res => res.json())
+      .then(res => readJsonWithTimeout<any>(res, 8000))
       .then(data => setConfigStatus(data))
       .catch(() => {});
   }, []);
@@ -180,7 +180,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             { ...liveFetchOptions, timeoutMs: 10000, retries: 0 }
           );
           if (wnRes.ok) {
-            wnData = await wnRes.json();
+            wnData = await readJsonWithTimeout<any>(wnRes, 10000);
             if (!wnData?.current) {
               console.warn("WeatherNext-3 returned incomplete data structure, engaging daily-forecast fallback");
               wnData = null;
@@ -281,12 +281,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         );
         
         if (!weatherRes.ok) {
-          const errJson = await weatherRes.json().catch(() => ({}));
+          const errJson = await readJsonWithTimeout<any>(weatherRes, 12000).catch(() => ({}));
           console.error("Weather API Error Response:", weatherRes.status, errJson);
           throw new Error(errJson.error || `Weather server returned ${weatherRes.status}`);
         }
 
-        const weatherData = await weatherRes.json();
+        const weatherData = await readJsonWithTimeout<any>(weatherRes, 12000);
         
         if (!weatherData.current) {
           throw new Error("Invalid weather data format received from Open-Meteo");
@@ -433,7 +433,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         const climateRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`, { timeoutMs: 8000, retries: 0 });
         
         if (climateRes.ok) {
-          const climateData = await climateRes.json();
+          const climateData = await readJsonWithTimeout<any>(climateRes, 8000);
           if (climateData.daily?.temperature_2m_mean && climateData.daily?.time) {
             const temps = climateData.daily.temperature_2m_mean;
             const times = climateData.daily.time;
@@ -459,7 +459,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         const lastYearRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${lastYearTodayStr}&end_date=${lastYearTodayStr}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`, { timeoutMs: 8000, retries: 0 });
         
         if (lastYearRes.ok) {
-          const lastYearData = await lastYearRes.json();
+          const lastYearData = await readJsonWithTimeout<any>(lastYearRes, 8000);
           if (lastYearData.daily && lastYearData.daily.temperature_2m_max.length > 0) {
             historicalToday = {
               maxTemp: lastYearData.daily.temperature_2m_max[0],
@@ -476,7 +476,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       let soilPH, soilNitrogen, soilCarbon;
       try {
         const soilRes = await fetchWithTimeout(`/api/soil-properties?lon=${globalLocation.longitude}&lat=${globalLocation.latitude}&property=phh2o&property=nitrogen&property=soc&depth=0-5cm&value=mean`, { timeoutMs: 8000, retries: 0 });
-        const soilData = await soilRes.json();
+        const soilData = await readJsonWithTimeout<any>(soilRes, 8000);
         
         const layers = soilData.properties?.layers || [];
         const phLayer = layers.find((l: any) => l.name === 'phh2o');

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import type { LiveServerMessage } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -82,6 +82,17 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
   }
 ];
 
+// --- Live audio visualizer --------------------------------------------------
+// The visualizer runs inside a requestAnimationFrame loop. The levels live in
+// a ref and the bars are painted through direct DOM writes, so the 2700+ line
+// component is not re-rendered ~60 times per second on a budget Android phone.
+const VISUALIZER_BAR_COUNT = 24;
+const IDLE_AUDIO_LEVELS = new Array(VISUALIZER_BAR_COUNT).fill(0.08);
+// The height easing the previous motion tween used (80 ms ease-out) plus the
+// colour transition Tailwind's `transition-colors` provides.
+const VISUALIZER_BAR_TRANSITION =
+  'height 80ms ease-out, color 150ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 150ms cubic-bezier(0.4, 0, 0.2, 1), fill 150ms cubic-bezier(0.4, 0, 0.2, 1), stroke 150ms cubic-bezier(0.4, 0, 0.2, 1)';
+
 export default function LiveVideoCopilot({
   lang,
   locationContext = "Bangladesh",
@@ -102,7 +113,11 @@ export default function LiveVideoCopilot({
   const [streamFps, setStreamFps] = useState(1);
   const [totalFramesSent, setTotalFramesSent] = useState(0);
   const [liveState, setLiveState] = useState<'idle' | 'listening' | 'analyzing' | 'speaking'>('idle');
-  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(24).fill(0));
+  // The live levels live in a ref: the rAF loop mutates them in place and
+  // paints the bars through direct DOM writes, so no React state update (and
+  // no re-render of this component) happens per animation frame.
+  const audioLevelsRef = useRef<number[]>(new Array(VISUALIZER_BAR_COUNT).fill(0));
+  const visualizerBarRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [transcripts, setTranscripts] = useState<TranscriptTurn[]>([]);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -546,15 +561,15 @@ export default function LiveVideoCopilot({
 
   // Visualizer Loop
   const updateVisualizer = () => {
-    let aiLevels: number[] = new Array(24).fill(0);
-    let userLevels: number[] = new Array(24).fill(0);
+    let aiLevels: number[] = new Array(VISUALIZER_BAR_COUNT).fill(0);
+    let userLevels: number[] = new Array(VISUALIZER_BAR_COUNT).fill(0);
     let aiSum = 0;
     let userSum = 0;
 
     if (analyserRef.current) {
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
       analyserRef.current.getByteFrequencyData(dataArray);
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < VISUALIZER_BAR_COUNT; i++) {
         const val = (dataArray[i * 2] || 0) / 255;
         aiLevels[i] = val;
         aiSum += val;
@@ -564,7 +579,7 @@ export default function LiveVideoCopilot({
     if (userAnalyserRef.current && !isMutedRef.current) {
       const dataArray = new Uint8Array(userAnalyserRef.current.frequencyBinCount);
       userAnalyserRef.current.getByteFrequencyData(dataArray);
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < VISUALIZER_BAR_COUNT; i++) {
         const val = (dataArray[i * 2] || 0) / 255;
         userLevels[i] = val;
         userSum += val;
@@ -574,15 +589,30 @@ export default function LiveVideoCopilot({
     const aiSpeaking = aiSum > 0.8;
     const userSpeaking = userSum > 0.6;
 
+    let nextLevels: number[];
     if (aiSpeaking) {
       setLiveState('speaking');
-      setAudioLevels(aiLevels);
+      nextLevels = aiLevels;
     } else if (userSpeaking) {
       setLiveState('listening');
-      setAudioLevels(userLevels);
+      nextLevels = userLevels;
     } else {
       setLiveState('idle');
-      setAudioLevels(new Array(24).fill(0.08));
+      nextLevels = IDLE_AUDIO_LEVELS;
+    }
+
+    // Mutate the shared level buffer in place (same array identity) and paint
+    // the bars directly. A fresh array in React state would re-render this
+    // whole component on every animation frame.
+    const levels = audioLevelsRef.current;
+    for (let i = 0; i < VISUALIZER_BAR_COUNT; i++) {
+      levels[i] = nextLevels[i];
+    }
+
+    const bars = visualizerBarRefs.current;
+    for (let i = 0; i < bars.length; i++) {
+      const bar = bars[i];
+      if (bar) bar.style.height = `${Math.max(4, levels[i] * 52)}px`;
     }
 
     animFrameRef.current = requestAnimationFrame(updateVisualizer);
@@ -1247,7 +1277,7 @@ Return a JSON object with this exact structure:
         });
 
         if (proxyResp.ok) {
-          const proxyData = await proxyResp.json();
+          const proxyData = await readJsonWithTimeout<any>(proxyResp, 45000);
           const parsed = JSON.parse(proxyData.text || '{}');
           const title = parsed.sessionTitle || (lang === 'bn' ? 'লাইভ ভিডিও ও ভয়েস পরামর্শ সেশন' : 'Live Video & Voice Consultation Session');
           const summary = parsed.comprehensiveSummary || (lang === 'bn' 
@@ -2409,11 +2439,14 @@ Return a JSON object with this exact structure:
             <div className={`absolute left-4 right-4 flex items-center justify-center gap-1 z-20 pointer-events-none ${
               isFullscreen ? 'bottom-28 sm:bottom-32' : 'bottom-16 sm:bottom-20'
             }`}>
-              {audioLevels.map((lvl, idx) => (
+              {Array.from({ length: VISUALIZER_BAR_COUNT }, (_, idx) => (
                 <motion.div
                   key={idx}
-                  animate={{ height: Math.max(4, lvl * 52) }}
-                  transition={{ duration: 0.08 }}
+                  ref={(el: HTMLDivElement | null) => {
+                    visualizerBarRefs.current[idx] = el;
+                    if (el) el.style.height = `${Math.max(4, (audioLevelsRef.current[idx] || 0) * 52)}px`;
+                  }}
+                  style={{ transition: VISUALIZER_BAR_TRANSITION }}
                   className={`w-1 rounded-full transition-colors ${
                     liveState === 'speaking' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' :
                     liveState === 'listening' ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]' : 'bg-gray-600/60'

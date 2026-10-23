@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
 
 interface Props {
@@ -86,7 +86,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
         body: JSON.stringify({ lat: globalLocation.latitude, lng: globalLocation.longitude }),
         timeoutMs: 30000
       });
-      const data = await response.json();
+      const data = await readJsonWithTimeout<any>(response, 30000);
       if (data.error) {
         const detailStr = data.details ? (typeof data.details === 'object' ? JSON.stringify(data.details) : data.details) : '';
         if (data.error === 'invalid_client' || detailStr.includes('invalid_client')) {

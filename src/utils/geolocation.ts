@@ -1,4 +1,4 @@
-import { fetchWithTimeout } from './fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from './fetchWithTimeout';
 
 export interface DetectedCoordinates {
   latitude: number;
@@ -28,7 +28,7 @@ export async function getFallbackLocation(): Promise<DetectedCoordinates> {
   try {
     const response = await fetchWithTimeout('/api/ip-location', { timeoutMs: 5000, retries: 1 });
     if (!response.ok) throw new Error('IP location failed');
-    const data = await response.json();
+    const data = await readJsonWithTimeout<any>(response, 5000);
     const lat = parseFloat(data.latitude);
     const lon = parseFloat(data.longitude);
     if (!isNaN(lat) && !isNaN(lon)) {
