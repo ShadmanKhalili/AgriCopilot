@@ -515,11 +515,26 @@ service cloud.firestore {
                     (
                       isAdmin() ||
                       // Farmer: cancel, revoke consent, rate/close, refresh counters.
+                      // The status check is about the farmer's own status
+                      // transitions. It must NOT gate the counter/consent
+                      // updates above it, because `incoming().status` is the
+                      // *current* status for those writes — and the current
+                      // status is 'accepted' or 'awaiting_farmer' precisely
+                      // when the farmer is expected to reply. Gating on it
+                      // denied the farmer's message bookkeeping (and consent
+                      // revocation) in exactly the states that matter.
                       (existing().farmerId == request.auth.uid &&
                        incoming().farmerId == existing().farmerId &&
                        incoming().expertId == existing().expertId &&
                        incoming().createdAt == existing().createdAt &&
-                       incoming().status in ['requested', 'cancelled', 'closed', 'resolved', 'in_progress'] &&
+                       (
+                         // Status unchanged: counters, consent withdrawal,
+                         // rating and close/cancel are always allowed.
+                         incoming().status == existing().status ||
+                         // Status moved: the farmer may only move to a
+                         // status they own.
+                         incoming().status in ['requested', 'cancelled', 'closed', 'resolved', 'in_progress']
+                       ) &&
                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'consentRevoked', 'consentRevokedAt', 'farmerRating', 'farmerFeedback', 'closedAt', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastFarmerMessageAt'])) ||
                       // Expert: accept, progress, resolve, refresh counters.
                       (existing().expertId == request.auth.uid &&
