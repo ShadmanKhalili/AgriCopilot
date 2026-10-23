@@ -54,6 +54,50 @@ export function sanitizePromptInput(userInput: string, maxChars: number = 4000):
   return { sanitized, isFlagged };
 }
 
+// 5. Safe external links
+//
+// Scheme links that a farmer is invited to open are a phishing surface: an
+// `https://evil.example` link rendered as "Government Subsidy Portal" sends
+// the farmer — and any reputation the portal has earned — somewhere else.
+// Only real web addresses are ever turned into an anchor target, and the
+// hostname is shown so the destination is visible before the tap.
+
+const SAFE_EXTERNAL_PROTOCOLS = ['http:', 'https:'];
+
+/**
+ * Return the URL if it is a safe external destination, otherwise null.
+ *
+ * Rejects `javascript:`, `data:`, `vbscript:`, `blob:` and every other
+ * scheme, as well as anything that does not parse as a URL.
+ */
+export function safeExternalUrl(url: unknown): string | null {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    return null;
+  }
+  if (!SAFE_EXTERNAL_PROTOCOLS.includes(parsed.protocol)) return null;
+  // A hostname has to exist; `https://` alone is not a destination.
+  if (!parsed.hostname || !parsed.hostname.includes('.')) return null;
+  return parsed.toString();
+}
+
+/**
+ * The hostname of an external URL, for display next to the link so the
+ * destination is obvious. Returns an empty string for anything unsafe.
+ */
+export function externalHostLabel(url: unknown): string {
+  const safe = safeExternalUrl(url);
+  if (!safe) return '';
+  try {
+    return new URL(safe).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
 // 4. Safe LocalStorage with Prototype Pollution Guard
 export const safeStorage = {
   getItem<T = any>(key: string, fallback: T): T {
