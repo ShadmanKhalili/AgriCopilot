@@ -67,6 +67,39 @@ interface PillarMeta {
   icon: any;
 }
 
+/**
+ * One tab panel.
+ *
+ * The panel keeps a stable React key for its whole life, so switching tabs
+ * never unmounts the tab's content: a paid AI answer, a Firestore listener
+ * and the live video copilot all survive the switch. The enter animation is
+ * applied here rather than on a keyed wrapper, because remounting the wrapper
+ * is exactly what used to throw the answer away.
+ */
+function TabPanel({
+  id,
+  active,
+  children
+}: {
+  id: Tab;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      id={`panel-${id}`}
+      role="tabpanel"
+      aria-labelledby={`tab-${id}`}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: active ? 1 : 0, y: active ? 0 : 8 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
+      className={active ? 'block flex-1' : 'hidden'}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export default function Layout() {
   const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['agri-copilot']));
@@ -115,6 +148,9 @@ export default function Layout() {
   const [agriCropStage, setAgriCropStage] = useState<string>('');
   const [agriCrop, setAgriCrop] = useState<string>('');
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
+  // The copilot mode (static upload vs live stream) is part of the farmer's
+  // session, so it survives a tab switch like the rest of the copilot state.
+  const [agriCopilotMode, setAgriCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
 
   // Human Expert Layer: a diagnosis screen can hand a pre-filled request seed
   // to the Expert Hub (which opens the consent wizard).
@@ -1040,14 +1076,14 @@ export default function Layout() {
                 </button>
               </div>
 
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18, ease: "easeOut" }}
-                  className="flex-1 flex flex-col"
-                >
+              {/* The tab panels are kept alive across tab switches. This wrapper
+                  deliberately has no changing key: remounting it used to
+                  destroy the active tab's whole subtree, which threw away a
+                  paid AI answer, tore down every Firestore listener and
+                  remounted the live video copilot on every bottom-nav tap.
+                  The enter animation now lives on each panel (see TabPanel),
+                  so it still plays on every switch. */}
+              <div className="flex-1 flex flex-col">
                   <Suspense fallback={
                     <div className="flex-1 flex flex-col items-center justify-center p-20 text-emerald-700/60">
                       <Loader2 className="w-10 h-10 animate-spin mb-3 text-emerald-600" />
@@ -1056,7 +1092,7 @@ export default function Layout() {
                       </div>
                     </div>
                   }>
-                    <div id="panel-agri-copilot" role="tabpanel" aria-labelledby="tab-agri-copilot" className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
+                    <TabPanel id="agri-copilot" active={activeTab === 'agri-copilot'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('agri-copilot') && (
                         <AgriCopilot 
@@ -1079,6 +1115,8 @@ export default function Layout() {
                           setPersistedCrop={setAgriCrop}
                           persistedAnalysisType={agriAnalysisType}
                           setPersistedAnalysisType={setAgriAnalysisType}
+                          persistedCopilotMode={agriCopilotMode}
+                          setPersistedCopilotMode={setAgriCopilotMode}
                           onNavigateTab={handleNavigateTab}
                           onlineExpertCount={expertOnlineCount}
                           onRequestExpert={(seed: any) => {
@@ -1089,8 +1127,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-expert-hub" role="tabpanel" aria-labelledby="tab-expert-hub" className={activeTab === 'expert-hub' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="expert-hub" active={activeTab === 'expert-hub'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('expert-hub') && (
                         <ExpertHub
@@ -1100,8 +1138,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-weather-advisory" role="tabpanel" aria-labelledby="tab-weather-advisory" className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="weather-advisory" active={activeTab === 'weather-advisory'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('weather-advisory') && (
                         <WeatherAdvisory 
@@ -1111,8 +1149,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-krishi-profit" role="tabpanel" aria-labelledby="tab-krishi-profit" className={activeTab === 'krishi-profit' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="krishi-profit" active={activeTab === 'krishi-profit'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('krishi-profit') && (
                         <KrishiProfitCalculator 
@@ -1123,8 +1161,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-climate-resilience" role="tabpanel" aria-labelledby="tab-climate-resilience" className={activeTab === 'climate-resilience' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="climate-resilience" active={activeTab === 'climate-resilience'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('climate-resilience') && (
                         <ClimateResilienceGuide 
@@ -1135,8 +1173,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-crop-health" role="tabpanel" aria-labelledby="tab-crop-health" className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="crop-health" active={activeTab === 'crop-health'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('crop-health') && (
                         <SatelliteHealth 
@@ -1146,13 +1184,13 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-smart-grade" role="tabpanel" aria-labelledby="tab-smart-grade" className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="smart-grade" active={activeTab === 'smart-grade'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-smart-planting" role="tabpanel" aria-labelledby="tab-smart-planting" className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="smart-planting" active={activeTab === 'smart-planting'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('smart-planting') && (
                         <SmartPlanting 
@@ -1163,8 +1201,8 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-market-connect" role="tabpanel" aria-labelledby="tab-market-connect" className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="market-connect" active={activeTab === 'market-connect'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('market-connect') && (
                         <MarketConnect 
@@ -1179,40 +1217,39 @@ export default function Layout() {
                         />
                       )}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-community-radar" role="tabpanel" aria-labelledby="tab-community-radar" className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="community-radar" active={activeTab === 'community-radar'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-gov-schemes" role="tabpanel" aria-labelledby="tab-gov-schemes" className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="gov-schemes" active={activeTab === 'gov-schemes'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-user-guide" role="tabpanel" aria-labelledby="tab-user-guide" className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="user-guide" active={activeTab === 'user-guide'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-farmer-dossier" role="tabpanel" aria-labelledby="tab-farmer-dossier" className={activeTab === 'farmer-dossier' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="farmer-dossier" active={activeTab === 'farmer-dossier'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('farmer-dossier') && <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="profile" active={activeTab === 'profile'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
                       </ErrorBoundary>
-                    </div>
-                    <div id="panel-admin-dashboard" role="tabpanel" aria-labelledby="tab-admin-dashboard" className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
+                    </TabPanel>
+                    <TabPanel id="admin-dashboard" active={activeTab === 'admin-dashboard'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('admin-dashboard') && userRole === 'admin' && <AdminDashboard lang={lang} />}
                       </ErrorBoundary>
-                    </div>
+                    </TabPanel>
                   </Suspense>
-                </motion.div>
-              </AnimatePresence>
+              </div>
             </div>
           </main>
 

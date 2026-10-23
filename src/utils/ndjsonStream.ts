@@ -22,7 +22,8 @@ export interface AiStreamResult {
 
 export async function readAiNdjsonStream(
   response: Response,
-  idleTimeoutMs: number = AI_STREAM_IDLE_TIMEOUT_MS
+  idleTimeoutMs: number = AI_STREAM_IDLE_TIMEOUT_MS,
+  signal?: AbortSignal
 ): Promise<AiStreamResult> {
   if (!response.body) {
     throw new Error('AI stream is not readable in this browser.');
@@ -45,6 +46,16 @@ export async function readAiNdjsonStream(
       void reader.cancel('AI stream stalled').catch(() => {});
     }, idleTimeoutMs);
   };
+
+  // The caller gave up (e.g. the screen unmounted): stop downloading the
+  // answer instead of leaving the connection open in the background.
+  const onAbort = () => {
+    void reader.cancel('aborted').catch(() => {});
+  };
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+  signal?.addEventListener('abort', onAbort, { once: true });
 
   const handleLine = (rawLine: string) => {
     const line = rawLine.trim();
@@ -83,6 +94,11 @@ export async function readAiNdjsonStream(
       if (finalEvent) break;
 
       const { value, done } = await reader.read();
+      // A cancelled download is not a truncated answer: report it as an abort
+      // so the caller neither retries nor blames the farmer's connection.
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       if (done) break;
 
       armWatchdog();
@@ -98,8 +114,12 @@ export async function readAiNdjsonStream(
     }
   } finally {
     if (idleTimer) clearTimeout(idleTimer);
+    signal?.removeEventListener('abort', onAbort);
   }
 
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
   if (buffer.trim()) handleLine(buffer);
 
   if (streamError) throw streamError;

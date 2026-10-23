@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer, HeartHandshake } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
-import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation } from '../services/ai';
+import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation, isAbortError } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
@@ -567,6 +567,9 @@ interface Props {
   setPersistedAnalysisType?: (type: string) => void;
   persistedDescription?: string;
   setPersistedDescription?: (desc: string) => void;
+  /** The farmer's chosen copilot mode (static upload / live stream). */
+  persistedCopilotMode?: 'static_upload' | 'live_stream';
+  setPersistedCopilotMode?: (mode: 'static_upload' | 'live_stream') => void;
   onNavigateTab?: (tab: any, payload?: any) => void;
   /** Live count of experts accepting requests (null = unknown, e.g. guest). */
   onlineExpertCount?: number | null;
@@ -606,6 +609,8 @@ export default function AgriCopilot({
   setPersistedAnalysisType,
   persistedDescription,
   setPersistedDescription,
+  persistedCopilotMode,
+  setPersistedCopilotMode,
   onNavigateTab,
   onlineExpertCount,
   onRequestExpert
@@ -640,12 +645,28 @@ export default function AgriCopilot({
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
-  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
+  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>(persistedCopilotMode || 'live_stream');
   // Which sample scenario card is currently loaded (visual selection ring)
   const [activeSampleIdx, setActiveSampleIdx] = useState<number | null>(null);
   const [customContextText, setCustomContextText] = useState('');
   const [isRxModalOpen, setIsRxModalOpen] = useState(false);
   const [rxModalData, setRxModalData] = useState<PrescriptionData | null>(null);
+
+  // --- Cancellation of in-flight AI work ---------------------------------
+  // A paid model call must not keep running (and must not have its answer
+  // applied) after the screen that asked for it is gone.
+  const isMountedRef = useRef(true);
+  const aiAbortControllersRef = useRef<Set<AbortController>>(new Set());
+
+  const beginAiRequest = () => {
+    const controller = new AbortController();
+    aiAbortControllersRef.current.add(controller);
+    return controller;
+  };
+
+  const endAiRequest = (controller: AbortController) => {
+    aiAbortControllersRef.current.delete(controller);
+  };
 
   const handleOpenPrescriptionModal = () => {
     if (!diagnosis) return;
@@ -790,6 +811,23 @@ export default function AgriCopilot({
   useEffect(() => {
     if (setPersistedDescription) setPersistedDescription(description);
   }, [description, setPersistedDescription]);
+
+  useEffect(() => {
+    if (setPersistedCopilotMode) setPersistedCopilotMode(copilotMode);
+  }, [copilotMode, setPersistedCopilotMode]);
+
+  // Cancel every in-flight AI request when this screen goes away, and ignore
+  // any state update that arrives after that point.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      aiAbortControllersRef.current.forEach((controller) => {
+        try { controller.abort(); } catch (e) { /* already aborted */ }
+      });
+      aiAbortControllersRef.current.clear();
+    };
+  }, []);
 
   const handleClearAll = () => {
     setImages([]);
@@ -939,12 +977,15 @@ export default function AgriCopilot({
   const handleTranslate = async () => {
     if (!diagnosis) return;
     setIsTranslating(true);
+    const controller = beginAiRequest();
     try {
       const targetLang = lang === 'en' ? 'English' : 'Bengali';
       
       // Translate diagnosis
-      const translatedDiagnosis = await translateText(diagnosis.diagnosis, targetLang);
-      const translatedAdvice = await translateText(diagnosis.verificationAdvice, targetLang);
+      const translatedDiagnosis = await translateText(diagnosis.diagnosis, targetLang, controller.signal);
+      const translatedAdvice = await translateText(diagnosis.verificationAdvice, targetLang, controller.signal);
+      
+      if (!isMountedRef.current) return;
       
       setDiagnosis(prev => prev ? {
         ...prev,
@@ -954,8 +995,8 @@ export default function AgriCopilot({
 
       // Generate new TTS
       try {
-        const base64Audio = await generateSpeech(translatedDiagnosis);
-        if (base64Audio) {
+        const base64Audio = await generateSpeech(translatedDiagnosis, controller.signal);
+        if (base64Audio && isMountedRef.current) {
           const binary = atob(base64Audio);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {
@@ -966,13 +1007,21 @@ export default function AgriCopilot({
           setAudioUrl(URL.createObjectURL(blob));
         }
       } catch (ttsError) {
-        console.error("TTS generation failed after translation:", ttsError);
+        if (!isAbortError(ttsError)) {
+          console.error("TTS generation failed after translation:", ttsError);
+        }
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        console.info('Translation cancelled.');
+        toast.error(lang === 'bn' ? 'অনুবাদ বাতিল করা হ\u09DFেছে।' : 'Translation cancelled.');
+        return;
+      }
       console.error("Translation error:", error);
       toast.error(lang === 'bn' ? "অনুবাদ করতে সমস্যা হয়েছে।" : "Failed to translate content.");
     } finally {
-      setIsTranslating(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsTranslating(false);
     }
   };
 
@@ -994,14 +1043,21 @@ export default function AgriCopilot({
     setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setIsChatLoading(true);
 
+    const controller = beginAiRequest();
     try {
-      const response = await activeSession.sendMessage({ message: userMessage });
+      const response = await activeSession.sendMessage({ message: userMessage }, controller.signal);
+      if (!isMountedRef.current) return;
       setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
     } catch (error) {
+      if (isAbortError(error)) {
+        console.info('Chat request cancelled.');
+        return;
+      }
       console.error("Chat error:", error);
       toast.error(t.tooltips.chatError);
     } finally {
-      setIsChatLoading(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsChatLoading(false);
       setTimeout(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -1026,15 +1082,22 @@ export default function AgriCopilot({
     setChatMessages(prev => [...prev, { role: 'user', text: formattedPrompt }]);
     setIsChatLoading(true);
 
+    const controller = beginAiRequest();
     try {
-      const response = await activeSession.sendMessage({ message: formattedPrompt });
+      const response = await activeSession.sendMessage({ message: formattedPrompt }, controller.signal);
+      if (!isMountedRef.current) return;
       setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
-      toast.success(lang === 'bn' ? 'নতুন তথ্যের আলোকে পরামর্শ যোগ করা হয়েছে' : 'Advisory updated with new context');
+      toast.success(lang === 'bn' ? 'নতুন তথ্যের আলোকে পরামর্শ যোগ করা হ\u09DFেছে' : 'Advisory updated with new context');
     } catch (error) {
+      if (isAbortError(error)) {
+        console.info('Chat request cancelled.');
+        return;
+      }
       console.error("Chat context error:", error);
       toast.error(t.tooltips.chatError);
     } finally {
-      setIsChatLoading(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsChatLoading(false);
       setTimeout(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -1115,8 +1178,10 @@ export default function AgriCopilot({
     if (chatMessages.length < 2 || isSummarizing) return;
     
     setIsSummarizing(true);
+    const controller = beginAiRequest();
     try {
-      const summary = await summarizeConversation(chatMessages, lang);
+      const summary = await summarizeConversation(chatMessages, lang, controller.signal);
+      if (!isMountedRef.current) return;
       setChatSummary(summary);
       
       if (user && lastDiagnosisId) {
@@ -1130,24 +1195,31 @@ export default function AgriCopilot({
           handleFirestoreError(error, OperationType.UPDATE, 'diagnoses');
         }
       } else if (!user) {
-        toast.success(lang === 'bn' ? 'সারাংশ তৈরি হয়েছে! সেভ করতে লগ-ইন করুন।' : 'Summary generated! Sign in to save permanently.');
+        toast.success(lang === 'bn' ? 'সারাংশ তৈরি হ\u09DFেছে! সেভ করতে লগ-ইন করুন।' : 'Summary generated! Sign in to save permanently.');
       } else {
         toast.success(t.tooltips.summarySaved);
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        console.info('Summary cancelled.');
+        toast.error(lang === 'bn' ? 'সারাংশ তৈরি বাতিল করা হ\u09DFেছে।' : 'Summary generation cancelled.');
+        return;
+      }
       console.error("Summarization Error:", error);
-      toast.error(lang === 'bn' ? 'সারাংশ তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate summary.');
+      toast.error(lang === 'bn' ? 'সারাংশ তৈরিতে সমস্যা হ\u09DFেছে।' : 'Failed to generate summary.');
     } finally {
-      setIsSummarizing(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsSummarizing(false);
     }
   };
 
   const handleGenerateAudio = async () => {
     if (!diagnosis || isAudioGenerating) return;
     setIsAudioGenerating(true);
+    const controller = beginAiRequest();
     try {
-      const audioBase64 = await generateSpeech(diagnosis.diagnosis);
-      if (audioBase64) {
+      const audioBase64 = await generateSpeech(diagnosis.diagnosis, controller.signal);
+      if (audioBase64 && isMountedRef.current) {
         const binary = atob(audioBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
@@ -1158,6 +1230,13 @@ export default function AgriCopilot({
         setAudioUrl(URL.createObjectURL(blob));
       }
     } catch (error) {
+      // A cancelled request must not fall back to the on-device voice: the
+      // farmer is no longer waiting for this answer.
+      if (isAbortError(error)) {
+        console.info('Audio generation cancelled.');
+        toast.error(lang === 'bn' ? 'অডিও তৈরি বাতিল করা হ\u09DFেছে।' : 'Audio generation cancelled.');
+        return;
+      }
       console.error("Audio generation failed, trying Web Speech fallback:", error);
       if ('speechSynthesis' in window) {
         try {
@@ -1168,13 +1247,14 @@ export default function AgriCopilot({
           window.speechSynthesis.speak(utterance);
           toast.success(lang === 'bn' ? 'অডিও চালানো হচ্ছে...' : 'Playing voice advisory...');
         } catch (synthErr) {
-          toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+          toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হ\u09DFেছে।' : 'Failed to generate audio advisory.');
         }
       } else {
-        toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
+        toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হ\u09DFেছে।' : 'Failed to generate audio advisory.');
       }
     } finally {
-      setIsAudioGenerating(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsAudioGenerating(false);
     }
   };
 
@@ -1212,6 +1292,7 @@ export default function AgriCopilot({
 
     setIsLoading(true);
     setAudioUrl(null); // Reset audio for new diagnosis
+    const controller = beginAiRequest();
     try {
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
       // Use English values for the AI prompt to ensure consistency, but we can pass the translated ones too
@@ -1226,8 +1307,14 @@ export default function AgriCopilot({
         lang, 
         isAdvanced,
         globalLocation || undefined,
-        description.trim() || undefined
+        description.trim() || undefined,
+        controller.signal
       );
+      
+      // The screen may have gone away while the model was thinking: do not
+      // write the answer into a component that no longer exists.
+      if (!isMountedRef.current) return;
+      
       setDiagnosis(result);
       
       // Initialize chat session
@@ -1285,16 +1372,24 @@ export default function AgriCopilot({
         toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
       }).catch(err => console.warn(err));
     } catch (error: any) {
+      // A cancelled request is not a failure: it was stopped on purpose, so it
+      // is neither retried nor reported as a broken AI service.
+      if (isAbortError(error)) {
+        console.info('Diagnosis cancelled.');
+        toast.error(lang === 'bn' ? 'রোগ নির্ণ\u09DF বাতিল করা হ\u09DFেছে।' : 'Diagnosis cancelled.');
+        return;
+      }
       console.error("Diagnosis failed:", error);
       const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
       const errorMsg = isQuotaError 
-        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
+        ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দ\u09DFা করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
         : (error.message || "Error connecting to AI service. Please try again.");
       
       setDiagnosis(null);
       toast.error(errorMsg);
     } finally {
-      setIsLoading(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsLoading(false);
     }
   };
 
@@ -1417,6 +1512,7 @@ export default function AgriCopilot({
     }
 
     setIsDeepAnalyzing(true);
+    const controller = beginAiRequest();
     try {
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
       const cropName = translations.en.crops[crop as keyof typeof translations.en.crops];
@@ -1430,8 +1526,11 @@ export default function AgriCopilot({
         lang, 
         diagnosis,
         globalLocation || undefined,
-        description.trim() || undefined
+        description.trim() || undefined,
+        controller.signal
       );
+      
+      if (!isMountedRef.current) return;
       
       setDeepDiagnosis(result);
       await incrementUsage();
@@ -1448,10 +1547,16 @@ export default function AgriCopilot({
         }
       }
     } catch (error: any) {
+      if (isAbortError(error)) {
+        console.info('Deep analysis cancelled.');
+        toast.error(lang === 'bn' ? 'গভীর বিশ্লেষণ বাতিল করা হ\u09DFেছে।' : 'Deep analysis cancelled.');
+        return;
+      }
       console.error("Deep Diagnosis failed:", error);
-      toast.error(lang === 'bn' ? 'গভীর বিশ্লেষণে সমস্যা হয়েছে।' : 'Error performing deep analysis. Please try again.');
+      toast.error(lang === 'bn' ? 'গভীর বিশ্লেষণে সমস্যা হ\u09DFেছে।' : 'Error performing deep analysis. Please try again.');
     } finally {
-      setIsDeepAnalyzing(false);
+      endAiRequest(controller);
+      if (isMountedRef.current) setIsDeepAnalyzing(false);
     }
   };
 

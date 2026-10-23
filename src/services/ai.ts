@@ -32,6 +32,38 @@ const loadGoogleGenAI = async (): Promise<GoogleGenAIConstructor> => {
 // attempts inside the server's 50 s stream budget).
 const AI_PROXY_HEADER_TIMEOUT_MS = 65000;
 
+/**
+ * True when a request was cancelled by the caller (the screen unmounted, the
+ * farmer navigated away). A cancelled request must never be retried and must
+ * never be reported as a generic AI failure.
+ */
+export const isAbortError = (error: any): boolean => {
+  if (!error) return false;
+  if (error.name === 'AbortError') return true;
+  // DOMException.ABORT_ERR
+  if (error.code === 20) return true;
+  const message = String(error.message || '').toLowerCase();
+  return message === 'aborted' || message.includes('was aborted');
+};
+
+/** Sleep that rejects as soon as the caller's signal is aborted. */
+const waitOrAbort = (ms: number, signal?: AbortSignal): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+
 type AiProxyResult = {
   text: string;
   candidates?: any[];
@@ -40,7 +72,7 @@ type AiProxyResult = {
 };
 
 // Helper to call AI via backend proxy
-const callAiProxy = async (params: any): Promise<AiProxyResult> => {
+const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyResult> => {
   try {
     // The proxy only serves signed-in callers: it is the only thing that
     // keeps the paid Gemini key from being an open relay. A farmer who never
@@ -56,7 +88,9 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
       // pages loaded before a deploy keep working against the new function.
       body: JSON.stringify({ ...params, stream: true }),
       timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
-      retries: 0
+      retries: 0,
+      // Forward the caller's cancellation so an abandoned request stops billing.
+      signal
     });
     
     if (!response.ok) {
@@ -72,7 +106,7 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
 
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/x-ndjson')) {
-      return await readAiNdjsonStream(response);
+      return await readAiNdjsonStream(response, undefined, signal);
     }
 
     // Buffered JSON path: audio/TTS responses and older/local proxies.
@@ -80,6 +114,8 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
     // aborted instead of leaving this promise pending forever.
     return await readJsonWithTimeout<AiProxyResult>(response, AI_PROXY_HEADER_TIMEOUT_MS);
   } catch (err: any) {
+    // A cancellation is not a proxy failure: don't log it as a critical error.
+    if (isAbortError(err)) throw err;
     console.error("Critical AI Proxy Error:", err);
     throw err;
   }
@@ -124,8 +160,8 @@ export const getLiveAiClient = async (): Promise<GoogleGenAI> => {
 
 // All text generation is proxied through the server. This keeps GEMINI_API_KEY
 // server-side and lets the server enforce its own failover cascade.
-const generateContent = async (params: any) => {
-  return callAiProxy(params);
+const generateContent = async (params: any, signal?: AbortSignal) => {
+  return callAiProxy(params, signal);
 };
 
 export { Type };
@@ -141,11 +177,20 @@ export const LIVE_API_MODEL = 'gemini-3.8-live-extended';
 export const LIVE_EXTENDED_THINKING_MODEL = 'gemini-3.8-live-extended-thinking';
 const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
-const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500) => {
+const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500, signal?: AbortSignal) => {
   for (let i = 0; i < retries; i++) {
+    // A cancelled request is never sent again: the caller already gave up.
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
     try {
       return await fn();
     } catch (error: any) {
+      // Never retry an aborted request: it would spend the farmer's data and
+      // the provider's quota on an answer nobody is waiting for.
+      if (isAbortError(error)) {
+        throw error;
+      }
       const errorStr = JSON.stringify(error || {}).toLowerCase() + ' ' + (error?.message || '').toLowerCase();
       const isQuotaError = error?.message?.includes('429') ||
                           error?.message?.includes('RESOURCE_EXHAUSTED') ||
@@ -182,12 +227,12 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500
       
       console.warn(`AI call failed (${isHighDemand ? 'High Demand (503)' : (isQuotaError ? 'Quota Exceeded' : (isNotFoundError ? 'Not Found' : 'Error'))}), retrying in ${Math.round(currentDelay)}ms (${i + 1}/${retries})...`);
       
-      await new Promise(res => setTimeout(res, currentDelay));
+      await waitOrAbort(currentDelay, signal);
     }
   }
 };
 
-const callAiWithFallback = async (params: any, primaryModel: string, customBackupModel?: string) => {
+const callAiWithFallback = async (params: any, primaryModel: string, customBackupModel?: string, signal?: AbortSignal) => {
   // If request contains responseModalities for AUDIO, only use models that support audio output
   const isAudio = params?.responseModalities?.includes?.(Modality.AUDIO) || 
                   params?.responseModalities?.includes?.('AUDIO');
@@ -196,7 +241,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   // cascade. Re-looping over models here would multiply every failed attempt
   // by the server's own fallbacks and stall the UI for minutes.
   if (!isAudio) {
-    return await generateContent({ ...params, model: primaryModel });
+    return await generateContent({ ...params, model: primaryModel }, signal);
   }
 
   // Audio responses are buffered, and the proxy only tries two voice models
@@ -208,8 +253,12 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   for (const model of new Set(fallbacks)) {
     if (!model) continue;
     try {
-      return await generateContent({ ...params, model });
+      return await generateContent({ ...params, model }, signal);
     } catch (error: any) {
+      // A cancelled request must not fall through to the next model.
+      if (isAbortError(error)) {
+        throw error;
+      }
       console.warn(`Model ${model} failed:`, error.message);
       lastError = error;
       // If permission or referrer blocked, generateContent already retried proxy
@@ -226,7 +275,8 @@ export const diagnoseCrop = async (
   lang: string, 
   isAdvanced?: boolean,
   coords?: { latitude: number; longitude: number },
-  description?: string
+  description?: string,
+  signal?: AbortSignal
 ) => {
   return await callAiWithRetry(async () => {
     try {
@@ -304,7 +354,7 @@ export const diagnoseCrop = async (
         contents,
         config,
         model: getModelName(isAdvanced)
-      });
+      }, signal);
       
       if (!response.text) {
         throw new Error("AI returned an empty response.");
@@ -315,7 +365,7 @@ export const diagnoseCrop = async (
       console.error("AI Service Error (Diagnose Crop):", error);
       throw error;
     }
-  });
+  }, 4, 1500, signal);
 };
 
 export const deepDiagnoseCrop = async (
@@ -326,7 +376,8 @@ export const deepDiagnoseCrop = async (
   lang: string, 
   basicDiagnosis: any,
   coords?: { latitude: number; longitude: number },
-  description?: string
+  description?: string,
+  signal?: AbortSignal
 ) => {
   return await callAiWithRetry(async () => {
     try {
@@ -418,7 +469,7 @@ export const deepDiagnoseCrop = async (
         contents,
         config,
         model: 'gemini-3.5-flash-lite'
-      });
+      }, signal);
       
       if (!response.text) {
         throw new Error("AI returned an empty response.");
@@ -429,10 +480,10 @@ export const deepDiagnoseCrop = async (
       console.error("AI Service Error (Deep Diagnose Crop):", error);
       throw error;
     }
-  });
+  }, 4, 1500, signal);
 };
 
-export const translateText = async (text: string, targetLang: string) => {
+export const translateText = async (text: string, targetLang: string, signal?: AbortSignal) => {
   return await callAiWithRetry(async () => {
     try {
       const prompt = `Translate the following text to ${targetLang}. Keep the exact same markdown formatting.
@@ -442,14 +493,14 @@ ${text}`;
 
       const response = await callAiWithFallback({
         contents: [{ parts: [{ text: prompt }] }]
-      }, BACKUP_MODEL);
+      }, BACKUP_MODEL, undefined, signal);
       
       return response.text || '';
     } catch (error) {
       console.error("AI Service Error (Translate Text):", error);
       throw error;
     }
-  });
+  }, 4, 1500, signal);
 };
 
 export const generateWeatherAdvisory = async (
@@ -535,7 +586,7 @@ export const generateWeatherAdvisory = async (
   });
 };
 
-export const generateSpeech = async (text: string) => {
+export const generateSpeech = async (text: string, signal?: AbortSignal) => {
   return await callAiWithRetry(async () => {
     try {
       const response = await callAiWithFallback({
@@ -546,7 +597,7 @@ export const generateSpeech = async (text: string) => {
             prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
-      }, TTS_PRIMARY_MODEL, TTS_BACKUP_MODEL);
+      }, TTS_PRIMARY_MODEL, TTS_BACKUP_MODEL, signal);
       
       console.log("TTS Response received", !!response.candidates?.[0]);
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -601,10 +652,10 @@ export const generateSpeech = async (text: string) => {
       console.error("AI Service Error (Generate Speech):", error);
       throw error;
     }
-  });
+  }, 4, 1500, signal);
 };
 
-export const summarizeConversation = async (messages: { role: string; text: string }[], lang: string) => {
+export const summarizeConversation = async (messages: { role: string; text: string }[], lang: string, signal?: AbortSignal) => {
   return await callAiWithRetry(async () => {
     try {
       const chatStr = messages.map(m => `${m.role === 'user' ? 'Farmer' : 'Expert'}: ${m.text}`).join('\n');
@@ -617,14 +668,14 @@ export const summarizeConversation = async (messages: { role: string; text: stri
 
       const response = await callAiWithFallback({
         contents: [{ parts: [{ text: prompt }] }]
-      }, BACKUP_MODEL);
+      }, BACKUP_MODEL, undefined, signal);
       
       return response.text || '';
     } catch (error) {
       console.error("AI Service Error (Summarize Conversation):", error);
       throw error;
     }
-  });
+  }, 4, 1500, signal);
 };
 
 export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, lang: string, isAdvanced?: boolean) => {
@@ -1136,7 +1187,7 @@ export const getPlantingRecommendations = async (
 export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
   const history: { role: string; text: string }[] = [];
   return {
-    sendMessage: async (req: { message: string }) => {
+    sendMessage: async (req: { message: string }, signal?: AbortSignal) => {
       const prompt = history.length === 0 
         ? `You are a helpful agricultural expert in Bangladesh. 
            CONTEXT: The user has just received a diagnosis for their crop: "${context}".
@@ -1153,7 +1204,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
       const response = await generateContent({
         contents,
         model: CHAT_MODEL
-      });
+      }, signal);
       
       const responseText = response.text || '';
       history.push({ role: 'user', text: req.message });
