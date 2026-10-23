@@ -167,8 +167,17 @@ const generateContent = async (params: any, signal?: AbortSignal) => {
 export { Type };
 
 // Advanced (Premium) analysis uses the larger model; standard requests use flash-lite.
-// Keep in sync with the server-side failover cascade in server.ts.
-const getModelName = (isAdvanced?: boolean) => isAdvanced ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
+//
+// NOTE: `gemini-3.8-flash` is **not** usable on this project's Gemini key —
+// it answers "This model is no longer available to new users" (404). It was
+// the "advanced" model here, so every advanced request was silently routed
+// back to the standard model by the server's allow-list anyway. The constant
+// now names a model that actually answers, so the code and the behaviour
+// agree. When the key is upgraded, change this one line (and the matching
+// `AI_TEXT_MODELS` in the Netlify function) to get the bigger model back.
+const STANDARD_MODEL = 'gemini-3.5-flash-lite';
+const ADVANCED_MODEL = 'gemini-3.5-flash-lite';
+const getModelName = (isAdvanced?: boolean) => (isAdvanced ? ADVANCED_MODEL : STANDARD_MODEL);
 const BACKUP_MODEL = 'gemini-3.5-flash-lite';
 const SEARCH_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
@@ -177,7 +186,60 @@ export const LIVE_API_MODEL = 'gemini-3.8-live-extended';
 export const LIVE_EXTENDED_THINKING_MODEL = 'gemini-3.8-live-extended-thinking';
 const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
-const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500, signal?: AbortSignal) => {
+/**
+ * Parse a model response that is supposed to contain JSON.
+ *
+ * Models routinely wrap JSON in a markdown code fence or add a sentence
+ * around it. A bare `JSON.parse()` throws on that, and because the parse
+ * happened *inside* the retry loop, one slightly-off answer was retried up to
+ * four times — four billable calls for one answer the farmer is waiting for.
+ *
+ * A response that still cannot be parsed is marked `AI_INVALID_JSON` so the
+ * retry loop does not spend the quota on it again.
+ */
+export const parseJsonResponse = <T = any>(text: string | undefined | null): T => {
+  const raw = (text || '').trim();
+  const invalid = (): never => {
+    const error: any = new Error('AI returned a response that is not valid JSON.');
+    error.code = 'AI_INVALID_JSON';
+    throw error;
+  };
+  if (!raw) return invalid();
+
+  // A fenced block: ```json { ... } ```
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fenced ? fenced[1] : raw).trim();
+
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    // Fall back to the first balanced object in the text.
+    const start = candidate.indexOf('{');
+    const end = candidate.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(candidate.slice(start, end + 1));
+      } catch {
+        return invalid();
+      }
+    }
+    return invalid();
+  }
+};
+
+/**
+ * How many times a single AI action is attempted.
+ *
+ * The server already owns the model cascade and retries once without Search
+ * grounding, so one browser attempt can cost up to two upstream calls. With
+ * the old value of 4 attempts, one farmer action could cost up to **twelve**
+ * billable calls, and under load that turns a traffic surge into a runaway
+ * bill. Two attempts still rides out a transient 503 from the model provider
+ * without multiplying the cost.
+ */
+const AI_MAX_ATTEMPTS = 2;
+
+const callAiWithRetry = async (fn: () => Promise<any>, retries = AI_MAX_ATTEMPTS, delay = 1500, signal?: AbortSignal) => {
   for (let i = 0; i < retries; i++) {
     // A cancelled request is never sent again: the caller already gave up.
     if (signal?.aborted) {
@@ -189,6 +251,11 @@ const callAiWithRetry = async (fn: () => Promise<any>, retries = 4, delay = 1500
       // Never retry an aborted request: it would spend the farmer's data and
       // the provider's quota on an answer nobody is waiting for.
       if (isAbortError(error)) {
+        throw error;
+      }
+      // Never retry a malformed answer: the model already answered, it just
+      // did not answer in JSON. Asking again costs another billable call.
+      if (error?.code === 'AI_INVALID_JSON') {
         throw error;
       }
       const errorStr = JSON.stringify(error || {}).toLowerCase() + ' ' + (error?.message || '').toLowerCase();
@@ -360,12 +427,12 @@ export const diagnoseCrop = async (
         throw new Error("AI returned an empty response.");
       }
       
-      return JSON.parse(response.text);
+      return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Diagnose Crop):", error);
       throw error;
     }
-  }, 4, 1500, signal);
+  }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const deepDiagnoseCrop = async (
@@ -475,12 +542,12 @@ export const deepDiagnoseCrop = async (
         throw new Error("AI returned an empty response.");
       }
       
-      return JSON.parse(response.text);
+      return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Deep Diagnose Crop):", error);
       throw error;
     }
-  }, 4, 1500, signal);
+  }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const translateText = async (text: string, targetLang: string, signal?: AbortSignal) => {
@@ -500,7 +567,7 @@ ${text}`;
       console.error("AI Service Error (Translate Text):", error);
       throw error;
     }
-  }, 4, 1500, signal);
+  }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const generateWeatherAdvisory = async (
@@ -652,7 +719,7 @@ export const generateSpeech = async (text: string, signal?: AbortSignal) => {
       console.error("AI Service Error (Generate Speech):", error);
       throw error;
     }
-  }, 4, 1500, signal);
+  }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const summarizeConversation = async (messages: { role: string; text: string }[], lang: string, signal?: AbortSignal) => {
@@ -675,7 +742,7 @@ export const summarizeConversation = async (messages: { role: string; text: stri
       console.error("AI Service Error (Summarize Conversation):", error);
       throw error;
     }
-  }, 4, 1500, signal);
+  }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, lang: string, isAdvanced?: boolean) => {
@@ -721,7 +788,7 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
         throw new Error("AI returned an empty response.");
       }
       
-      return JSON.parse(response.text || '{}');
+      return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Grade Produce):", error);
       throw error;
@@ -869,7 +936,7 @@ ${locationContext}`;
           toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
         });
-        const parsed = JSON.parse(response.text || '{}');
+        const parsed = parseJsonResponse(response.text);
         return parsed;
       } catch (searchError) {
         console.warn("Google Search model failed, falling back to standard generation:", searchError);
@@ -884,7 +951,7 @@ Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets
           },
           model: BACKUP_MODEL
         });
-        return JSON.parse(fallbackResponse.text || '{}');
+        return parseJsonResponse(fallbackResponse.text);
       }
     } catch (error) {
       console.error("AI Service Error (Market Insights):", error);
@@ -961,7 +1028,7 @@ export const fetchLiveWebMandiPrices = async (lang: string = 'bn'): Promise<{ it
         model: SEARCH_MODEL
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = parseJsonResponse(response.text);
       return {
         items: parsed.items || [],
         timestamp: today,
@@ -1031,7 +1098,7 @@ export const findGovernmentSchemes = async (
           toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
         });
-        return JSON.parse(response.text || '{}');
+        return parseJsonResponse(response.text);
       } catch (searchError) {
         console.warn("Search model failed for schemes, falling back:", searchError);
         const fallbackResponse = await generateContent({
@@ -1042,7 +1109,7 @@ export const findGovernmentSchemes = async (
           },
           model: BACKUP_MODEL
         });
-        return JSON.parse(fallbackResponse.text || '{}');
+        return parseJsonResponse(fallbackResponse.text);
       }
     } catch (error) {
       console.error("AI Service Error (Gov Schemes):", error);
@@ -1176,7 +1243,7 @@ export const getPlantingRecommendations = async (
         model: getModelName(isAdvanced)
       });
       
-      return JSON.parse(response.text || '{}');
+      return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Planting Recommendations):", error);
       throw error;
@@ -1339,7 +1406,7 @@ export const syncCuratedSchemes = async () => {
         model: SEARCH_MODEL
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = parseJsonResponse(response.text);
       if (parsed.schemes && Array.isArray(parsed.schemes)) {
         const batch = writeBatch(db);
         const colRef = collection(db, 'gov_schemes');
