@@ -1,25 +1,43 @@
 import { Handler } from "@netlify/functions";
+import { validateOutboundUrl, safeFetch, readTextWithLimit } from "./_shared/safe-url.ts";
 
+/**
+ * Netlify link-preview function.
+ *
+ * The URL arrives from the browser, so this endpoint is a request proxy: it
+ * must never be usable to reach the function's own network. All SSRF
+ * protections live in `_shared/safe-url.ts`, which the Express server in
+ * `server.ts` also uses — the two used to drift, and the weaker copy shipped.
+ *
+ * The browser calls this same-origin (`/api/link-preview?url=...`), so no
+ * permissive CORS header is sent: a wildcard would let any website drive this
+ * proxy from a visitor's browser.
+ */
 export const handler: Handler = async (event) => {
   const { url } = event.queryStringParameters || {};
   if (!url) {
     return { statusCode: 400, body: JSON.stringify({ error: "URL is required" }) };
   }
 
-  let urlObj: URL;
+  let hostForDisplay = "";
   try {
-    urlObj = new URL(url);
+    hostForDisplay = new URL(url).hostname;
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid URL" }) };
   }
 
-  const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '169.254.169.254'];
-  if (blockedHosts.includes(urlObj.hostname) || urlObj.hostname.startsWith('192.168.') || urlObj.hostname.startsWith('10.')) {
-    return { statusCode: 403, body: JSON.stringify({ error: "Access to internal resources is prohibited" }) };
+  const validation = await validateOutboundUrl(url);
+  if (!validation.safe || !validation.url) {
+    return {
+      statusCode: 403,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: validation.error || "Forbidden URL destination" }),
+    };
   }
+  const urlObj = validation.url;
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(urlObj.toString(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;'
@@ -27,14 +45,14 @@ export const handler: Handler = async (event) => {
     });
 
     const contentType = response.headers.get('content-type') || '';
-    
+
     if (response.status === 403 || response.status === 404 || !contentType.includes('text/html')) {
       return {
         statusCode: 200,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: response.status === 404 ? "Portal Not Found" : "Portal Access Restricted",
-          description: !contentType.includes('text/html') && response.status === 200 
+          description: !contentType.includes('text/html') && response.status === 200
             ? "This link leads to a document or secure portal. Click below to view it directly."
             : "This portal requires a direct visit for security verification. Please use the link below to access the official website.",
           siteName: urlObj.hostname,
@@ -44,13 +62,13 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const html = await response.text();
+    const html = await readTextWithLimit(response);
 
     const getMeta = (property: string) => {
       const regex = new RegExp(`<meta [^>]*property=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
       const match = html.match(regex);
       if (match) return match[1];
-      
+
       const regexName = new RegExp(`<meta [^>]*name=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
       const matchName = html.match(regexName);
       return matchName ? matchName[1] : null;
@@ -76,7 +94,7 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: title?.trim(),
         description: description?.trim(),
@@ -89,11 +107,11 @@ export const handler: Handler = async (event) => {
   } catch (error: any) {
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: "Portal Access Restricted",
         description: "This portal requires a direct visit to view its content. Click the link below to access the official website.",
-        siteName: urlObj.hostname,
+        siteName: hostForDisplay || urlObj.hostname,
         url: url,
         isRestricted: true
       })

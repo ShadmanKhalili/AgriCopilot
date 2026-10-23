@@ -9,6 +9,7 @@ import helmet from "helmet";
 import { rateLimit } from 'express-rate-limit';
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
+import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
 
 dotenv.config();
 
@@ -1760,67 +1761,11 @@ async function startServer() {
   // AI PROXY ROUTES REMOVED (AI moved to frontend)
 
 
-  // Helper function to validate URLs and prevent Server-Side Request Forgery (SSRF)
-  function isSafeTargetUrl(urlString: string): { safe: boolean; error?: string; urlObj?: URL } {
-    let urlObj: URL;
-    try {
-      urlObj = new URL(urlString);
-    } catch {
-      return { safe: false, error: "Invalid URL format" };
-    }
-
-    // 1. Strictly enforce HTTP or HTTPS protocols
-    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-      return { safe: false, error: "Only HTTP and HTTPS protocols are permitted" };
-    }
-
-    const hostname = urlObj.hostname.toLowerCase().trim();
-
-    // 2. Block loopback, local, and reserved cloud metadata domains
-    const blockedExactHosts = [
-      'localhost',
-      'localhost.localdomain',
-      '127.0.0.1',
-      '0.0.0.0',
-      '::1',
-      '[::1]',
-      'metadata.google.internal',
-      'metadata.goog',
-      '169.254.169.254',
-      'instance-data'
-    ];
-
-    if (blockedExactHosts.includes(hostname)) {
-      return { safe: false, error: "Access to loopback or cloud metadata endpoints is prohibited" };
-    }
-
-    // 3. Block private IP ranges (RFC 1918, RFC 3927 link-local, Carrier-grade NAT)
-    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const ipMatch = hostname.match(ipv4Regex);
-    if (ipMatch) {
-      const a = Number(ipMatch[1]);
-      const b = Number(ipMatch[2]);
-      if (a === 10 || a === 127 || a === 0) return { safe: false, error: "Access to private address space is prohibited" };
-      if (a === 169 && b === 254) return { safe: false, error: "Access to link-local address space is prohibited" };
-      if (a === 172 && b >= 16 && b <= 31) return { safe: false, error: "Access to private address space is prohibited" };
-      if (a === 192 && b === 168) return { safe: false, error: "Access to private address space is prohibited" };
-      if (a === 100 && b >= 64 && b <= 127) return { safe: false, error: "Access to shared carrier address space is prohibited" };
-    }
-
-    // 4. Block IPv6 private addresses
-    if (hostname.startsWith('[') || hostname.includes(':')) {
-      if (hostname === '::1' || hostname === '[::1]' || hostname.startsWith('fe80:') || hostname.startsWith('fc00:') || hostname.startsWith('fd00:')) {
-        return { safe: false, error: "Access to IPv6 private address space is prohibited" };
-      }
-    }
-
-    // 5. Block internal cloud hostnames
-    if (hostname.endsWith('.internal') || hostname.endsWith('.local') || hostname.endsWith('.corp')) {
-      return { safe: false, error: "Access to internal domain spaces is prohibited" };
-    }
-
-    return { safe: true, urlObj };
-  }
+  // SSRF protection for outbound fetches lives in
+  // `netlify/functions/_shared/safe-url.ts` and is shared with the Netlify
+  // function that actually serves `/api/link-preview` in production. The two
+  // implementations used to drift — this file had a hardened validator while
+  // the shipped Netlify copy kept a four-entry host blocklist.
 
   // Link Preview Helper (Hardened against SSRF & Resource Exhaustion)
   app.get("/api/link-preview", async (req, res) => {
@@ -1829,11 +1774,11 @@ async function startServer() {
       return res.status(400).json({ error: "URL query parameter is required" });
     }
 
-    const validation = isSafeTargetUrl(url);
-    if (!validation.safe || !validation.urlObj) {
+    const validation = await validateOutboundUrl(url);
+    if (!validation.safe || !validation.url) {
       return res.status(403).json({ error: validation.error || "Forbidden URL destination" });
     }
-    const urlObj = validation.urlObj;
+    const urlObj = validation.url;
 
     try {
       console.log(`Fetching sanitized link preview for: ${url}`);
@@ -1855,7 +1800,18 @@ async function startServer() {
         timeout: 6000,
         maxContentLength: 1024 * 1024, // 1MB maximum payload to prevent memory exhaustion DoS
         maxRedirects: 5,
-        validateStatus: (status) => status < 500
+        validateStatus: (status) => status < 500,
+        // Re-validate every redirect hop: a public URL can 302 straight to
+        // 169.254.169.254, and axios would otherwise follow it unchecked.
+        beforeRedirect: async (options) => {
+          const nextUrl = options.url
+            ? new URL(options.url, options.baseURL || undefined).toString()
+            : '';
+          const hop = await validateOutboundUrl(nextUrl);
+          if (!hop.safe) {
+            throw new Error(hop.error || "Forbidden redirect target");
+          }
+        }
       });
 
       const contentType = response.headers['content-type'] || '';
