@@ -1,6 +1,10 @@
 import { Handler } from '@netlify/functions';
 import axios from 'axios';
 
+// Every upstream call needs a deadline: without one a stalled Copernicus
+// response holds the Netlify function open until the platform kills it.
+const UPSTREAM_TIMEOUT_MS = 12_000;
+
 export const handler: Handler = async (event) => {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
@@ -37,7 +41,7 @@ export const handler: Handler = async (event) => {
           client_id: clientId,
           client_secret: clientSecret,
         }).toString(),
-        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: UPSTREAM_TIMEOUT_MS }
       );
       accessToken = authResponse.data.access_token;
       processEndpoint = "https://sh.dataspace.copernicus.eu/api/v1/process";
@@ -50,7 +54,7 @@ export const handler: Handler = async (event) => {
           client_id: clientId,
           client_secret: clientSecret,
         }).toString(),
-        { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+        { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: UPSTREAM_TIMEOUT_MS }
       );
       accessToken = authResponse.data.access_token;
       processEndpoint = "https://services.sentinel-hub.com/api/v1/process";
@@ -59,6 +63,13 @@ export const handler: Handler = async (event) => {
     // 2. Fetch NDVI & NDMI via Statistical API
     const latNum = Number(lat);
     const lngNum = Number(lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum) ||
+        latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Valid latitude and longitude are required" })
+      };
+    }
     const offset = 0.001; // ~100m
     const bbox = [lngNum - offset, latNum - offset, lngNum + offset, latNum + offset];
 
@@ -142,7 +153,8 @@ export const handler: Handler = async (event) => {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
           Accept: "application/json"
-        }
+        },
+        timeout: UPSTREAM_TIMEOUT_MS
       }
     );
 

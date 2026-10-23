@@ -7,6 +7,7 @@ import { db } from '../firestore';
 import { useAuth } from './AuthProvider';
 import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { safeExternalUrl, externalHostLabel } from '../utils/security';
 import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
@@ -25,6 +26,12 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
   const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // A scheme's link comes from seeded data and from what the AI returns, so
+  // it is never trusted blindly: only real web addresses become anchors, and
+  // the destination hostname is shown so a farmer can see where the tap goes.
+  const safeHref = safeExternalUrl(url);
+  const hostLabel = externalHostLabel(url);
+
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
@@ -40,6 +47,18 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
     fetchMetadata();
   }, [url]);
 
+  if (!safeHref) {
+    // A link we cannot vouch for is not rendered as a link at all.
+    return (
+      <div className="flex items-center gap-3 bg-white/5 w-full p-5 rounded-2xl border border-white/10">
+        <Globe className="w-5 h-5 text-gray-500" />
+        <span className="text-xs font-black uppercase tracking-widest text-gray-500">
+          {lang === 'bn' ? 'লিঙ্ক পাওয়া যায়নি' : 'Link unavailable'}
+        </span>
+      </div>
+    );
+  }
+
   if (loading) return (
     <div className="animate-pulse bg-white/5 h-24 rounded-2xl border border-white/10 p-4 flex gap-4 items-center">
       <div className="w-16 h-16 bg-white/10 rounded-xl"></div>
@@ -52,7 +71,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
 
   if (!metadata) return (
     <motion.a 
-      href={url} 
+      href={safeHref} 
       target="_blank" 
       rel="noopener noreferrer"
       whileHover={{ y: -2 }}
@@ -69,7 +88,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
   if (metadata.isRestricted) {
     return (
       <motion.a 
-        href={url} 
+        href={safeHref} 
         target="_blank" 
         rel="noopener noreferrer"
         whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.08)' }}
@@ -85,6 +104,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
         <p className="text-xs text-gray-400 leading-relaxed line-clamp-3 font-medium mb-3">{metadata.description}</p>
         <div className="flex items-center justify-between">
            <span className="text-[11px] font-bold text-orange-500/80 uppercase tracking-widest">{lang === 'bn' ? 'পোর্টাল দেখুন' : 'VIEW PORTAL'}</span>
+           <span className="text-[10px] font-bold text-orange-400/70 mr-2 truncate max-w-[45%]" title={hostLabel}>{hostLabel}</span>
            <ExternalLink className="w-3 h-3 text-orange-400" />
         </div>
       </motion.a>
@@ -93,7 +113,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
 
   return (
     <motion.a 
-      href={url} 
+      href={safeHref} 
       target="_blank" 
       rel="noopener noreferrer"
       whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.08)' }}
@@ -120,6 +140,7 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
         )}
         <div className="pt-2 flex items-center justify-between">
            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{lang === 'bn' ? 'দেখুন' : 'VISIT PORTAL'}</span>
+           <span className="text-[10px] font-bold text-gray-500/80 mr-2 truncate max-w-[45%]" title={hostLabel}>{hostLabel}</span>
            <ExternalLink className="w-3 h-3 text-blue-400" />
         </div>
       </div>

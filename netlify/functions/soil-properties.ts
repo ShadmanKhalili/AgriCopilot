@@ -1,5 +1,24 @@
 import { Handler } from "@netlify/functions";
 
+/**
+ * Netlify SoilGrids proxy (ISRIC).
+ *
+ * Two hardening points:
+ *  - every upstream call has a timeout, so a stalled ISRIC response cannot
+ *    hold a Netlify function open until the platform kills it (which shows up
+ *    as a 504 with no explanation);
+ *  - the coordinates are validated and the property list is bounded, so the
+ *    endpoint cannot be used to ask the upstream for an unbounded response.
+ */
+
+const UPSTREAM_TIMEOUT_MS = 12_000;
+const MAX_PROPERTIES = 8;
+
+const isValidCoordinate = (value: unknown): value is string => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= -90 && parsed <= 90;
+};
+
 export const handler: Handler = async (event) => {
   const { lat, lon, property, depth, value } = event.queryStringParameters || {};
 
@@ -7,6 +26,13 @@ export const handler: Handler = async (event) => {
     return {
       statusCode: 400,
       body: JSON.stringify({ error: "Latitude and longitude are required" }),
+    };
+  }
+
+  if (!isValidCoordinate(lat) || !isValidCoordinate(lon)) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: "Latitude and longitude must be valid coordinates" }),
     };
   }
 
@@ -37,13 +63,13 @@ export const handler: Handler = async (event) => {
   finalParams.append("lon", lon as string);
   
   const properties = multiParams.property || (property ? [(property as string)] : []);
-  properties.forEach(p => finalParams.append("property", p));
-  
+  properties.slice(0, MAX_PROPERTIES).forEach(p => finalParams.append("property", p));
+
   const depths = multiParams.depth || (depth ? [(depth as string)] : []);
-  depths.forEach(d => finalParams.append("depth", d));
-  
+  depths.slice(0, MAX_PROPERTIES).forEach(d => finalParams.append("depth", d));
+
   const values = multiParams.value || (value ? [(value as string)] : []);
-  values.forEach(v => finalParams.append("value", v));
+  values.slice(0, MAX_PROPERTIES).forEach(v => finalParams.append("value", v));
 
   const url = `https://rest.isric.org/soilgrids/v2.0/properties/query?${finalParams.toString()}`;
 
@@ -51,8 +77,16 @@ export const handler: Handler = async (event) => {
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
+    if (!response.ok) {
+      return {
+        statusCode: 502,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Soil data service did not respond" }),
+      };
+    }
     const data = await response.json();
 
     return {

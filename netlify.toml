@@ -33,6 +33,23 @@
 
 # --- Production security headers (parity with the Express helmet config) ---
 
+# Content-Security-Policy.
+#
+# The Express server in `server.ts` has sent a helmet CSP for a long time, but
+# that file is NOT the production path: `netlify.toml` rewrites `/api/*` to the
+# Netlify functions and the site itself is served by Netlify's CDN, so the
+# helmet policy never reached a browser. The deployed site and its function
+# responses had **no CSP at all**.
+#
+# This is the same policy, minus the dev-only localhost extras, plus the
+# directives that actually matter for a farm-facing PWA: `object-src 'none'`,
+# `base-uri 'self'`, `form-action 'self'`, `script-src-attr 'none'` and a
+# `connect-src` that only reaches the APIs the app really uses.
+#
+# `'unsafe-inline'` and `'unsafe-eval'` are still allowed in `script-src`:
+# AdSense's `adsbygoogle.js` injects inline scripts at runtime, and removing
+# it would silently kill the ad revenue. Tightening that needs a nonce and is
+# tracked separately.
 [[headers]]
   for = "/*"
   [headers.values]
@@ -40,6 +57,7 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "geolocation=(self), camera=(self), microphone=(self)"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src-attr 'none'; worker-src 'self' blob:; manifest-src 'self'; media-src 'self' blob: data:; frame-ancestors 'self' https://*.google.com https://*.googleusercontent.com https://*.web.app https://*.firebaseapp.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://ep1.adtrafficquality.google https://ep2.adtrafficquality.google https://www.googletagmanager.com https://www.googletagservices.com https://apis.google.com https://adservice.google.com https://partner.googleadservices.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' data: blob: https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com https://*.web.app https://*.firebase.google.com https://*.google.com wss://*.googleapis.com wss://*.google.com wss://*.firebaseio.com https://weather.googleapis.com https://maps.googleapis.com https://api.open-meteo.com https://archive-api.open-meteo.com https://rest.isric.org https://api.worldbank.org https://api.bigdatacloud.net https://get.geojs.io https://identity.dataspace.copernicus.eu https://sh.dataspace.copernicus.eu https://services.sentinel-hub.com https://*.openstreetmap.org https://www.openstreetmap.org https://fonts.googleapis.com https://fonts.gstatic.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://*.doubleclick.net; frame-src 'self' https://*.openstreetmap.org https://www.openstreetmap.org https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com https://*.googlesyndication.com https://adservice.google.com https://www.google.com https://*.firebaseapp.com"
 
 # The service worker must always be revalidated so PWA updates land immediately
 [[headers]]
