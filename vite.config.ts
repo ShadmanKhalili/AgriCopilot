@@ -62,10 +62,16 @@ export default defineConfig(({mode}) => {
           cleanupOutdatedCaches: true,
           runtimeCaching: [
             {
-              // Hashed build assets (index-f1fMjefh.js) are immutable, so cache them
+              // Hashed build assets (index-BI9RNHtI.js) are immutable, so cache them
               // on first use. This keeps the app offline-capable without making the
               // service worker precache megabytes of vendor JS up front.
-              urlPattern: /\/assets\/.*\.[0-9a-f]{8}\.(js|css)$/i,
+              // Vite emits dash-separated, base64url-style hashes
+              // (`index-BI9RNHtI.js`), so the pattern must allow `-` in the hash
+              // and must not assume a dot before it. The previous pattern
+              // (`\.[0-9a-f]{8}\.`) matched no real asset at all, which left the
+              // installed PWA with zero JavaScript in the cache and no way to
+              // boot offline.
+              urlPattern: /\/assets\/.*-[A-Za-z0-9_-]{8,}\.(js|css)$/i,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'agri-build-assets',

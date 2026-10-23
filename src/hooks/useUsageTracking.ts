@@ -37,6 +37,20 @@ export function useUsageTracking(tabId: string = 'global') {
     return 100; // Fair use cap of 100 per day globally for free
   };
 
+  /**
+   * Local safety counter used while the Firestore profile has not loaded yet.
+   * It is date-stamped like the guest and premium counters: without a date the
+   * counter never reset, so a single offline window could lock the farmer out
+   * of every AI feature for good.
+   */
+  const readFallbackUsage = (): number => {
+    if (!user) return 0;
+    const today = new Date().toISOString().split('T')[0];
+    if (localStorage.getItem(`fallbackDate_${user.uid}_${tabId}`) !== today) return 0;
+    const stored = localStorage.getItem(`fallbackUsage_${user.uid}_${tabId}`);
+    return stored ? parseInt(stored, 10) : 0;
+  };
+
   const getPremiumLimit = () => {
      if (!user) return 0; // Guest cannot use premium
      if (userProfile?.tier === 'premium') return 9999;
@@ -49,8 +63,7 @@ export function useUsageTracking(tabId: string = 'global') {
     if (!userProfile) {
       // Profile hasn't loaded yet: fall back to the local safety counter so the
       // quota gate is never a silent no-op during that window.
-      const stored = localStorage.getItem(`fallbackUsage_${user.uid}_${tabId}`);
-      return stored ? parseInt(stored, 10) : 0;
+      return readFallbackUsage();
     }
     if (userProfile?.lastUsedDate !== today) {
       return 0;
@@ -94,9 +107,9 @@ export function useUsageTracking(tabId: string = 'global') {
     } else if (user) {
       // Profile hasn't loaded yet: track locally so the quota gate still degrades
       // safely during this window (otherwise calls are invisible to the limiter).
-      const stored = localStorage.getItem(`fallbackUsage_${user.uid}_${tabId}`);
-      const newUsage = (stored ? parseInt(stored, 10) : 0) + 1;
+      const newUsage = readFallbackUsage() + 1;
       localStorage.setItem(`fallbackUsage_${user.uid}_${tabId}`, newUsage.toString());
+      localStorage.setItem(`fallbackDate_${user.uid}_${tabId}`, today);
       console.warn("Usage tracked locally - user profile not yet loaded.");
     }
   };
