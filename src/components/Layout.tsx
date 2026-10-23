@@ -43,6 +43,8 @@ import { useExpertAvailability } from '../hooks/useExpertAvailability';
 import { useExpertUnread } from '../hooks/useExpertUnread';
 import toBn from '../utils/banglaNum';
 import { detectUserLocation } from '../utils/geolocation';
+import { safeStorage } from '../utils/security';
+import { ErrorBoundary } from './ErrorBoundary';
 
 type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
 
@@ -77,11 +79,11 @@ export default function Layout() {
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
   const [lang, setLang] = useState<Language>('bn');
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('krishi_theme');
-      if (saved === 'light' || saved === 'dark') return saved;
-    }
-    return 'light';
+    // safeStorage swallows SecurityError / QuotaExceededError. A locked-down
+    // in-app browser (Messenger/Facebook webview) must not brick the app on
+    // the very first render of the root component.
+    const saved = safeStorage.getItem<string>('krishi_theme', 'light');
+    return saved === 'dark' ? 'dark' : 'light';
   });
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export default function Layout() {
       root.classList.remove('dark');
     }
     root.setAttribute('data-theme', theme);
-    localStorage.setItem('krishi_theme', theme);
+    safeStorage.setItem('krishi_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
@@ -201,6 +203,15 @@ export default function Layout() {
       setMarketProduce(payload.produce.toLowerCase());
     }
     setActiveTab(tab);
+  };
+
+  // A broken tool must not take down the whole app: every tab panel gets its
+  // own compact boundary, so a render-time throw in one panel keeps the shell
+  // (offline banner, nav badges, unsaved chat) alive.
+  const tabErrorBoundaryProps = {
+    variant: 'compact' as const,
+    lang,
+    onGoHome: () => handleNavigateTab('agri-copilot')
   };
 
   const { locationName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
@@ -1046,6 +1057,7 @@ export default function Layout() {
                     </div>
                   }>
                     <div id="panel-agri-copilot" role="tabpanel" aria-labelledby="tab-agri-copilot" className={activeTab === 'agri-copilot' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('agri-copilot') && (
                         <AgriCopilot 
                           lang={lang} 
@@ -1076,8 +1088,10 @@ export default function Layout() {
                           }}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-expert-hub" role="tabpanel" aria-labelledby="tab-expert-hub" className={activeTab === 'expert-hub' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('expert-hub') && (
                         <ExpertHub
                           lang={lang}
@@ -1085,8 +1099,10 @@ export default function Layout() {
                           onClearRequestSeed={() => setExpertRequestSeed(null)}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-weather-advisory" role="tabpanel" aria-labelledby="tab-weather-advisory" className={activeTab === 'weather-advisory' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('weather-advisory') && (
                         <WeatherAdvisory 
                           lang={lang} 
@@ -1094,8 +1110,10 @@ export default function Layout() {
                           setGlobalLocation={setGlobalLocation}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-krishi-profit" role="tabpanel" aria-labelledby="tab-krishi-profit" className={activeTab === 'krishi-profit' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('krishi-profit') && (
                         <KrishiProfitCalculator 
                           lang={lang} 
@@ -1104,8 +1122,10 @@ export default function Layout() {
                           onNavigateTab={handleNavigateTab}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-climate-resilience" role="tabpanel" aria-labelledby="tab-climate-resilience" className={activeTab === 'climate-resilience' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('climate-resilience') && (
                         <ClimateResilienceGuide 
                           lang={lang} 
@@ -1114,8 +1134,10 @@ export default function Layout() {
                           onSetLocation={() => setIsRegionModalOpen(true)}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-crop-health" role="tabpanel" aria-labelledby="tab-crop-health" className={activeTab === 'crop-health' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('crop-health') && (
                         <SatelliteHealth 
                           lang={lang} 
@@ -1123,11 +1145,15 @@ export default function Layout() {
                           setGlobalLocation={setGlobalLocation}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-smart-grade" role="tabpanel" aria-labelledby="tab-smart-grade" className={activeTab === 'smart-grade' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('smart-grade') && <SmartGrade lang={lang} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-smart-planting" role="tabpanel" aria-labelledby="tab-smart-planting" className={activeTab === 'smart-planting' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('smart-planting') && (
                         <SmartPlanting 
                           lang={lang} 
@@ -1136,8 +1162,10 @@ export default function Layout() {
                           onNavigateTab={handleNavigateTab}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-market-connect" role="tabpanel" aria-labelledby="tab-market-connect" className={activeTab === 'market-connect' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('market-connect') && (
                         <MarketConnect 
                           lang={lang} 
@@ -1150,24 +1178,37 @@ export default function Layout() {
                           setGlobalLocation={setGlobalLocation}
                         />
                       )}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-community-radar" role="tabpanel" aria-labelledby="tab-community-radar" className={activeTab === 'community-radar' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-gov-schemes" role="tabpanel" aria-labelledby="tab-gov-schemes" className={activeTab === 'gov-schemes' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('gov-schemes') && <GovSchemes lang={lang} globalLocation={globalLocation} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-user-guide" role="tabpanel" aria-labelledby="tab-user-guide" className={activeTab === 'user-guide' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('user-guide') && <UserGuide lang={lang} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-farmer-dossier" role="tabpanel" aria-labelledby="tab-farmer-dossier" className={activeTab === 'farmer-dossier' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('farmer-dossier') && <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" className={activeTab === 'profile' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
+                      </ErrorBoundary>
                     </div>
                     <div id="panel-admin-dashboard" role="tabpanel" aria-labelledby="tab-admin-dashboard" className={activeTab === 'admin-dashboard' ? 'block flex-1' : 'hidden'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('admin-dashboard') && userRole === 'admin' && <AdminDashboard lang={lang} />}
+                      </ErrorBoundary>
                     </div>
                   </Suspense>
                 </motion.div>

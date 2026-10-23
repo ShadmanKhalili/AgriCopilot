@@ -2,7 +2,7 @@ import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
 import { ensureAiSession } from '../firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { readAiNdjsonStream } from '../utils/ndjsonStream';
 
 // The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
@@ -76,7 +76,9 @@ const callAiProxy = async (params: any): Promise<AiProxyResult> => {
     }
 
     // Buffered JSON path: audio/TTS responses and older/local proxies.
-    return await response.json();
+    // The read has its own budget, so a body that stalls mid-transfer is
+    // aborted instead of leaving this promise pending forever.
+    return await readJsonWithTimeout<AiProxyResult>(response, AI_PROXY_HEADER_TIMEOUT_MS);
   } catch (err: any) {
     console.error("Critical AI Proxy Error:", err);
     throw err;
@@ -105,7 +107,7 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
     }
     throw new Error(errMsg);
   }
-  const data = await response.json();
+  const data = await readJsonWithTimeout<any>(response, 15000);
   if (!data.token) {
     throw new Error("No token returned by live-token service");
   }
