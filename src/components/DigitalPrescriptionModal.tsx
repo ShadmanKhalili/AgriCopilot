@@ -287,11 +287,28 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
   const handleSaveToDossier = async () => {
     if (isSaving) return;
     setIsSaving(true);
+    const saveLocally = () => {
+      try {
+        const existing = JSON.parse(localStorage.getItem('farmer_saved_prescriptions') || '[]');
+        existing.unshift({ rxId, crop: data.crop, diseaseName: data.diseaseName, date: currentDate });
+        localStorage.setItem('farmer_saved_prescriptions', JSON.stringify(existing.slice(0, 20)));
+        toast.success(lang === 'bn' ? 'স্থানীয় ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to local dossier!');
+      } catch (e) {
+        toast.error('Error saving');
+      }
+    };
     try {
+      // The Firestore rules only accept a prescription filed by a signed-in
+      // owner. A signed-out visitor is kept on the local dossier instead of
+      // writing an `anonymous` row into the national audit registry.
+      if (!user) {
+        saveLocally();
+        return;
+      }
       await addDoc(collection(db, 'prescriptions'), {
         rxId,
-        userId: user?.uid || 'anonymous',
-        farmerName: data.farmerName || user?.displayName || 'Registered Grower',
+        userId: user.uid,
+        farmerName: data.farmerName || user.displayName || 'Registered Grower',
         crop: data.crop,
         diseaseName: data.diseaseName,
         severity: data.severity,
@@ -300,17 +317,10 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
         createdAt: new Date().toISOString(),
         verified: true
       });
-      toast.success(lang === 'bn' ? 'কৃষক ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to Farmer Dossier!');
+      toast.success(lang === 'bn' ? 'কৃষক ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to Farmer Dossier!');
     } catch (err) {
       console.warn("Could not save to firestore, falling back to local:", err);
-      try {
-        const existing = JSON.parse(localStorage.getItem('farmer_saved_prescriptions') || '[]');
-        existing.unshift({ rxId, crop: data.crop, diseaseName: data.diseaseName, date: currentDate });
-        localStorage.setItem('farmer_saved_prescriptions', JSON.stringify(existing.slice(0, 20)));
-        toast.success(lang === 'bn' ? 'স্থানীয় ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to local dossier!');
-      } catch (e) {
-        toast.error('Error saving');
-      }
+      saveLocally();
     } finally {
       setIsSaving(false);
     }

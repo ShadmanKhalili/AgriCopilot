@@ -89,8 +89,12 @@ export function useUsageTracking(tabId: string = 'global') {
     } else if (userProfile) {
       try {
         const userDocRef = doc(db, 'users', user.uid);
-        const { increment } = await import('firebase/firestore');
-        
+
+        // A plain integer is written on purpose. `increment(1)` is a server-side
+        // transform, and Firestore rules evaluate `request.resource.data` on the
+        // transform rather than on the resulting number — so the write was
+        // rejected by `isValidUser` and the daily counter silently stayed at
+        // its first value, meaning the free-tier quota was never enforced.
         if (userProfile.lastUsedDate !== today) {
           await updateDoc(userDocRef, {
             usageCount: 1,
@@ -98,7 +102,7 @@ export function useUsageTracking(tabId: string = 'global') {
           });
         } else {
           await updateDoc(userDocRef, {
-            usageCount: increment(1)
+            usageCount: (userProfile.usageCount || 0) + 1
           });
         }
       } catch (error) {
