@@ -20,6 +20,7 @@
  */
 
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
+import { safeStorage } from '../utils/security';
 
 /** One commodity, as published in the bulletin. */
 export interface BulletinPrice {
@@ -60,6 +61,40 @@ export interface OfficialBulletin {
 const ENDPOINT = '/api/market-prices';
 
 /**
+ * Where the last bulletin that reached this farmer is kept.
+ *
+ * The government server is not fast, and it sometimes stalls. When it does,
+ * the endpoint answers 503 — and without this, the ticker would fall back to
+ * the prices frozen in the app's source. Keeping the last bulletin on the
+ * device means the farmer keeps seeing the most recent prices they actually
+ * received, with the date they were fetched, instead of a month-old
+ * constant.
+ */
+const CACHE_KEY = 'agri.marketBulletin.v1';
+
+/** How old a locally cached bulletin may be before it is not worth showing. */
+const LOCAL_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The last bulletin this device received, if it is still recent enough. */
+const readCachedBulletin = (): OfficialBulletin | null => {
+  const cached = safeStorage.getItem<any>(CACHE_KEY, null);
+  if (!cached || !Array.isArray(cached.prices) || !cached.prices.length) return null;
+  const fetchedAt = Date.parse(cached.fetchedAt);
+  if (Number.isNaN(fetchedAt)) return null;
+  if (Date.now() - fetchedAt > LOCAL_CACHE_MAX_AGE_MS) return null;
+  return { ...cached, stale: true } as OfficialBulletin;
+};
+
+/** Keep the bulletin for next time. */
+const writeCachedBulletin = (bulletin: OfficialBulletin): void => {
+  try {
+    safeStorage.setItem(CACHE_KEY, bulletin);
+  } catch {
+    // Storage may be unavailable (private mode, quota). Not worth failing over.
+  }
+};
+
+/**
  * Read the bulletin.
  *
  * Returns `null` when the bulletin cannot be reached — the caller then keeps
@@ -67,13 +102,13 @@ const ENDPOINT = '/api/market-prices';
  */
 export const fetchOfficialBulletin = async (signal?: AbortSignal): Promise<OfficialBulletin | null> => {
   try {
-    const response = await fetchWithTimeout(ENDPOINT, { signal, timeoutMs: 12000, retries: 1 });
+    const response = await fetchWithTimeout(ENDPOINT, { signal, timeoutMs: 20000, retries: 1 });
     if (!response.ok) {
       console.warn(`[MarketPrices] bulletin endpoint returned HTTP ${response.status}`);
-      return null;
+      return readCachedBulletin();
     }
 
-    const data = await readJsonWithTimeout<any>(response, 12000);
+    const data = await readJsonWithTimeout<any>(response, 20000);
     const matched = Array.isArray(data?.matched) ? data.matched : [];
 
     const prices: BulletinPrice[] = matched
@@ -89,7 +124,12 @@ export const fetchOfficialBulletin = async (signal?: AbortSignal): Promise<Offic
       }))
       .filter((price: BulletinPrice) => Number.isFinite(price.low) && Number.isFinite(price.high));
 
-    return {
+    if (!prices.length) {
+      // An empty bulletin is not useful; keep the last good one.
+      return readCachedBulletin();
+    }
+
+    const bulletin: OfficialBulletin = {
       source: String(data?.source ?? 'Department of Agricultural Marketing (DAM)'),
       sourceUrl: String(data?.sourceUrl ?? 'https://market.dam.gov.bd/market_daily_price_report'),
       fetchedAt: String(data?.fetchedAt ?? new Date().toISOString()),
@@ -98,9 +138,12 @@ export const fetchOfficialBulletin = async (signal?: AbortSignal): Promise<Offic
       prices,
       missing: Array.isArray(data?.missing) ? data.missing : [],
     };
+
+    writeCachedBulletin(bulletin);
+    return bulletin;
   } catch (error) {
     console.warn('[MarketPrices] could not read the official bulletin:', error);
-    return null;
+    return readCachedBulletin();
   }
 };
 

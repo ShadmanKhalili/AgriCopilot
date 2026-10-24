@@ -22,6 +22,19 @@ const STALE_MAX_MS = 24 * 60 * 60 * 1000;
 /** Ceiling on the response we will buffer from the source. */
 const MAX_SOURCE_BYTES = 1024 * 1024;
 
+/**
+ * Budget for one attempt.
+ *
+ * The government server answers in 3–7 s and is slower under load, so the
+ * budget has to be generous; but the whole function has to finish inside
+ * Netlify's own limit, so two attempts are bounded rather than open-ended.
+ */
+const ATTEMPT_TIMEOUT_MS = 9_000;
+const RETRY_TIMEOUT_MS = 8_000;
+
+/** Pause before the second attempt. */
+const RETRY_DELAY_MS = 700;
+
 export interface BulletinPayload {
   source: string;
   sourceUrl: string;
@@ -43,23 +56,16 @@ interface CacheEntry {
 let cache: CacheEntry | null = null;
 
 /**
- * Fetch the bulletin and turn it into prices.
- *
- * The bulletin is public: no key, no subscription, no search engine. The
- * source is a government page, so the request is made with a browser-like
- * user agent and goes through the shared SSRF-validated fetch.
+ * One attempt: fetch the bulletin and turn it into prices.
  */
-export const loadMarketBulletin = async (): Promise<BulletinPayload> => {
+const fetchBulletinOnce = async (timeoutMs: number): Promise<BulletinPayload> => {
   const response = await safeFetch(BULLETIN_URL, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       Accept: 'text/html,application/xhtml+xml',
     },
-    // The bulletin takes about 3.5 s to answer; the shared default is 8 s,
-    // and a little more headroom is worth having on a slow government server.
-    // If this budget is exceeded the caller keeps the last known prices.
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {
@@ -84,6 +90,42 @@ export const loadMarketBulletin = async (): Promise<BulletinPayload> => {
     missing,
     itemCount: items.length,
   };
+};
+
+/**
+ * Fetch the bulletin, retrying once with a fresh connection.
+ *
+ * The government server is not fast and sometimes stalls; one retry is the
+ * difference between today's prices and yesterday's.
+ */
+const fetchBulletin = async (): Promise<BulletinPayload> => {
+  try {
+    return await fetchBulletinOnce(ATTEMPT_TIMEOUT_MS);
+  } catch (firstError: any) {
+    console.warn('[Market Bulletin] first attempt failed:', firstError?.message || firstError);
+    await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    return await fetchBulletinOnce(RETRY_TIMEOUT_MS);
+  }
+};
+
+/** The fetch that is currently running, if any. */
+let inFlight: Promise<BulletinPayload> | null = null;
+
+/**
+ * Fetch the bulletin — but only one request to the government site at a
+ * time.
+ *
+ * Several farmers opening the app at once must not turn into several
+ * simultaneous requests to a government server that is already slow; they
+ * all wait for the one fetch and share its answer.
+ */
+export const loadMarketBulletin = async (): Promise<BulletinPayload> => {
+  if (!inFlight) {
+    inFlight = fetchBulletin().finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
 };
 
 /**
