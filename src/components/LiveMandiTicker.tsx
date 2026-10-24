@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toBn } from '../utils/banglaNum';
 import { 
   TrendingUp, 
@@ -305,6 +305,10 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
   const [isPaused, setIsPaused] = useState(false);
   const [priceTier, setPriceTier] = useState<'wholesale' | 'retail'>('wholesale');
   const [isSyncingWeb, setIsSyncingWeb] = useState(false);
+  // A ref, not the state: the periodic refresh below runs on a timer whose
+  // closure would otherwise capture a stale `isSyncingWeb` and start a
+  // second fetch while one is already in flight.
+  const syncingRef = useRef(false);
   const [lastSyncText, setLastSyncText] = useState<string>(
     lang === 'bn' ? '৩০ সেপ্টেম্বর ২০২৬ • কৃষি বিপণন অধিদপ্তর (DAM)' : '30 Sep 2026 • DAM & TCB Bulletin'
   );
@@ -328,8 +332,9 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
   const handleLiveWebSync = async (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (e) audioFeedback.playTactileClick();
-    if (isSyncingWeb) return;
+    if (syncingRef.current) return;
 
+    syncingRef.current = true;
     setIsSyncingWeb(true);
     try {
       const result = await fetchLiveWebMandiPrices(lang);
@@ -399,15 +404,27 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
     } catch (err) {
       console.warn("Bulletin refresh failed, keeping the last known prices:", err);
     } finally {
+      syncingRef.current = false;
       setIsSyncingWeb(false);
     }
   };
 
-  // Load today's official prices as soon as the ticker is on screen.
+  // Load today's official prices as soon as the ticker is on screen, and
+  // keep them fresh while the app stays open.
+  //
+  // The government publishes the bulletin once a day, and the server caches
+  // it for an hour, so a farmer who leaves the app open in the field used to
+  // keep looking at the snapshot from when they opened it. Half an hour is
+  // well inside the cache window, so this costs one cheap request and picks
+  // up a newly published bulletin within half an hour.
   useEffect(() => {
     handleLiveWebSync();
+    const timer = setInterval(() => {
+      handleLiveWebSync();
+    }, 30 * 60 * 1000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [lang]);
 
   return (
     <>
