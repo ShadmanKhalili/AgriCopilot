@@ -233,16 +233,33 @@ export { Type };
 
 // Advanced (Premium) analysis uses the larger model; standard requests use flash-lite.
 //
-// NOTE: `gemini-3.8-flash` is **not** usable on this project's Gemini key —
-// it answers "This model is no longer available to new users" (404). It was
-// the "advanced" model here, so every advanced request was silently routed
-// back to the standard model by the server's allow-list anyway. The constant
-// now names a model that actually answers, so the code and the behaviour
-// agree. When the key is upgraded, change this one line (and the matching
-// `AI_TEXT_MODELS` in the Netlify function) to get the bigger model back.
+// Which models this project's Gemini key can actually serve was measured
+// against the live proxy on 24 Oct 2026, by asking the server for each model
+// and reading back which one actually answered:
+//
+//   gemini-3.8-flash      -> refused ("no longer available to new users")
+//   gemini-2.5-flash      -> refused ("no longer available to new users")
+//   gemini-3.6-flash      -> answers
+//   gemini-3.5-flash-lite -> answers
+//
+// So the advanced and search constants below point at `gemini-3.6-flash`, the
+// largest model this key really serves.
+//
+// Before this change they named `gemini-3.8-flash` and `gemini-2.5-flash`.
+// Because the server fails over to the next model, every advanced request and
+// every search request paid for one *refused* upstream call before the
+// answer arrived — a third of the key's request budget spent on a model the
+// key does not have. Worse, the search feature never actually searched:
+// the server only attaches the Google Search tool to `gemini-2.5-flash`, so
+// the tool was never sent and the model answered "I do not have access to
+// real-time market data" instead of looking up live prices.
+//
+// If the key is upgraded again and a bigger model starts answering, change
+// these two lines (and the matching `AI_TEXT_MODELS` in the Netlify
+// function) — that is all it takes.
 const STANDARD_MODEL = 'gemini-3.5-flash-lite';
-const ADVANCED_MODEL = 'gemini-3.8-flash';
-const SEARCH_MODEL = 'gemini-2.5-flash';
+const ADVANCED_MODEL = 'gemini-3.6-flash';
+const SEARCH_MODEL = 'gemini-3.6-flash';
 const getModelName = (isAdvanced?: boolean) => (isAdvanced ? ADVANCED_MODEL : STANDARD_MODEL);
 const BACKUP_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
