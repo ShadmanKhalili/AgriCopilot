@@ -47,15 +47,30 @@ export default defineConfig(({mode}) => {
           ],
         },
         workbox: {
-          // In production only precache the app shell. Precaching every vendor
+          // In production only precache the static assets. Precaching every vendor
           // chunk previously made the service worker download ~2.8 MB before the
           // app was usable, which is a serious problem for farmers on slow rural
           // connections. Hashed assets are cached on demand at runtime instead.
           // In dev the output dir contains no built assets, so keep the full glob
           // there (otherwise workbox warns about an unmatched pattern).
+          //
+          // NOTE: `index.html` is deliberately NOT precached. Workbox registers
+          // the precache route BEFORE the runtime routes, and its
+          // `directoryIndex` mapping makes a navigation to `/` match the
+          // precached `/index.html`. The precached copy is served cache-first,
+          // so right after a deploy the browser hands the farmer the OLD
+          // index.html — which points at hashed chunks the deploy already
+          // deleted. The browser then asks for a chunk that no longer exists,
+          // the app never boots, and the farmer is stuck on the "app has been
+          // updated" screen with no way forward. With `navigateFallback: null`
+          // the navigate runtime route below (network-first) is the only thing
+          // that answers `/`, and it always returns the HTML that matches the
+          // deployed chunks. Offline still works: the same route caches the
+          // navigation response in `agri-app-shell` and serves it when the
+          // network is gone.
           globPatterns: mode === 'production'
-            ? ['**/*.{css,html,ico,png,svg,woff,woff2}']
-            : ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+            ? ['**/*.{css,ico,png,svg,woff,woff2}']
+            : ['**/*.{js,css,ico,png,svg,woff,woff2}'],
           globIgnores: ['**/node_modules/**'],
           maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
           // NOTE: `navigateFallback` is deliberately disabled (vite-plugin-pwa
