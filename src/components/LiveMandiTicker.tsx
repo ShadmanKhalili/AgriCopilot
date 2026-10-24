@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toBn } from '../utils/banglaNum';
 import { 
   TrendingUp, 
@@ -46,13 +46,13 @@ export interface CommodityItem {
 }
 
 export interface PriceVerificationEvidence {
-  status: 'verified_bulletin' | 'web_search_estimate';
+  status: 'verified_bulletin' | 'web_search_estimate' | 'not_in_bulletin';
   bulletinSource: string;
   sourceUrl?: string;
   market: string;
   date: string;
   unit: string;
-  verificationMethod: 'official_government_bulletin' | 'automated_search_grounding';
+  verificationMethod: 'official_government_bulletin' | 'automated_search_grounding' | 'last_known_bulletin';
 }
 
 const createDamEvidence = (market: string, unit: string = 'kg'): PriceVerificationEvidence => ({
@@ -320,26 +320,57 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
     setPriceTier(prev => prev === 'wholesale' ? 'retail' : 'wholesale');
   };
 
-  // Perform a live web search for commodity rates using Google Search Grounding
-  const handleLiveWebSync = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    audioFeedback.playTactileClick();
+  // Refresh from the official bulletin: the Department of Agricultural
+  // Marketing publishes the day's prices publicly, and the server reads and
+  // parses them. This used to ask Gemini to run a Google Search for the
+  // bulletin — the search tool is refused by this project's key, so it never
+  // returned anything and the ticker silently kept its 30 September prices.
+  const handleLiveWebSync = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (e) audioFeedback.playTactileClick();
     if (isSyncingWeb) return;
 
     setIsSyncingWeb(true);
     try {
       const result = await fetchLiveWebMandiPrices(lang);
       if (result.items && result.items.length > 0) {
+        const bulletinDate = result.timestamp.slice(0, 10);
+        const missingIds = new Set(result.missing.map((m) => m.id));
+
         setCommodities(prev => prev.map(comm => {
           const update = result.items.find(u => u.id === comm.id);
-          if (!update) return comm;
-          const webEvidence: PriceVerificationEvidence = {
-            status: 'web_search_estimate',
-            bulletinSource: `Google Search Grounding (${result.source || 'Online Mandi Bulletin'})`,
+          if (!update) {
+            // Not in today's bulletin: keep the last known figure, but say so
+            // instead of passing it off as today's price.
+            if (!missingIds.has(comm.id)) return comm;
+            const lastKnownEvidence: PriceVerificationEvidence = {
+              status: 'not_in_bulletin',
+              bulletinSource: lang === 'bn'
+                ? 'আজকের সরকারি বুলেটিনে নেই'
+                : 'Not in today\'s official bulletin',
+              sourceUrl: result.sourceUrl,
+              market: comm.marketEn,
+              date: comm.verificationEvidence?.date || '2026-09-30',
+              unit: comm.unitEn,
+              verificationMethod: 'last_known_bulletin'
+            };
+            return {
+              ...comm,
+              officialDamVerified: false,
+              verificationEvidence: lastKnownEvidence
+            };
+          }
+
+          const officialEvidence: PriceVerificationEvidence = {
+            status: 'verified_bulletin',
+            bulletinSource: lang === 'bn'
+              ? 'কৃষি বিপণন অধিদপ্তর (DAM) • দৈনিক বাজার বুলেটিন'
+              : 'Dept of Agricultural Marketing (DAM) daily bulletin',
+            sourceUrl: result.sourceUrl,
             market: comm.marketEn,
-            date: new Date().toISOString().split('T')[0],
+            date: bulletinDate,
             unit: comm.unitEn,
-            verificationMethod: 'automated_search_grounding'
+            verificationMethod: 'official_government_bulletin'
           };
           return {
             ...comm,
@@ -349,25 +380,34 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
             trend: (update.trend as any) || comm.trend,
             low24h: update.low24h || comm.low24h,
             high24h: update.high24h || comm.high24h,
-            seasonContextBn: update.notes ? `${update.notes} (লাইভ ওয়েব সার্চ - অনির্ধারিত)` : comm.seasonContextBn,
-            officialDamVerified: false,
-            verificationEvidence: webEvidence
+            seasonContextBn: update.notes
+              ? `${comm.seasonContextBn} (ডিএএম দৈনিক বুলেটিন: ${update.notes})`
+              : comm.seasonContextBn,
+            officialDamVerified: true,
+            verificationEvidence: officialEvidence
           };
         }));
-        setLastSyncText(lang === 'bn' 
-          ? `আজকের লাইভ ওয়েব সার্চ • ${result.source} (অনুমান)` 
-          : `Live Web Search • ${result.source} (Estimate)`);
+
+        setLastSyncText(lang === 'bn'
+          ? `আজকের সরকারি DAM বুলেটিন • ${bulletinDate}${result.stale ? ' (সেভ করা)' : ''}`
+          : `Official DAM bulletin • ${bulletinDate}${result.stale ? ' (cached)' : ''}`);
       } else {
-        setLastSyncText(lang === 'bn' 
-          ? 'যাচাইকৃত: ৩০ সেপ্টেম্বর ২০২৬ • DAM dam.gov.bd' 
+        setLastSyncText(lang === 'bn'
+          ? 'যাচাইকৃত: ৩০ সেপ্টেম্বর ২০২৬ • DAM dam.gov.bd'
           : 'Verified: 30 Sep 2026 • DAM dam.gov.bd');
       }
     } catch (err) {
-      console.warn("Live web sync failed, preserving verified DAM bulletin:", err);
+      console.warn("Bulletin refresh failed, keeping the last known prices:", err);
     } finally {
       setIsSyncingWeb(false);
     }
   };
+
+  // Load today's official prices as soon as the ticker is on screen.
+  useEffect(() => {
+    handleLiveWebSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -409,11 +449,11 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               onClick={handleLiveWebSync}
               disabled={isSyncingWeb}
               className="hidden lg:flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono text-stone-300 bg-stone-800/80 hover:bg-stone-700 hover:text-white border border-stone-600 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
-              title={lang === 'bn' ? 'গুগল সার্চ ও DAM দিয়ে লাইভ বাজারদর রিফ্রেশ করুন' : 'Live Google Search & DAM price re-sync'}
+              title={lang === 'bn' ? 'আজকের সরকারি DAM বুলেটিন থেকে দর রিফ্রেশ করুন' : "Refresh from today's official DAM bulletin"}
             >
               <RefreshCw className={`w-2.5 h-2.5 ${isSyncingWeb ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
               <span className="text-emerald-300 font-bold">
-                {isSyncingWeb ? (lang === 'bn' ? 'সার্চ হচ্ছে...' : 'Searching...') : 'DAM.GOV.BD'}
+                {isSyncingWeb ? (lang === 'bn' ? 'আপডেট হচ্ছে...' : 'Updating...') : 'DAM.GOV.BD'}
               </span>
             </button>
           </div>
@@ -615,6 +655,33 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                   </span>
                 </div>
               </div>
+            ) : selectedCommodity.verificationEvidence?.status === 'not_in_bulletin' ? (
+              <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/25 text-[11px] text-stone-300 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="font-bold text-amber-300">
+                      {lang === 'bn' ? 'আজকের বুলেটিনে নেই' : 'Not in today\'s bulletin'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+                    {lang === 'bn' ? 'শেষ জানা দর' : 'Last Known Price'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-stone-400 font-mono flex items-center justify-between">
+                  <span>
+                    {selectedCommodity.verificationEvidence?.date} • {selectedCommodity.verificationEvidence?.market} ({selectedCommodity.verificationEvidence?.unit})
+                  </span>
+                  <a
+                    href={selectedCommodity.verificationEvidence?.sourceUrl || 'https://market.dam.gov.bd/market_daily_price_report'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-400 hover:underline flex items-center gap-0.5"
+                  >
+                    dam.gov.bd <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+              </div>
             ) : (
               <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-[11px] text-stone-300 space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -632,9 +699,9 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                   <span>
                     {selectedCommodity.verificationEvidence?.date || '2026-09-30'} • {selectedCommodity.verificationEvidence?.market || selectedCommodity.marketEn}
                   </span>
-                  <a 
-                    href="https://dam.gov.bd" 
-                    target="_blank" 
+                  <a
+                    href={selectedCommodity.verificationEvidence?.sourceUrl || 'https://dam.gov.bd'}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-emerald-400 hover:underline flex items-center gap-0.5"
                   >
@@ -656,7 +723,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
                 <span>
                   {isSyncingWeb 
                     ? (lang === 'bn' ? 'সার্চ হচ্ছে...' : 'Searching...') 
-                    : (lang === 'bn' ? 'লাইভ ওয়েব সার্চ যাচাই' : 'Live Web Re-Check')}
+                    : (lang === 'bn' ? 'সরকারি বুলেটিন রিফ্রেশ' : 'Refresh Official Bulletin')}
                 </span>
               </button>
 
