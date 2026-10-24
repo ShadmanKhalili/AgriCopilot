@@ -45,7 +45,12 @@ const parseModelList = (raw: string | undefined, fallback: string[]): string[] =
   return list.length ? Array.from(new Set(list)) : fallback;
 };
 
-const TEXT_MODELS = parseModelList(process.env.AI_TEXT_MODELS, ["gemini-3.5-flash-lite"]);
+const TEXT_MODELS = parseModelList(process.env.AI_TEXT_MODELS, [
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-2.5-flash",
+  "gemini-3.5-flash-lite",
+]);
 const AUDIO_MODELS = parseModelList(process.env.AI_AUDIO_MODELS, [
   "gemini-3.8-flash-lite-tts",
   "gemini-3.8-flash-tts",
@@ -110,6 +115,21 @@ const resolveModel = (requested: unknown, isAudio: boolean): string => {
   const wanted = typeof requested === "string" ? requested.trim() : "";
   if (wanted && allowList.includes(wanted)) return wanted;
   return allowList[0];
+};
+
+const getCandidateModels = (requested: unknown, isAudio: boolean): string[] => {
+  if (isAudio) return AUDIO_MODELS;
+  const wanted = typeof requested === "string" ? requested.trim() : "";
+  if (wanted === "gemini-3.8-flash") {
+    return ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+  }
+  if (wanted === "gemini-2.5-flash") {
+    return ["gemini-2.5-flash", "gemini-3.5-flash-lite"];
+  }
+  if (wanted && TEXT_MODELS.includes(wanted)) {
+    return [wanted, "gemini-3.5-flash-lite"];
+  }
+  return ["gemini-3.5-flash-lite"];
 };
 
 const errorMessage = (error: any): string => {
@@ -251,18 +271,19 @@ const streamText = async (
         }
       };
 
-      const model = resolveModel(requestedModel, false);
+      const candidateModels = getCandidateModels(requestedModel, false);
       const deadline = Date.now() + STREAM_BUDGET_MS;
       let produced = false;
 
-      // Ground first, then the same model without grounding. A key that does
-      // not have Google Search enabled fails the grounded call, and the
-      // ungrounded retry is what actually answers the farmer.
       const wantsTools =
         !!requestedTools && !groundingDisabledForInstance && SEARCH_GROUNDING_MODE !== "off";
-      const attempts: Array<Record<string, unknown> | undefined> = wantsTools
-        ? [config, stripTools(config)]
-        : [stripTools(config)];
+
+      for (const model of candidateModels) {
+        if (Date.now() >= deadline - 3_000) break;
+
+        const attempts: Array<Record<string, unknown> | undefined> = wantsTools && model === "gemini-2.5-flash"
+          ? [config, stripTools(config)]
+          : [stripTools(config)];
 
       for (const attemptConfig of attempts) {
         const remaining = deadline - Date.now();
@@ -303,6 +324,7 @@ const streamText = async (
         }
         console.warn(`[AI Proxy] Model ${model} failed: ${outcome.error}`);
       }
+    }
 
       send({
         type: "error",
@@ -333,26 +355,29 @@ const bufferText = async (
   requestedTools: any[] | undefined,
   quota: { uid: string; idToken: string; dayNumber: number }
 ): Promise<Response> => {
-  const model = resolveModel(requestedModel, false);
+  const candidateModels = getCandidateModels(requestedModel, false);
   const wantsTools =
     !!requestedTools && !groundingDisabledForInstance && SEARCH_GROUNDING_MODE !== "off";
-  const attempts: Array<Record<string, unknown> | undefined> = wantsTools
-    ? [config, stripTools(config)]
-    : [stripTools(config)];
 
-  for (const attemptConfig of attempts) {
-    const outcome = await runModel(apiKey, model, contents, attemptConfig, () => {});
-    if (outcome.status === "ok") {
-      await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
-      return jsonResponse(200, {
-        text: outcome.text,
-        modelUsed: outcome.model,
-      });
+  for (const model of candidateModels) {
+    const attempts: Array<Record<string, unknown> | undefined> = wantsTools && model === "gemini-2.5-flash"
+      ? [config, stripTools(config)]
+      : [stripTools(config)];
+
+    for (const attemptConfig of attempts) {
+      const outcome = await runModel(apiKey, model, contents, attemptConfig, () => {});
+      if (outcome.status === "ok") {
+        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
+        return jsonResponse(200, {
+          text: outcome.text,
+          modelUsed: outcome.model,
+        });
+      }
+      if (attemptConfig && requestedTools && !isQuotaOrRateError(outcome.error)) {
+        groundingDisabledForInstance = true;
+      }
+      console.warn(`[AI Proxy] Model ${model} failed: ${outcome.error}`);
     }
-    if (attemptConfig && requestedTools && !isQuotaOrRateError(outcome.error)) {
-      groundingDisabledForInstance = true;
-    }
-    console.warn(`[AI Proxy] Model ${model} failed: ${outcome.error}`);
   }
 
   return jsonResponse(502, { error: "AI is temporarily unavailable. Please try again in a moment." });

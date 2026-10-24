@@ -8,23 +8,34 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
 
-// Lazy load components
-const LiveMandiTicker = lazy(() => import('./LiveMandiTicker'));
-const AgriCopilot = lazy(() => import('./AgriCopilot'));
-const SmartGrade = lazy(() => import('./SmartGrade'));
-const SmartPlanting = lazy(() => import('./SmartPlanting'));
-const MarketConnect = lazy(() => import('./MarketConnect'));
-const KrishiProfitCalculator = lazy(() => import('./KrishiProfitCalculator'));
-const ClimateResilienceGuide = lazy(() => import('./ClimateResilienceGuide'));
-const WeatherAdvisory = lazy(() => import('./WeatherAdvisory'));
-const SatelliteHealth = lazy(() => import('./SatelliteHealth'));
-const CommunityRadar = lazy(() => import('./CommunityRadar'));
-const GovSchemes = lazy(() => import('./GovSchemes'));
-const UserGuide = lazy(() => import('./UserGuide'));
-const Profile = lazy(() => import('./Profile'));
-const FarmerDossier = lazy(() => import('./FarmerDossier'));
-const AdminDashboard = lazy(() => import('./AdminDashboard'));
-const ExpertHub = lazy(() => import('./ExpertHub'));
+// Persistent top ticker is statically imported so it never suffers dynamic import failures
+import LiveMandiTicker from './LiveMandiTicker';
+
+// Resilient dynamic loader that retries transient module fetch errors
+function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      return new Promise<{ default: T }>((resolve) => setTimeout(resolve, 600)).then(factory);
+    })
+  );
+}
+
+// Lazy load tab components
+const AgriCopilot = lazyWithRetry(() => import('./AgriCopilot'));
+const SmartGrade = lazyWithRetry(() => import('./SmartGrade'));
+const SmartPlanting = lazyWithRetry(() => import('./SmartPlanting'));
+const MarketConnect = lazyWithRetry(() => import('./MarketConnect'));
+const KrishiProfitCalculator = lazyWithRetry(() => import('./KrishiProfitCalculator'));
+const ClimateResilienceGuide = lazyWithRetry(() => import('./ClimateResilienceGuide'));
+const WeatherAdvisory = lazyWithRetry(() => import('./WeatherAdvisory'));
+const SatelliteHealth = lazyWithRetry(() => import('./SatelliteHealth'));
+const CommunityRadar = lazyWithRetry(() => import('./CommunityRadar'));
+const GovSchemes = lazyWithRetry(() => import('./GovSchemes'));
+const UserGuide = lazyWithRetry(() => import('./UserGuide'));
+const Profile = lazyWithRetry(() => import('./Profile'));
+const FarmerDossier = lazyWithRetry(() => import('./FarmerDossier'));
+const AdminDashboard = lazyWithRetry(() => import('./AdminDashboard'));
+const ExpertHub = lazyWithRetry(() => import('./ExpertHub'));
 
 import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
@@ -793,15 +804,10 @@ export default function Layout() {
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           
           {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
-          {/* Lazy-loaded so recharts is not pulled into the initial bundle. */}
-          <Suspense fallback={
-            <div className="h-10 shrink-0 border-b border-emerald-900/40 bg-emerald-950/60 animate-pulse" aria-hidden="true" />
-          }>
-            <LiveMandiTicker 
-              lang={lang} 
-              onNavigateToMarket={() => handleNavigateTab('market-connect')} 
-            />
-          </Suspense>
+          <LiveMandiTicker 
+            lang={lang} 
+            onNavigateToMarket={() => handleNavigateTab('market-connect')} 
+          />
 
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">

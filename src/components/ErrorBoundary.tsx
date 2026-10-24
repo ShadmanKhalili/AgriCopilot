@@ -32,6 +32,22 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    const errorMsg = String(error?.message || error || '');
+    const isChunkLoadError = error?.name === 'TypeError' && 
+      (errorMsg.includes('Failed to fetch dynamically imported module') ||
+       errorMsg.includes('dynamically imported'));
+
+    if (isChunkLoadError && typeof window !== 'undefined') {
+      const storageKey = 'app_chunk_auto_reload';
+      const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+      const now = Date.now();
+      // Auto-reload once within a 15-second window to fetch fresh bundle
+      if (now - lastReload > 15000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+        return;
+      }
+    }
     console.error('Uncaught error:', error, errorInfo);
   }
 

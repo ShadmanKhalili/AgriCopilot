@@ -215,10 +215,18 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       try {
         ai = await getLiveAiClient();
       } catch (err: any) {
-        console.error("Live AI client connection failed:", err);
-        toast.error(lang === 'bn' 
-          ? "ভয়েস কল সার্ভারের সাথে সংযুক্ত হতে পারেনি। অনুগ্রহ করে আবার চেষ্টা করুন।" 
-          : "Could not establish secure Live voice session. Please try again.");
+        const errorMsg = String(err?.message || err || '');
+        const isKeySuspended = errorMsg.includes('suspended') || errorMsg.includes('API key') || errorMsg.includes('403');
+        console.warn("[LiveExpertCall] Live Voice client connection unavailable:", isKeySuspended ? "Gemini API key inactive/suspended" : "Connection failed");
+        toast.error(
+          isKeySuspended
+            ? (lang === 'bn' 
+                ? "জেমিনি এআই কি সাময়িকভাবে স্থগিত বা পরিবর্তিত হয়েছে। .env ফাইলে সক্রিয় GEMINI_API_KEY প্রদান করুন।" 
+                : "Gemini API key is suspended or rotated. Please provide an active GEMINI_API_KEY in .env.")
+            : (lang === 'bn' 
+                ? "ভয়েস কল সার্ভারের সাথে সংযুক্ত হতে পারেনি। অনুগ্রহ করে আবার চেষ্টা করুন।" 
+                : "Could not establish secure Live voice session. Please try again.")
+        );
         setIsCalling(false);
         setIsRinging(false);
         return;

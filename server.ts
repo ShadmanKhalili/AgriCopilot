@@ -13,7 +13,7 @@ import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
 import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -229,10 +229,12 @@ async function startServer() {
   // Server-side AI Proxy: Securely proxies Gemini API calls using process.env.GEMINI_API_KEY
   // avoiding client-side HTTP referrer restrictions and keeping secrets off the browser.
   let serverAiClient: GoogleGenAI | null = null;
+  let cachedAiApiKey: string | null = null;
   const getServerAi = () => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return null;
-    if (!serverAiClient) {
+    if (!serverAiClient || cachedAiApiKey !== apiKey) {
+      cachedAiApiKey = apiKey;
       serverAiClient = new GoogleGenAI({ 
         apiKey,
         httpOptions: {
@@ -252,7 +254,7 @@ async function startServer() {
   // failure used to burn two extra pointless upstream calls.
   // Keep in sync with `AI_TEXT_MODELS` / `AI_AUDIO_MODELS` in
   // netlify/functions/ai-proxy.ts — these two copies drifted apart before.
-  const TEXT_MODEL_ALLOWLIST = (process.env.AI_TEXT_MODELS || "gemini-3.5-flash-lite")
+  const TEXT_MODEL_ALLOWLIST = (process.env.AI_TEXT_MODELS || "gemini-3.8-flash,gemini-3.6-flash,gemini-2.5-flash,gemini-3.5-flash-lite")
     .split(",").map(m => m.trim()).filter(m => /^gemini-[a-z0-9.\-]+$/i.test(m));
   const AUDIO_MODEL_ALLOWLIST = (process.env.AI_AUDIO_MODELS || "gemini-3.8-flash-lite-tts,gemini-3.8-flash-tts")
     .split(",").map(m => m.trim()).filter(m => /^gemini-[a-z0-9.\-]+$/i.test(m));
@@ -262,10 +264,19 @@ async function startServer() {
     if (requestedModel.includes("-tts")) {
       return Array.from(new Set([requestedModel, ...AUDIO_MODEL_ALLOWLIST]));
     }
-    // Server-owned cascade with gemini-3.5-flash-lite as primary
+    // Advanced Analysis cascade: gemini-3.8-flash -> gemini-3.6-flash -> gemini-3.5-flash-lite
+    if (requestedModel === "gemini-3.8-flash") {
+      return ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+    }
+    // Search Grounding cascade: gemini-2.5-flash -> gemini-3.5-flash-lite
+    if (requestedModel === "gemini-2.5-flash") {
+      return ["gemini-2.5-flash", "gemini-3.5-flash-lite"];
+    }
+    // Default text models
     return Array.from(new Set([
-      ...(TEXT_MODEL_ALLOWLIST.includes(requestedModel) ? [requestedModel] : []),
+      requestedModel,
       ...TEXT_MODEL_ALLOWLIST,
+      "gemini-3.5-flash-lite"
     ]));
   };
 
@@ -296,9 +307,22 @@ async function startServer() {
         expireTime: (tokenResponse as any)?.expireTime || null
       });
     } catch (err: any) {
-      console.error("Failed to generate ephemeral Live API token:", err);
-      return res.status(500).json({
-        error: err.message || "Failed to generate ephemeral session token."
+      const rawMsg = String(err?.message || err || '');
+      const isSuspended = rawMsg.includes("CONSUMER_SUSPENDED") || rawMsg.includes("has been suspended");
+      const isKeyError = isSuspended || rawMsg.includes("PERMISSION_DENIED") || rawMsg.includes("API_KEY_INVALID") || err?.status === 403;
+
+      let safeErrorMessage = "Failed to generate ephemeral session token.";
+      if (isSuspended) {
+        safeErrorMessage = "Gemini API key has been suspended or rotated. Please configure an active GEMINI_API_KEY.";
+      } else if (isKeyError) {
+        safeErrorMessage = "Gemini API key is invalid or lacks Live API permissions.";
+      }
+
+      console.warn(`[Live Token] Ephemeral token generation unavailable: ${safeErrorMessage}`);
+      return res.status(isKeyError ? 403 : 500).json({
+        error: safeErrorMessage,
+        isSuspended,
+        isKeyError
       });
     }
   });
@@ -437,6 +461,10 @@ async function startServer() {
         } catch (err: any) {
           lastError = err;
           const errStr = String(err?.message || err || '');
+          const isModelNotFound = err?.status === 404 || 
+                                  errStr.includes("404") || 
+                                  errStr.includes("not found") || 
+                                  errStr.includes("no longer available");
           const isHighDemandOrUnavailable = err?.status === 503 || 
                                             errStr.includes("503") || 
                                             errStr.includes("UNAVAILABLE") || 
@@ -445,17 +473,26 @@ async function startServer() {
           const isRateLimit = err?.status === 429 || 
                               errStr.includes("429") || 
                               errStr.includes("RESOURCE_EXHAUSTED");
+          const isGroundingFailure = (err?.status === 403 || err?.status === 400) && 
+                                     Boolean(mergedConfig?.tools) && 
+                                     (errStr.includes("search") || errStr.includes("grounding") || errStr.includes("permission") || errStr.includes("not supported"));
 
-          // If it's a 503 high demand or 429 rate limit, attempt fallback model
-          if ((isHighDemandOrUnavailable || isRateLimit) && i < candidateModels.length - 1) {
+          // If it's a 404 not found, 503 high demand, 429 rate limit, or search grounding issue, attempt fallback model
+          if ((isModelNotFound || isHighDemandOrUnavailable || isRateLimit || isGroundingFailure) && i < candidateModels.length - 1) {
             const nextModel = candidateModels[i + 1];
-            console.warn(`[AI Proxy Failover] Model '${currentModel}' unavailable (${isHighDemandOrUnavailable ? '503 High Demand' : '429 Rate Limit'}). Seamlessly failing over to '${nextModel}'...`);
-            // Brief 250ms backoff before next model attempt
-            await new Promise(r => setTimeout(r, 250));
+            console.warn(`[AI Proxy Failover] Model '${currentModel}' unavailable (${isModelNotFound ? '404 Not Found' : isRateLimit ? '429 Rate Limit' : isGroundingFailure ? 'Grounding Error' : '503 High Demand'}). Seamlessly failing over to '${nextModel}'...`);
+            
+            // If grounding failed or falling over to lite, strip tools for a clean fallback
+            if ((isGroundingFailure || nextModel === "gemini-3.5-flash-lite") && mergedConfig?.tools) {
+              delete mergedConfig.tools;
+            }
+            // Adaptive backoff: 1000ms on 429 rate limit, 200ms on other errors
+            const backoffMs = isRateLimit ? 1000 : 200;
+            await new Promise(r => setTimeout(r, backoffMs));
             continue;
           }
 
-          // If permission/referrer error, fallbacks won't help
+          // If permission/referrer error without tools, fallbacks won't help
           const isReferrer = errStr.includes("REFERRER") || errStr.includes("referer") || errStr.includes("API_KEY_HTTP_REFERRER_BLOCKED");
           if (isReferrer) {
             break;
@@ -466,23 +503,30 @@ async function startServer() {
       // If all candidate models failed, throw last error to catch block
       throw lastError;
     } catch (error: any) {
-      console.error("[Server AI Proxy Error]:", error?.message || error);
       const errStr = String(error?.message || error || '');
+      const isSuspended = errStr.includes("CONSUMER_SUSPENDED") || errStr.includes("has been suspended");
       const isReferrer = errStr.includes("REFERRER") || errStr.includes("referer") || errStr.includes("API_KEY_HTTP_REFERRER_BLOCKED");
       const is403 = error?.status === 403 || errStr.includes("403") || errStr.includes("PERMISSION_DENIED");
       const isHighDemand = error?.status === 503 || errStr.includes("503") || errStr.includes("UNAVAILABLE") || errStr.includes("high demand");
       
-      let friendlyError = error?.message || "Internal AI Proxy error";
-      if (isReferrer) {
-        friendlyError = "Gemini API key has an HTTP Referrer restriction in Google Cloud Console ('Requests from referer are blocked'). To resolve this, open Google Cloud Console > APIs & Services > Credentials, edit the API key, and set 'Application restrictions' to 'None'.";
+      let friendlyError = "Internal AI Proxy error";
+      if (isSuspended) {
+        friendlyError = "Gemini API key has been suspended or rotated. Please configure an active GEMINI_API_KEY in .env.";
+      } else if (isReferrer) {
+        friendlyError = "Gemini API key has an HTTP Referrer restriction in Google Cloud Console. To resolve this, open Google Cloud Console > APIs & Services > Credentials, edit the API key, and set 'Application restrictions' to 'None'.";
       } else if (isHighDemand) {
         friendlyError = "The AI service is currently experiencing exceptionally high demand across model clusters. Please retry in a few moments.";
+      } else if (error?.message) {
+        friendlyError = error.message.replace(/api_key:[A-Za-z0-9_\-]+/g, 'api_key:[REDACTED]');
       }
 
-      return res.status(error?.status && typeof error.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : 500).json({
+      console.warn(`[Server AI Proxy] Request failed: ${friendlyError}`);
+
+      return res.status(error?.status && typeof error.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : (is403 || isSuspended ? 403 : 500)).json({
         error: friendlyError,
+        isSuspended,
         isReferrerBlocked: isReferrer,
-        isPermissionDenied: is403,
+        isPermissionDenied: is403 || isSuspended,
         isHighDemand
       });
     }
@@ -677,7 +721,7 @@ async function startServer() {
         return res.json(getAgroClimaticVegetationIndex(latNum, lngNum));
       }
       
-      return res.json({ ndvi: ndviValue, ndmi: ndmiValue, source: 'sentinel_2' });
+      return res.json({ ndvi: ndviValue, ndmi: ndmiValue, source: 'sentinel_2', isEstimated: false });
 
     } catch {
       // Seamlessly fallback to Agro-Climatic Model without breaking user experience

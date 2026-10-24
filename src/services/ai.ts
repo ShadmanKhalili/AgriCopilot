@@ -71,53 +71,111 @@ type AiProxyResult = {
   modelUsed?: string;
 };
 
-// Helper to call AI via backend proxy
-const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyResult> => {
-  try {
-    // The proxy only serves signed-in callers: it is the only thing that
-    // keeps the paid Gemini key from being an open relay. A farmer who never
-    // signed in gets a guest session created for them here.
-    const idToken = await ensureAiSession();
-    const response = await fetchWithTimeout('/api/ai-proxy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${idToken}`,
-      },
-      // Opt in to NDJSON. Without this flag the proxy returns buffered JSON so
-      // pages loaded before a deploy keep working against the new function.
-      body: JSON.stringify({ ...params, stream: true }),
-      timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
-      retries: 0,
-      // Forward the caller's cancellation so an abandoned request stops billing.
-      signal
-    });
-    
-    if (!response.ok) {
-      let errorMessage = `AI Proxy Failed (Status: ${response.status})`;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch (e) {
-        // Not JSON
+// Burst Queue & Concurrency Limiter
+// Google Gemini Free Tier limits to 15 RPM.
+// The burst queue restricts in-flight requests (max 2 concurrent) and enforces spacing
+// between requests, with automatic 429 exponential backoff retry.
+let activeRequests = 0;
+const MAX_CONCURRENT_REQUESTS = 2;
+const requestQueue: Array<() => void> = [];
+
+const acquireSlot = async (signal?: AbortSignal): Promise<() => void> => {
+  if (activeRequests < MAX_CONCURRENT_REQUESTS) {
+    activeRequests++;
+    return () => {
+      activeRequests--;
+      if (requestQueue.length > 0) {
+        const next = requestQueue.shift();
+        if (next) setTimeout(next, 100);
       }
-      throw new Error(errorMessage);
-    }
+    };
+  }
 
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/x-ndjson')) {
-      return await readAiNdjsonStream(response, undefined, signal);
-    }
+  return new Promise<() => void>((resolve, reject) => {
+    const onAbort = () => {
+      const idx = requestQueue.indexOf(run);
+      if (idx !== -1) requestQueue.splice(idx, 1);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
 
-    // Buffered JSON path: audio/TTS responses and older/local proxies.
-    // The read has its own budget, so a body that stalls mid-transfer is
-    // aborted instead of leaving this promise pending forever.
-    return await readJsonWithTimeout<AiProxyResult>(response, AI_PROXY_HEADER_TIMEOUT_MS);
+    const run = () => {
+      signal?.removeEventListener('abort', onAbort);
+      activeRequests++;
+      resolve(() => {
+        activeRequests--;
+        if (requestQueue.length > 0) {
+          const next = requestQueue.shift();
+          if (next) setTimeout(next, 100);
+        }
+      });
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    requestQueue.push(run);
+  });
+};
+
+// Helper to call AI via backend proxy with burst protection
+const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyResult> => {
+  const releaseSlot = await acquireSlot(signal);
+  try {
+    const idToken = await ensureAiSession();
+    
+    // Up to 2 attempts with backoff if upstream hits 429 burst rate limit
+    let attempt = 0;
+    while (attempt < 2) {
+      attempt++;
+      try {
+        const response = await fetchWithTimeout('/api/ai-proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ ...params, stream: true }),
+          timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
+          retries: 0,
+          signal
+        });
+        
+        if (response.status === 429 && attempt < 2) {
+          console.warn("[AI Client Queue] 429 rate limit encountered, applying 1.5s exponential backoff...");
+          await waitOrAbort(1500, signal);
+          continue;
+        }
+
+        if (!response.ok) {
+          let errorMessage = `AI Proxy Failed (Status: ${response.status})`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // Not JSON
+          }
+          throw new Error(errorMessage);
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/x-ndjson')) {
+          return await readAiNdjsonStream(response, undefined, signal);
+        }
+
+        return await readJsonWithTimeout<AiProxyResult>(response, AI_PROXY_HEADER_TIMEOUT_MS);
+      } catch (err: any) {
+        if (isAbortError(err)) throw err;
+        if (attempt >= 2 || !String(err?.message || '').includes('429')) {
+          throw err;
+        }
+        await waitOrAbort(1500, signal);
+      }
+    }
+    throw new Error("AI request failed after rate limit retry.");
   } catch (err: any) {
-    // A cancellation is not a proxy failure: don't log it as a critical error.
     if (isAbortError(err)) throw err;
-    console.error("Critical AI Proxy Error:", err);
+    console.warn("AI Proxy Request Notice:", err?.message || err);
     throw err;
+  } finally {
+    releaseSlot();
   }
 };
 
@@ -135,11 +193,18 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
   });
   if (!response.ok) {
     let errMsg = `Live Token Request Failed (Status: ${response.status})`;
+    let isSuspended = false;
     try {
       const data = await response.json();
       if (data.error) errMsg = data.error;
+      if (data.isSuspended) isSuspended = true;
     } catch (e) {
       // Not JSON
+    }
+    // Redact any raw API keys that might be echoed
+    errMsg = errMsg.replace(/api_key:[A-Za-z0-9_\-]+/g, 'api_key:[REDACTED]');
+    if (isSuspended || errMsg.includes('suspended')) {
+      errMsg = "Gemini API key is suspended or rotated. Please configure an active GEMINI_API_KEY in .env.";
     }
     throw new Error(errMsg);
   }
@@ -176,10 +241,10 @@ export { Type };
 // agree. When the key is upgraded, change this one line (and the matching
 // `AI_TEXT_MODELS` in the Netlify function) to get the bigger model back.
 const STANDARD_MODEL = 'gemini-3.5-flash-lite';
-const ADVANCED_MODEL = 'gemini-3.5-flash-lite';
+const ADVANCED_MODEL = 'gemini-3.8-flash';
+const SEARCH_MODEL = 'gemini-2.5-flash';
 const getModelName = (isAdvanced?: boolean) => (isAdvanced ? ADVANCED_MODEL : STANDARD_MODEL);
 const BACKUP_MODEL = 'gemini-3.5-flash-lite';
-const SEARCH_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
 const TTS_BACKUP_MODEL = 'gemini-3.8-flash-tts'; 
 export const LIVE_API_MODEL = 'gemini-3.8-live-extended';
