@@ -25,12 +25,13 @@ const MAX_SOURCE_BYTES = 1024 * 1024;
 /**
  * Budget for one attempt.
  *
- * The government server answers in 3–7 s and is slower under load, so the
- * budget has to be generous; but the whole function has to finish inside
- * Netlify's own limit, so two attempts are bounded rather than open-ended.
+ * The government server is erratic: measured on 24 Oct 2026 it answered in
+ * 3.3 s, 3.9 s, 4.5 s, 4.9 s, 5.1 s, 6.3 s — and then once took 13.9 s. The
+ * budget has to cover the slow tail, while the whole function still has to
+ * finish inside Netlify's own limit, so the two attempts are bounded.
  */
-const ATTEMPT_TIMEOUT_MS = 9_000;
-const RETRY_TIMEOUT_MS = 8_000;
+const ATTEMPT_TIMEOUT_MS = 15_000;
+const RETRY_TIMEOUT_MS = 5_000;
 
 /** Pause before the second attempt. */
 const RETRY_DELAY_MS = 700;
@@ -129,10 +130,20 @@ export const loadMarketBulletin = async (): Promise<BulletinPayload> => {
 };
 
 /**
- * The cached bulletin, if it is still recent enough to serve.
+ * The cached bulletin if it is still fresh (inside the TTL).
+ */
+export const getFreshMarketBulletin = (): BulletinPayload | null => {
+  if (!cache) return null;
+  if (Date.now() - cache.fetchedAt >= CACHE_TTL_MS) return null;
+  return { ...cache.payload, stale: false };
+};
+
+/**
+ * The cached bulletin if it is old but still usable (inside the stale window).
  *
- * A stale bulletin is far better than a blank ticker, as long as it is
- * labelled as stale and is not ancient.
+ * This is what gets served while a refresh is running: the farmer sees the
+ * last published prices straight away instead of waiting on a government
+ * server that can take fourteen seconds.
  */
 export const getStaleMarketBulletin = (): BulletinPayload | null => {
   if (!cache) return null;
@@ -141,12 +152,15 @@ export const getStaleMarketBulletin = (): BulletinPayload | null => {
 };
 
 /**
- * The cached bulletin if it is still fresh (inside the TTL).
+ * Refresh the cached bulletin, best effort.
+ *
+ * The caller has already been served, so a failure here is not the farmer's
+ * problem: the next request tries again.
  */
-export const getFreshMarketBulletin = (): BulletinPayload | null => {
-  if (!cache) return null;
-  if (Date.now() - cache.fetchedAt >= CACHE_TTL_MS) return null;
-  return { ...cache.payload };
+export const refreshMarketBulletinInBackground = (): void => {
+  void loadMarketBulletin().catch((error: any) => {
+    console.warn('[Market Bulletin] background refresh failed:', error?.message || error);
+  });
 };
 
 /** Remember a bulletin for the cache window. */

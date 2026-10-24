@@ -5,6 +5,7 @@ import {
   getStaleMarketBulletin,
   loadMarketBulletin,
   rememberMarketBulletin,
+  refreshMarketBulletinInBackground,
 } from './_shared/market-bulletin.ts';
 
 /**
@@ -60,6 +61,16 @@ export const handler: Handler = async (event) => {
     return { statusCode: 200, headers, body: JSON.stringify({ ...fresh, cached: true }) };
   }
 
+  // The cached bulletin is older than the one-hour window but still inside
+  // the stale window. Serve it straight away — a farmer should not wait on a
+  // government server that can take fourteen seconds — and refresh in the
+  // background for the next request.
+  const stale = getStaleMarketBulletin();
+  if (stale) {
+    refreshMarketBulletinInBackground();
+    return { statusCode: 200, headers, body: JSON.stringify({ ...stale, cached: true }) };
+  }
+
   try {
     const payload = await loadMarketBulletin();
     rememberMarketBulletin(payload);
@@ -67,9 +78,9 @@ export const handler: Handler = async (event) => {
   } catch (error: any) {
     console.warn('[Market Prices] Could not reach the bulletin:', error?.message || error);
 
-    const stale = getStaleMarketBulletin();
-    if (stale) {
-      return { statusCode: 200, headers, body: JSON.stringify({ ...stale, cached: true }) };
+    const lastKnown = getStaleMarketBulletin();
+    if (lastKnown) {
+      return { statusCode: 200, headers, body: JSON.stringify({ ...lastKnown, cached: true }) };
     }
 
     return {

@@ -17,6 +17,7 @@ import {
   getStaleMarketBulletin,
   loadMarketBulletin,
   rememberMarketBulletin,
+  refreshMarketBulletinInBackground,
 } from "./netlify/functions/_shared/market-bulletin.ts";
 
 dotenv.config({ override: true });
@@ -243,6 +244,15 @@ async function startServer() {
       const fresh = getFreshMarketBulletin();
       if (fresh) {
         res.json({ ...fresh, cached: true });
+        return;
+      }
+      // Serve the last bulletin straight away and refresh in the background:
+      // the government server can take fourteen seconds, and a farmer should
+      // not wait for it.
+      const stale = getStaleMarketBulletin();
+      if (stale) {
+        refreshMarketBulletinInBackground();
+        res.json({ ...stale, cached: true });
         return;
       }
       const payload = await loadMarketBulletin();
