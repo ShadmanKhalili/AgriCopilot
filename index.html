@@ -81,22 +81,100 @@
       // the app shell — a cached index.html from before a deploy, pointing at a
       // hashed chunk that no longer exists. Without this, the farmer gets a
       // blank white screen with no idea what happened.
-      window.addEventListener('error', function (event) {
-        var el = event && event.target;
-        if (!el || el.tagName !== 'SCRIPT' || !el.src) return;
-        if (el.src.indexOf('/assets/') === -1) return;
+      (function () {
         var root = document.getElementById('root');
-        if (!root || root.childElementCount > 0) return;
-        root.innerHTML =
-          '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
-          'padding:24px;text-align:center;font-family:system-ui,sans-serif;background:#f8fafc;color:#064e3b">' +
-          '<div><div style="font-size:28px;font-weight:800;margin-bottom:8px">&#127807;</div>' +
-          '<div style="font-weight:700;margin-bottom:6px">অ্যাপটি আপডেট হয়েছে।</div>' +
-          '<div style="font-size:14px;opacity:0.8;margin-bottom:18px">The app has been updated. Please reopen it.</div>' +
-          '<button onclick="location.reload()" ' +
-          'style="background:#064e3b;color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:700;cursor:pointer">' +
-          'রিলোড / Reload</button></div></div>';
-      }, true);
+        var RECOVERED_KEY = 'agri.shell.recovered';
+        var noticeShown = false;
+
+        // The page CSP sets `script-src-attr 'none'`, so an inline
+        // `onclick="..."` attribute is silently refused by the browser: the
+        // Reload button used to look normal and do absolutely nothing. Bind the
+        // handler in JS instead — an inline <script> block is allowed by
+        // `script-src`, only inline *attributes* are blocked.
+        function bindReload() {
+          var btn = document.getElementById('agri-reload-btn');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            reloadFresh();
+          });
+        }
+
+        // A plain reload can be answered by the very same stale shell, so
+        // navigate with a cache-busting query string: the service worker's
+        // precache entry for `/index.html` does not match a URL that carries a
+        // query, so the request goes to the network and returns the HTML that
+        // matches the deployed chunks.
+        function reloadFresh() {
+          if (navigator.onLine === false) {
+            location.reload();
+            return;
+          }
+          location.replace(location.pathname + '?agri-reload=' + Date.now());
+        }
+
+        // Has the automatic recovery already run? The marker in the URL is the
+        // reliable guard: it survives even when web storage is unavailable
+        // (private mode, blocked storage). Without it a stale shell would
+        // reload itself forever.
+        function alreadyRecovered() {
+          if (/[?&]agri-reload=/.test(location.search)) return true;
+          try {
+            return !!sessionStorage.getItem(RECOVERED_KEY);
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function showUpdateNotice() {
+          if (!root || root.childElementCount > 0) return;
+          noticeShown = true;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+            'padding:24px;text-align:center;font-family:system-ui,sans-serif;background:#f8fafc;color:#064e3b">' +
+            '<div><div style="font-size:28px;font-weight:800;margin-bottom:8px">&#127807;</div>' +
+            '<div style="font-weight:700;margin-bottom:6px">অ্যাপটি আপডেট হয়েছে।</div>' +
+            '<div style="font-size:14px;opacity:0.8;margin-bottom:18px">The app has been updated. Please reopen it.</div>' +
+            '<button id="agri-reload-btn" type="button" style="background:#064e3b;color:#fff;border:0;border-radius:12px;' +
+            'padding:12px 22px;font-weight:700;cursor:pointer">রিলোড / Reload</button></div></div>';
+          bindReload();
+        }
+
+        window.addEventListener('error', function (event) {
+          var el = event && event.target;
+          if (!el || el.tagName !== 'SCRIPT' || !el.src) return;
+          if (el.src.indexOf('/assets/') === -1) return;
+          showUpdateNotice();
+          // Recover automatically once so a farmer is never stuck on this
+          // screen. The URL marker above stops a genuinely broken deploy from
+          // turning into a reload loop; the button stays available for a
+          // manual retry.
+          if (alreadyRecovered()) return;
+          try {
+            sessionStorage.setItem(RECOVERED_KEY, '1');
+          } catch (e) {
+            /* storage unavailable: the URL marker is the only guard */
+          }
+          setTimeout(reloadFresh, 80);
+        }, true);
+
+        // Once the real app has mounted, drop the recovery marker from the
+        // address bar so shared links stay clean. The card above must NOT
+        // trigger this — it would remove the very marker that stops the reload
+        // loop.
+        if (root && window.MutationObserver) {
+          var observer = new MutationObserver(function () {
+            if (noticeShown || root.childElementCount === 0) return;
+            observer.disconnect();
+            if (!/[?&]agri-reload=/.test(location.search)) return;
+            try {
+              history.replaceState(null, '', location.pathname);
+            } catch (e) {
+              /* history is not writable here: the marker is harmless */
+            }
+          });
+          observer.observe(root, { childList: true });
+        }
+      })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
