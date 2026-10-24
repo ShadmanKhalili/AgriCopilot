@@ -4,6 +4,7 @@ import { ensureAiSession } from '../firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { readAiNdjsonStream } from '../utils/ndjsonStream';
+import { bulletinPromptContext, fetchOfficialBulletin } from './marketPrices';
 
 // The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
 // Text generation always goes through the server proxy, so no provider key is
@@ -893,25 +894,40 @@ export const getMarketInsights = async (
         ? `GPS Location: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
         : `Location: Bangladesh wholesale markets (Kawran Bazar, Shyambazar, Khatunganj, Mohasthan, Cox's Bazar).`;
 
-      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.
-Perform an in-depth web search using Google Search for the latest live market prices, arrival trends, and retail dynamics for "${produce}" in Bangladesh as of TODAY (${today}, Year: ${currentYear}).
+      // The official prices are fetched, not searched for.
+      //
+      // The Google Search tool is refused by this project's Gemini key (the
+      // upstream rejects the tool and the request is retried without it), so
+      // asking the model to search for the bulletin returned nothing and it
+      // answered from its training data instead — asked for today's date it
+      // said 2024-05-18. The Department of Agricultural Marketing publishes
+      // the same bulletin publicly, so the server reads it directly and the
+      // model is anchored on real published numbers.
+      const bulletin = await fetchOfficialBulletin();
+      const officialPrices = bulletinPromptContext(bulletin, produce);
 
-YOUR SEARCH TASKS:
-1. MAINSTREAM WHOLESALE MANDI PRICES & TRENDS:
-   - Search for wholesale auction prices and mandi bulletins at Kawran Bazar (কারওয়ান বাজার), Shyambazar (শ্যামবাজার), Khatunganj (খাতুনগঞ্জ), and Department of Agricultural Marketing (DAM - dam.gov.bd).
-   - Find minimum, maximum, and average wholesale prices per KG in BDT.
+      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.
+Analyse the market for "${produce}" in Bangladesh as of TODAY (${today}, Year: ${currentYear}).
+
+${officialPrices}
+
+YOUR TASKS:
+1. WHOLESALE MANDI PRICES & TRENDS:
+   - Use the official bulletin price above as the base price for "${produce}".
+   - Describe the wholesale mandis where it trades (Kawran Bazar, Shyambazar, Khatunganj) and, for regional commodities, the local mandi.
+   - Give minimum, maximum and average price per KG in BDT, anchored on the official figure rather than contradicting it.
    - Note arrival supply volume (পর্যাপ্ত / মাঝারি / ঘাটতি) and price momentum (উর্ধ্বমুখী / স্থিতিশীল / নিম্নমুখী).
 
 2. SUPERMARKET & E-COMMERCE RETAIL PRICES:
-   - Search supermarket websites and retail apps in Bangladesh: Shwapno (স্বপ্ন / shwapno.com), Meena Bazar (মীনা বাজার / meenabazaronline.com), Agora (আগোরা / agorasuperstores.com), and Chaldal (চালডাল / chaldal.com) for "${produce}".
-   - Find exact packaged/graded retail price per KG.
+   - Give the typical retail shelf price per KG for "${produce}" in Bangladesh supermarkets (Shwapno, Meena Bazar, Agora) and apps (Chaldal), based on the official price plus the usual retail markup over wholesale.
    - Note packaging condition (যেমন: গ্রেডেড প্যাকেট, খোলা, নেট ব্যাগ) and stock availability.
 
 3. VALUE-CHAIN MARGIN SPREAD & FARMER GUIDANCE:
-   - Calculate percentage markup between wholesale mandi rate and supermarket retail shelf rate.
+   - Calculate the percentage markup between the wholesale rate and the supermarket retail shelf rate.
    - Provide concrete, actionable bargaining advice for farmers (e.g., selling directly, sorting Grade-A for supermarket supply contracts, timing delivery to Karwan Bazar vs local cold storage).
 
 CRITICAL REQUIREMENTS:
+- Base every price on the official bulletin figure given above. If the commodity is not in that bulletin, say so plainly and label any figure as an estimate — never present an invented number as official.
 - All prices must be strictly in BDT (Taka) and per KG (Kilogram). Convert Maunds (40kg) accurately to per KG.
 - Deliver results in structured JSON format matching the schema.
 - Language for summaries, notes, and tips: ${lang === 'bn' ? 'Bangla (সহজ ও বাস্তবমুখী বাংলা)' : 'English'}.
@@ -1007,23 +1023,23 @@ ${locationContext}`;
             }
           },
           required: ['insights', 'wholesaleRates', 'supermarketRates', 'supermarkets', 'mandiHubs', 'marginSpread', 'priceDrivers', 'farmerActionTips']
-        },
-        tools: [{ googleSearch: {} }]
+        }
       };
 
       try {
         const response = await generateContent({
           contents: [{ parts: [{ text: prompt }] }],
           config,
-          toolConfig: { includeServerSideToolInvocations: true },
           model: SEARCH_MODEL
         });
         const parsed = parseJsonResponse(response.text);
         return parsed;
       } catch (searchError) {
-        console.warn("Google Search model failed, falling back to standard generation:", searchError);
-        const fallbackPrompt = `Provide realistic in-depth market intelligence for ${produce} in Bangladesh around ${today}.
-Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets (Shwapno, Meena Bazar, Agora, Chaldal). Return JSON matching schema in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
+        console.warn("Market analysis model failed, retrying with the standard model:", searchError);
+        const fallbackPrompt = `${officialPrices}
+
+Provide realistic in-depth market intelligence for ${produce} in Bangladesh around ${today}.
+Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets (Shwapno, Meena Bazar, Agora, Chaldal). Base every price on the official bulletin figure above. Return JSON matching schema in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
 
         const fallbackResponse = await generateContent({
           contents: [{ parts: [{ text: fallbackPrompt }] }],
@@ -1053,78 +1069,63 @@ export interface LiveMandiItemUpdate {
   notes?: string;
 }
 
-export const fetchLiveWebMandiPrices = async (lang: string = 'bn'): Promise<{ items: LiveMandiItemUpdate[]; timestamp: string; source: string }> => {
-  return await callAiWithRetry(async () => {
-    try {
-      const now = new Date();
-      const today = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      const prompt = `Perform an accurate, real-time Google Search for official daily agricultural market bulletins in Bangladesh (Department of Agricultural Marketing dam.gov.bd, TCB, Kawran Bazar, Khatunganj, Reazuddin Bazar Chittagong, and Cox's Bazar mandis) for today (${today}).
-      
-      Find the most accurate wholesale farm-gate / arat price and city retail price per unit in BDT for:
-      1. cb_tomato: Fresh Red Tomato (পাকা টমেটো) - per kg
-      2. pabna_chili: Green Chili (কাঁচা মরিচ) - per kg
-      3. munshiganj_potato: Diamond Potato (ডায়মন্ড আলু) - per kg
-      4. faridpur_onion: Deshi Onion (দেশি পেঁয়াজ) - per kg
-      5. dinajpur_rice: Coarse Boro/Swarna Rice (মোটা চাল) - per kg
-      6. kushtia_miniket: Miniket Fine Rice (মিনিকেট সরু চাল) - per kg
-      7. dhaka_egg: Commercial Brown Egg (ফার্মের লেয়ার ডিম) - per piece (or wholesale per piece, retail per piece)
-      8. jessore_brinjal: Purple Eggplant (গোল বেগুন) - per kg
-      9. natore_garlic: Deshi Garlic (দেশি রসুন) - per kg
-      10. ctg_ginger: Imported Ginger (আমদানীকৃত আদা) - per kg
-      
-      CRITICAL: Ensure the prices match real DAM/TCB bulletins. Return JSON matching schema.`;
+/**
+ * The live mandi prices, straight from the official bulletin.
+ *
+ * This used to ask Gemini to run a Google Search for the day's DAM bulletin.
+ * The `googleSearch` tool is refused by this project's key, so the search
+ * never returned anything: the ticker silently kept its prices frozen at
+ * 30 September 2026, and the model — asked for prices it could not look up —
+ * was free to invent them.
+ *
+ * The bulletin is public, so the server reads it and parses it
+ * (`/api/market-prices`). No model call, no search engine, no invented
+ * numbers: the low and high of the published range are the wholesale and
+ * retail prices, and the bulletin's own change figure is the change.
+ */
+export const fetchLiveWebMandiPrices = async (lang: string = 'bn'): Promise<{
+  items: LiveMandiItemUpdate[];
+  timestamp: string;
+  source: string;
+  sourceUrl: string;
+  stale: boolean;
+  missing: Array<{ id: string; label: string }>;
+}> => {
+  const bulletin = await fetchOfficialBulletin();
 
-      const config: any = {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            items: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.STRING },
-                  wholesalePrice: { type: Type.NUMBER },
-                  retailPrice: { type: Type.NUMBER },
-                  change: { type: Type.NUMBER },
-                  trend: { type: Type.STRING },
-                  low24h: { type: Type.NUMBER },
-                  high24h: { type: Type.NUMBER },
-                  notes: { type: Type.STRING }
-                },
-                required: ['id', 'wholesalePrice', 'retailPrice', 'change', 'trend', 'low24h', 'high24h']
-              }
-            },
-            sourceCitation: { type: Type.STRING }
-          },
-          required: ['items', 'sourceCitation']
-        },
-        tools: [{ googleSearch: {} }]
-      };
+  if (!bulletin) {
+    console.warn('Official bulletin unavailable; keeping the last known prices.');
+    return {
+      items: [],
+      timestamp: new Date().toISOString(),
+      source: 'dam.gov.bd Official Bulletin (unavailable)',
+      sourceUrl: 'https://market.dam.gov.bd/market_daily_price_report',
+      stale: true,
+      missing: [],
+    };
+  }
 
-      const response = await generateContent({
-        contents: [{ parts: [{ text: prompt }] }],
-        config,
-        toolConfig: { includeServerSideToolInvocations: true },
-        model: SEARCH_MODEL
-      });
+  const items: LiveMandiItemUpdate[] = bulletin.prices.map((price) => ({
+    id: price.id,
+    wholesalePrice: price.low,
+    retailPrice: price.high,
+    change: price.changePct ?? 0,
+    trend: price.direction,
+    low24h: price.low,
+    high24h: price.high,
+    notes: `${price.name}: ${price.low}-${price.high} BDT/kg`,
+  }));
 
-      const parsed = parseJsonResponse(response.text);
-      return {
-        items: parsed.items || [],
-        timestamp: today,
-        source: parsed.sourceCitation || 'dam.gov.bd & Google Search Grounding'
-      };
-    } catch (err) {
-      console.warn("Live web mandi search error, falling back to verified DAM bulletin:", err);
-      return {
-        items: [],
-        timestamp: new Date().toLocaleDateString('en-GB'),
-        source: 'dam.gov.bd Official Bulletin'
-      };
-    }
-  });
+  return {
+    items,
+    timestamp: bulletin.fetchedAt,
+    source: bulletin.stale
+      ? `${bulletin.source} (cached — the source was unreachable)`
+      : bulletin.source,
+    sourceUrl: bulletin.sourceUrl,
+    stale: bulletin.stale,
+    missing: bulletin.missing,
+  };
 };
 
 export const findGovernmentSchemes = async (

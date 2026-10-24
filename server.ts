@@ -12,6 +12,12 @@ import { GoogleGenAI } from "@google/genai";
 import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
 import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
+import {
+  getFreshMarketBulletin,
+  getStaleMarketBulletin,
+  loadMarketBulletin,
+  rememberMarketBulletin,
+} from "./netlify/functions/_shared/market-bulletin.ts";
 
 dotenv.config({ override: true });
 
@@ -224,6 +230,35 @@ async function startServer() {
         googleMaps: googleMapsConfigured ? "Google Maps Platform (Authenticated)" : "Standard Web Maps"
       }
     });
+  });
+
+  // Live market prices from the Department of Agricultural Marketing.
+  //
+  // The same bulletin the Netlify function serves, for the self-hosted
+  // deployment: the source is public and free, so no search engine and no
+  // provider key are involved. The parsed bulletin is cached for an hour,
+  // and a cached copy is served (labelled stale) if the source is down.
+  app.get("/api/market-prices", async (_req, res) => {
+    try {
+      const fresh = getFreshMarketBulletin();
+      if (fresh) {
+        res.json({ ...fresh, cached: true });
+        return;
+      }
+      const payload = await loadMarketBulletin();
+      rememberMarketBulletin(payload);
+      res.json({ ...payload, cached: false });
+    } catch (error: any) {
+      console.warn("[Market Prices] Could not reach the bulletin:", error?.message || error);
+      const stale = getStaleMarketBulletin();
+      if (stale) {
+        res.json({ ...stale, stale: true, cached: true });
+        return;
+      }
+      res.status(503).json({
+        error: "The official price bulletin could not be reached right now. Please try again shortly.",
+      });
+    }
   });
 
   // Server-side AI Proxy: Securely proxies Gemini API calls using process.env.GEMINI_API_KEY
