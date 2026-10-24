@@ -9,21 +9,63 @@
   node_bundler = "esbuild"
 
 # --- API rewrites (order matters: specific routes before the /api/* catch-all) ---
+#
+# Rate limits (Netlify code-based rules — available on every plan, no extra
+# account, no dashboard).
+#
+# Why this exists: the per-account daily allowance inside the AI proxy is a
+# floor, not a wall. Firebase email sign-up is open, so anyone can create
+# accounts and spread their calls across them. A per-IP limit above the API
+# routes is the cheapest hard stop available: one address can no longer drain
+# the paid Gemini key or the Sentinel Hub quota in a loop.
+#
+# `aggregate_by = ["ip", "domain"]` counts every visitor separately, so
+# "120" means "120 requests a minute from this one address", not "120 a
+# minute for the whole site".
+#
+# The numbers are deliberately generous. In rural Bangladesh many farmers
+# share one public IP (carrier-grade NAT), so a tight limit would throttle
+# real users. These caps only bite on traffic no human would generate.
+#
+# Netlify keeps counting for up to 10 seconds before it starts blocking, so
+# a few requests over the line still get through.
 
+# The AI proxy is the only endpoint that spends the paid Gemini key, so it
+# gets its own, tighter cap.
+[[redirects]]
+  from = "/api/ai-proxy"
+  to = "/.netlify/functions/ai-proxy"
+  status = 200
+  [redirects.rate_limit]
+    window_limit = 120
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
+# Live video mints a billable Gemini Live session, so it is capped hard.
 [[redirects]]
   from = "/api/gemini/live-token"
   to = "/.netlify/functions/gemini-live-token"
   status = 200
+  [redirects.rate_limit]
+    window_limit = 30
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
 
 [[redirects]]
   from = "/api/weather-next"
   to = "/.netlify/functions/weathernext-3"
   status = 200
 
+# Everything else under /api/ (satellite imagery, soil, weather, location
+# lookups). Each call is cheap, but a loop of them is still waste.
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+  [redirects.rate_limit]
+    window_limit = 600
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
 
 # Build assets are content-hashed and immutable. If one is missing, it means
 # the visitor is holding a stale copy of index.html from before a deploy.
