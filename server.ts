@@ -248,10 +248,15 @@ async function startServer() {
   };
 
   // The model list is a SERVER decision. The caller may ask for a model, but
-  // it only ever selects from this list. `gemini-3.8-flash` and
-  // `gemini-2.5-flash` are deliberately absent: on this project's key they
-  // answer 404 "This model is no longer available to new users", so every
-  // failure used to burn two extra pointless upstream calls.
+  // it only ever selects from this list.
+  //
+  // Measured against this project's key on 24 Oct 2026: `gemini-3.6-flash` and
+  // `gemini-3.5-flash-lite` answer, while `gemini-3.8-flash` and
+  // `gemini-2.5-flash` answer 404 "This model is no longer available to new
+  // users". They are still listed (the client may ask for them and the
+  // cascade below moves on), but a request that names one pays for a refused
+  // upstream call first — so the app points at `gemini-3.6-flash`.
+  //
   // Keep in sync with `AI_TEXT_MODELS` / `AI_AUDIO_MODELS` in
   // netlify/functions/ai-proxy.ts — these two copies drifted apart before.
   const TEXT_MODEL_ALLOWLIST = (process.env.AI_TEXT_MODELS || "gemini-3.8-flash,gemini-3.6-flash,gemini-2.5-flash,gemini-3.5-flash-lite")

@@ -97,6 +97,22 @@ const STREAM_BUDGET_MS = 22_000;
 const SEARCH_GROUNDING_MODE = (process.env.AI_SEARCH_GROUNDING || 'auto').toLowerCase();
 let groundingDisabledForInstance = false;
 
+/**
+ * Models that may be sent the Google Search tool.
+ *
+ * The tool used to be attached to `gemini-2.5-flash` and to nothing else.
+ * That model answers "no longer available to new users" on this project's
+ * key, so the search feature silently ran ungrounded — the model replied
+ * that it had no access to live market prices, because no search tool had
+ * ever been sent to it.
+ *
+ * `gemini-3.6-flash` is the model this key does serve, so it gets the tool.
+ * A model that refuses the tool fails the grounded attempt and the very same
+ * request is retried without it, so naming a model here can never turn a
+ * request that would have succeeded into one that fails.
+ */
+const GROUNDING_CAPABLE_MODELS = new Set(["gemini-3.6-flash", "gemini-2.5-flash"]);
+
 const jsonResponse = (statusCode: number, payload: unknown) =>
   new Response(JSON.stringify(payload), {
     status: statusCode,
@@ -281,7 +297,7 @@ const streamText = async (
       for (const model of candidateModels) {
         if (Date.now() >= deadline - 3_000) break;
 
-        const attempts: Array<Record<string, unknown> | undefined> = wantsTools && model === "gemini-2.5-flash"
+        const attempts: Array<Record<string, unknown> | undefined> = wantsTools && GROUNDING_CAPABLE_MODELS.has(model)
           ? [config, stripTools(config)]
           : [stripTools(config)];
 
@@ -360,7 +376,7 @@ const bufferText = async (
     !!requestedTools && !groundingDisabledForInstance && SEARCH_GROUNDING_MODE !== "off";
 
   for (const model of candidateModels) {
-    const attempts: Array<Record<string, unknown> | undefined> = wantsTools && model === "gemini-2.5-flash"
+    const attempts: Array<Record<string, unknown> | undefined> = wantsTools && GROUNDING_CAPABLE_MODELS.has(model)
       ? [config, stripTools(config)]
       : [stripTools(config)];
 
