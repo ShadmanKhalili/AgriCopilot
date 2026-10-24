@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { GoogleGenAI } from '@google/genai';
 import { extractBearerTokenFromHeader, verifyIdToken } from './_shared/auth.ts';
+import { checkIpRateLimit, extractClientIpFromHeaders, liveTokensPerIpPerMinute } from './_shared/ip-limit.ts';
 
 /**
  * Endpoint to issue short-lived ephemeral session tokens for direct browser Live API sessions.
@@ -34,6 +35,23 @@ export const handler: Handler = async (event) => {
   }
 
   try {
+    // Each token here starts a billable Live session, so one address must not
+    // be able to mint them in a loop.
+    const ipLimit = checkIpRateLimit(
+      extractClientIpFromHeaders(event.headers as Record<string, string | undefined> | undefined),
+      liveTokensPerIpPerMinute(),
+      'live-token'
+    );
+    if (!ipLimit.allowed) {
+      return {
+        statusCode: 429,
+        body: JSON.stringify({
+          error: 'Too many live AI sessions from this connection. Please wait a minute and try again.',
+          retryAfterSeconds: ipLimit.retryAfterSeconds
+        })
+      };
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return {

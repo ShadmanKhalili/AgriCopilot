@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
+import { aiCallsPerIpPerMinute, checkIpRateLimit, extractClientIp } from "./_shared/ip-limit.ts";
 import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
 
 /**
@@ -460,7 +461,23 @@ export default async (request: Request, _context: any): Promise<Response> => {
     .replace(/^Bearer\s+/i, "")
     .trim();
 
-  // ── 2. Enforce the daily allowance ──────────────────────────────────────
+  // ── 2. Enforce the per-IP ceiling ───────────────────────────────────────
+  // The daily allowance below is per account, and accounts are free to
+  // create. This is the wall that stops one address from spending the paid
+  // key's whole budget on its own.
+  const ipLimit = checkIpRateLimit(
+    extractClientIp(request),
+    aiCallsPerIpPerMinute(),
+    "ai-proxy"
+  );
+  if (!ipLimit.allowed) {
+    return jsonResponse(429, {
+      error: "Too many AI requests from this connection. Please wait a minute and try again.",
+      retryAfterSeconds: ipLimit.retryAfterSeconds,
+    });
+  }
+
+  // ── 3. Enforce the daily allowance ──────────────────────────────────────
   const dayNumber = utcDayNumber();
   const plan = await getUserPlan(user.uid, idToken);
   const limit = plan === "premium" ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
@@ -481,7 +498,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
     });
   }
 
-  // ── 3. Read and validate the body ────────────────────────────────────────
+  // ── 4. Read and validate the body ────────────────────────────────────────
   let raw: string;
   try {
     raw = await request.text();
@@ -517,7 +534,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
     return jsonResponse(400, { error: "Too many conversation turns in a single request." });
   }
 
-  // ── 4. Build the upstream config ─────────────────────────────────────────
+  // ── 5. Build the upstream config ─────────────────────────────────────────
   const callerConfig = (body.config || {}) as Record<string, unknown>;
   const config: Record<string, unknown> = { ...callerConfig };
   for (const key of ["responseModalities", "speechConfig", "generationConfig"]) {
