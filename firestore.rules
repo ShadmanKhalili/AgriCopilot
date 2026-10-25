@@ -657,5 +657,50 @@ service cloud.firestore {
       allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
       allow update, delete: if false;
     }
+
+    // ===============================================================
+    // Server-recorded moderation events
+    //   users/{uid}/moderationEvents/{eventId}
+    //
+    // Written by the AI proxy when the upstream refuses a request. The write
+    // is made with the caller's own token, so the rules can prove the caller
+    // is writing into their own subtree.
+    //
+    // The record is metadata about an event, not a transcript of it: who,
+    // when, which surface, why, which model, how serious. The prompt text,
+    // the image and the answer are never written here, so this ledger can
+    // never become a second copy of what the farmer typed or photographed.
+    //
+    // The `category` key is optional — the upstream names a harm category only
+    // sometimes — so it is allowed to be present or absent.
+    //
+    // Create-only. The events cannot be updated or deleted, by the farmer or
+    // by an administrator, so the ledger cannot be rewritten.
+    // ===============================================================
+
+    match /users/{userId}/moderationEvents/{eventId} {
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(eventId) &&
+                    request.resource.data.keys().hasOnly(['uid', 'day', 'surface', 'reason', 'model', 'severity', 'at', 'category']) &&
+                    request.resource.data.uid == request.auth.uid &&
+                    request.resource.data.day == serverDayNumber() &&
+                    request.resource.data.surface in ['text', 'audio'] &&
+                    request.resource.data.reason is string &&
+                    request.resource.data.reason.size() > 0 &&
+                    request.resource.data.reason.size() <= 64 &&
+                    request.resource.data.model is string &&
+                    request.resource.data.model.size() > 0 &&
+                    request.resource.data.model.size() <= 64 &&
+                    request.resource.data.severity in ['low', 'medium', 'high'] &&
+                    request.resource.data.at is number &&
+                    (!('category' in request.resource.data) ||
+                     (request.resource.data.category is string &&
+                      request.resource.data.category.size() <= 64));
+      // The account holder can see their own refusals; an administrator can
+      // review them. Nobody else can.
+      allow read: if isOwner(userId) || isAdmin();
+      allow update, delete: if false;
+    }
   }
 }

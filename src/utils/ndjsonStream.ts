@@ -80,6 +80,12 @@ export async function readAiNdjsonStream(
     }
     if (event?.type === 'error') {
       streamError = new Error(event.error || 'The AI service returned an error.');
+      // A coded refusal (safety block) must survive the trip through the
+      // stream so the UI can tell it apart from a broken service. The partial
+      // text is discarded when the error is thrown below, so nothing that
+      // tripped a filter is ever displayed.
+      if (event.code) (streamError as any).code = event.code;
+      if (event.reason) (streamError as any).reason = event.reason;
     }
   };
 
