@@ -13,7 +13,7 @@ import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { computeFocusCrop } from '../utils/imageCapture';
-import { diagnosisConfidence, confidenceValue, normalizeDiseaseCandidates, ESCALATION_THRESHOLD } from '../utils/diagnosisTypes';
+import { diagnosisConfidence, confidenceValue, normalizeDiseaseCandidates, ESCALATION_THRESHOLD, resolveDiagnosisRecordFields } from '../utils/diagnosisTypes';
 import { isSafetyBlockError, safetyBlockMessage } from '../utils/safetyBlock';
 import type { DiagnosisImage } from '../utils/diagnosisTypes';
 import { motion, AnimatePresence } from 'motion/react';
@@ -622,7 +622,12 @@ export default function AgriCopilot({
   const [images, setImages] = useState<DiagnosisImage[]>(persistedImages || []);
   const [cropStage, setCropStage] = useState(persistedCropStage || '');
   const [crop, setCrop] = useState(persistedCrop || '');
-  const [analysisType, setAnalysisType] = useState(persistedAnalysisType || '');
+  // The analysis-type picker has no empty option — it always DISPLAYS
+  // "disease" first — so the state must start there too. It used to start as
+  // an empty string, which meant the picker showed "disease" while the state
+  // said "": the farmer picked a disease type, the record said nothing, and
+  // the Firestore rule rejected the save.
+  const [analysisType, setAnalysisType] = useState(persistedAnalysisType || 'disease');
   const [description, setDescription] = useState(persistedDescription || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isFindingExpert, setIsFindingExpert] = useState(false);
@@ -844,7 +849,9 @@ export default function AgriCopilot({
     setImages([]);
     setCropStage('');
     setCrop('');
-    setAnalysisType('');
+    // The analysis-type picker has no empty option, so it must go back to its
+    // first real option — otherwise the picker renders blank after a clear.
+    setAnalysisType('disease');
     setDescription('');
     setDiagnosis(null);
     setDeepDiagnosis(null);
@@ -1343,54 +1350,92 @@ export default function AgriCopilot({
       setChatSession(session);
       setChatMessages([]);
       
-      await incrementUsage();
+      // Counting the usage is bookkeeping, not part of the answer. A failure
+      // here must never wipe the diagnosis the farmer is about to see.
+      try {
+        await incrementUsage();
+      } catch (usageError) {
+        console.warn('Usage counter could not be updated:', usageError);
+      }
 
-      const allowedSeverities = ['Low', 'Medium', 'High'];
-      const diagSeverity = allowedSeverities.includes(result.qualitativeSeverity) ? result.qualitativeSeverity : 'Medium';
+      // ── The history record must satisfy the Firestore rule ────────────────
+      // `isValidDiagnosis` requires a NON-EMPTY crop, cropStage and
+      // analysisType (`isStr(val, 1, 128)`), and a symptomsBreakdown of at
+      // most 25 items.
+      //
+      // The crop and the crop-stage picker both offer "Auto detect" as their
+      // first option, and that option's value is an empty string — so an
+      // "auto detect" diagnosis legitimately has no crop. Writing the empty
+      // string made Firestore refuse the whole record with "Missing or
+      // insufficient permissions". `resolveDiagnosisRecordFields` resolves
+      // the values instead: the farmer's own choice when they made one, an
+      // honest marker when they did not.
+      const recordFields = resolveDiagnosisRecordFields({
+        crop,
+        cropStage,
+        analysisType,
+        severity: result.qualitativeSeverity,
+        symptoms: result.symptomsBreakdown,
+      });
 
       // Save to Firestore if user is logged in
       if (user) {
         try {
           const diagDoc = await addDoc(collection(db, 'diagnoses'), {
             userId: String(user.uid),
-            crop: String(crop || ''),
-            cropStage: String(cropStage || ''),
-            analysisType: String(analysisType || ''),
+            crop: recordFields.crop,
+            cropStage: recordFields.cropStage,
+            analysisType: recordFields.analysisType,
             diagnosisText: String(result.diagnosis || 'No diagnosis provided'),
-            qualitativeSeverity: String(diagSeverity),
-            symptomsBreakdown: Array.isArray(result.symptomsBreakdown) ? result.symptomsBreakdown : [],
+            qualitativeSeverity: recordFields.qualitativeSeverity,
+            symptomsBreakdown: recordFields.symptomsBreakdown,
             verificationAdvice: String(result.verificationAdvice || 'Consult an expert.'),
             createdAt: new Date().toISOString()
           });
           setLastDiagnosisId(diagDoc.id);
         } catch (error) {
-          handleFirestoreError(error, OperationType.CREATE, 'diagnoses');
+          // A failed history write must never destroy the answer. The farmer
+          // has already been given a diagnosis; losing it because a
+          // background write was refused is far worse than losing the
+          // history entry. The detail goes to the console; the farmer gets a
+          // sentence in their own language.
+          console.warn('The diagnosis could not be saved to the history:', error);
+          toast.error(lang === 'bn'
+            ? 'রোগ নির্ণয়টি সম্পন্ন হয়েছে, তবে ইতিহাসে সংরক্ষণ করা যায়নি।'
+            : 'Your diagnosis is complete, but it could not be saved to your history.');
         }
       }
 
       // Record in Farmer Credit & Insurance Dossier (both for logged in and guest users)
+      // This is a background write: it must never be able to throw into the
+      // outer catch, because the outer catch clears the diagnosis the farmer
+      // has already been given.
       const effectiveUid = user?.uid || 'guest_farmer_demo';
       const cropTitle = crop ? crop.trim() : '';
-      recordFarmerInteractionEvent({
-        userId: effectiveUid,
-        fullName: user?.displayName || '',
-        eventType: 'crop_diagnosis',
-        title: cropTitle 
-          ? (lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`)
-          : (lang === 'bn' ? 'ফসল রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন' : 'Crop Health & Disease Evaluation'),
-        summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 1000),
-        keyFacts: [
-          ...(cropTitle ? [`ফসল: ${cropTitle}`] : []),
-          `রোগের তীব্রতা: ${diagSeverity}`,
-          `লক্ষণ: ${(result.symptomsBreakdown || []).slice(0, 2).join(', ') || 'পাতার দাগ/ক্ষতি'}`,
-          `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 120)}`
-        ],
-        crop: cropTitle || undefined,
-        district: selectedDistrict || undefined,
-        insight: `নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন (তীব্রতা: ${diagSeverity})`
-      }).then(() => {
-        toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
-      }).catch(err => console.warn(err));
+      try {
+        recordFarmerInteractionEvent({
+          userId: effectiveUid,
+          fullName: user?.displayName || '',
+          eventType: 'crop_diagnosis',
+          title: cropTitle 
+            ? (lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`)
+            : (lang === 'bn' ? 'ফসল রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন' : 'Crop Health & Disease Evaluation'),
+          summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 1000),
+          keyFacts: [
+            ...(cropTitle ? [`ফসল: ${cropTitle}`] : []),
+            `রোগের তীব্রতা: ${recordFields.qualitativeSeverity}`,
+            `লক্ষণ: ${recordFields.symptomsBreakdown.slice(0, 2).join(', ') || 'পাতার দাগ/ক্ষতি'}`,
+            `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 120)}`
+          ],
+          crop: cropTitle || undefined,
+          district: selectedDistrict || undefined,
+          insight: `নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন (তীব্রতা: ${recordFields.qualitativeSeverity})`
+        }).then(() => {
+          toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
+        }).catch(err => console.warn('Dossier event could not be recorded:', err));
+      } catch (dossierError) {
+        console.warn('Dossier event could not be recorded:', dossierError);
+      }
     } catch (error: any) {
       // A cancelled request is not a failure: it was stopped on purpose, so it
       // is neither retried nor reported as a broken AI service.

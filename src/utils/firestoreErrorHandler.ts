@@ -60,6 +60,19 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     return;
   }
 
+  // The full detail — including who the caller was — belongs in the developer
+  // console, not on the farmer's screen.
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+
+  // What travels upward is a plain sentence the UI can display. A farmer must
+  // never be handed a JSON blob, and a machine-readable code lets a caller
+  // react to a permission refusal specifically.
+  const permissionDenied = /permission|insufficient/i.test(errMsg);
+  const friendly = new Error(
+    permissionDenied
+      ? 'This action is not allowed for your account. Please sign in again and try.'
+      : 'Could not save to the cloud storage. Please try again.'
+  ) as Error & { code?: string };
+  friendly.code = permissionDenied ? 'PERMISSION_DENIED' : 'FIRESTORE_ERROR';
+  throw friendly;
 }

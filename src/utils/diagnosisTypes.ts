@@ -149,3 +149,67 @@ export const confidenceValue = (diagnosis: any): number | null => {
   const signal = diagnosisConfidence(diagnosis);
   return signal.basis === 'unknown' ? null : signal.score;
 };
+
+// ───────────────────────────────────────────────────────────────────────────
+// The shape of a saved diagnosis record
+// ───────────────────────────────────────────────────────────────────────────
+
+/** The maximum number of symptom entries the Firestore rule accepts. */
+export const MAX_SYMPTOM_ENTRIES = 25;
+
+/** The severities the Firestore rule accepts for a diagnosis. */
+export const ALLOWED_SEVERITIES = ['Low', 'Medium', 'High'] as const;
+
+/**
+ * The marker stored when the farmer asked for the crop to be detected from
+ * the photo instead of naming it.
+ */
+export const AUTO_DETECTED = 'auto-detected';
+
+/**
+ * Resolve the fields of a diagnosis record so that it always satisfies the
+ * Firestore rule.
+ *
+ * `isValidDiagnosis` in `firestore.rules` requires:
+ *
+ *   - `crop`, `cropStage` and `analysisType` to be NON-EMPTY strings
+ *     (`isStr(val, 1, 128)`);
+ *   - `qualitativeSeverity` to be one of Low / Medium / High;
+ *   - `symptomsBreakdown` to be a list of at most 25 entries.
+ *
+ * The crop and the crop-stage picker both offer "Auto detect" as their first
+ * option, and that option's value is an empty string — so an "auto detect"
+ * diagnosis legitimately has no crop. Writing the empty string made
+ * Firestore refuse the whole record with "Missing or insufficient
+ * permissions", which then wiped the diagnosis the farmer had just been
+ * given.
+ *
+ * The values are therefore resolved here: the farmer's own choice when they
+ * made one, an honest marker when they did not.
+ */
+export const resolveDiagnosisRecordFields = (input: {
+  crop?: string | null;
+  cropStage?: string | null;
+  analysisType?: string | null;
+  severity?: string | null;
+  symptoms?: unknown;
+}): {
+  crop: string;
+  cropStage: string;
+  analysisType: string;
+  qualitativeSeverity: string;
+  symptomsBreakdown: string[];
+} => {
+  const severity = String(input.severity || '');
+  const symptoms = Array.isArray(input.symptoms) ? (input.symptoms as any[]) : [];
+
+  return {
+    crop: String(input.crop || '') || AUTO_DETECTED,
+    cropStage: String(input.cropStage || '') || AUTO_DETECTED,
+    analysisType: String(input.analysisType || '') || 'disease',
+    qualitativeSeverity: (ALLOWED_SEVERITIES as readonly string[]).includes(severity)
+      ? severity
+      : 'Medium',
+    symptomsBreakdown: symptoms.slice(0, MAX_SYMPTOM_ENTRIES).map((s) => String(s)),
+  };
+};
