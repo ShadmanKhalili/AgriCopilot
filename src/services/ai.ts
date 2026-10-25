@@ -5,6 +5,8 @@ import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { readAiNdjsonStream } from '../utils/ndjsonStream';
 import { bulletinPromptContext, fetchOfficialBulletin } from './marketPrices';
+import { buildCropKnowledge } from '../data/diseaseKb';
+import type { DiagnosisImage } from '../utils/diagnosisTypes';
 
 // The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
 // Text generation always goes through the server proxy, so no provider key is
@@ -265,7 +267,18 @@ const getModelName = (isAdvanced?: boolean) => (isAdvanced ? ADVANCED_MODEL : ST
 const BACKUP_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
 const TTS_BACKUP_MODEL = 'gemini-3.8-flash-tts'; 
-export const LIVE_API_MODEL = 'gemini-3.8-live-extended';
+// Live API models.
+//
+// `gemini-3.8-live` is the fast, low-latency model with no reasoning delay.
+// `gemini-3.8-live-extended-thinking` is the only Live model that accepts a
+// `thinking_level` (low | medium | high — it does NOT support MINIMAL).
+//
+// This used to be 'gemini-3.8-live-extended', which is not a real model id.
+// It broke two paths that connect with this constant: the "quick advice"
+// toggle (LiveVideoCopilot / LiveExpertCall pick the model by
+// `isExtendedThinking`) and the connect-error fallback that retries without
+// thinking. Both now work.
+export const LIVE_API_MODEL = 'gemini-3.8-live';
 export const LIVE_EXTENDED_THINKING_MODEL = 'gemini-3.8-live-extended-thinking';
 const CHAT_MODEL = 'gemini-3.5-flash-lite';
 
@@ -418,7 +431,7 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
 };
 
 export const diagnoseCrop = async (
-  images: { base64: string; mimeType: string }[], 
+  images: DiagnosisImage[],
   crop: string, 
   cropStage: string, 
   analysisType: string, 
@@ -428,6 +441,17 @@ export const diagnoseCrop = async (
   description?: string,
   signal?: AbortSignal
 ) => {
+  // Two optional strictness settings on the request:
+  //   - `minItems` is enforced by Gemini's constrained decoder, so the model
+  //     has to return at least three candidates instead of quietly returning
+  //     one guess. The SDK types it as a string and the API reference
+  //     documents it the same way.
+  //   - `mediaResolution: HIGH` gives the model 1120 tokens of detail for
+  //     the image instead of the default's fewer, which is the whole point
+  //     of capturing at 1280px instead of 800px.
+  // If the upstream ever rejects either form we drop both and retry once
+  // rather than failing the whole diagnosis.
+  let strictRequest = true;
   return await callAiWithRetry(async () => {
     try {
       const locationContext = coords 
@@ -435,6 +459,11 @@ export const diagnoseCrop = async (
         : `Location: Unknown (Please advise based on general best practices).`;
 
       const userNoteContext = description ? `\nThe user has also provided this additional note/description regarding the plant: "${description}"\n` : '';
+      // Curated Bangladesh field reference for this crop. This is the single
+      // biggest accuracy lever available: a disease description database plus
+      // scoring rules took GPT-4o from 45.9% to 88.9% on leaf-disease
+      // identification, and symptom knowledge alone is worth ~16 points.
+      const cropKnowledge = buildCropKnowledge(crop, lang === 'bn' ? 'bn' : 'en');
 
       const prompt = `You are a world-class agricultural expert specializing in crops from Bangladesh.
       Analyze the provided image(s) of a ${crop || 'plant (please identify the crop)'} plant at the ${cropStage || 'unknown'} stage.
@@ -449,10 +478,15 @@ export const diagnoseCrop = async (
       
       If multiple images are provided, synthesize the information from all of them to provide a more accurate diagnosis.
       
+      IMAGE READING RULES:
+      - Some images are labelled "AUTO-CROPPED DETAIL VIEW". Those are close-ups of the most textured region of the full photo that precedes them. Read spot colour, lesion edges and surface texture from the close-up; read the whole-plant context from the full image.
+      - The photos are high resolution. Look at the leaf surface itself — the spots, their colour, their edges — not just the outline of the plant. Tell chlorosis (even yellowing) apart from necrosis (dead brown tissue with defined edges) and from mosaic or mottling.
+      - If the image shows no plant at all, say so plainly instead of inventing a diagnosis.
+      ${cropKnowledge ? `\n${cropKnowledge}\n` : ''}
       CRITICAL ANALYSIS GUIDELINES & CHAIN OF THOUGHT:
       To ensure high accuracy, you MUST follow a deductive reasoning pattern. Do not jump to conclusions. Your JSON must include:
       - 'visibleSymptoms': A detailed list of all symptoms visible in the image.
-      - 'possibleDiseases': A list of at least 3 possible conditions that match the symptoms and the crop.
+      - 'possibleDiseases': AT LEAST 3 ranked candidate conditions. Every candidate must carry a score and the evidence behind it. This is the most important field for accuracy: a bare list of names is useless, because the farmer cannot tell a well-supported guess from a wild one.
       - 'differentialDiagnosis': An explanation of why it is the final disease and NOT the others.
       - DO NOT provide specific chemical/nutrient percentages (e.g., N/P/K %) as these cannot be reliably diagnosed from images alone. Instead, suggest general nutritional health based on vigor and color.
       - STRICT LEGAL & REGULATORY SAFETY: Under Bangladesh Pesticide Rules & DAE standards, STRICTLY FORBIDDEN from recommending banned, restricted, or WHO Class Ia/Ib chemicals (e.g., Paraquat, Endosulfan, Monocrotophos, Dichlorvos, Phosphamidon, Carbofuran). Always recommend Integrated Pest Management (IPM), biological controls, or DAE-registered modern compounds (e.g., Chlorantraniliprole, Cartap, Mancozeb, Azoxystrobin, Trichoderma). For any chemical recommendation, you MUST explicitly state the Pre-Harvest Interval (PHI / অপেক্ষমাণ সময়) and recommend consulting the local DAE Sub-Assistant Agriculture Officer (SAAO / উপ-সহকারী কৃষি কর্মকর্তা).
@@ -461,7 +495,9 @@ export const diagnoseCrop = async (
       {
         "status": "Valid" | "Invalid",
         "visibleSymptoms": "Detailed description of visible symptoms",
-        "possibleDiseases": ["Condition 1", "Condition 2", "Condition 3"],
+        "possibleDiseases": [
+          { "disease": "Candidate condition name", "score": 0-100, "evidence": "What in the image supports this candidate", "differentiators": "What rules the other candidates out" }
+        ],
         "differentialDiagnosis": "Reasoning for choosing the final diagnosis",
         "diagnosis": "Detailed markdown final diagnosis and treatment plan (approx 100 words)",
         "qualitativeSeverity": "Low" | "Medium" | "High",
@@ -470,18 +506,34 @@ export const diagnoseCrop = async (
         "verificationAdvice": "Detailed, actionable 2-3 step advice to verify this diagnosis in markdown format (e.g., bullet points for specific field tests or questions for DAE officers)."
       }
       
+      - possibleDiseases[].score: how well that candidate matches the image, 0-100. Use the FULL range honestly. If one candidate fits clearly, give it 80+ and the others below 40. If you are genuinely torn between two, give them nearly the same score — the margin between your candidates is what tells the farmer whether to trust the answer or call an expert, so padding the top score with a wide gap is worse than useless.
       - confidence: an integer 0-100 representing how certain you are of the final diagnosis given only the provided image(s). Be conservative: below 60 means the image is ambiguous, blurry, or atypical enough that a human agronomist must verify in person. Never inflate it.
       
       If the image is not related to agriculture or is too blurry, set status to "Invalid" and explain why in the diagnosis field.`;
       
       const config: any = {
         responseMimeType: 'application/json',
+        mediaResolution: strictRequest ? 'MEDIA_RESOLUTION_HIGH' : undefined,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             status: { type: Type.STRING, description: 'Valid or Invalid' },
             visibleSymptoms: { type: Type.STRING },
-            possibleDiseases: { type: Type.ARRAY, items: { type: Type.STRING } },
+            possibleDiseases: {
+              type: Type.ARRAY,
+              ...(strictRequest ? { minItems: '3' } : {}),
+              description: 'At least 3 ranked candidate conditions, each carrying a score and the evidence for it',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  disease: { type: Type.STRING, description: 'Name of the candidate condition' },
+                  score: { type: Type.NUMBER, description: 'How well this candidate matches the image, 0-100. Use the full range honestly.' },
+                  evidence: { type: Type.STRING, description: 'What in the image supports this candidate' },
+                  differentiators: { type: Type.STRING, description: 'What distinguishes this candidate from the others' }
+                },
+                required: ['disease', 'score', 'evidence', 'differentiators']
+              }
+            },
             differentialDiagnosis: { type: Type.STRING },
             diagnosis: { type: Type.STRING, description: 'Detailed diagnosis text' },
             qualitativeSeverity: { type: Type.STRING, description: 'Low, Medium, or High' },
@@ -497,7 +549,21 @@ export const diagnoseCrop = async (
         }
       };
       
-      const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
+      // Send the full frame, then — when we have one — an automatically
+      // cropped close-up of the most detailed region of that same photo. The
+      // close-up is always supplementary, never a replacement.
+      const contents: any[] = [];
+      for (const img of images) {
+        contents.push({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] });
+        if (img.focusCropBase64) {
+          contents.push({
+            parts: [
+              { text: 'AUTO-CROPPED DETAIL VIEW of the previous image: an automatic close-up of the most detailed region of that same photo. Read spot colour, lesion edges and surface texture here; take the whole-plant context from the previous full image.' },
+              { inlineData: { data: img.focusCropBase64, mimeType: img.mimeType } }
+            ]
+          });
+        }
+      }
       contents.push({ parts: [{ text: prompt }] });
 
       const response = await generateContent({
@@ -513,13 +579,19 @@ export const diagnoseCrop = async (
       return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Diagnose Crop):", error);
+      // If the upstream rejected the request schema or the media resolution,
+      // drop the optional strictness and let the retry go out without it,
+      // rather than failing the farmer's diagnosis over a request detail.
+      if (strictRequest && /min_?items|INVALID_ARGUMENT|InvalidArgument|invalid argument|response_?schema|media_?resolution|\[400/i.test(String((error as any)?.message || error))) {
+        strictRequest = false;
+      }
       throw error;
     }
   }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
 export const deepDiagnoseCrop = async (
-  images: { base64: string; mimeType: string }[], 
+  images: DiagnosisImage[],
   crop: string, 
   cropStage: string, 
   analysisType: string, 
@@ -529,6 +601,9 @@ export const deepDiagnoseCrop = async (
   description?: string,
   signal?: AbortSignal
 ) => {
+  // Same optional-strictness escape hatch as the basic diagnosis: if the
+  // upstream rejects the media-resolution setting we retry once without it.
+  let strictRequest = true;
   return await callAiWithRetry(async () => {
     try {
       const now = new Date();
@@ -539,6 +614,10 @@ export const deepDiagnoseCrop = async (
         : `Location: Bangladesh agricultural regions.`;
 
       const userNoteContext = description ? `\nUSER'S ADDITIONAL NOTES/DESCRIPTION: "${description}"\n` : '';
+      // The same curated field reference the basic diagnosis uses. The deep
+      // audit compares the preliminary claim against real alternatives, so it
+      // needs to know what those alternatives actually look like.
+      const cropKnowledge = buildCropKnowledge(crop, lang === 'bn' ? 'bn' : 'en');
 
       const prompt = `You are a SENIOR AGRICULTURAL PATHOLOGIST and INDEPENDENT DIAGNOSTIC AUDITOR.
       CURRENT DATE & SEASON: ${currentDateStr} (Year: ${currentYear}).
@@ -548,7 +627,7 @@ export const deepDiagnoseCrop = async (
       WORKING HYPOTHESIS (For audit only):
       - Preliminary Claim: ${basicDiagnosis.diagnosis}
       - Symptoms Noted: ${basicDiagnosis.symptomsBreakdown?.join(', ')}
-      
+      ${cropKnowledge ? `\n${cropKnowledge}\n` : ''}
       YOUR MISSION:
       Reach the GROUND TRUTH using forensic visual evidence. Do not blindly confirm the preliminary claim, but do not contradict it without definitive proof.
       
@@ -588,6 +667,9 @@ export const deepDiagnoseCrop = async (
       
       const config: any = {
         responseMimeType: 'application/json',
+        // Same detail budget as the basic diagnosis: HIGH gives the model
+        // 1120 tokens of image detail instead of the default's fewer.
+        mediaResolution: strictRequest ? 'MEDIA_RESOLUTION_HIGH' : undefined,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -612,7 +694,18 @@ export const deepDiagnoseCrop = async (
         tools: [{ googleSearch: {} }]
       };
       
-      const contents: any[] = images.map(img => ({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] }));
+      const contents: any[] = [];
+      for (const img of images) {
+        contents.push({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] });
+        if (img.focusCropBase64) {
+          contents.push({
+            parts: [
+              { text: 'AUTO-CROPPED DETAIL VIEW of the previous image: an automatic close-up of the most detailed region of that same photo. Read spot colour, lesion edges and surface texture here; take the whole-plant context from the previous full image.' },
+              { inlineData: { data: img.focusCropBase64, mimeType: img.mimeType } }
+            ]
+          });
+        }
+      }
       contents.push({ parts: [{ text: prompt }] });
 
       const response = await generateContent({
@@ -628,6 +721,11 @@ export const deepDiagnoseCrop = async (
       return parseJsonResponse(response.text);
     } catch (error) {
       console.error("AI Service Error (Deep Diagnose Crop):", error);
+      // Drop the optional media-resolution strictness and let the retry go
+      // out without it, rather than failing the deep analysis outright.
+      if (strictRequest && /INVALID_ARGUMENT|InvalidArgument|invalid argument|media_?resolution|\[400/i.test(String((error as any)?.message || error))) {
+        strictRequest = false;
+      }
       throw error;
     }
   }, AI_MAX_ATTEMPTS, 1500, signal);

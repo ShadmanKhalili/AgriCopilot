@@ -43,6 +43,10 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const sessionIdRef = useRef<number>(0);
   const isStartingCallRef = useRef<boolean>(false);
   const isAiTurnInProgressRef = useRef<boolean>(false);
+  // True while Gemini 3.8 Live Extended Thinking is still reasoning in the
+  // background. `turnComplete` can arrive before the model is actually done,
+  // so this keeps the turn open until the model says it is idle.
+  const isModelBusyRef = useRef<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sound effects generator
@@ -179,6 +183,9 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
 
     // Clean up any previous call artifacts first
     endCall();
+    // A previous call can end mid-reasoning; don't carry a stale busy flag
+    // into the new session or the first turn would never release the lock.
+    isModelBusyRef.current = false;
     setIsCalling(true);
     setIsRinging(true);
     
@@ -400,6 +407,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
                   nextPlayTimeRef.current = outCtx.currentTime;
                 }
                 isAiTurnInProgressRef.current = false;
+                isModelBusyRef.current = false;
                 setCallStatus('listening');
               } else if (isAiPlaying && !isUserSpeaking) {
                 // AI is speaking and user is quiet: drop low room leak so AI doesn't echo into itself
@@ -478,17 +486,38 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             setCallStatus('listening');
           }
 
-          // 4. Turn Complete handling - naturally release lock
+          // 4. Async reasoning status. With Gemini 3.8 Live Extended Thinking the
+          //    model keeps reasoning in the background, so `turnComplete` can
+          //    arrive while it is still working. `interactionStatus` is not
+          //    declared in the SDK's types, but the SDK copies serverContent
+          //    through untouched, so read it defensively off the raw message.
+          //    When the field is absent the old behaviour is preserved.
+          const rawInteractionStatus = (message.serverContent as any)?.interactionStatus as string | undefined;
+          if (rawInteractionStatus) {
+            const modelIsBusy = rawInteractionStatus.indexOf('IN_PROGRESS') !== -1;
+            isModelBusyRef.current = modelIsBusy;
+            if (modelIsBusy) {
+              // Still reasoning — hold the turn open and show the thinking state.
+              setCallStatus('thinking');
+            } else if (sourceNodesRef.current.length === 0 && isAiTurnInProgressRef.current) {
+              // The model finished reasoning and has nothing left to send.
+              isAiTurnInProgressRef.current = false;
+              setCallStatus('listening');
+            }
+          }
+
+          // 5. Turn Complete handling - naturally release lock
           if (message.serverContent?.turnComplete) {
-            if (sourceNodesRef.current.length === 0) {
+            if (sourceNodesRef.current.length === 0 && !isModelBusyRef.current) {
               isAiTurnInProgressRef.current = false;
               setCallStatus('listening');
             }
           }
           
-          // 5. Interruption handling
+          // 6. Interruption handling
           if (message.serverContent?.interrupted) {
             isAiTurnInProgressRef.current = false;
+            isModelBusyRef.current = false;
             sourceNodesRef.current.forEach(node => {
               try { node.stop(); } catch (e) {}
             });
@@ -605,8 +634,12 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
         sourceNodesRef.current = sourceNodesRef.current.filter(n => n !== source);
         const ctx = outputAudioContextRef.current || audioContextRef.current;
         if (sourceNodesRef.current.length === 0 && ctx && ctx.currentTime >= nextPlayTimeRef.current - 0.05) {
-          isAiTurnInProgressRef.current = false;
-          setCallStatus('listening');
+          // If the model is still reasoning in the background, more audio may
+          // still be coming — keep the turn open instead of going idle.
+          if (!isModelBusyRef.current) {
+            isAiTurnInProgressRef.current = false;
+            setCallStatus('listening');
+          }
         }
       };
     } catch (err) {
@@ -950,6 +983,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
                       onClick={(e) => {
                         e.stopPropagation();
                         isAiTurnInProgressRef.current = false;
+                        isModelBusyRef.current = false;
                         sourceNodesRef.current.forEach(node => {
                           try { node.stop(); } catch (err) {}
                         });

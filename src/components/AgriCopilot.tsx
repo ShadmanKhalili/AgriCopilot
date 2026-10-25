@@ -12,6 +12,9 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
+import { computeFocusCrop } from '../utils/imageCapture';
+import { diagnosisConfidence, confidenceValue, normalizeDiseaseCandidates, ESCALATION_THRESHOLD } from '../utils/diagnosisTypes';
+import type { DiagnosisImage } from '../utils/diagnosisTypes';
 import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
@@ -615,7 +618,7 @@ export default function AgriCopilot({
   onlineExpertCount,
   onRequestExpert
 }: Props) {
-  const [images, setImages] = useState<{ base64: string; mimeType: string }[]>(persistedImages || []);
+  const [images, setImages] = useState<DiagnosisImage[]>(persistedImages || []);
   const [cropStage, setCropStage] = useState(persistedCropStage || '');
   const [crop, setCrop] = useState(persistedCrop || '');
   const [analysisType, setAnalysisType] = useState(persistedAnalysisType || '');
@@ -688,6 +691,13 @@ export default function AgriCopilot({
     // NOTE: district objects expose `bn_name` (not `bn`), so Bangla must read that key.
     const districtName = geoData.find(d => d.id === selectedDistrict)?.[lang === 'bn' ? 'bn_name' : 'name'] || 'Bangladesh';
 
+    // Never invent a confidence number. A missing value used to be displayed
+    // as 95%, which told the farmer the model was certain when nothing had
+    // been established. When no defensible number can be computed we pass
+    // null and the prescription shows "Not Assessed" instead.
+    const rxSignal = diagnosisConfidence(diagnosis);
+    const rxConfidence = rxSignal.basis === 'unknown' ? null : rxSignal.score;
+
     setRxModalData({
       rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
       farmerName: user?.displayName || (lang === 'bn' ? 'নিবন্ধিত কৃষক' : 'Registered Farmer'),
@@ -697,7 +707,7 @@ export default function AgriCopilot({
       diseaseName: diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop Pathological Condition',
       pathogen: diagnosis.pathogen || 'Agricultural Pathogen Analysis',
       severity: diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium',
-      confidence: diagnosis.confidence || 95,
+      confidence: rxConfidence,
       symptoms: diagnosis.symptomsBreakdown && diagnosis.symptomsBreakdown.length > 0 
         ? diagnosis.symptomsBreakdown 
         : [lang === 'bn' ? 'পাতায় দাগ ও সংক্রমণের স্পষ্ট লক্ষণ' : 'Leaf lesions and tissue necrosis identified'],
@@ -875,9 +885,18 @@ export default function AgriCopilot({
       try {
         const processedImages = await Promise.all(
           filesToProcess.map(async (file) => {
-            const optimizedDataUrl = await resizeImage(file, 800);
+            const optimizedDataUrl = await resizeImage(file, 1280);
             const base64Data = optimizedDataUrl.split(',')[1];
-            return { base64: base64Data, mimeType: 'image/jpeg' };
+            // Also crop out the most detailed region of the photo. A disease
+            // shows up as texture — speckling, necrotic edges, mould — so the
+            // busiest patch is usually the lesion. It is sent as an EXTRA
+            // image alongside the full frame, never instead of it.
+            const focusCrop = await computeFocusCrop(optimizedDataUrl);
+            return {
+              base64: base64Data,
+              mimeType: 'image/jpeg',
+              focusCropBase64: focusCrop ? focusCrop.split(',')[1] : undefined
+            };
           })
         );
         
@@ -1560,6 +1579,10 @@ export default function AgriCopilot({
     }
   };
 
+  // `possibleDiseases` can be the new scored-candidate array or the old flat
+  // string array still sitting in Firestore — normalise once, here.
+  const diseaseCandidates = normalizeDiseaseCandidates(diagnosis?.possibleDiseases);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1650,8 +1673,21 @@ export default function AgriCopilot({
                 setImages(prev => [{ base64, mimeType: mime }, ...prev.slice(0, 4)]);
                 setCopilotMode('static_upload');
                 toast.success(lang === 'bn' 
-                  ? '📸 লাইভ ফ্রেম যুক্ত হয়েছে! এখন ডায়াগনসিস বাটনে চাপুন।' 
+                  ? '📸 লাইভ ফ্রেম যুক্ত হয়েছে! এখন ডায়াগনসিস বাটনে চাপুন।'
                   : '📸 Live frame captured! Ready for full prescription.');
+                // Compute the detail crop for the captured frame as well.
+                void computeFocusCrop(dataUrl).then((crop) => {
+                  if (!crop) return;
+                  const cropBase64 = crop.split(',')[1];
+                  if (!cropBase64) return;
+                  setImages(prev => {
+                    // Only attach it if this frame is still the newest one.
+                    if (!prev[0] || prev[0].base64 !== base64) return prev;
+                    const next = [...prev];
+                    next[0] = { ...next[0], focusCropBase64: cropBase64 };
+                    return next;
+                  });
+                });
               }
             }}
           />
@@ -2222,7 +2258,7 @@ export default function AgriCopilot({
                             
                             <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-stone-200/80 dark:border-stone-700 text-[11px] text-stone-600 dark:text-stone-400 font-medium">
                               <span>{lang === 'bn' ? '🏛️ স্থানীয় উপ-সহকারী কৃষি কর্মকর্তা (SAAO) বা কৃষি কল সেন্টারের ১৬১২৩ নম্বরে বিনামূল্যে পরামর্শ নিন' : '🏛️ Consult your local SAAO or dial toll-free Krishi Hotline 16123'}</span>
-                              {diagnosis.confidence < 70 && (
+                              {diagnosisConfidence(diagnosis).score < ESCALATION_THRESHOLD && (
                                 <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-300 bg-amber-100/70 dark:bg-amber-950/50 px-2 py-0.5 rounded-lg border border-amber-200 dark:border-amber-800">
                                   <AlertTriangle className="w-3.5 h-3.5" />
                                   <span className="text-[11px] font-bold uppercase tracking-wider">{t.lowConfidenceWarning}</span>
@@ -2318,7 +2354,7 @@ export default function AgriCopilot({
                                     <h4 className="font-black text-base text-slate-900 dark:text-white tracking-tight">
                                       {lang === 'bn' ? 'মানুষ বিশেষজ্ঞের সাথে কথা বলুন' : 'Talk to a human expert'}
                                     </h4>
-                                    {(diagnosis.qualitativeSeverity === 'High' || (diagnosis.confidence || 100) < 70) && (
+                                    {(diagnosis.qualitativeSeverity === 'High' || diagnosisConfidence(diagnosis).score < ESCALATION_THRESHOLD) && (
                                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800">
                                         {lang === 'bn' ? 'প্রস্তাবিত' : 'Recommended'}
                                       </span>
@@ -2347,7 +2383,7 @@ export default function AgriCopilot({
                                         diagnosis.disease || diagnosis.diagnosis || ''
                                       ).slice(0, 600),
                                       severity: diagnosis.qualitativeSeverity || diagnosis.severity,
-                                      confidence: diagnosis.confidence,
+                                      confidence: confidenceValue(diagnosis),
                                       photosCount: images.length,
                                     });
                                   }}
@@ -2393,11 +2429,20 @@ export default function AgriCopilot({
                                 {lang === 'bn' ? 'সম্ভাব্য অন্যান্য রোগ ও লক্ষণ তুলনা' : 'Differential Diagnosis & Comparison'}
                               </h4>
                               
-                              {diagnosis.possibleDiseases && diagnosis.possibleDiseases.length > 0 && (
+                              {diseaseCandidates.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mb-4">
-                                  {diagnosis.possibleDiseases.map((disease: string, idx: number) => (
-                                    <span key={idx} className="bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold">
-                                      {disease}
+                                  {diseaseCandidates.map((candidate, idx) => (
+                                    <span
+                                      key={idx}
+                                      title={candidate.evidence || undefined}
+                                      className="bg-gray-50 text-gray-600 border border-gray-200 px-3 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
+                                    >
+                                      {candidate.disease}
+                                      {candidate.score !== null && (
+                                        <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
+                                          {Math.round(candidate.score)}%
+                                        </span>
+                                      )}
                                     </span>
                                   ))}
                                 </div>
