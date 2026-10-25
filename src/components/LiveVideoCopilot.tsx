@@ -8,15 +8,32 @@ import {
 } from 'lucide-react';
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
+import { captureToDataUrl } from '../utils/imageCapture';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import type { LiveServerMessage } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Inline the two enum values used by the live config. Importing the SDK for
+// Inline the enum values used by the live config. Importing the SDK for
 // its runtime enums would pull ~280 KB into the first screen; the SDK itself
 // is loaded on demand by getLiveAiClient() when a session actually starts.
+//
+// `gemini-3.8-live-extended-thinking` accepts thinking levels low, medium and
+// high. It does NOT support MINIMAL, and there is no level above HIGH.
 const Modality = { AUDIO: 'AUDIO' } as const;
-const ThinkingLevel = { LOW: 'LOW' } as const;
+const ThinkingLevel = { LOW: 'LOW', MEDIUM: 'MEDIUM', HIGH: 'HIGH' } as const;
+type ThinkingLevelOption = keyof typeof ThinkingLevel;
+
+// One-line explanation of what each depth costs the farmer.
+const THINKING_LEVEL_HINT: Record<ThinkingLevelOption, string> = {
+  LOW: 'Fastest reply',
+  MEDIUM: 'Balanced',
+  HIGH: 'Deepest reasoning, slower',
+};
+const THINKING_LEVEL_HINT_BN: Record<ThinkingLevelOption, string> = {
+  LOW: 'দ্রুততম উত্তর',
+  MEDIUM: 'ভারসাম্যপূর্ণ',
+  HIGH: 'গভীরতম বিশ্লেষণ, ধীর',
+};
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
@@ -103,6 +120,10 @@ export default function LiveVideoCopilot({
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isExtendedThinking, setIsExtendedThinking] = useState(true);
+  // Reasoning depth for the Extended Thinking Live model. LOW keeps the
+  // shipped behaviour; MEDIUM/HIGH buy deeper background reasoning at the
+  // cost of latency (thinking tokens bill at the output rate).
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevelOption>('LOW');
   const [liveThinkingText, setLiveThinkingText] = useState<string>('');
   const [showThinkingDetails, setShowThinkingDetails] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
@@ -215,6 +236,10 @@ export default function LiveVideoCopilot({
   const sessionIdRef = useRef<number>(0);
   const isStartingSessionRef = useRef<boolean>(false);
   const isAiTurnInProgressRef = useRef<boolean>(false);
+  // True while Gemini 3.8 Live Extended Thinking is still reasoning in the
+  // background. `turnComplete` can arrive before the model is actually done,
+  // so this keeps the acoustic lock held until the model says it is idle.
+  const isModelBusyRef = useRef<boolean>(false);
   const frameIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const animFrameRef = useRef<number | null>(null);
@@ -435,8 +460,11 @@ export default function LiveVideoCopilot({
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: targetFacingMode,
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          // Ask for a 1280x720 stream. The old 640x480 request capped the
+          // detail before the frame was ever drawn, so even a "full
+          // resolution" capture had no resolution to speak of.
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
         audio: {
           channelCount: 1,
@@ -528,8 +556,8 @@ export default function LiveVideoCopilot({
         const newVideoStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: nextMode,
-            width: { ideal: 640 },
-            height: { ideal: 480 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           }
         });
         const newVideoTrack = newVideoStream.getVideoTracks()[0];
@@ -669,8 +697,12 @@ export default function LiveVideoCopilot({
         sourceNodesRef.current = sourceNodesRef.current.filter(n => n !== source);
         const ctx = outputAudioContextRef.current || audioContextRef.current;
         if (sourceNodesRef.current.length === 0 && ctx && ctx.currentTime >= nextPlayTimeRef.current - 0.05) {
-          isAiTurnInProgressRef.current = false;
-          setLiveState('listening');
+          // If the model is still reasoning in the background, more audio may
+          // still be coming — keep the turn open instead of going idle.
+          if (!isModelBusyRef.current) {
+            isAiTurnInProgressRef.current = false;
+            setLiveState('listening');
+          }
         }
       };
     } catch (err) {
@@ -678,11 +710,10 @@ export default function LiveVideoCopilot({
     }
   };
 
-  // Send single video frame (1 FPS)
+  // Send single video frame (1 FPS, 2 FPS in deep-pathology mode)
   const sendVideoFrame = (session: any) => {
     const activeSession = session || sessionRef.current;
-    if (!canvasRef.current || !activeSession) return;
-    const canvas = canvasRef.current;
+    if (!activeSession) return;
 
     // Check if we have either a preset image or an active video stream
     const hasPreset = !!(activeDemoPreset && presetImageRef.current);
@@ -697,19 +728,14 @@ export default function LiveVideoCopilot({
     const isUserSpeaking = Date.now() < userSpeakingHangoverRef.current;
     if (isAiSpeaking || isUserSpeaking) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = 480;
-    canvas.height = 360;
-
-    if (hasPreset && presetImageRef.current) {
-      ctx.drawImage(presetImageRef.current, 0, 0, 480, 360);
-    } else if (hasVideo && videoRef.current) {
-      ctx.drawImage(videoRef.current, 0, 0, 480, 360);
-    }
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.55);
+    // Capture at full camera resolution. The old path drew the frame into a
+    // 480x360 canvas, which is LESS THAN ONE Gemini tile (768px) — the model
+    // was being asked to read a lesion out of a picture that had almost no
+    // detail left in it. The session's MEDIA_RESOLUTION_HIGH now does the
+    // zooming server-side for the same 256-token budget.
+    const dataUrl = hasPreset && presetImageRef.current
+      ? captureToDataUrl(presetImageRef.current)
+      : captureToDataUrl(videoRef.current as HTMLVideoElement);
     const base64Data = dataUrl.split(',')[1];
     if (base64Data) {
       try {
@@ -821,6 +847,7 @@ export default function LiveVideoCopilot({
       lastAiSpeechEndTimeRef.current = 0;
       userSpeakingHangoverRef.current = 0;
       isAiTurnInProgressRef.current = false;
+      isModelBusyRef.current = false;
       updateVisualizer();
 
       let ai: any = null;
@@ -920,7 +947,7 @@ CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 5. Switch to English ONLY if the user explicitly says "Speak in English" or "ইংরেজিতে বলুন".
 
 LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
-1. Continuous Multimodal Observation: You receive 1 JPEG video frame every second from the camera. Continuously observe whatever the user shows—whether it is an indoor decorative pot, a rooftop planter, a balcony railing pot, kitchen garden herb, seedling, leaf, or farm crop.
+1. Continuous Multimodal Observation: You receive a full-resolution JPEG video frame from the camera once per second. The frames are high resolution — read the leaf surface, the spots, their colour and their texture, not just the overall shape of the plant. Continuously observe whatever the user shows—whether it is an indoor decorative pot, a rooftop planter, a balcony railing pot, kitchen garden herb, seedling, leaf, or farm crop.
 2. Ultra-low latency spoken turns: Keep responses short, natural, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human mentor in the garden with them.
 3. Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু দেখতে চান?", "জল দেওয়া হয়েছে?"). Never give long speeches.
 4. IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or speaks while you are talking, immediately stop your previous sentence and address their new question without repeating earlier words.
@@ -947,11 +974,16 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
         outputAudioTranscription: {},
         inputAudioTranscription: {},
         systemInstruction: systemInstructionWithMemory,
+        // "zoomed reframing with 256 tokens": Gemini crops each frame to the
+        // salient region instead of downsampling the whole picture. This is
+        // the same 256-token budget the old 480x360 path was already paying,
+        // but the model now actually gets to see the leaf.
+        mediaResolution: 'MEDIA_RESOLUTION_HIGH',
       };
 
       if (isExtendedThinking) {
         liveConfig.thinkingConfig = {
-          thinkingLevel: ThinkingLevel.LOW
+          thinkingLevel: ThinkingLevel[thinkingLevel]
         };
       }
 
@@ -1018,6 +1050,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
                   nextPlayTimeRef.current = outCtx.currentTime;
                 }
                 isAiTurnInProgressRef.current = false;
+                isModelBusyRef.current = false;
                 isAiTurnCancelledRef.current = true;
                 clearSubtitles();
                 setLiveState('listening');
@@ -1056,7 +1089,16 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
 
             audioSource.connect(processor);
 
-            // Launch 1 FPS Video Frame Loop (paused during active user or AI speaking)
+            // Launch the Video Frame Loop (paused during active user or AI
+            // speaking).
+            //
+            // 1 FPS is not an arbitrary choice: Google's Live API guidance is
+            // explicit that video frames are sent "at a specific frame rate
+            // (max 1 frame per second)" and that "for best results, use
+            // 768x768 resolution at 1 FPS". Pushing 2 FPS would double the
+            // media tokens for frames the API is not expecting. The detail
+            // win comes from the frame resolution and MEDIA_RESOLUTION_HIGH,
+            // not from sending more frames.
             frameIntervalRef.current = setInterval(() => {
               const currentSession = activeLiveSession || sessionRef.current;
               if (currentSession && sessionIdRef.current === currentSessionId) {
@@ -1135,18 +1177,39 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
             }
           }
 
-          // 5. Flush remaining buffer and gracefully release acoustic lock after audio playback finishes
-          if (message.serverContent?.turnComplete) {
-            flushRemainingModelText();
-            if (sourceNodesRef.current.length === 0) {
+          // 5. Async reasoning status. With Gemini 3.8 Live Extended Thinking the
+          //    model keeps reasoning in the background, so `turnComplete` can
+          //    arrive while it is still working. `interactionStatus` is not
+          //    declared in the SDK's types, but the SDK copies serverContent
+          //    through untouched, so read it defensively off the raw message.
+          //    When the field is absent the old behaviour is preserved.
+          const rawInteractionStatus = (message.serverContent as any)?.interactionStatus as string | undefined;
+          if (rawInteractionStatus) {
+            const modelIsBusy = rawInteractionStatus.indexOf('IN_PROGRESS') !== -1;
+            isModelBusyRef.current = modelIsBusy;
+            if (modelIsBusy) {
+              // Still reasoning — hold the turn open and show the thinking state.
+              setLiveState('analyzing');
+            } else if (sourceNodesRef.current.length === 0 && isAiTurnInProgressRef.current) {
+              // The model finished reasoning and has nothing left to send.
               isAiTurnInProgressRef.current = false;
               setLiveState('listening');
             }
           }
 
-          // 6. Interruption handling
+          // 6. Flush remaining buffer and gracefully release acoustic lock after audio playback finishes
+          if (message.serverContent?.turnComplete) {
+            flushRemainingModelText();
+            if (sourceNodesRef.current.length === 0 && !isModelBusyRef.current) {
+              isAiTurnInProgressRef.current = false;
+              setLiveState('listening');
+            }
+          }
+
+          // 7. Interruption handling
           if (message.serverContent?.interrupted) {
             isAiTurnInProgressRef.current = false;
+            isModelBusyRef.current = false;
             clearSubtitles();
             sourceNodesRef.current.forEach(node => {
               try { node.stop(); } catch (e) {}
@@ -1544,21 +1607,17 @@ Return a JSON object with this exact structure:
       img.src = preset.svgImage;
       img.onload = () => {
         presetImageRef.current = img;
-        if (sessionRef.current && canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          if (ctx) {
-            canvasRef.current.width = 480;
-            canvasRef.current.height = 360;
-            ctx.drawImage(img, 0, 0, 480, 360);
-            const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.6);
-            const b64 = dataUrl.split(',')[1];
-            if (b64) {
-              try {
-                sessionRef.current.sendRealtimeInput({
-                  video: { data: b64, mimeType: 'image/jpeg' }
-                });
-              } catch (e) {}
-            }
+        if (sessionRef.current) {
+          // Full resolution — the session's MEDIA_RESOLUTION_HIGH does the
+          // zooming server-side rather than us shrinking the frame here.
+          const dataUrl = captureToDataUrl(img);
+          const b64 = dataUrl.split(',')[1];
+          if (b64) {
+            try {
+              sessionRef.current.sendRealtimeInput({
+                video: { data: b64, mimeType: 'image/jpeg' }
+              });
+            } catch (e) {}
           }
         }
       };
@@ -1825,34 +1884,33 @@ Return a JSON object with this exact structure:
   };
 
   const handleCaptureSnapshot = () => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
     // drawImage throws unless the source actually holds decodable pixels:
     // images need `complete`, video needs HAVE_CURRENT_DATA (readyState >= 2).
+    let dataUrl = '';
     if (activeDemoPreset && presetImageRef.current) {
       const presetImg = presetImageRef.current;
       if (!presetImg.complete || presetImg.naturalWidth === 0) {
-        toast.error(lang === 'bn' ? 'ডেমো ছবি এখনো লোড হয়নি, একটু পরে চেষ্টা করুন।' : 'Demo image is still loading, please try again shortly.');
+        toast.error(lang === 'bn' ? 'ডেমো ছবি এখনো লোড হয়নি, একটু পরে চেষ্টা করুন।' : 'Demo image is still loading, please try again shortly.');
         return;
       }
-      ctx.drawImage(presetImg, 0, 0, 640, 480);
+      dataUrl = captureToDataUrl(presetImg);
     } else if (videoRef.current) {
       if (videoRef.current.readyState < 2) {
         toast.error(lang === 'bn' ? 'ক্যামেরা ফ্রেম এখনো প্রস্তুত নেই, একটু পরে চেষ্টা করুন।' : 'Camera frame is not ready yet, please try again shortly.');
         return;
       }
-      ctx.drawImage(videoRef.current, 0, 0, 640, 480);
+      // Full camera resolution. The old path drew into a 640x480 canvas —
+      // still under one Gemini tile.
+      dataUrl = captureToDataUrl(videoRef.current);
     } else {
       toast.error(lang === 'bn' ? 'ক্যাপচার করার জন্য কোনো ফ্রেম নেই।' : 'No frame available to capture.');
       return;
     }
 
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    if (!dataUrl) {
+      toast.error(lang === 'bn' ? 'ফ্রেমটি প্রস্তুত করা যায়নি। আবার চেষ্টা করুন।' : 'Could not prepare the captured frame. Please try again.');
+      return;
+    }
 
     playTone(1200, 0.1, 0.1);
     toast.success(lang === 'bn' ? '📸 ফ্রেম ক্যাপচার করা হয়েছে! প্রেসক্রিপশনে যুক্ত হচ্ছে...' : '📸 Snapshot captured! Transferring to prescription engine...');
@@ -2006,6 +2064,48 @@ Return a JSON object with this exact structure:
                 />
               </span>
             </button>
+
+            {/* Reasoning depth — only meaningful on the Extended Thinking model,
+                because plain gemini-3.8-live has no reasoning at all. */}
+            {isExtendedThinking && (
+              <div className="w-full px-3 py-2 rounded-xl border border-purple-500/25 bg-purple-950/25 backdrop-blur-md">
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-[11px] font-bold text-purple-200 truncate">
+                    {lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
+                  </span>
+                  <span className="text-[10px] text-purple-300/80 truncate">
+                    {lang === 'bn'
+                      ? THINKING_LEVEL_HINT_BN[thinkingLevel]
+                      : THINKING_LEVEL_HINT[thinkingLevel]}
+                  </span>
+                </div>
+                <div
+                  className="grid grid-cols-3 gap-1.5"
+                  role="radiogroup"
+                  aria-label={lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
+                >
+                  {(['LOW', 'MEDIUM', 'HIGH'] as ThinkingLevelOption[]).map((level) => {
+                    const active = thinkingLevel === level;
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setThinkingLevel(level)}
+                        className={`min-h-[36px] rounded-lg border text-[11px] font-bold tracking-wide transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-purple-500/70 border-purple-300/70 text-white'
+                            : 'bg-gray-900/60 border-purple-500/20 text-purple-200/70 hover:bg-purple-900/60'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <motion.button
               whileHover={{ scale: 1.03 }}
@@ -2320,6 +2420,7 @@ Return a JSON object with this exact structure:
                       onClick={(e) => {
                         e.stopPropagation();
                         isAiTurnInProgressRef.current = false;
+                        isModelBusyRef.current = false;
                         isAiTurnCancelledRef.current = true; // Signals onmessage to discard any trailing incoming chunks
                         sourceNodesRef.current.forEach(node => {
                           try { node.stop(); } catch (err) {}

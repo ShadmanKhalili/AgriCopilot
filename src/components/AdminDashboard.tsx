@@ -82,6 +82,7 @@ import { toPng } from 'html-to-image';
 import toast from 'react-hot-toast';
 import { geoData } from '../utils/geoData';
 import { Language } from '../utils/translations';
+import { confidenceLabel, confidenceValue } from '../utils/diagnosisTypes';
 import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
 import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
 import { useAuth } from './AuthProvider';
@@ -1074,7 +1075,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           </span>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {diag.confidence || 96}%
+                          {confidenceLabel(diag)}
                         </td>
                         <td className="px-6 py-4">
                           <button
@@ -1085,7 +1086,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                                 crop: diag.crop || 'Paddy',
                                 diseaseName: diag.diagnosisText || 'Crop Infection',
                                 severity: diag.qualitativeSeverity || 'Critical',
-                                confidence: diag.confidence || 96,
+                                confidence: confidenceValue(diag),
                                 location: `${diag.district || 'Bogura'}, Bangladesh`,
                                 symptoms: ['Tissue chlorosis', 'Water soaked necrotic patches'],
                                 culturalSteps: ['Drain field water for 3 days', 'Suspend top-dress urea'],
@@ -1489,7 +1490,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                                 diseaseName: rx.diseaseName,
                                 pathogen: rx.pathogen || 'Agricultural Pathological Finding',
                                 severity: rx.severity,
-                                confidence: rx.confidence || 96,
+                                confidence: confidenceValue(rx),
                                 location: rx.location || 'Bangladesh',
                                 symptoms: rx.symptoms || ['Tissue necrosis', 'Foliar chlorosis'],
                                 culturalSteps: rx.culturalSteps || ['Prune infected leaves', 'Maintain drainage'],

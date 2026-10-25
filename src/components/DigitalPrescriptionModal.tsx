@@ -265,7 +265,7 @@ export default function DigitalPrescriptionModal({
 🌾 ${lang === 'bn' ? 'ফসল' : 'Crop'}: ${data.crop} (${data.cropStage || 'Field'})
 📍 ${lang === 'bn' ? 'এলাকা' : 'Location'}: ${data.location}
 🔬 ${lang === 'bn' ? 'রোগ নির্ণয়' : 'Diagnosis'}: ${data.diseaseName} (${data.severity})
-📊 ${lang === 'bn' ? 'নির্ভুলতা' : 'Confidence'}: ${data.confidence}%
+📊 ${lang === 'bn' ? 'নির্ভুলতা' : 'Confidence'}: ${data.confidence !== null && data.confidence !== undefined ? `${data.confidence}%` : (lang === 'bn' ? 'মূল্যায়ন করা হয়নি' : 'Not assessed')}
 
 💊 ${lang === 'bn' ? 'ব্যবস্থাপত্র ও করণীয়' : 'Prescribed Treatment'}:
 ${data.chemicalSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
