@@ -149,13 +149,19 @@ const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyRe
 
         if (!response.ok) {
           let errorMessage = `AI Proxy Failed (Status: ${response.status})`;
+          let errorCode: string | undefined;
           try {
             const errorData = await response.json();
             errorMessage = errorData.error || errorMessage;
+            // A coded refusal (safety block) must reach the UI so it can say
+            // something honest instead of "Error connecting to AI service".
+            errorCode = errorData.code;
           } catch (e) {
             // Not JSON
           }
-          throw new Error(errorMessage);
+          const error = new Error(errorMessage) as Error & { code?: string };
+          if (errorCode) error.code = errorCode;
+          throw error;
         }
 
         const contentType = response.headers.get('content-type') || '';

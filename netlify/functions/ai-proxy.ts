@@ -2,6 +2,18 @@ import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
 import { aiCallsPerIpPerMinute, checkIpRateLimit, extractClientIp } from "./_shared/ip-limit.ts";
 import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
+import { recordModerationEvent } from "./_shared/moderation-events.ts";
+import {
+  SAFETY_BLOCK_CODE,
+  SAFETY_BLOCK_MESSAGE,
+  SERVER_SAFETY_SETTINGS,
+  SERVER_SAFETY_SETTINGS_WITHOUT_JAILBREAK,
+  detectSafetyBlockInChunk,
+  detectSafetyBlockInError,
+  hasJailbreakCategory,
+  isJailbreakCategoryRejection,
+  withoutJailbreakCategory,
+} from "./_shared/safety-policy.ts";
 
 /**
  * Netlify AI proxy.
@@ -97,6 +109,17 @@ const STREAM_BUDGET_MS = 22_000;
  */
 const SEARCH_GROUNDING_MODE = (process.env.AI_SEARCH_GROUNDING || 'auto').toLowerCase();
 let groundingDisabledForInstance = false;
+
+/**
+ * The upstream rejected the `HARM_CATEGORY_JAILBREAK` setting on this key.
+ *
+ * The SDK's own comment says the category is "not supported in Gemini API"
+ * while the current guide lists it as adjustable, so rather than trust either
+ * the proxy tries it once, sees the rejection, and drops that single category
+ * for the rest of this instance's life. The other four categories stay
+ * exactly as strict.
+ */
+let jailbreakCategoryDisabledForInstance = false;
 
 /**
  * Models that may be sent the Google Search tool.
@@ -216,13 +239,21 @@ const measureContents = (contents: unknown): { textChars: number; images: number
 
 type StreamOutcome =
   | { status: "ok"; text: string; model: string }
-  | { status: "error"; error: string };
+  | {
+      status: "blocked";
+      reason: string;
+      category: string | null;
+      severity: "low" | "medium" | "high";
+      model: string;
+    }
+  | { status: "error"; error: string; raw?: any };
 
 /**
  * One attempt against one model.
- * Returns the text on success, or the error that stopped it.
+ * Returns the text on success, a safety block when the upstream refused the
+ * content, or the error that stopped it.
  */
-const runModel = async (
+const runModelOnce = async (
   apiKey: string,
   model: string,
   contents: unknown,
@@ -241,6 +272,20 @@ const runModel = async (
 
     let text = "";
     for await (const chunk of responseStream) {
+      // The block is checked BEFORE the text of the same chunk is emitted.
+      // The chunk that carries `finishReason: SAFETY` can also carry the
+      // text that tripped the filter, and that text must never reach the
+      // farmer — not even partially.
+      const block = detectSafetyBlockInChunk(chunk);
+      if (block) {
+        return {
+          status: "blocked",
+          reason: block.reason,
+          category: block.category,
+          severity: block.severity,
+          model,
+        };
+      }
       const piece = chunk.text || "";
       if (piece) {
         text += piece;
@@ -252,10 +297,58 @@ const runModel = async (
     }
     return { status: "error", error: "The model returned an empty response." };
   } catch (error: any) {
-    return { status: "error", error: errorMessage(error) };
+    // A blocked request arrives as a thrown HTTP 400 whose `error.code` names
+    // the safety category. It is a refusal, not a broken service.
+    const block = detectSafetyBlockInError(error);
+    if (block) {
+      return {
+        status: "blocked",
+        reason: block.reason,
+        category: block.category,
+        severity: block.severity,
+        model,
+      };
+    }
+    return { status: "error", error: errorMessage(error), raw: error };
   } finally {
     clearTimeout(timer);
   }
+};
+
+/**
+ * One attempt against one model, with the jailbreak-category fallback.
+ *
+ * `HARM_CATEGORY_JAILBREAK` is the one safety setting the upstream may
+ * reject outright. When it does, the same request is retried once without
+ * that single category — the other four stay exactly as strict, so the
+ * policy is never quietly weakened, only made compatible.
+ */
+const runModel = async (
+  apiKey: string,
+  model: string,
+  contents: unknown,
+  config: Record<string, unknown>,
+  onChunk: (text: string) => void
+): Promise<StreamOutcome> => {
+  let effectiveConfig = config;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const outcome = await runModelOnce(apiKey, model, contents, effectiveConfig, onChunk);
+    if (
+      attempt === 0 &&
+      outcome.status === "error" &&
+      hasJailbreakCategory(effectiveConfig) &&
+      isJailbreakCategoryRejection(outcome.raw)
+    ) {
+      jailbreakCategoryDisabledForInstance = true;
+      effectiveConfig = withoutJailbreakCategory(effectiveConfig);
+      console.warn(
+        "[AI Proxy] The upstream rejected HARM_CATEGORY_JAILBREAK; retrying without that one category."
+      );
+      continue;
+    }
+    return outcome;
+  }
+  return { status: "error", error: "The model could not be reached." };
 };
 
 const streamText = async (
@@ -327,6 +420,27 @@ const streamText = async (
           return;
         }
 
+        if (outcome.status === "blocked") {
+          // The upstream refused the content. Record it against the farmer's
+          // moderation ledger, charge the allowance (the upstream call really
+          // happened and really cost money), and answer with a coded refusal.
+          //
+          // Any text already streamed for this attempt is abandoned: the
+          // client discards the partial answer when it sees the error frame,
+          // so nothing that tripped a filter is ever displayed.
+          await recordModerationEvent(quota.uid, quota.idToken, quota.dayNumber, {
+            surface: "text",
+            reason: outcome.reason,
+            category: outcome.category,
+            model: outcome.model,
+            severity: outcome.severity,
+          });
+          await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
+          send({ type: "error", error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
+          close();
+          return;
+        }
+
         if (produced) {
           // We cannot switch models after partial text without duplicating it.
           send({ type: "error", error: "The AI stream was interrupted. Please try again." });
@@ -390,6 +504,17 @@ const bufferText = async (
           modelUsed: outcome.model,
         });
       }
+      if (outcome.status === "blocked") {
+        await recordModerationEvent(quota.uid, quota.idToken, quota.dayNumber, {
+          surface: "text",
+          reason: outcome.reason,
+          category: outcome.category,
+          model: outcome.model,
+          severity: outcome.severity,
+        });
+        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
+        return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
+      }
       if (attemptConfig && requestedTools && !isQuotaOrRateError(outcome.error)) {
         groundingDisabledForInstance = true;
       }
@@ -419,6 +544,22 @@ const generateAudio = async (
         contents: contents as any,
         config: { ...config, abortSignal: abortController.signal },
       });
+
+      // A blocked prompt carries `promptFeedback.blockReason` and no
+      // candidate; a blocked answer carries `candidates[0].finishReason`.
+      const block = detectSafetyBlockInChunk(response);
+      if (block) {
+        await recordModerationEvent(quota.uid, quota.idToken, quota.dayNumber, {
+          surface: "audio",
+          reason: block.reason,
+          category: block.category,
+          model: candidate,
+          severity: block.severity,
+        });
+        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
+        return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
+      }
+
       await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
       return jsonResponse(200, {
         text: response.text || "",
@@ -427,6 +568,18 @@ const generateAudio = async (
         modelUsed: candidate,
       });
     } catch (error: any) {
+      const block = detectSafetyBlockInError(error);
+      if (block) {
+        await recordModerationEvent(quota.uid, quota.idToken, quota.dayNumber, {
+          surface: "audio",
+          reason: block.reason,
+          category: block.category,
+          model: candidate,
+          severity: block.severity,
+        });
+        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
+        return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
+      }
       console.warn(`[AI Proxy] Audio model ${candidate} failed: ${errorMessage(error)}`);
     } finally {
       clearTimeout(timer);
@@ -545,8 +698,15 @@ export default async (request: Request, _context: any): Promise<Response> => {
     Math.max(Number(callerConfig.maxOutputTokens) || MAX_OUTPUT_TOKENS, 256),
     MAX_OUTPUT_TOKENS
   );
-  // Safety settings are the server's decision.
-  delete config.safetySettings;
+  // Safety settings are the server's decision, not the caller's.
+  //
+  // The caller's own `safetySettings` are dropped here and replaced with the
+  // server policy, so a client cannot raise the threshold, add a category or
+  // remove one. Both the text path and the audio path share this one `config`
+  // object, so a single assignment covers both.
+  config.safetySettings = jailbreakCategoryDisabledForInstance
+    ? SERVER_SAFETY_SETTINGS_WITHOUT_JAILBREAK
+    : SERVER_SAFETY_SETTINGS;
   // Only Google Search may be requested, and only when the caller asked.
   const requestedTools = sanitizeTools(body.tools);
   if (requestedTools) config.tools = requestedTools;

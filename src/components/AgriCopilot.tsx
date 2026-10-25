@@ -14,6 +14,7 @@ import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { computeFocusCrop } from '../utils/imageCapture';
 import { diagnosisConfidence, confidenceValue, normalizeDiseaseCandidates, ESCALATION_THRESHOLD } from '../utils/diagnosisTypes';
+import { isSafetyBlockError, safetyBlockMessage } from '../utils/safetyBlock';
 import type { DiagnosisImage } from '../utils/diagnosisTypes';
 import { motion, AnimatePresence } from 'motion/react';
 import Tooltip from './Tooltip';
@@ -1073,7 +1074,7 @@ export default function AgriCopilot({
         return;
       }
       console.error("Chat error:", error);
-      toast.error(t.tooltips.chatError);
+      toast.error(isSafetyBlockError(error) ? safetyBlockMessage(lang) : t.tooltips.chatError);
     } finally {
       endAiRequest(controller);
       if (isMountedRef.current) setIsChatLoading(false);
@@ -1113,7 +1114,7 @@ export default function AgriCopilot({
         return;
       }
       console.error("Chat context error:", error);
-      toast.error(t.tooltips.chatError);
+      toast.error(isSafetyBlockError(error) ? safetyBlockMessage(lang) : t.tooltips.chatError);
     } finally {
       endAiRequest(controller);
       if (isMountedRef.current) setIsChatLoading(false);
@@ -1400,7 +1401,9 @@ export default function AgriCopilot({
       }
       console.error("Diagnosis failed:", error);
       const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
-      const errorMsg = isQuotaError 
+      const errorMsg = isSafetyBlockError(error)
+        ? safetyBlockMessage(lang)
+        : isQuotaError
         ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দ\u09DFা করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
         : (error.message || "Error connecting to AI service. Please try again.");
       
