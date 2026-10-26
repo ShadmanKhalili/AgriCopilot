@@ -801,7 +801,11 @@ export default function Layout() {
         </div>
 
         {/* ======================= MAIN CONTENT AREA ======================= */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* `min-w-0` is required: a flex item's automatic minimum size is its
+            min-content width, so without it this column refuses to shrink
+            below the widest child and pushes the layout wider than the
+            viewport (the sidebar then squeezes the content out of reach). */}
+        <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
           
           {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
           <LiveMandiTicker 
@@ -943,7 +947,7 @@ export default function Layout() {
           </header>
 
           {/* ================= SCROLLABLE MAIN CONTENT ================= */}
-          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-y-auto custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#090d16] pb-28 md:pb-6 transition-colors duration-200">
+          <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#090d16] pb-28 md:pb-6 transition-colors duration-200">
             
             {/* FinTech Ambient Mesh Glow & Texture Grid */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -1001,9 +1005,13 @@ export default function Layout() {
                   <ChevronRight className="w-4 h-4 sm:hidden shrink-0" />
                 </button>
               )}
-              {/* Simplified First Experience Quick Action Bar */}
-              <div className="mb-3 sm:mb-4 hidden md:flex items-center justify-between gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
-                <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Simplified First Experience Quick Action Bar.
+                  It wraps instead of scrolling sideways: on a ~800px
+                  window the four chips do not fit on one line, and a
+                  horizontal scroll left the last one clipped with no
+                  visible way to reach it. */}
+              <div className="mb-3 sm:mb-4 hidden md:flex flex-wrap items-center justify-between gap-2 py-0.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <button
                     onClick={() => setActiveTab('agri-copilot')}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${

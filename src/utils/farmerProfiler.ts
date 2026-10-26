@@ -338,6 +338,15 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     createdAt: now
   };
 
+  // Firestore refuses a document that contains an `undefined` field value
+  // ("Unsupported field value: undefined"), and it refuses the WHOLE
+  // document — so an AI-generated event, which has no defensible confidence
+  // score, was never written to `farmer_timeline_events` at all. The key is
+  // therefore omitted rather than set to undefined.
+  if (newEvent.confidenceScore === undefined) {
+    delete newEvent.confidenceScore;
+  }
+
   // 2. Fetch existing profile or create initial completely blank/accurate baseline
   let existingProfile = await fetchFarmerProfile(cleanUserId);
 
