@@ -25,7 +25,12 @@ import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import toBn from '../utils/banglaNum';
-import type { PrescriptionData } from './DigitalPrescriptionModal';
+import {
+  buildPrescriptionData,
+  topCandidate,
+  extractPhiDays,
+  type PrescriptionData,
+} from '../utils/prescriptionData';
 
 // Heavy, action-triggered panels are split out so the first screen only ships
 // what a farmer needs before they interact.
@@ -679,55 +684,26 @@ export default function AgriCopilot({
 
   const handleOpenPrescriptionModal = () => {
     if (!diagnosis) return;
-    
-    const chemSteps = diagnosis.chemicalRemedy 
-      ? [diagnosis.chemicalRemedy] 
-      : [
-          deepDiagnosis?.advancedTreatment || (lang === 'bn' ? 'কপার অক্সিক্লোরাইড ৫০ ডব্লিউপি (২ গ্রাম/লিটার পানিতে মিশিয়ে বিকেলে স্প্রে করুন)' : 'Copper Oxychloride 50 WP @ 2g/L')
-        ];
-        
-    const orgSteps = diagnosis.organicRemedy 
-      ? [diagnosis.organicRemedy] 
-      : [lang === 'bn' ? 'নিম তেল (৫ মিলি/লিটার) ও ট্রাইকোডার্মা বায়ো-এজেন্ট প্রয়োগ' : 'Neem oil @ 5ml/L and Trichoderma bio-agent'];
-
-    const cultSteps = diagnosis.verificationAdvice 
-      ? [diagnosis.verificationAdvice] 
-      : [lang === 'bn' ? 'আক্রান্ত পাতা কেটে ধ্বংস করুন এবং জমি বা টবের ড্রেনেজ পরিষ্কার রাখুন' : 'Prune infected parts and maintain clean field drainage'];
 
     // NOTE: district objects expose `bn_name` (not `bn`), so Bangla must read that key.
     const districtName = geoData.find(d => d.id === selectedDistrict)?.[lang === 'bn' ? 'bn_name' : 'name'] || 'Bangladesh';
+    const upazilaName = geoData.find(d => d.id === selectedDistrict)?.upazilas?.find(u => u.id === selectedUpazila)?.[lang === 'bn' ? 'bn_name' : 'name'] || '';
 
-    // Never invent a confidence number. A missing value used to be displayed
-    // as 95%, which told the farmer the model was certain when nothing had
-    // been established. When no defensible number can be computed we pass
-    // null and the prescription shows "Not Assessed" instead.
-    const rxSignal = diagnosisConfidence(diagnosis);
-    const rxConfidence = rxSignal.basis === 'unknown' ? null : rxSignal.score;
-
-    setRxModalData({
-      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+    // Every field on the card comes from what the model actually returned.
+    // The old builder read `disease`, `chemicalRemedy`, `organicRemedy` and
+    // `pathogen` — fields the current schema does not produce — so the card
+    // fell back to the whole diagnosis paragraph as the "disease name" and
+    // to a hardcoded copper oxychloride spray for every single disease.
+    setRxModalData(buildPrescriptionData({
+      diagnosis,
+      deepDiagnosis,
+      crop,
+      cropStage,
+      district: districtName,
+      upazila: upazilaName,
       farmerName: user?.displayName || (lang === 'bn' ? 'নিবন্ধিত কৃষক' : 'Registered Farmer'),
-      location: `${districtName}, Bangladesh`,
-      crop: crop || (lang === 'bn' ? 'ফসলি জমি' : 'Field Crop'),
-      cropStage: cropStage || (lang === 'bn' ? 'মাঠ পর্যায়' : 'Field Stage'),
-      diseaseName: diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop Pathological Condition',
-      pathogen: diagnosis.pathogen || 'Agricultural Pathogen Analysis',
-      severity: diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium',
-      confidence: rxConfidence,
-      symptoms: diagnosis.symptomsBreakdown && diagnosis.symptomsBreakdown.length > 0 
-        ? diagnosis.symptomsBreakdown 
-        : [lang === 'bn' ? 'পাতায় দাগ ও সংক্রমণের স্পষ্ট লক্ষণ' : 'Leaf lesions and tissue necrosis identified'],
-      culturalSteps: cultSteps,
-      organicSteps: orgSteps,
-      chemicalSteps: chemSteps,
-      harvestIntervalDays: 14,
-      weatherSnapshot: {
-        temp: '28.5°C',
-        humidity: '84%',
-        rainRisk: 'Low to Moderate',
-        advisory: lang === 'bn' ? 'বৃষ্টিহীন পরিষ্কার বিকেলে স্প্রে করুন' : 'Apply during dry afternoon window'
-      }
-    });
+      lang,
+    }));
     setIsRxModalOpen(true);
   };
 
@@ -2512,10 +2488,15 @@ export default function AgriCopilot({
                             <Suspense fallback={null}>
                             <PlantHealthRecoveryTracker
                               lang={lang}
-                              cropName={crop || 'Crop'}
-                              diseaseName={diagnosis.disease || diagnosis.diagnosis?.split('\n')[0] || 'Pathology Finding'}
-                              severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Critical'}
-                              harvestIntervalDays={14}
+                              cropName={crop || (lang === 'bn' ? 'ফসল' : 'Crop')}
+                              diseaseName={
+                                topCandidate(diagnosis)?.disease
+                                || diagnosis.disease
+                                || diagnosis.diagnosis?.split('\n')[0]
+                                || (lang === 'bn' ? 'রোগ শনাক্ত করা যায়নি' : 'No condition identified')
+                              }
+                              severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium'}
+                              harvestIntervalDays={extractPhiDays(deepDiagnosis?.advancedTreatment)}
                               initialPathway="organic"
                               onRequestExpert={onRequestExpert}
                             />

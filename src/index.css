@@ -74,6 +74,27 @@
     background: rgba(16, 185, 129, 0.45);
   }
 
+  /* Hide the scrollbar but keep the scroll. The quick-action bar in the
+     layout uses this; without the rule the class did nothing and a raw
+     grey scrollbar appeared under the toolbar on narrow desktop widths. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  /* `truncate` only works when the element is allowed to shrink. As a flex
+     item its automatic minimum size is its content width, so a truncated
+     label kept its full width and pushed the row wider than the viewport
+     (this is what made the Live/Photo toggle overflow at ~800px). */
+  .truncate {
+    min-width: 0;
+  }
+
   .markdown-body {
     @apply text-inherit;
   }

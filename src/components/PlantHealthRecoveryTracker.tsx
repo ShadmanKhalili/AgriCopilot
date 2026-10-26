@@ -226,7 +226,9 @@ export default function PlantHealthRecoveryTracker({
   cropName = 'Paddy',
   diseaseName = 'Bacterial Leaf Blight',
   severity = 'Critical',
-  harvestIntervalDays = 14,
+  // No default: a pre-harvest interval is a safety number. When it has not
+  // been established the tracker must say so rather than print a guess.
+  harvestIntervalDays,
   initialPathway = 'organic',
   compact = false,
   onRequestExpert
@@ -454,14 +456,22 @@ export default function PlantHealthRecoveryTracker({
           <div className="text-2xl sm:text-3xl font-display font-black text-amber-300 font-mono">
             {pathway === 'organic' ? (
               <span className="text-emerald-400">0 Days</span>
-            ) : (
+            ) : harvestIntervalDays ? (
               <span>{Math.max(harvestIntervalDays - currentMilestone.day, 0)} Days</span>
+            ) : (
+              <span className="text-base leading-snug">
+                {lang === 'bn' ? 'নির্ধারিত হয়নি' : 'Not established'}
+              </span>
             )}
           </div>
           <div className="text-[11px] text-stone-300">
-            {pathway === 'organic' 
+            {pathway === 'organic'
               ? (lang === 'bn' ? 'জৈব পদ্ধতি • রাসায়নিক অবশিষ্টাংশ নেই' : 'Organic pathway • No synthetic residue')
-              : (lang === 'bn' ? 'স্ট্যান্ডার্ড পিএইচআই নির্দেশিকা' : 'Standard Pre-Harvest Interval (PHI)')}
+              : harvestIntervalDays
+                ? (lang === 'bn' ? 'স্ট্যান্ডার্ড পিএইচআই নির্দেশিকা' : 'Standard Pre-Harvest Interval (PHI)')
+                : (lang === 'bn'
+                    ? 'অপেক্ষমাণ সময় নির্ধারিত হয়নি • স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন'
+                    : 'PHI not established • follow your local SAAO advice')}
           </div>
         </div>
 

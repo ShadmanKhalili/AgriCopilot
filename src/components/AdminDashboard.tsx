@@ -83,7 +83,8 @@ import toast from 'react-hot-toast';
 import { geoData } from '../utils/geoData';
 import { Language } from '../utils/translations';
 import { confidenceLabel, confidenceValue } from '../utils/diagnosisTypes';
-import DigitalPrescriptionModal, { PrescriptionData } from './DigitalPrescriptionModal';
+import DigitalPrescriptionModal from './DigitalPrescriptionModal';
+import { buildPrescriptionFromRecord, type PrescriptionData } from '../utils/prescriptionData';
 import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
 import { useAuth } from './AuthProvider';
 
@@ -1081,19 +1082,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedRxForModal({
-                                rxId: `RX-BD-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-                                crop: diag.crop || 'Paddy',
-                                diseaseName: diag.diagnosisText || 'Crop Infection',
-                                severity: diag.qualitativeSeverity || 'Critical',
-                                confidence: confidenceValue(diag),
-                                location: `${diag.district || 'Bogura'}, Bangladesh`,
-                                symptoms: ['Tissue chlorosis', 'Water soaked necrotic patches'],
-                                culturalSteps: ['Drain field water for 3 days', 'Suspend top-dress urea'],
-                                organicSteps: ['Spray 5% fresh neem kernel extract'],
-                                chemicalSteps: ['Copper Hydroxide 77 WP @ 2g/L water in non-rainy window'],
-                                harvestIntervalDays: 14
-                              });
+                              // The card must show what the record actually
+                              // contains. It used to print the same hardcoded
+                              // symptoms, cultural steps, organic steps and
+                              // "Copper Hydroxide 77 WP @ 2g/L" for every
+                              // diagnosis in the table, whatever the disease.
+                              setSelectedRxForModal(
+                                buildPrescriptionFromRecord(diag, lang, { district: diag.district })
+                              );
                               setIsRxModalOpen(true);
                             }}
                             className="px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-stone-700 dark:text-stone-300 text-[11px] font-bold border border-stone-200 dark:border-stone-700 transition-all flex items-center gap-1 cursor-pointer"
@@ -1483,21 +1479,32 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                           <button
                             type="button"
                             onClick={() => {
+                              // The registry row IS the stored prescription,
+                              // so show it as saved. The old builder filled
+                              // every missing field with invented clinical
+                              // data, which made an empty record look
+                              // certified.
                               setSelectedRxForModal({
                                 rxId: rx.rxId,
                                 farmerName: rx.farmerName,
                                 crop: rx.crop,
+                                cropStage: rx.cropStage,
                                 diseaseName: rx.diseaseName,
-                                pathogen: rx.pathogen || 'Agricultural Pathological Finding',
+                                pathogen: rx.pathogen,
                                 severity: rx.severity,
-                                confidence: confidenceValue(rx),
+                                confidence: rx.confidenceAssessed === false ? null : confidenceValue(rx),
+                                confidenceAssessed: rx.confidenceAssessed !== false,
                                 location: rx.location || 'Bangladesh',
-                                symptoms: rx.symptoms || ['Tissue necrosis', 'Foliar chlorosis'],
-                                culturalSteps: rx.culturalSteps || ['Prune infected leaves', 'Maintain drainage'],
-                                organicSteps: rx.organicSteps || ['Apply neem extract 5ml/L'],
-                                chemicalSteps: rx.chemicalSteps || ['Copper Hydroxide 77 WP @ 2g/L'],
-                                harvestIntervalDays: rx.harvestIntervalDays || 14,
-                                weatherSnapshot: rx.weatherSnapshot
+                                symptoms: Array.isArray(rx.symptoms) ? rx.symptoms : [],
+                                culturalSteps: Array.isArray(rx.culturalSteps) ? rx.culturalSteps : [],
+                                organicSteps: Array.isArray(rx.organicSteps) ? rx.organicSteps : [],
+                                chemicalSteps: Array.isArray(rx.chemicalSteps) ? rx.chemicalSteps : [],
+                                chemicalGated: rx.chemicalGated !== false,
+                                expertVerified: rx.verified === true,
+                                harvestIntervalDays:
+                                  typeof rx.harvestIntervalDays === 'number' ? rx.harvestIntervalDays : undefined,
+                                weatherSnapshot: rx.weatherSnapshot,
+                                differentialDiagnosis: rx.differentialDiagnosis
                               });
                               setIsRxModalOpen(true);
                             }}

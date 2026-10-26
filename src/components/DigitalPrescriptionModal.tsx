@@ -15,34 +15,15 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
 import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 import { audioFeedback } from '../utils/audioFeedback';
+import {
+  toStorablePrescription,
+  type PrescriptionData,
+} from '../utils/prescriptionData';
 
-export interface PrescriptionData {
-  rxId?: string;
-  farmerName?: string;
-  phone?: string;
-  location: string;
-  crop: string;
-  cropStage?: string;
-  diseaseName: string;
-  pathogen?: string;
-  severity: 'Low' | 'Medium' | 'Critical' | string;
-  confidence?: number | null;
-  symptoms: string[];
-  investigationSteps?: string[];
-  culturalSteps: string[];
-  organicSteps: string[];
-  chemicalSteps: string[];
-  chemicalGated?: boolean;
-  expertVerified?: boolean;
-  harvestIntervalDays?: number;
-  weatherSnapshot?: {
-    temp?: string;
-    humidity?: string;
-    rainRisk?: string;
-    advisory?: string;
-  };
-  sampleImage?: string;
-}
+// The Rx payload and the rules for filling it live in one place so the
+// farmer-facing card and the admin audit registry can never disagree about
+// what is real. See `src/utils/prescriptionData.ts` for the full rationale.
+export type { PrescriptionData } from '../utils/prescriptionData';
 
 interface DigitalPrescriptionModalProps {
   isOpen: boolean;
@@ -290,7 +271,10 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
     const saveLocally = () => {
       try {
         const existing = JSON.parse(localStorage.getItem('farmer_saved_prescriptions') || '[]');
-        existing.unshift({ rxId, crop: data.crop, diseaseName: data.diseaseName, date: currentDate });
+        // Keep the whole card, not just three fields — the local dossier is
+        // the only copy a farmer has when the audit registry write is
+        // refused, so a trimmed copy would lose the regimen.
+        existing.unshift({ ...data, date: currentDate });
         localStorage.setItem('farmer_saved_prescriptions', JSON.stringify(existing.slice(0, 20)));
         toast.success(lang === 'bn' ? 'স্থানীয় ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to local dossier!');
       } catch (e) {
@@ -305,18 +289,10 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
         saveLocally();
         return;
       }
-      await addDoc(collection(db, 'prescriptions'), {
-        rxId,
-        userId: user.uid,
-        farmerName: data.farmerName || user.displayName || 'Registered Grower',
-        crop: data.crop,
-        diseaseName: data.diseaseName,
-        severity: data.severity,
-        confidence: data.confidence,
-        location: data.location,
-        createdAt: new Date().toISOString(),
-        verified: true
-      });
+      await addDoc(
+        collection(db, 'prescriptions'),
+        toStorablePrescription(data, user.uid, user.displayName || '')
+      );
       toast.success(lang === 'bn' ? 'কৃষক ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to Farmer Dossier!');
     } catch (err) {
       console.warn("Could not save to firestore, falling back to local:", err);
@@ -519,9 +495,11 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 </span>
                 <span className="text-[11px] font-medium text-stone-800 flex items-center gap-1.5">
                   <Thermometer className="w-3 h-3 text-amber-600" />
-                  {data.weatherSnapshot?.temp || '28°C'}
+                  {data.weatherSnapshot?.temp
+                    || (lang === 'bn' ? 'তথ্য নেই' : 'Not captured')}
                   <Droplets className="w-3 h-3 text-blue-500 ml-1" />
-                  {data.weatherSnapshot?.humidity || '80%'}
+                  {data.weatherSnapshot?.humidity
+                    || (lang === 'bn' ? 'তথ্য নেই' : 'Not captured')}
                 </span>
               </div>
             </div>
@@ -550,6 +528,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   {/* Severity badge */}
                   <div className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${
                     data.severity === 'Critical' || data.severity === 'মারাত্মক'
+                      || data.severity === 'High' || data.severity === 'উচ্চ'
                       ? 'bg-rose-500/20 text-rose-300 border-rose-400/40'
                       : data.severity === 'Medium' || data.severity === 'মাঝারি'
                       ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
@@ -587,6 +566,19 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   </div>
                 </div>
               )}
+
+              {/* Why this condition and not the alternatives — the model
+                  states it, so the card should carry it. */}
+              {data.differentialDiagnosis && (
+                <div className="mt-3 pt-3 border-t border-emerald-800/80">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
+                    {lang === 'bn' ? 'কেন এই রোগ — অন্য সম্ভাবনার তুলনায়' : 'Why this condition, and not the alternatives'}
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-emerald-50/90">
+                    {data.differentialDiagnosis}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Prescribed Step-by-Step Regimen (Rx ℞) */}
@@ -616,14 +608,22 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   <span className="w-5 h-5 rounded-full bg-stone-800 text-white flex items-center justify-center text-[11px] font-black">1</span>
                   <span>{lang === 'bn' ? 'তাৎক্ষণিক জমি/টব স্যানিটেশন ও নন-কেমিক্যাল পরিচর্যা' : 'Immediate Cultural & Sanitation Protocols'}</span>
                 </div>
-                <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
-                  {data.culturalSteps.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-emerald-700 font-bold">✔</span>
-                      <span className="leading-relaxed">{step}</span>
-                    </li>
-                  ))}
-                </ul>
+                {data.culturalSteps.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
+                    {data.culturalSteps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-emerald-700 font-bold">✔</span>
+                        <span className="leading-relaxed">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-stone-500 italic">
+                    {lang === 'bn'
+                      ? 'এই রোগের জন্য কোনো সাংস্কৃতিক ব্যবস্থাপত্র রিপোর্ট করা হয়নি।'
+                      : 'No cultural protocol was reported for this condition.'}
+                  </p>
+                )}
               </div>
 
               {/* Section 2: Chemical Regimen with Gating */}
@@ -638,14 +638,16 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                       {lang === 'bn' ? 'অনুমোদন পেন্ডিং' : 'Review Required'}
                     </span>
                   </div>
-                  <ul className="space-y-2 text-xs text-rose-950 pl-2">
-                    {data.chemicalSteps.map((step, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-rose-700 font-black shrink-0 mt-0.5">⚠️</span>
-                        <span className="leading-relaxed font-semibold">{step}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {data.chemicalSteps.length > 0 && (
+                    <ul className="space-y-2 text-xs text-rose-950 pl-2">
+                      {data.chemicalSteps.map((step, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-rose-700 font-black shrink-0 mt-0.5">⚠️</span>
+                          <span className="leading-relaxed font-semibold">{step}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="mt-3 p-2.5 rounded-xl bg-rose-100/90 text-[11px] text-rose-900 border border-rose-300 leading-relaxed">
                     {lang === 'bn' 
                       ? 'খাদ্য নিরাপত্তা ও ফসলের বিষক্রিয়া রোধে: কৃত্রিম বুদ্ধিমত্তা কোনো অনির্ধারিত রাসায়নিক প্রয়োগের অনুমতি প্রদান করে না। স্প্রে করার পূর্বে অবশ্যই মাঠ পর্যায়ের উপ-সহকারী কৃষি কর্মকর্তা (SAAO) বা লাইসেন্সপ্রাপ্ত উদ্ভিদ রোগতত্ত্ববিদের লিখিত অনুমোদন নিন।'
@@ -687,14 +689,22 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   <span className="w-5 h-5 rounded-full bg-teal-700 text-white flex items-center justify-center text-[11px] font-black">3</span>
                   <span>{lang === 'bn' ? 'জৈব ও পরিবেশবান্ধব বিকল্প সমাধান' : 'Bio-Control & Organic Alternatives'}</span>
                 </div>
-                <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
-                  {data.organicSteps.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-teal-700 font-bold">🌱</span>
-                      <span className="leading-relaxed">{step}</span>
-                    </li>
-                  ))}
-                </ul>
+                {data.organicSteps.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs text-stone-700 pl-2">
+                    {data.organicSteps.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-teal-700 font-bold">🌱</span>
+                        <span className="leading-relaxed">{step}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-stone-500 italic">
+                    {lang === 'bn'
+                      ? 'এই রোগের জন্য কোনো জৈবিক বিকল্প রিপোর্ট করা হয়নি।'
+                      : 'No bio-control alternative was reported for this condition.'}
+                  </p>
+                )}
               </div>
 
               {/* Recovery Tracker Collapsible Preview for Investors & Farmers */}
@@ -723,7 +733,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                       cropName={data.crop}
                       diseaseName={data.diseaseName}
                       severity={data.severity}
-                      harvestIntervalDays={data.harvestIntervalDays || 14}
+                      harvestIntervalDays={data.harvestIntervalDays}
                       initialPathway="organic"
                     />
                   </div>
