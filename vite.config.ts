@@ -128,12 +128,14 @@ export default defineConfig(({mode}) => {
             },
             {
               // Real-time dynamic weather forecasts must NEVER be hijacked by stale Service Worker cache
-              urlPattern: /^\/api\/(daily-forecast|weathernext-3|weather-next)/i,
+              // Workbox tests a RegExp against the full URL (https://…), so a
+              // pattern anchored at `^/api/` never matched. Match the path.
+              urlPattern: ({ url }) => /^\/api\/(daily-forecast|weathernext-3|weather-next)/i.test(url.pathname),
               handler: 'NetworkOnly',
             },
             {
               // Historical climate multi-year archives can be cached safely for 7 days
-              urlPattern: /^\/api\/historical-data/i,
+              urlPattern: ({ url }) => /^\/api\/historical-data/i.test(url.pathname),
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'agri-climate-archive-cache',

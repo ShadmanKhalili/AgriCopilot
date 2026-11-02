@@ -31,10 +31,13 @@ export function useUsageTracking(tabId: string = 'global') {
     }
   }, [user, tabId]);
 
+  // The AI proxy enforces the real allowance (AI_FREE_DAILY_LIMIT and
+  // AI_PREMIUM_DAILY_LIMIT, 100 and 1000 by default). A visitor who is not
+  // signed in is given a guest account on their first AI call and gets the
+  // free allowance, so the numbers shown here must match the server's.
   const getLimit = () => {
-    if (!user) return 10; // 10 per tab for guest
-    if (userProfile?.tier === 'premium') return 9999; // Unlimited effectively for paid
-    return 100; // Fair use cap of 100 per day globally for free
+    if (userProfile?.tier === 'premium') return 1000;
+    return 100;
   };
 
   /**
@@ -53,7 +56,7 @@ export function useUsageTracking(tabId: string = 'global') {
 
   const getPremiumLimit = () => {
      if (!user) return 0; // Guest cannot use premium
-     if (userProfile?.tier === 'premium') return 9999;
+     if (userProfile?.tier === 'premium') return 1000;
      return 1; // Free account gets 1 premium analysis per tab
   }
 

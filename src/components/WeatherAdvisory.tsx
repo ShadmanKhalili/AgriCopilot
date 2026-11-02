@@ -42,7 +42,8 @@ interface WeatherData {
   rainChance: number;
   uvIndex: number;
   locationName: string;
-  historicalAvgTemp?: number;
+  /** Average daily high for this month over the last 5 years. */
+  historicalAvgMax?: number;
   historicalToday?: {
     maxTemp: number;
     minTemp: number;
@@ -426,16 +427,19 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       lastYearToday.setFullYear(lastYearToday.getFullYear() - 1);
       const lastYearTodayStr = lastYearToday.toISOString().split('T')[0];
 
-      let historicalAvgTemp = undefined;
+      let historicalAvgMax = undefined;
       let historicalToday = undefined;
 
       try {
-        const climateRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean&timezone=auto`, { timeoutMs: 8000, retries: 0 });
-        
+        // Daily highs, not daily means: the card compares them with the
+        // forecast high. A mean mixes in the night, so any afternoon reading
+        // looked several degrees "above normal".
+        const climateRes = await fetchWithTimeout(`/api/historical-data?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max&timezone=auto`, { timeoutMs: 8000, retries: 0 });
+
         if (climateRes.ok) {
           const climateData = await readJsonWithTimeout<any>(climateRes, 8000);
-          if (climateData.daily?.temperature_2m_mean && climateData.daily?.time) {
-            const temps = climateData.daily.temperature_2m_mean;
+          if (climateData.daily?.temperature_2m_max && climateData.daily?.time) {
+            const temps = climateData.daily.temperature_2m_max;
             const times = climateData.daily.time;
             
             let sum = 0;
@@ -447,7 +451,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               }
             }
             if (count > 0) {
-              historicalAvgTemp = sum / count;
+              historicalAvgMax = sum / count;
             }
           }
         }
@@ -490,7 +494,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         console.error("Failed to fetch soil data", e);
       }
 
-      newWeather.historicalAvgTemp = historicalAvgTemp;
+      newWeather.historicalAvgMax = historicalAvgMax;
       newWeather.historicalToday = historicalToday;
       if (soilPH !== undefined) newWeather.soilPH = soilPH;
       if (soilNitrogen !== undefined) newWeather.soilNitrogen = soilNitrogen;
@@ -1163,7 +1167,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 )}
 
                 {/* Historical Climate Comparison (Squeezed) */}
-                {(weather.historicalAvgTemp !== undefined || weather.historicalToday !== undefined) && (
+                {(weather.historicalAvgMax !== undefined || weather.historicalToday !== undefined) && (
                   <div className="bg-blue-50/40 dark:bg-blue-950/20 p-2.5 sm:p-3 rounded-xl border border-blue-100/70 dark:border-blue-900/40 text-xs">
                     <div className="flex items-center gap-2 mb-1.5">
                       <History className="w-3.5 h-3.5 text-blue-600" />
@@ -1173,6 +1177,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     </div>
                     {weather.historicalToday && (
                       <div className="flex flex-wrap gap-3 text-stone-700 dark:text-stone-300 mb-1.5 font-medium">
+                        <span className="text-stone-500 dark:text-stone-400">
+                          {lang === 'bn' ? 'গত বছর এই দিনে:' : 'This day last year:'}
+                        </span>
                         <span className="flex items-center gap-1">
                           <Thermometer className="w-3 h-3 text-red-500" /> Max: {weather.historicalToday.maxTemp}°C
                         </span>
@@ -1184,13 +1191,25 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         </span>
                       </div>
                     )}
-                    {weather.historicalAvgTemp !== undefined && (
-                      <p className="text-stone-600 dark:text-stone-400 leading-relaxed">
-                        {lang === 'bn' 
-                          ? `গত ৫ বছরে এই মাসে গড় তাপমাত্রা ছিল ${weather.historicalAvgTemp.toFixed(1)}°C। আজকের তাপমাত্রা (${weather.temp.toFixed(1)}°C) স্বাভাবিকের চেয়ে ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'বেশি' : 'কম'}।`
-                          : `The 5-year average temperature for this month was ${weather.historicalAvgTemp.toFixed(1)}°C. Today (${weather.temp.toFixed(1)}°C) is ${Math.abs(weather.temp - weather.historicalAvgTemp).toFixed(1)}°C ${weather.temp > weather.historicalAvgTemp ? 'higher' : 'lower'} than usual.`}
-                      </p>
-                    )}
+                    {weather.historicalAvgMax !== undefined && (() => {
+                      // Compare like with like: the highest temperature expected
+                      // over the next 24 hours against this month's average daily
+                      // high, not the current reading against a day-and-night mean.
+                      const avgMax = weather.historicalAvgMax;
+                      const forecastHigh = Math.max(
+                        weather.temp,
+                        ...(weather.hourlyForecast || []).map(h => h.temp).filter(Number.isFinite)
+                      );
+                      const diff = forecastHigh - avgMax;
+                      const nearNormal = Math.abs(diff) < 0.5;
+                      return (
+                        <p className="text-stone-600 dark:text-stone-400 leading-relaxed">
+                          {lang === 'bn'
+                            ? `গত ৫ বছরে এই মাসে দিনের গড় সর্বোচ্চ তাপমাত্রা ছিল ${avgMax.toFixed(1)}°C। আগামী ২৪ ঘণ্টার সর্বোচ্চ তাপমাত্রা (${forecastHigh.toFixed(1)}°C) ${nearNormal ? 'স্বাভাবিকের কাছাকাছি' : `স্বাভাবিকের চেয়ে ${Math.abs(diff).toFixed(1)}°C ${diff > 0 ? 'বেশি' : 'কম'}`}।`
+                            : `Over the last 5 years, days this month reached an average high of ${avgMax.toFixed(1)}°C. The high over the next 24 hours (${forecastHigh.toFixed(1)}°C) is ${nearNormal ? 'close to normal' : `${Math.abs(diff).toFixed(1)}°C ${diff > 0 ? 'above' : 'below'} that`}.`}
+                        </p>
+                      );
+                    })()}
                   </div>
                 )}
 

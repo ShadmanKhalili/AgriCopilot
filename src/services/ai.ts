@@ -436,6 +436,40 @@ const callAiWithFallback = async (params: any, primaryModel: string, customBacku
   throw lastError;
 };
 
+/**
+ * Base64 characters of photos one diagnosis request may carry. The AI proxy
+ * refuses a body over 4 MB; this leaves room for the prompt and the schema.
+ */
+const MAX_IMAGE_PAYLOAD_CHARS = 3.5 * 1024 * 1024;
+
+/**
+ * Turn the farmer's photos into request parts: each full photo, then — when
+ * we have one — an automatically cropped close-up of the most detailed region
+ * of that same photo. The close-up is always supplementary, never a
+ * replacement, so when five large photos and their close-ups would not fit in
+ * one request the close-ups are left out and every photo is still sent.
+ */
+const buildDiagnosisImageParts = (images: DiagnosisImage[]): any[] => {
+  const totalChars = images.reduce(
+    (sum, img) => sum + img.base64.length + (img.focusCropBase64?.length || 0),
+    0
+  );
+  const includeCrops = totalChars <= MAX_IMAGE_PAYLOAD_CHARS;
+  const contents: any[] = [];
+  for (const img of images) {
+    contents.push({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] });
+    if (includeCrops && img.focusCropBase64) {
+      contents.push({
+        parts: [
+          { text: 'AUTO-CROPPED DETAIL VIEW of the previous image: an automatic close-up of the most detailed region of that same photo. Read spot colour, lesion edges and surface texture here; take the whole-plant context from the previous full image.' },
+          { inlineData: { data: img.focusCropBase64, mimeType: img.mimeType } }
+        ]
+      });
+    }
+  }
+  return contents;
+};
+
 export const diagnoseCrop = async (
   images: DiagnosisImage[],
   crop: string, 
@@ -555,21 +589,7 @@ export const diagnoseCrop = async (
         }
       };
       
-      // Send the full frame, then — when we have one — an automatically
-      // cropped close-up of the most detailed region of that same photo. The
-      // close-up is always supplementary, never a replacement.
-      const contents: any[] = [];
-      for (const img of images) {
-        contents.push({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] });
-        if (img.focusCropBase64) {
-          contents.push({
-            parts: [
-              { text: 'AUTO-CROPPED DETAIL VIEW of the previous image: an automatic close-up of the most detailed region of that same photo. Read spot colour, lesion edges and surface texture here; take the whole-plant context from the previous full image.' },
-              { inlineData: { data: img.focusCropBase64, mimeType: img.mimeType } }
-            ]
-          });
-        }
-      }
+      const contents = buildDiagnosisImageParts(images);
       contents.push({ parts: [{ text: prompt }] });
 
       const response = await generateContent({
@@ -700,18 +720,7 @@ export const deepDiagnoseCrop = async (
         tools: [{ googleSearch: {} }]
       };
       
-      const contents: any[] = [];
-      for (const img of images) {
-        contents.push({ parts: [{ inlineData: { data: img.base64, mimeType: img.mimeType } }] });
-        if (img.focusCropBase64) {
-          contents.push({
-            parts: [
-              { text: 'AUTO-CROPPED DETAIL VIEW of the previous image: an automatic close-up of the most detailed region of that same photo. Read spot colour, lesion edges and surface texture here; take the whole-plant context from the previous full image.' },
-              { inlineData: { data: img.focusCropBase64, mimeType: img.mimeType } }
-            ]
-          });
-        }
-      }
+      const contents = buildDiagnosisImageParts(images);
       contents.push({ parts: [{ text: prompt }] });
 
       const response = await generateContent({

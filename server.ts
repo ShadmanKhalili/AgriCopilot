@@ -171,7 +171,9 @@ async function startServer() {
           "https://adservice.google.com",
           "https://www.google.com", 
           "https://content-cloudrun-static-files-pa.googleapis.com",
-          "https://*.firebaseapp.com"
+          "https://*.firebaseapp.com",
+          // AdSense's invalid-traffic check (sodar) runs in a frame here.
+          "https://ep2.adtrafficquality.google"
         ],
         "frame-ancestors": ["'self'", "https://*.google.com", "https://*.googleusercontent.com", "https://*.web.app", "https://*.firebaseapp.com"],
       },
@@ -457,8 +459,9 @@ async function startServer() {
       if (measured.chars > 40000) {
         return res.status(413).json({ error: "That request contains too much text." });
       }
-      if (measured.images > 4) {
-        return res.status(413).json({ error: "You can send at most 4 images at a time." });
+      // Five photos plus a close-up of each, matching the Netlify proxy.
+      if (measured.images > 10) {
+        return res.status(413).json({ error: "You can send at most 10 images at a time." });
       }
       if (Array.isArray(contents) && contents.length > 100) {
         return res.status(400).json({ error: "Too many conversation turns in single request (max 100)." });
