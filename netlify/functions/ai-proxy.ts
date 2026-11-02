@@ -82,12 +82,16 @@ const FREE_DAILY_LIMIT = clampInt(process.env.AI_FREE_DAILY_LIMIT, 100, 1, 10000
 /** Calls a premium account may make per day. */
 const PREMIUM_DAILY_LIMIT = clampInt(process.env.AI_PREMIUM_DAILY_LIMIT, 1000, 1, 100000);
 
-/** Largest request body we will even parse. */
-const MAX_REQUEST_BYTES = 512 * 1024;
+/**
+ * Largest request body we will even parse. A photo diagnosis carries up to
+ * five 1280px photos plus a close-up of each, which is well over 512 KB;
+ * 4 MB fits them and stays under Netlify's 6 MB request limit.
+ */
+const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 /** Largest amount of prompt text across all turns of one request. */
 const MAX_TOTAL_TEXT_CHARS = 40_000;
-/** Largest number of images in one request. */
-const MAX_INLINE_IMAGES = 4;
+/** Largest number of images in one request: five photos and their close-ups. */
+const MAX_INLINE_IMAGES = 10;
 
 /**
  * Per-model time budget and the overall budget for one proxied request.

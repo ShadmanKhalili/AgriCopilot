@@ -161,7 +161,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
               </span>
             </div>
             <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">
-              {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E · {lang === 'bn' ? 'কক্সবাজার / চট্টগ্রাম কৃষি অঞ্চল' : 'Bangladesh Agro Zone'}
+              {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E · {lang === 'bn' ? 'বাংলাদেশ কৃষি অঞ্চল' : 'Bangladesh Agro Zone'}
             </span>
           </div>
         </div>

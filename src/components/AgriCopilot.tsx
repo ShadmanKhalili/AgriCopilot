@@ -552,6 +552,26 @@ const SAMPLE_DIAGNOSIS_CASES = [
   }
 ];
 
+type SampleDiagnosis = typeof SAMPLE_DIAGNOSIS_CASES[number]['sampleDiagnosis'];
+
+/**
+ * The result card renders `diagnosis` as its main text, but the sample cases
+ * only carry structured fields, so every sample opened onto an empty card with
+ * no disease name and no treatment. Compose that text from the sample itself.
+ */
+const buildSampleDiagnosisText = (sample: SampleDiagnosis, lang: Language): string => {
+  const bn = lang === 'bn';
+  return [
+    `### ${bn ? sample.diseaseBn : sample.disease}`,
+    `**${bn ? 'কারণ' : 'Cause'}:** ${sample.cause}`,
+    `**${bn ? 'জৈব সমাধান' : 'Organic treatment'}:** ${sample.organicRemedy}`,
+    `**${bn ? 'রাসায়নিক সমাধান' : 'Chemical treatment'}:** ${sample.chemicalRemedy}`,
+    bn
+      ? '> স্প্রে করার আগে অপেক্ষমাণ সময় (PHI) জেনে নিন এবং স্থানীয় উপ-সহকারী কৃষি কর্মকর্তার (SAAO) পরামর্শ নিন।'
+      : '> Check the pre-harvest interval (PHI) and confirm with your local Sub-Assistant Agriculture Officer (SAAO) before spraying.',
+  ].join('\n\n');
+};
+
 interface Props {
   lang: Language;
   globalLocation: { latitude: number; longitude: number } | null;
@@ -843,8 +863,13 @@ export default function AgriCopilot({
   const handleSelectSampleDiagnosis = (sc: typeof SAMPLE_DIAGNOSIS_CASES[0]) => {
     setCrop(sc.crop);
     if (setPersistedCrop) setPersistedCrop(sc.crop);
-    setDiagnosis(sc.sampleDiagnosis);
-    if (setPersistedDiagnosis) setPersistedDiagnosis(sc.sampleDiagnosis);
+    const sampleDiag = {
+      ...sc.sampleDiagnosis,
+      status: 'Valid',
+      diagnosis: buildSampleDiagnosisText(sc.sampleDiagnosis, lang),
+    };
+    setDiagnosis(sampleDiag);
+    if (setPersistedDiagnosis) setPersistedDiagnosis(sampleDiag);
     
     // Initialize active chat session for this sample
     const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";

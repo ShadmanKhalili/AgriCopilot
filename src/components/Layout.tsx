@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { 
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
@@ -57,7 +57,31 @@ import { detectUserLocation } from '../utils/geolocation';
 import { safeStorage } from '../utils/security';
 import { ErrorBoundary } from './ErrorBoundary';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
+const TAB_IDS = ['agri-copilot', 'smart-grade', 'smart-planting', 'climate-resilience', 'krishi-profit', 'market-connect', 'weather-advisory', 'crop-health', 'community-radar', 'gov-schemes', 'farmer-dossier', 'expert-hub', 'user-guide', 'profile', 'admin-dashboard'] as const;
+type Tab = typeof TAB_IDS[number];
+
+// Short names used by the sitemap and older shared links.
+const TAB_HASH_ALIASES: Record<string, Tab> = {
+  copilot: 'agri-copilot',
+  weather: 'weather-advisory',
+  calculator: 'krishi-profit',
+};
+
+/**
+ * The tab a URL hash points at. An empty hash is the home tab; a hash that
+ * names no tab returns null so the caller can leave the current tab alone.
+ */
+const tabFromHash = (hash: string): Tab | null => {
+  let key = hash.replace(/^#/, '').trim().toLowerCase();
+  try {
+    key = decodeURIComponent(key);
+  } catch {
+    // Keep the raw value; it simply will not match a tab.
+  }
+  if (!key) return 'agri-copilot';
+  if ((TAB_IDS as readonly string[]).includes(key)) return key as Tab;
+  return TAB_HASH_ALIASES[key] || null;
+};
 
 type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
 
@@ -112,7 +136,7 @@ function TabPanel({
 }
 
 export default function Layout() {
-  const [activeTab, setActiveTab] = useState<Tab>('agri-copilot');
+  const [activeTab, setActiveTab] = useState<Tab>(() => tabFromHash(window.location.hash) || 'agri-copilot');
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['agri-copilot']));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
@@ -121,7 +145,13 @@ export default function Layout() {
   const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
   const [selectedPillarFilter, setSelectedPillarFilter] = useState<PillarKey>('all');
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
-  const [lang, setLang] = useState<Language>('bn');
+  const [lang, setLang] = useState<Language>(() => {
+    // A `?lang=` link (the sitemap's alternate-language URLs) wins; otherwise
+    // the farmer's last choice is kept across visits.
+    const fromUrl = new URLSearchParams(window.location.search).get('lang');
+    if (fromUrl === 'en' || fromUrl === 'bn') return fromUrl;
+    return safeStorage.getItem<string>('krishi_lang', 'bn') === 'en' ? 'en' : 'bn';
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     // safeStorage swallows SecurityError / QuotaExceededError. A locked-down
     // in-app browser (Messenger/Facebook webview) must not brick the app on
@@ -147,8 +177,47 @@ export default function Layout() {
   };
 
   useEffect(() => {
+    safeStorage.setItem('krishi_lang', lang);
+    // Keep a `?lang=` link in step with a manual switch, so a reload does not
+    // flip the language back.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('lang') && url.searchParams.get('lang') !== lang) {
+      url.searchParams.set('lang', lang);
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  }, [lang]);
+
+  useEffect(() => {
     setVisitedTabs(prev => new Set(prev).add(activeTab));
   }, [activeTab]);
+
+  // Each tab has its own address (#weather-advisory, #expert-hub, …), so the
+  // phone's back button returns to the previous tab instead of closing the
+  // app, and a tab can be bookmarked or shared. Home has no hash.
+  const isFirstTabSync = useRef(true);
+  useEffect(() => {
+    const firstSync = isFirstTabSync.current;
+    isFirstTabSync.current = false;
+    if (tabFromHash(window.location.hash) === activeTab) return;
+    const hash = activeTab === 'agri-copilot' ? '' : `#${activeTab}`;
+    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    // Tidying an unknown hash on load must not add a back-button step.
+    if (firstSync) window.history.replaceState(null, '', url);
+    else window.history.pushState(null, '', url);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const tab = tabFromHash(window.location.hash);
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('popstate', syncTabFromUrl);
+    window.addEventListener('hashchange', syncTabFromUrl);
+    return () => {
+      window.removeEventListener('popstate', syncTabFromUrl);
+      window.removeEventListener('hashchange', syncTabFromUrl);
+    };
+  }, []);
 
   // AgriCopilot State Persistence
   const [agriImages, setAgriImages] = useState<{ base64: string; mimeType: string }[]>([]);
