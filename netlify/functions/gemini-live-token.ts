@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions';
 import { GoogleGenAI } from '@google/genai';
 import { extractBearerTokenFromHeader, verifyIdToken } from './_shared/auth.ts';
 import { checkIpRateLimit, extractClientIpFromHeaders, liveTokensPerIpPerMinute } from './_shared/ip-limit.ts';
+import { issueLiveToken } from './_shared/live-token.ts';
 
 /**
  * Endpoint to issue short-lived ephemeral session tokens for direct browser Live API sessions.
@@ -76,17 +77,35 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Mint a single-use short-lived ephemeral token for the Live API WebSocket session
-    const tokenResponse = await client.authTokens.create({
-      config: { uses: 1 }
-    });
+    // The client names the Live model it will connect with; the token is
+    // locked to it, counted against the daily allowance and time-limited
+    // (see `_shared/live-token.ts`).
+    let requestedModel: unknown;
+    try {
+      const raw = event.isBase64Encoded
+        ? Buffer.from(event.body || '', 'base64').toString('utf8')
+        : event.body || '';
+      requestedModel = raw ? JSON.parse(raw)?.model : undefined;
+    } catch {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body.' }) };
+    }
+
+    const result = await issueLiveToken(client, user.uid, token, requestedModel);
+    if (result.ok === false) {
+      return {
+        statusCode: result.status,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: result.error })
+      };
+    }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        token: tokenResponse.name,
-        expireTime: tokenResponse?.expireTime || null
+        token: result.token,
+        expireTime: result.expireTime,
+        model: result.model
       })
     };
   } catch (err: any) {

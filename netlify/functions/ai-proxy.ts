@@ -1,8 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
 import { aiCallsPerIpPerMinute, checkIpRateLimit, extractClientIp } from "./_shared/ip-limit.ts";
-import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
+import { countAiUsageToday, dailyAiLimit, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
 import { recordModerationEvent } from "./_shared/moderation-events.ts";
+import { maxOutputTokensFromEnv, sanitizeGenerationConfig } from "./_shared/ai-config.ts";
 import {
   SAFETY_BLOCK_CODE,
   SAFETY_BLOCK_MESSAGE,
@@ -69,18 +70,8 @@ const AUDIO_MODELS = parseModelList(process.env.AI_AUDIO_MODELS, [
   "gemini-3.8-flash-tts",
 ]);
 
-const clampInt = (raw: string | undefined, fallback: number, min: number, max: number): number => {
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return fallback;
-  return Math.min(max, Math.max(min, Math.trunc(value)));
-};
-
 /** Ceiling on the tokens the model may produce for one call. */
-const MAX_OUTPUT_TOKENS = clampInt(process.env.AI_MAX_OUTPUT_TOKENS, 8192, 256, 16384);
-/** Calls a free account may make per day. */
-const FREE_DAILY_LIMIT = clampInt(process.env.AI_FREE_DAILY_LIMIT, 100, 1, 100000);
-/** Calls a premium account may make per day. */
-const PREMIUM_DAILY_LIMIT = clampInt(process.env.AI_PREMIUM_DAILY_LIMIT, 1000, 1, 100000);
+const MAX_OUTPUT_TOKENS = maxOutputTokensFromEnv();
 
 /**
  * Largest request body we will even parse. A photo diagnosis carries up to
@@ -637,7 +628,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
   // ── 3. Enforce the daily allowance ──────────────────────────────────────
   const dayNumber = utcDayNumber();
   const plan = await getUserPlan(user.uid, idToken);
-  const limit = plan === "premium" ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const limit = dailyAiLimit(plan);
   const used = await countAiUsageToday(user.uid, idToken, dayNumber);
   if (used === null) {
     // Fail closed: if the counter cannot be read we cannot know whether the
@@ -692,16 +683,15 @@ export default async (request: Request, _context: any): Promise<Response> => {
   }
 
   // ── 5. Build the upstream config ─────────────────────────────────────────
-  const callerConfig = (body.config || {}) as Record<string, unknown>;
-  const config: Record<string, unknown> = { ...callerConfig };
-  for (const key of ["responseModalities", "speechConfig", "generationConfig"]) {
-    if (body[key] !== undefined) config[key] = body[key];
+  // Only the settings the app uses are forwarded, with the output tokens and
+  // thinking budget capped (see `_shared/ai-config.ts`). The speech call sends
+  // `responseModalities` and `speechConfig` at the top level of the body.
+  const callerConfig: Record<string, unknown> =
+    body.config && typeof body.config === "object" ? { ...body.config } : {};
+  for (const key of ["responseModalities", "speechConfig"]) {
+    if (body[key] !== undefined) callerConfig[key] = body[key];
   }
-  // The caller does not get to choose how many tokens the answer may use.
-  config.maxOutputTokens = Math.min(
-    Math.max(Number(callerConfig.maxOutputTokens) || MAX_OUTPUT_TOKENS, 256),
-    MAX_OUTPUT_TOKENS
-  );
+  const config = sanitizeGenerationConfig(callerConfig, MAX_OUTPUT_TOKENS);
   // Safety settings are the server's decision, not the caller's.
   //
   // The caller's own `safetySettings` are dropped here and replaced with the
@@ -714,8 +704,6 @@ export default async (request: Request, _context: any): Promise<Response> => {
   // Only Google Search may be requested, and only when the caller asked.
   const requestedTools = sanitizeTools(body.tools);
   if (requestedTools) config.tools = requestedTools;
-  else delete config.tools;
-  delete config.toolConfig;
 
   const modalities = (config.responseModalities || []) as string[];
   const isAudio = Array.isArray(modalities) && modalities.includes("AUDIO");

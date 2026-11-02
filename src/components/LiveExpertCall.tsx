@@ -218,15 +218,23 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
       await new Promise(resolve => setTimeout(resolve, 4000));
       clearInterval(ringInterval);
 
+      // The live token is locked to one model, so pick it before asking for one.
+      const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
+
       let ai: any = null;
       try {
-        ai = await getLiveAiClient();
+        ai = await getLiveAiClient(selectedLiveModel);
       } catch (err: any) {
         const errorMsg = String(err?.message || err || '');
         const isKeySuspended = errorMsg.includes('suspended') || errorMsg.includes('API key') || errorMsg.includes('403');
-        console.warn("[LiveExpertCall] Live Voice client connection unavailable:", isKeySuspended ? "Gemini API key inactive/suspended" : "Connection failed");
+        const isLimitReached = err?.status === 429;
+        console.warn("[LiveExpertCall] Live Voice client connection unavailable:", isLimitReached ? "Limit reached" : isKeySuspended ? "Gemini API key inactive/suspended" : "Connection failed");
         toast.error(
-          isKeySuspended
+          isLimitReached
+            ? (lang === 'bn'
+                ? "আজকের লাইভ সেশনের সীমা শেষ, অথবা এই সংযোগ থেকে অনেক অনুরোধ এসেছে। ছবি দিয়ে রোগ নির্ণয় ও চ্যাট এখনো চালু আছে; পরে আবার চেষ্টা করুন।"
+                : errorMsg)
+            : isKeySuspended
             ? (lang === 'bn' 
                 ? "জেমিনি এআই কি সাময়িকভাবে স্থগিত বা পরিবর্তিত হয়েছে। .env ফাইলে সক্রিয় GEMINI_API_KEY প্রদান করুন।" 
                 : "Gemini API key is suspended or rotated. Please provide an active GEMINI_API_KEY in .env.")
@@ -314,8 +322,6 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
 - If you need details, ask ONE simple, clarifying question at a time (e.g., "আপনার বারান্দায় দিনে কয় ঘণ্টা রোদ আসে?", "টবের মাটিতে কি পানি জমে থাকে?").
 - Agrochemical Safety: For home gardens, indoor pots, and edible herbs, strongly prioritize safe organic remedies. Never recommend banned toxic chemicals (Paraquat, Carbofuran, Monocrotophos).
 - SINGLE RESPONSE MANDATE: Deliver exactly ONE clear, complete spoken answer per inquiry. Never provide duplicate answers.`;
-
-      const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
       const liveConfig: any = {
         responseModalities: [Modality.AUDIO],
@@ -559,7 +565,10 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             : 'Connecting via Gemini 3.8 Live Extended mode...', { icon: '⚡' });
           const fallbackConfig = { ...liveConfig };
           delete fallbackConfig.thinkingConfig;
-          activeSession = await ai.live.connect({
+          // The first token is locked to the extended model and single-use,
+          // so the fallback model needs a token of its own.
+          const fallbackAi: any = await getLiveAiClient(LIVE_API_MODEL);
+          activeSession = await fallbackAi.live.connect({
             model: LIVE_API_MODEL,
             config: fallbackConfig,
             callbacks: liveCallbacks

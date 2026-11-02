@@ -11,7 +11,9 @@ import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
-import { countAiUsageToday, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
+import { countAiUsageToday, dailyAiLimit, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
+import { maxOutputTokensFromEnv, sanitizeGenerationConfig } from "./netlify/functions/_shared/ai-config.ts";
+import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
 import {
   getFreshMarketBulletin,
   getStaleMarketBulletin,
@@ -334,6 +336,18 @@ async function startServer() {
 
   // Endpoint to issue short-lived ephemeral session tokens for direct browser Live API sessions
   app.post("/api/gemini/live-token", aiLimiter, async (req, res) => {
+    // Same rules as the Netlify function: a token starts a billable Live
+    // session, so only a signed-in account gets one, counted against its
+    // daily allowance, locked to one model and time-limited.
+    const idToken = extractBearerTokenFromHeader(req.headers.authorization);
+    if (!idToken) {
+      return res.status(401).json({ error: "Sign in to use the live AI session." });
+    }
+    const user = await verifyIdToken(idToken);
+    if (!user) {
+      return res.status(401).json({ error: "Your session has expired. Please sign in again." });
+    }
+
     try {
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -349,14 +363,15 @@ async function startServer() {
         });
       }
 
-      // Mint a single-use short-lived ephemeral token for the Live API WebSocket session
-      const tokenResponse = await client.authTokens.create({
-        config: { uses: 1 }
-      });
+      const result = await issueLiveToken(client as any, user.uid, idToken, req.body?.model);
+      if (result.ok === false) {
+        return res.status(result.status).json({ error: result.error });
+      }
 
       return res.json({
-        token: tokenResponse.name,
-        expireTime: (tokenResponse as any)?.expireTime || null
+        token: result.token,
+        expireTime: result.expireTime,
+        model: result.model
       });
     } catch (err: any) {
       const rawMsg = String(err?.message || err || '');
@@ -409,9 +424,7 @@ async function startServer() {
       // ── Daily allowance ───────────────────────────────────────────────────
       const dayNumber = utcDayNumber();
       const plan = await getUserPlan(user.uid, idToken);
-      const limit = plan === "premium"
-        ? Number(process.env.AI_PREMIUM_DAILY_LIMIT || 1000)
-        : Number(process.env.AI_FREE_DAILY_LIMIT || 100);
+      const limit = dailyAiLimit(plan);
       const used = await countAiUsageToday(user.uid, idToken, dayNumber);
       if (used === null) {
         return res.status(503).json({ error: "The AI service is busy. Please try again in a moment." });
@@ -431,10 +444,8 @@ async function startServer() {
         contents,
         config,
         tools,
-        toolConfig,
         responseModalities,
-        speechConfig,
-        generationConfig
+        speechConfig
       } = req.body || {};
 
       if (!contents) {
@@ -467,30 +478,24 @@ async function startServer() {
         return res.status(400).json({ error: "Too many conversation turns in single request (max 100)." });
       }
 
-      const mergedConfig: any = {
-        ...(config || {}),
-        ...(tools ? { tools } : {}),
-        ...(toolConfig ? { toolConfig } : {}),
-        ...(responseModalities ? { responseModalities } : {}),
-        ...(speechConfig ? { speechConfig } : {}),
-        ...(generationConfig ? { generationConfig } : {})
-      };
-      // The caller does not get to choose how many tokens the answer may use,
-      // and safety settings are the server's decision.
-      const maxOutputTokens = Math.min(
-        Math.max(Number(mergedConfig.maxOutputTokens) || 8192, 256),
-        16384
+      // Only the settings the app uses are forwarded, with the output tokens
+      // and thinking budget capped, and safety settings left to the server
+      // (see netlify/functions/_shared/ai-config.ts).
+      const mergedConfig: any = sanitizeGenerationConfig(
+        {
+          ...(config && typeof config === "object" ? config : {}),
+          ...(responseModalities ? { responseModalities } : {}),
+          ...(speechConfig ? { speechConfig } : {})
+        },
+        maxOutputTokensFromEnv()
       );
-      mergedConfig.maxOutputTokens = maxOutputTokens;
-      delete mergedConfig.safetySettings;
       // Only Google Search may be requested, and only when the caller asked.
-      if (Array.isArray(mergedConfig.tools)) {
-        const allowed = mergedConfig.tools.filter((t: any) =>
+      const requestedTools = Array.isArray(tools) ? tools : config?.tools;
+      if (Array.isArray(requestedTools)) {
+        const allowed = requestedTools.filter((t: any) =>
           t && typeof t === "object" && Object.keys(t).length === 1 && "googleSearch" in t);
         if (allowed.length) mergedConfig.tools = allowed;
-        else delete mergedConfig.tools;
       }
-      delete mergedConfig.toolConfig;
 
       const candidateModels = getCandidateModels(requestedModel);
       let lastError: any = null;

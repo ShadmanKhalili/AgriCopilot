@@ -39,6 +39,37 @@ const eventsCollection = (uid: string) =>
 const bearer = (idToken: string) => ({ Authorization: `Bearer ${idToken}` });
 
 /**
+ * What one usage event paid for. `live` is one minted Live API session token
+ * (live video / voice), which costs far more than a single text answer.
+ */
+export type AiUsageKind = 'text' | 'audio' | 'live';
+
+const limitFromEnv = (raw: string | undefined, fallback: number): number => {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(MAX_EVENTS_PER_DAY, Math.max(1, Math.trunc(value)));
+};
+
+/**
+ * AI calls an account may make per day, of every kind together
+ * (`AI_FREE_DAILY_LIMIT`, default 100; `AI_PREMIUM_DAILY_LIMIT`, default 1000).
+ */
+export const dailyAiLimit = (plan: 'free' | 'premium'): number =>
+  plan === 'premium'
+    ? limitFromEnv(process.env.AI_PREMIUM_DAILY_LIMIT, 1000)
+    : limitFromEnv(process.env.AI_FREE_DAILY_LIMIT, 100);
+
+/**
+ * Live sessions an account may start per day, on top of the overall limit
+ * (`AI_FREE_DAILY_LIVE_SESSIONS`, default 20;
+ * `AI_PREMIUM_DAILY_LIVE_SESSIONS`, default 200).
+ */
+export const dailyLiveSessionLimit = (plan: 'free' | 'premium'): number =>
+  plan === 'premium'
+    ? limitFromEnv(process.env.AI_PREMIUM_DAILY_LIVE_SESSIONS, 200)
+    : limitFromEnv(process.env.AI_FREE_DAILY_LIVE_SESSIONS, 20);
+
+/**
  * The current UTC day as `YYYYMMDD`.
  *
  * UTC on purpose: the Firestore rules derive the same value from
@@ -63,38 +94,50 @@ const randomEventId = (): string => {
 };
 
 /**
- * How many AI calls this account has already made today.
+ * How many AI calls this account has already made today — of one `kind`
+ * when given, otherwise of every kind.
  * Returns `null` when the count could not be read — the caller then fails
  * closed rather than handing out free AI.
  */
 export const countAiUsageToday = async (
   uid: string,
   idToken: string,
-  dayNumber: number
+  dayNumber: number,
+  kind?: AiUsageKind
 ): Promise<number | null> => {
   try {
+    const filters: unknown[] = [
+      {
+        fieldFilter: {
+          field: { fieldPath: 'uid' },
+          op: 'EQUAL',
+          value: { stringValue: uid },
+        },
+      },
+      {
+        fieldFilter: {
+          field: { fieldPath: 'day' },
+          op: 'EQUAL',
+          value: { integerValue: String(dayNumber) },
+        },
+      },
+    ];
+    if (kind) {
+      filters.push({
+        fieldFilter: {
+          field: { fieldPath: 'kind' },
+          op: 'EQUAL',
+          value: { stringValue: kind },
+        },
+      });
+    }
     const body = {
       structuredQuery: {
         from: [{ collectionId: 'aiUsage' }],
         where: {
           compositeFilter: {
             op: 'AND',
-            filters: [
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'uid' },
-                  op: 'EQUAL',
-                  value: { stringValue: uid },
-                },
-              },
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'day' },
-                  op: 'EQUAL',
-                  value: { integerValue: String(dayNumber) },
-                },
-              },
-            ],
+            filters,
           },
         },
         limit: MAX_EVENTS_PER_DAY,
@@ -124,16 +167,17 @@ export const countAiUsageToday = async (
 };
 
 /**
- * Record one successful AI call against today's allowance.
- * Failures are swallowed: an unwritable counter must not break the farmer's
- * request that already produced an answer.
+ * Record one AI call against today's allowance. Returns whether the event
+ * was stored. Failures are never thrown: an unwritable counter must not break
+ * the farmer's request that already produced an answer, so callers that do
+ * not need the result can ignore it.
  */
 export const recordAiUsage = async (
   uid: string,
   idToken: string,
   dayNumber: number,
-  kind: 'text' | 'audio'
-): Promise<void> => {
+  kind: AiUsageKind
+): Promise<boolean> => {
   try {
     const eventId = randomEventId();
     const url = `${eventsCollection(uid)}?documentId=${eventId}`;
@@ -145,14 +189,16 @@ export const recordAiUsage = async (
         at: { integerValue: String(Date.now()) },
       },
     };
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { ...bearer(idToken), 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FIRESTORE_TIMEOUT_MS),
     });
+    return response.ok;
   } catch {
-    // Ignore — see the doc comment.
+    // See the doc comment: report, never throw.
+    return false;
   }
 };
 
