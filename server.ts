@@ -9,7 +9,7 @@ import helmet from "helmet";
 import { rateLimit } from 'express-rate-limit';
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
-import { validateOutboundUrl } from "./netlify/functions/_shared/safe-url.ts";
+import { validateOutboundUrl, safeFetch, readTextWithLimit } from "./netlify/functions/_shared/safe-url.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
 import { countAiUsageToday, dailyAiLimit, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
 import { maxOutputTokensFromEnv, sanitizeGenerationConfig } from "./netlify/functions/_shared/ai-config.ts";
@@ -1964,38 +1964,16 @@ async function startServer() {
     try {
       console.log(`Fetching sanitized link preview for: ${url}`);
       
-      const response = await axios.get(url, {
+      // Every redirect hop is re-validated, with a timeout and a size limit.
+      const response = await safeFetch(urlObj.toString(), {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'max-age=0',
-          'Connection': 'keep-alive',
-          'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-          'Referer': urlObj.origin + '/'
-        },
-        httpsAgent: new https.Agent({
-          rejectUnauthorized: process.env.NODE_ENV === 'production'
-        }),
-        timeout: 6000,
-        maxContentLength: 1024 * 1024, // 1MB maximum payload to prevent memory exhaustion DoS
-        maxRedirects: 5,
-        validateStatus: (status) => status < 500,
-        // Re-validate every redirect hop: a public URL can 302 straight to
-        // 169.254.169.254, and axios would otherwise follow it unchecked.
-        beforeRedirect: async (options) => {
-          const nextUrl = options.url
-            ? new URL(options.url, options.baseURL || undefined).toString()
-            : '';
-          const hop = await validateOutboundUrl(nextUrl);
-          if (!hop.safe) {
-            throw new Error(hop.error || "Forbidden redirect target");
-          }
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8'
         }
       });
 
-      const contentType = response.headers['content-type'] || '';
+      const contentType = response.headers.get('content-type') || '';
       
       if (response.status === 403 || response.status === 404 || !contentType.includes('text/html')) {
         return res.json({
@@ -2009,7 +1987,7 @@ async function startServer() {
         });
       }
 
-      const html = typeof response.data === 'string' ? response.data : '';
+      const html = await readTextWithLimit(response);
       
       // Basic meta tag extraction via regex (simple and effective for most OG sites)
       const getMeta = (property: string) => {

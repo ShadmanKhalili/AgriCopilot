@@ -8,6 +8,7 @@ import { useAuth } from './AuthProvider';
 import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { safeExternalUrl, externalHostLabel } from '../utils/security';
+import { fixSchemeLinks } from '../utils/schemeLinks';
 import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
@@ -25,6 +26,7 @@ interface LinkMetadata {
 function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
   const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreachable, setUnreachable] = useState(false);
 
   // A scheme's link comes from seeded data and from what the AI returns, so
   // it is never trusted blindly: only real web addresses become anchors, and
@@ -38,6 +40,8 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
         const res = await fetchWithTimeout(`/api/link-preview?url=${encodeURIComponent(url)}`, { timeoutMs: 10000, retries: 1 });
         const data = await readJsonWithTimeout<any>(res, 10000);
         if (!data.error) setMetadata(data);
+        // A site that no longer exists must not look like a working link.
+        else if (/could not be resolved/i.test(data.error)) setUnreachable(true);
       } catch (err) {
         console.error("Link preview error:", err);
       } finally {
@@ -66,6 +70,17 @@ function LinkPreviewCard({ url, lang }: { url: string; lang: Language }) {
         <div className="h-3 bg-white/10 rounded w-1/2"></div>
         <div className="h-2 bg-white/10 rounded w-3/4"></div>
       </div>
+    </div>
+  );
+
+  if (unreachable) return (
+    <div className="flex items-center gap-3 bg-white/5 w-full p-5 rounded-2xl border border-white/10">
+      <Globe className="w-5 h-5 text-gray-400 shrink-0" />
+      <span className="text-xs font-bold text-gray-300">
+        {lang === 'bn'
+          ? `${hostLabel} সাইটটি এখন খোলা যাচ্ছে না। জানতে কৃষি কল সেন্টারে ফোন করুন: ১৬১২৩`
+          : `${hostLabel} cannot be opened right now. For details, call the Krishi Call Centre: 16123`}
+      </span>
     </div>
   );
 
@@ -610,7 +625,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
 
                   <div className="pt-8 space-y-4">
                     <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-400 px-2">{lang === 'bn' ? 'সরাসরি লিঙ্ক ও প্রিভিউ' : 'Direct Link & Preview'}</h4>
-                    {scheme.sourceLinks?.map((link, linkIdx) => (
+                    {fixSchemeLinks(scheme.sourceLinks).map((link, linkIdx) => (
                       <LinkPreviewCard key={linkIdx} url={link} lang={lang} />
                     ))}
                   </div>

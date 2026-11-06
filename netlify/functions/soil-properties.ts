@@ -14,9 +14,9 @@ import { Handler } from "@netlify/functions";
 const UPSTREAM_TIMEOUT_MS = 12_000;
 const MAX_PROPERTIES = 8;
 
-const isValidCoordinate = (value: unknown): value is string => {
+const isInRange = (value: unknown, limit: number): value is string => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= -90 && parsed <= 90;
+  return Number.isFinite(parsed) && Math.abs(parsed) <= limit;
 };
 
 export const handler: Handler = async (event) => {
@@ -29,7 +29,7 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  if (!isValidCoordinate(lat) || !isValidCoordinate(lon)) {
+  if (!isInRange(lat, 90) || !isInRange(lon, 180)) {
     return {
       statusCode: 400,
       body: JSON.stringify({ error: "Latitude and longitude must be valid coordinates" }),

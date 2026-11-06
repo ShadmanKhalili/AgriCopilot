@@ -27,8 +27,13 @@ export default function CommunityRadar({ lang }: Props) {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
-    
+    if (!user) {
+      // Without this a signed-out visitor sees the spinner forever.
+      setAlerts([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     // Fetch recent diagnoses for the current user to evaluate severe risks locally
     const q = query(
@@ -101,12 +106,12 @@ export default function CommunityRadar({ lang }: Props) {
         </div>
         <div className="min-w-0">
           <h3 className="font-black text-red-900 uppercase tracking-widest text-xs mb-0.5">
-            {lang === 'bn' ? 'সতর্কতা ও কমিউনিটি রাডার' : 'Community Warning System'}
+            {lang === 'bn' ? 'আপনার খামারের সতর্কতা' : 'Your farm alerts'}
           </h3>
           <p className="text-xs sm:text-sm text-red-800/80 font-medium leading-relaxed">
             {lang === 'bn' 
-              ? 'এই রাডারে আপনার এলাকার অন্যান্য কৃষকদের দ্বারা শনাক্ত করা গুরুতর রোগ ও পোকার আক্রমণ দেখানো হচ্ছে। আপনার ফসলের সুরক্ষায় আগাম ব্যবস্থা নিন।' 
-              : 'This radar shows high-severity diseases and pests recently detected by other farmers in the network. Use this to take preventative action for your own crops.'}
+              ? 'এখানে আপনার নিজের ছবি পরীক্ষায় পাওয়া মাঝারি ও গুরুতর রোগ-বালাই দেখানো হচ্ছে। এলাকার অন্য কৃষকদের তথ্য এখনো এখানে যুক্ত হয়নি।' 
+              : 'This shows the moderate and severe problems found in your own photo checks. Reports from other farmers in your area are not included yet.'}
           </p>
         </div>
       </div>
@@ -125,7 +130,7 @@ export default function CommunityRadar({ lang }: Props) {
             {lang === 'bn' ? 'কোনো গুরুতর সতর্কতা নেই' : 'No Severe Alerts'}
           </h3>
           <p className="text-gray-500 text-xs sm:text-sm">
-            {lang === 'bn' ? 'আপনার এলাকায় বর্তমানে কোনো বড় ধরনের বালাই প্রাদুর্ভাব পাওয়া যায়নি।' : 'No major pest outbreaks currently reported in your area.'}
+            {lang === 'bn' ? 'আপনার ছবি পরীক্ষায় এখনো কোনো মাঝারি বা গুরুতর সমস্যা পাওয়া যায়নি।' : 'None of your photo checks have found a moderate or severe problem yet.'}
           </p>
         </div>
       ) : (
@@ -173,7 +178,7 @@ export default function CommunityRadar({ lang }: Props) {
               <div className="flex items-center justify-between pt-3 border-t border-gray-100/80 text-[11px] font-bold text-gray-400">
                 <div className="flex items-center truncate mr-2">
                   <MapPin className="w-3 h-3 mr-1 text-emerald-600 shrink-0" />
-                  <span className="truncate">Bangladesh Network</span>
+                  <span className="truncate">{lang === 'bn' ? 'আপনার পরীক্ষা' : 'Your check'}</span>
                 </div>
                 <div className="flex items-center shrink-0">
                   <Calendar className="w-3 h-3 mr-1 text-gray-400 shrink-0" />

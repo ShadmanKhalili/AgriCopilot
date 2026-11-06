@@ -170,10 +170,10 @@ export default function Profile({ lang, onUpgrade }: Props) {
           </div>
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
-              {lang === 'bn' ? 'কৃষক প্রোফাইল ও স্মার্ট কৃষি কার্ড' : 'Farmer Profile & Smart Krishi Dossier'}
+              {lang === 'bn' ? 'কৃষক প্রোফাইল ও স্মার্ট কৃষি কার্ড' : 'Farmer Profile & Smart Krishi Card'}
             </h2>
             <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm">
-              {lang === 'bn' ? 'কৃষিঋণ, ফসল বীমা ও লাইভ পরামর্শের স্বয়ংক্রিয় ইতিহাস' : 'Credit scoring, crop insurance eligibility & live session history'}
+              {lang === 'bn' ? 'খামার রেকর্ড ও লাইভ পরামর্শের ইতিহাস' : 'Farm record & live session history'}
             </p>
           </div>
         </div>
@@ -189,7 +189,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            {lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card'}
+            {lang === 'bn' ? 'স্মার্ট কৃষক কার্ড' : 'Smart Krishi Card'}
           </button>
           <button
             onClick={() => setViewMode('account')}

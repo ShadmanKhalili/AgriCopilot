@@ -106,7 +106,7 @@ export const TactileStepper: React.FC<TactileStepperProps> = ({
             onClick={() => setIsEditing(true)}
             title={lang === 'bn' ? 'সরাসরি সংখ্যা টাইপ করতে ক্লিক করুন' : 'Click to edit number manually'}
             aria-label={lang === 'bn' ? `${label ? label + ': ' : ''}${value} ${unit || ''} (সম্পাদনা করতে ক্লিক করুন)` : `${label ? label + ': ' : ''}${value} ${unit || ''} (click to edit)`}
-            className="w-full flex items-baseline justify-center gap-1 font-mono font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100 tabular-nums cursor-text hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            className="w-full min-h-9 flex items-baseline justify-center gap-1 font-mono font-bold text-sm sm:text-base text-stone-900 dark:text-stone-100 tabular-nums cursor-text hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
           >
             <span>{typeof value === 'number' ? value.toLocaleString() : value}</span>
             {unit && (

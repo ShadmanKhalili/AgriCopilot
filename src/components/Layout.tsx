@@ -448,11 +448,11 @@ export default function Layout() {
     },
     {
       id: 'farmer-dossier',
-      name: lang === 'bn' ? 'স্মার্ট কৃষক কার্ড ও ঋণ' : 'Smart Krishi Card & Loans',
+      name: lang === 'bn' ? 'স্মার্ট কৃষক কার্ড' : 'Smart Krishi Card',
       icon: ShieldCheck,
-      description: lang === 'bn' ? 'ডিজিটাল ক্রেডিট স্কোর, ফসল বীমা ও লাইভ ইতিহাস' : 'Digital credit score, crop insurance & history',
+      description: lang === 'bn' ? 'খামার রেকর্ড ও লাইভ পরামর্শের ইতিহাস' : 'Farm record & consultation history',
       pillar: 'support',
-      subcategory: lang === 'bn' ? 'ডিজিটাল প্রোফাইল ও ঋণ' : 'Credit & Insurance Dossier'
+      subcategory: lang === 'bn' ? 'ডিজিটাল খামার রেকর্ড' : 'Digital Farm Record'
     },
     { 
       id: 'user-guide', 
@@ -1058,8 +1058,8 @@ export default function Layout() {
                             ? `এখন ${toBn(expertOnlineCount)} জন অনুরোধ নিচ্ছেন • জরুরি হলে ১৫ মিনিট`
                             : `${expertOnlineCount} accepting requests now • emergency in 15 min`)
                         : (lang === 'bn'
-                            ? 'যাচাইকৃত কৃষি অফিসার ও কৃষিবিদ • সাধারণত ২৪ ঘণ্টায় উত্তর'
-                            : 'Verified agri officers & experts • usually within 24h')}
+                            ? 'কৃষি বিশেষজ্ঞের সাহায্য চান • জরুরি হলে ফোন করুন ১৬১২৩'
+                            : 'Ask an agriculture expert • if urgent, call 16123')}
                     </span>
                   </span>
                   {expertOnlineCount != null && expertOnlineCount > 0 && (
@@ -1328,7 +1328,8 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="admin-dashboard" active={activeTab === 'admin-dashboard'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('admin-dashboard') && userRole === 'admin' && <AdminDashboard lang={lang} />}
+                      {/* AdminDashboard shows its own "access restricted" page to everyone else. */}
+                      {visitedTabs.has('admin-dashboard') && <AdminDashboard lang={lang} />}
                       </ErrorBoundary>
                     </TabPanel>
                   </Suspense>
