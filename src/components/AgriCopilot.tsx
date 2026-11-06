@@ -2567,7 +2567,7 @@ export default function AgriCopilot({
                                         <div>
                                           <h3 className="font-display font-black text-blue-900 tracking-tight uppercase text-xl leading-none">{lang === 'bn' ? 'গভীর কৃষি বিশ্লেষণ' : 'Detailed Field Analysis'}</h3>
                                           <span className="text-xs font-semibold text-blue-600 mt-1 inline-block">
-                                            {lang === 'bn' ? 'কৃষি গবেষণা ও বৈজ্ঞানিক তথ্যসূত্র ভিত্তিক' : 'Based on Agricultural Research & Field Data'}
+                                            {lang === 'bn' ? 'এআই বিশ্লেষণ — যাচাই করে নিন' : 'AI analysis — please verify'}
                                           </span>
                                         </div>
                                       </div>
@@ -2660,7 +2660,7 @@ export default function AgriCopilot({
                                       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                                       <h4 className="flex items-center text-[11px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
                                         <ShieldAlert className="w-5 h-5 mr-3 text-white" />
-                                        {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা এবং সঠিক মাত্রা' : 'Advanced Treatment & Exact Dosages'}
+                                        {lang === 'bn' ? 'চিকিৎসার উপায়' : 'Treatment options'}
                                       </h4>
                                       <div className="markdown-body text-white/95 text-[15px] font-medium leading-relaxed space-y-4">
                                         <ReactMarkdown>{deepDiagnosis.advancedTreatment}</ReactMarkdown>
