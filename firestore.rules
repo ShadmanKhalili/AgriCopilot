@@ -649,7 +649,8 @@ service cloud.firestore {
                     request.resource.data.keys().hasOnly(['uid', 'day', 'kind', 'at']) &&
                     request.resource.data.uid == request.auth.uid &&
                     request.resource.data.day == serverDayNumber() &&
-                    request.resource.data.kind in ['text', 'audio'] &&
+                    // `live` is one Live API session token, counted separately.
+                    request.resource.data.kind in ['text', 'audio', 'live'] &&
                     request.resource.data.at is number;
       // The owner is taken from the event itself, not from the path: a path
       // wildcard is not reliably bound while a collection is listed, and the

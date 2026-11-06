@@ -188,8 +188,9 @@ const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyRe
   }
 };
 
-// Ephemeral Live API Token retrieval for direct WebSocket sessions
-export const getEphemeralLiveToken = async (): Promise<string> => {
+// Ephemeral Live API Token retrieval for direct WebSocket sessions. The server
+// locks the token to `model`, so a session must connect with that same model.
+export const getEphemeralLiveToken = async (model: string): Promise<string> => {
   const idToken = await ensureAiSession();
   const response = await fetchWithTimeout('/api/gemini/live-token', {
     method: 'POST',
@@ -197,6 +198,7 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
     },
+    body: JSON.stringify({ model }),
     timeoutMs: 15000,
     retries: 0
   });
@@ -215,7 +217,11 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
     if (isSuspended || errMsg.includes('suspended')) {
       errMsg = "Gemini API key is suspended or rotated. Please configure an active GEMINI_API_KEY in .env.";
     }
-    throw new Error(errMsg);
+    const error: Error & { status?: number } = new Error(errMsg);
+    // 429 means the daily allowance or the per-connection limit was reached;
+    // the live screens show that to the farmer instead of a connection error.
+    error.status = response.status;
+    throw error;
   }
   const data = await readJsonWithTimeout<any>(response, 15000);
   if (!data.token) {
@@ -226,8 +232,8 @@ export const getEphemeralLiveToken = async (): Promise<string> => {
 
 // Returns a fresh GoogleGenAI instance initialized with a single-use ephemeral token.
 // The token is minted server-side; no long-lived provider key reaches the browser.
-export const getLiveAiClient = async (): Promise<GoogleGenAI> => {
-  const token = await getEphemeralLiveToken();
+export const getLiveAiClient = async (model: string): Promise<GoogleGenAI> => {
+  const token = await getEphemeralLiveToken(model);
   const GenAI = await loadGoogleGenAI();
   return new GenAI({ apiKey: token });
 };
