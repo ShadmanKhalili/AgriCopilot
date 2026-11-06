@@ -117,7 +117,7 @@ export default function LiveVideoCopilot({
   globalLocation = null,
   onCaptureFrameForDeepDiagnosis
 }: LiveVideoCopilotProps) {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isExtendedThinking, setIsExtendedThinking] = useState(true);
@@ -2140,7 +2140,7 @@ Return a JSON object with this exact structure:
             </motion.button>
 
             {/* Investor demo — collapsed behind a tiny ghost control (boardroom tool, no public use) */}
-            {showInvestorPanel ? (
+            {userRole === 'admin' && (showInvestorPanel ? (
             <div className="pt-2 text-left">
               <div className="bg-gradient-to-br from-amber-500/10 via-emerald-950/40 to-teal-950/40 p-3.5 rounded-2xl border border-amber-500/30 backdrop-blur-md">
                 <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -2284,7 +2284,7 @@ Return a JSON object with this exact structure:
                   <span>{lang === 'bn' ? 'ডেমো' : 'Demo'}</span>
                 </button>
               </div>
-            )}
+            ))}
           </div>
         )}
 
@@ -2356,6 +2356,7 @@ Return a JSON object with this exact structure:
 
               <div className="flex items-center gap-2">
                 {/* Investor Demo Preset Switcher in Active Call */}
+                {userRole === 'admin' && (
                 <div className="relative">
                   <button
                     type="button"
@@ -2421,6 +2422,7 @@ Return a JSON object with this exact structure:
                     )}
                   </AnimatePresence>
                 </div>
+                )}
 
                 {/* Instant Stop / Interrupt Button during AI speech */}
                 <AnimatePresence>

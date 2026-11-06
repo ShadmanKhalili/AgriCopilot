@@ -780,7 +780,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     : (lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা • রিভিউ পেন্ডিং' : 'AI Decision Support • Review Pending')}
                 </p>
                 <p className="text-[11px] text-stone-400 font-mono">
-                  SHA256: {rxId.replace(/-/g, '').slice(0, 16)}
+                  {lang === 'bn' ? 'রেকর্ড নম্বর' : 'Record no.'}: {rxId}
                 </p>
               </div>
             </div>

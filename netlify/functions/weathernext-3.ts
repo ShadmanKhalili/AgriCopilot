@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import axios from 'axios';
+import { checkIpRateLimit, extractClientIpFromHeaders, weatherCallsPerIpPerMinute } from './_shared/ip-limit.ts';
 
 /**
  * AgroCast AI / Google Weather API agro-forecast endpoint (Netlify function).
@@ -9,7 +10,7 @@ import axios from 'axios';
  *
  * PATHWAY 1: Live Google Maps Platform Weather API (weather.googleapis.com) -
  *            activated when a Google Maps key is available (client header
- *            `x-google-maps-key`, ?apiKey= query, or a server env secret).
+ *            a server env secret).
  * PATHWAY 2: Automatic high-resolution Open-Meteo agro-meteorological ensemble
  *            fallback when no key is configured or the live lookup fails.
  *
@@ -27,6 +28,23 @@ type WeatherAlertItem = {
   agroImpact: string;
   dataSource?: { name: string; authorityUri: string };
 };
+
+const PAID_WEATHER_CACHE_MS = 10 * 60 * 1000;
+const PAID_WEATHER_CACHE_MAX = 500;
+const paidWeatherCache = new Map<string, { at: number; body: string }>();
+
+const weatherResponse = (body: string) => ({
+  statusCode: 200,
+  headers: {
+    'Content-Type': 'application/json',
+    // Browsers and proxies must not keep a forecast; only this function's short cache does.
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'Surrogate-Control': 'no-store'
+  },
+  body
+});
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {
@@ -51,19 +69,39 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Invalid latitude or longitude' }) };
     }
 
-    // Resolve Google API key. Server-side secrets take priority so the browser's
-    // (possibly HTTP-referrer-restricted) key can never break the server-to-server
-    // Google Weather lookup. The client header/query remain a development fallback.
+    // Resolve Google API key. Server-side secrets only: a caller must not be able
+    // to choose the key this function spends.
     const googleKey =
       process.env.GOOGLE_MAPS_API_KEY ||
       process.env.GOOGLE_API_KEY ||
       process.env.MAPS_API_KEY ||
-      process.env.VITE_GOOGLE_MAPS_API_KEY ||
-      event.headers['x-google-maps-key'] ||
-      qs.apiKey;
+      process.env.VITE_GOOGLE_MAPS_API_KEY;
 
     const gridLat = Math.round(lat / 0.05) * 0.05;
     const gridLon = Math.round(lon / 0.05) * 0.05;
+
+    // Each live lookup makes 3 paid Google calls, and this endpoint is open to
+    // signed-out visitors. Nearby requests share an answer for a few minutes,
+    // and one address cannot loop past the limit.
+    const cacheKey = `${gridLat.toFixed(2)}_${gridLon.toFixed(2)}_${timezone}_${forecast_days}`;
+    const cached = paidWeatherCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < PAID_WEATHER_CACHE_MS) {
+      return weatherResponse(cached.body);
+    }
+    if (googleKey) {
+      const limit = checkIpRateLimit(
+        extractClientIpFromHeaders(event.headers as Record<string, string | undefined>),
+        weatherCallsPerIpPerMinute(),
+        'weather'
+      );
+      if (!limit.allowed) {
+        return {
+          statusCode: 429,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error: 'Too many weather requests. Please wait a minute.', retryAfterSeconds: limit.retryAfterSeconds })
+        };
+      }
+    }
 
     let googleWeatherSucceeded = false;
     let weatherPayload: any = null;
@@ -702,18 +740,12 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        // Real-time forecast must never be cached by proxy or browser
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'Surrogate-Control': 'no-store'
-      },
-      body: JSON.stringify(weatherPayload)
-    };
+    const body = JSON.stringify(weatherPayload);
+    if (googleWeatherSucceeded) {
+      if (paidWeatherCache.size >= PAID_WEATHER_CACHE_MAX) paidWeatherCache.clear();
+      paidWeatherCache.set(cacheKey, { at: Date.now(), body });
+    }
+    return weatherResponse(body);
   } catch (error: any) {
     console.error('[AgroCast AI][netlify] Error generating weather forecast:', error.message);
     return {

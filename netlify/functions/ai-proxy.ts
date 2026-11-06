@@ -181,6 +181,17 @@ const errorMessage = (error: any): string => {
   return message.length > 300 ? `${message.slice(0, 300)}…` : message;
 };
 
+/**
+ * True only when the upstream refused the Google Search tool itself. A timeout,
+ * an empty answer or a passing outage says nothing about search, and treating
+ * them as a refusal switched search off for the whole function instance.
+ */
+const isSearchToolRejection = (outcome: { error?: string; raw?: any }): boolean => {
+  const text = `${outcome.error || ""} ${JSON.stringify(outcome.raw ?? {})}`.toLowerCase();
+  const refused = /\b(400|403)\b|invalid_argument|permission_denied/.test(text);
+  return refused && /\btools?\b|google_?search|grounding/.test(text) && !isQuotaOrRateError(outcome.raw ?? outcome.error);
+};
+
 /** True for errors that will not be fixed by changing the request shape. */
 const isQuotaOrRateError = (error: any): boolean => {
   const text = `${error?.message || ""} ${JSON.stringify(error || {})}`.toLowerCase();
@@ -463,7 +474,7 @@ const streamText = async (
           close();
           return;
         }
-        if (attemptConfig && requestedTools && !isQuotaOrRateError(outcome.error)) {
+        if (attemptConfig === config && isSearchToolRejection(outcome)) {
           // Grounding is what the upstream rejected. Remember it so the next
           // request on this instance does not pay for the same failure.
           groundingDisabledForInstance = true;
@@ -533,7 +544,7 @@ const bufferText = async (
         await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
         return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
       }
-      if (attemptConfig && requestedTools && !isQuotaOrRateError(outcome.error)) {
+      if (attemptConfig === config && isSearchToolRejection(outcome)) {
         groundingDisabledForInstance = true;
       }
       console.warn(`[AI Proxy] Model ${model} failed: ${outcome.error}`);

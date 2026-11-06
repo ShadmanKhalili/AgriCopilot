@@ -64,8 +64,10 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
   const consultations = useFarmerConsultations(!!user?.uid && !isExpert);
 
   const [experts, setExperts] = useState<ExpertPublic[]>([]);
-  // Demo profiles stay in the directory, labelled, but nobody answers them.
+  // Nobody answers a demo profile, and a request can't be sent to one, so only
+  // the owner sees them, for demonstrating the flow.
   const realExpertCount = experts.filter((e) => !e.isDemo).length;
+  const directoryExperts = isAdmin ? experts : experts.filter((e) => !e.isDemo);
   const [application, setApplication] = useState<ExpertApplication | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<any>(null);
@@ -647,13 +649,13 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
               )}
 
               {/* Expert directory */}
-              {experts.length > 0 && (
+              {directoryExperts.length > 0 && (
                 <div className="space-y-3">
                   <h2 className="font-black text-sm text-slate-900 dark:text-white px-1">
                     {bn ? 'বিশেষজ্ঞ ডিরেক্টরি' : 'Expert directory'}
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {experts.slice(0, 8).map((e) => (
+                    {directoryExperts.slice(0, 8).map((e) => (
                       <button
                         key={e.uid}
                         type="button"

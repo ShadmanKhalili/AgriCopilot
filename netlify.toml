@@ -55,6 +55,10 @@
   from = "/api/weather-next"
   to = "/.netlify/functions/weathernext-3"
   status = 200
+  [redirects.rate_limit]
+    window_limit = 60
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
 
 # Everything else under /api/ (satellite imagery, soil, weather, location
 # lookups). Each call is cheap, but a loop of them is still waste.
