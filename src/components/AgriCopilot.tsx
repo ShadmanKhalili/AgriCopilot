@@ -1321,6 +1321,12 @@ export default function AgriCopilot({
 
     setIsLoading(true);
     setAudioUrl(null); // Reset audio for new diagnosis
+    // Everything below belongs to the previous diagnosis. Left in place, the old
+    // deep analysis stays on screen, and later ratings or summaries are saved to
+    // the old record if this one can't be saved.
+    setDeepDiagnosis(null);
+    setChatSummary(null);
+    setLastDiagnosisId(null);
     const controller = beginAiRequest();
     try {
       const analysisTypeStr = analysisType === 'disease' ? t.disease : analysisType === 'pest' ? t.pest : t.abiotic;
@@ -2478,8 +2484,8 @@ export default function AgriCopilot({
                                 </span>
                                 {onlineExpertCount != null && onlineExpertCount > 0
                                   ? lang === 'bn'
-                                    ? `এখন ${toBn(onlineExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — সাধারণ প্রশ্নে ২৪ ঘণ্টার মধ্যে উত্তর`
-                                    : `${onlineExpertCount} expert${onlineExpertCount > 1 ? 's' : ''} accepting requests now — general answers within 24h`
+                                    ? `এখন ${toBn(onlineExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন • জরুরি হলে ফোন করুন ১৬১২৩`
+                                    : `${onlineExpertCount} expert${onlineExpertCount > 1 ? 's' : ''} accepting requests now • if urgent, call 16123`
                                   : lang === 'bn'
                                     ? 'কৃষি বিশেষজ্ঞের সাহায্য চান • জরুরি হলে ফোন করুন ১৬১২৩'
                                     : 'Ask an agriculture expert — if urgent, call 16123'}

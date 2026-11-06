@@ -8,7 +8,7 @@ import { useAuth } from './AuthProvider';
 import { syncCuratedSchemes, startSchemeChat } from '../services/ai';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { safeExternalUrl, externalHostLabel } from '../utils/security';
-import { fixSchemeLinks } from '../utils/schemeLinks';
+import { fixSchemeLinks, fixSchemeRecord } from '../utils/schemeLinks';
 import { CURRENT_PDF_SCHEMES, seedGovSchemes } from '../data/seedSchemes';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
@@ -278,7 +278,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const schemes: GovScheme[] = [];
       snapshot.forEach((doc) => {
-        schemes.push({ id: doc.id, ...doc.data() } as GovScheme);
+        schemes.push(fixSchemeRecord({ id: doc.id, ...doc.data() } as GovScheme));
       });
       setAllSchemes(schemes);
     }, (error) => {
@@ -633,7 +633,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
 
                 <div className="flex items-center justify-center p-4">
                   <p className="text-[11px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                    {scheme.lastUpdated ? (lang === 'bn' ? `যাচাইকৃত: ${new Date(scheme.lastUpdated).toLocaleDateString()}` : `Verified: ${new Date(scheme.lastUpdated).toLocaleDateString()}`) : 'TRUSTED'}
+                    {scheme.lastUpdated ? (lang === 'bn' ? `সর্বশেষ আপডেট: ${new Date(scheme.lastUpdated).toLocaleDateString()}` : `Last updated: ${new Date(scheme.lastUpdated).toLocaleDateString()}`) : ''}
                   </p>
                 </div>
               </div>

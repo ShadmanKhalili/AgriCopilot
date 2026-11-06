@@ -207,9 +207,9 @@ export const SLA_MINUTES: Record<ConsultationUrgency, number> = {
 
 /** Response-time expectations shown wherever expert availability is promoted. */
 export const SLA_CHIPS: { urgency: ConsultationUrgency; labelBn: string; labelEn: string }[] = [
-  { urgency: 'emergency', labelBn: 'জরুরি: ১৫ মিনিট', labelEn: 'Emergency: 15 min' },
-  { urgency: 'urgent', labelBn: 'দ্রুত: ২ ঘণ্টা', labelEn: 'Urgent: 2 hours' },
-  { urgency: 'general', labelBn: 'সাধারণ: ২৪ ঘণ্টা', labelEn: 'General: 24 hours' },
+  { urgency: 'emergency', labelBn: 'জরুরি: লক্ষ্য ১৫ মিনিট', labelEn: 'Emergency: target 15 min' },
+  { urgency: 'urgent', labelBn: 'দ্রুত: লক্ষ্য ২ ঘণ্টা', labelEn: 'Urgent: target 2 hours' },
+  { urgency: 'general', labelBn: 'সাধারণ: লক্ষ্য ২৪ ঘণ্টা', labelEn: 'General: target 24 hours' },
 ];
 
 /** Consent stays valid for 7 days unless the farmer revokes it earlier. */
@@ -301,9 +301,9 @@ export const consentExpiryMs = (fromMs: number = Date.now()): number =>
 
 export const urgencyLabel = (urgency: ConsultationUrgency, lang: string): string => {
   const bn = lang === 'bn';
-  if (urgency === 'emergency') return bn ? '১৫ মিনিটের মধ্যে' : 'Within 15 minutes';
-  if (urgency === 'urgent') return bn ? '২ ঘণ্টার মধ্যে' : 'Within 2 hours';
-  return bn ? '২৪ ঘণ্টার মধ্যে' : 'Within 24 hours';
+  if (urgency === 'emergency') return bn ? 'লক্ষ্য ১৫ মিনিট' : 'Target 15 minutes';
+  if (urgency === 'urgent') return bn ? 'লক্ষ্য ২ ঘণ্টা' : 'Target 2 hours';
+  return bn ? 'লক্ষ্য ২৪ ঘণ্টা' : 'Target 24 hours';
 };
 
 export const statusLabel = (status: ConsultationStatus, lang: string): string => {
