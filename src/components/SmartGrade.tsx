@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { gradeProduce } from '../services/ai';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
+import { auth } from '../firebase';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useUsageTracking } from '../hooks/useUsageTracking';
@@ -82,11 +83,15 @@ export default function SmartGrade({ lang }: Props) {
       
       await incrementUsage();
 
+      // The AI request may have just created this visitor's guest account, and `user`
+      // still holds the value from before it. Saving under that would lose the record.
+      const sessionUser = user ?? auth.currentUser;
+
       // Save to Firestore as indicative visual assessment if user is logged in
-      if (user) {
+      if (sessionUser) {
         try {
           await addDoc(collection(db, 'certificates'), {
-            userId: user.uid,
+            userId: sessionUser.uid,
             produce,
             grade: gradeResult.grade,
             justification: gradeResult.justification,
@@ -98,8 +103,8 @@ export default function SmartGrade({ lang }: Props) {
           });
 
           recordFarmerInteractionEvent({
-            userId: user.uid,
-            fullName: user.displayName || 'কৃষক ভাই (Farmer)',
+            userId: sessionUser.uid,
+            fullName: sessionUser.displayName || 'কৃষক ভাই (Farmer)',
             eventType: 'smart_grading',
             origin: 'ai_unverified',
             evidenceStatus: 'unverified',

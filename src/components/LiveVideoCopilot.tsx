@@ -7,7 +7,7 @@ import {
   CalendarDays, HelpCircle, ListChecks, Share2, X
 } from 'lucide-react';
 import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
-import { ensureAiSession } from '../firebase';
+import { auth, ensureAiSession } from '../firebase';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
 import { captureToDataUrl } from '../utils/imageCapture';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
@@ -1299,9 +1299,12 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
         sessionStorage.setItem('agri_temp_guest_session_id', guestSessionId);
       }
     }
-    const isGuest = !user?.uid;
-    const effectiveUid = user?.uid || guestSessionId;
-    const effectiveName = user?.displayName || (isGuest ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest Farmer') : '');
+    // Starting the session may have just created this visitor's guest account,
+    // and `user` still holds the value from before it.
+    const sessionUser = user ?? auth.currentUser;
+    const isGuest = !sessionUser?.uid;
+    const effectiveUid = sessionUser?.uid || guestSessionId;
+    const effectiveName = sessionUser?.displayName || (isGuest ? (lang === 'bn' ? 'অতিথি কৃষক' : 'Guest Farmer') : '');
 
     // Safe generic fallback steps when the model could not distill specific ones
     const defaultActionSteps = lang === 'bn'

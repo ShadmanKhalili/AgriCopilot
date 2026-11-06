@@ -5,6 +5,7 @@ import { toPng } from 'html-to-image';
 import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation, isAbortError } from '../services/ai';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firestore';
+import { auth } from '../firebase';
 import { useAuth } from './AuthProvider';
 import toast from 'react-hot-toast';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
@@ -1404,11 +1405,15 @@ export default function AgriCopilot({
         symptoms: result.symptomsBreakdown,
       });
 
+      // The AI request may have just created this visitor's guest account, and `user`
+      // still holds the value from before it. Saving under that would lose the record.
+      const sessionUser = user ?? auth.currentUser;
+
       // Save to Firestore if user is logged in
-      if (user) {
+      if (sessionUser) {
         try {
           const diagDoc = await addDoc(collection(db, 'diagnoses'), {
-            userId: String(user.uid),
+            userId: String(sessionUser.uid),
             crop: recordFields.crop,
             cropStage: recordFields.cropStage,
             analysisType: recordFields.analysisType,
@@ -1436,12 +1441,12 @@ export default function AgriCopilot({
       // This is a background write: it must never be able to throw into the
       // outer catch, because the outer catch clears the diagnosis the farmer
       // has already been given.
-      const effectiveUid = user?.uid || 'guest_farmer_demo';
+      const effectiveUid = sessionUser?.uid || 'guest_farmer_demo';
       const cropTitle = crop ? crop.trim() : '';
       try {
         recordFarmerInteractionEvent({
           userId: effectiveUid,
-          fullName: user?.displayName || '',
+          fullName: sessionUser?.displayName || '',
           eventType: 'crop_diagnosis',
           title: cropTitle 
             ? (lang === 'bn' ? `${cropTitle} রোগ নির্ণয় ও স্বাস্থ্য মূল্যায়ন` : `${cropTitle} Disease Diagnosis & Health Scan`)
