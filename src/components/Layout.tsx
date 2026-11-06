@@ -899,24 +899,6 @@ export default function Layout() {
               </button>
             </div>
 
-            {/* Center: Executive Impact Badge (FinTech / Investor Grade) */}
-            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-900 dark:text-emerald-300 font-mono text-[11px] shadow-2xs backdrop-blur-xs select-none">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="font-bold text-emerald-800 dark:text-emerald-300">
-                {lang === 'bn' ? '১৬.৫M কৃষক সুরক্ষিত' : '16.5M Farmers'}
-              </span>
-              <span className="text-stone-300 dark:text-emerald-800">•</span>
-              <span className="text-stone-700 dark:text-stone-300 font-medium">
-                {lang === 'bn' ? '$৪৫০M ফসল সাশ্রয়' : '$450M Loss Shield'}
-              </span>
-              <span className="text-stone-300 dark:text-emerald-800">•</span>
-              <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider text-[11px]">
-                {lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা প্রোটোকল' : 'AI Decision Support Protocol'}
-              </span>
-            </div>
 
             {/* Right: Universal Location Chip, Theme Toggle, Language Toggle & Actions */}
             <div className="flex items-center space-x-1 sm:space-x-2">

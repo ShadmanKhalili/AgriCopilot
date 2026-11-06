@@ -1345,7 +1345,25 @@ export default function AgriCopilot({
       if (!isMountedRef.current) return;
       
       setDiagnosis(result);
-      
+
+      // A refused photo is not a diagnosis: the red card explains why, and
+      // nothing goes into the history, the farm record or the follow-up chat.
+      // The call is still counted, because the model really ran and the server
+      // charges it to the daily allowance either way.
+      if (result.status === 'Invalid') {
+        setChatSession(null);
+        setChatMessages([]);
+        setDeepDiagnosis(null);
+        setChatSummary(null);
+        setLastDiagnosisId(null);
+        try {
+          await incrementUsage();
+        } catch (usageError) {
+          console.warn('Usage counter could not be updated:', usageError);
+        }
+        return;
+      }
+
       // Initialize chat session
       const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
       const session = startAgriChat(result.diagnosis, lang, locationContext);
@@ -2549,7 +2567,7 @@ export default function AgriCopilot({
                                         <div>
                                           <h3 className="font-display font-black text-blue-900 tracking-tight uppercase text-xl leading-none">{lang === 'bn' ? 'গভীর কৃষি বিশ্লেষণ' : 'Detailed Field Analysis'}</h3>
                                           <span className="text-xs font-semibold text-blue-600 mt-1 inline-block">
-                                            {lang === 'bn' ? 'কৃষি গবেষণা ও বৈজ্ঞানিক তথ্যসূত্র ভিত্তিক' : 'Based on Agricultural Research & Field Data'}
+                                            {lang === 'bn' ? 'এআই বিশ্লেষণ — যাচাই করে নিন' : 'AI analysis — please verify'}
                                           </span>
                                         </div>
                                       </div>
@@ -2642,7 +2660,7 @@ export default function AgriCopilot({
                                       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                                       <h4 className="flex items-center text-[11px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-8">
                                         <ShieldAlert className="w-5 h-5 mr-3 text-white" />
-                                        {lang === 'bn' ? 'উন্নত চিকিৎসা ব্যবস্থা এবং সঠিক মাত্রা' : 'Advanced Treatment & Exact Dosages'}
+                                        {lang === 'bn' ? 'চিকিৎসার উপায়' : 'Treatment options'}
                                       </h4>
                                       <div className="markdown-body text-white/95 text-[15px] font-medium leading-relaxed space-y-4">
                                         <ReactMarkdown>{deepDiagnosis.advancedTreatment}</ReactMarkdown>
@@ -2671,7 +2689,7 @@ export default function AgriCopilot({
                                     <div className="bg-indigo-50/50 p-7 rounded-[2.5rem] border border-indigo-100 shadow-sm hover:bg-indigo-50/80 transition-colors">
                                       <h4 className="flex items-center text-[11px] font-black text-indigo-800 uppercase tracking-[0.3em] mb-5">
                                         <Globe className="w-4 h-4 mr-2.5 text-indigo-600" />
-                                        {lang === 'bn' ? 'পরিবেশ ও প্রাদুর্ভাবের তথ্য' : 'Environmental & Outbreak Context'}
+                                        {lang === 'bn' ? 'মৌসুম ও পরিবেশ' : 'Season & conditions'}
                                       </h4>
                                       <div className="markdown-body text-[13px] text-indigo-950 font-bold leading-relaxed">
                                         <ReactMarkdown>{deepDiagnosis.environmentalContext}</ReactMarkdown>
@@ -2690,19 +2708,6 @@ export default function AgriCopilot({
                                     </p>
                                   </div>
                                   
-                                  {deepDiagnosis.sources && deepDiagnosis.sources.length > 0 && (
-                                    <div className="pt-4 border-t border-gray-100">
-                                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">{lang === 'bn' ? 'যাচাইকৃত তথ্যসূত্র' : 'Verified Sources'}</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {deepDiagnosis.sources.map((source: string, idx: number) => (
-                                          <div key={idx} className="flex items-center space-x-2 text-[11px] bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                                            <Globe className="w-2.5 h-2.5 text-gray-400" />
-                                            <span className="text-gray-500 font-bold max-w-[150px] truncate">{source.replace(/https?:\/\/(www\.)?/, '')}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             </motion.div>

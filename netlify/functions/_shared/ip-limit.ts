@@ -176,6 +176,20 @@ export const aiCallsPerIpPerMinute = (): number => {
 };
 
 /**
+ * The per-minute ceiling for paid Google Weather lookups.
+ *
+ * `WEATHER_MAX_CALLS_PER_IP_PER_MINUTE` (default 60). Higher than the AI limit
+ * because many mobile users in one area can share an address. Answers served
+ * from the cache do not count, and the app falls back to its free forecast
+ * when this is reached.
+ */
+export const weatherCallsPerIpPerMinute = (): number => {
+  const raw = Number(process.env.WEATHER_MAX_CALLS_PER_IP_PER_MINUTE);
+  if (!Number.isFinite(raw) || raw <= 0) return 60;
+  return Math.min(1000, Math.trunc(raw));
+};
+
+/**
  * The per-minute ceiling for the live-token endpoint.
  *
  * `AI_MAX_LIVE_TOKENS_PER_IP_PER_MINUTE` (default 10) — each token starts a

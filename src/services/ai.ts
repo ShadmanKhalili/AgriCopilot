@@ -690,24 +690,25 @@ ${DIAGNOSIS_HONESTY_RULES}
 ${outputRules(lang)}
 
       YOUR MISSION:
-      Reach the GROUND TRUTH using forensic visual evidence. Do not blindly confirm the preliminary claim, but do not contradict it without definitive proof.
+      Reach the best supported conclusion from the visual evidence. Do not blindly confirm the preliminary claim, but do not contradict it without clear visual evidence.
       
       STEP 0: INDEPENDENT VISUAL AUDIT
       Ignore the preliminary claim for a moment. Examine the images and list every visual abnormality (edges, spots, curling, texture, spores, pests).
       
       STEP 1: DIFFERENTIAL AUDIT
       - Compare the preliminary claim against 2-3 most likely alternatives (e.g., Disease vs Nutrient vs Pest).
-      - If the preliminary claim ("${basicDiagnosis.diagnosis}") is correct, identify the "Technical Signature" (the specific visual mark) that confirms it beyond doubt.
-      - If it is incorrect, provide the logical proof for the correction.
+      - If the preliminary claim ("${basicDiagnosis.diagnosis}") is correct, identify the "Technical Signature" (the specific visual mark) that supports it.
+      - If it is incorrect, explain what you see that points elsewhere.
       
-      STEP 2: SEARCH GROUNDING & REGIONAL OUTBREAK CONTEXT
+      STEP 2: SEASONAL CONTEXT
+      - You have no internet access for this answer. Do not claim to have searched, and do not mention current outbreaks, advisories, bulletins or weather reports. Do not list any sources or URLs.
       - Use GOOGLE SEARCH to cross-reference these symptoms with active disease outbreaks, monsoon/climate advisories, and agricultural research bulletins in Bangladesh for ${crop || 'crop'} (targeting reports from DAE, BARI, BRRI, or AIS Bangladesh for ${currentYear}).
-      - Check if regional seasonal weather and humidity in ${locationContext} currently support the suspected pathogen.
+      - Say from general knowledge whether the usual weather for this season in ${locationContext} tends to favour the suspected problem.
       
-      STEP 3: FINAL EXPERT VERDICT
-      - Provide a final diagnosis with high physiological certainty.
-      - Give EXACT dosages for approved local brands in Bangladesh (ACI, Syngenta, Auto Crop Care, etc.).
-      - Provide a specific PHI (Pre-Harvest Interval).
+      STEP 3: FINAL ASSESSMENT
+      - Give your most likely diagnosis and say how sure you are.
+      - Name the type of treatment. Give a dose only if it is the standard rate you are sure of, and tell the farmer to follow the product label and confirm with the local SAAO.
+      - Tell the farmer to follow the pre-harvest interval on the product label. Do not invent one.
 
       CRITICAL: Translate all fields to ${lang === 'bn' ? 'Bangla' : 'English'}.
       
@@ -717,13 +718,12 @@ ${outputRules(lang)}
         "severityScore": 1-10,
         "hypothesesEvaluation": "Objective audit of the initial hypothesis vs your findings. Confirm if correct, or explain the correction (markdown).",
         "possibleAlternatives": ["Alternative 1", "Alternative 2"],
-        "differentialReasoning": "The definitive evidence that proves your final conclusion and rules out alternatives (markdown).",
+        "differentialReasoning": "The evidence that supports your conclusion and makes the alternatives less likely (markdown).",
         "detailedDiagnosis": "Final expert conclusion with physiological context (markdown).",
         "recoveryTimeline": "Actionable timeline: Day 1, Week 1, Month 1 (markdown).",
-        "advancedTreatment": "CHEMICAL and ORGANIC protocols with EXACT dosages and safety rules (markdown).",
-        "environmentalContext": "Search-grounded local context and outbreak data (markdown).",
-        "biologicalCause": "Technical Pathogen details (provide this last).",
-        "sources": ["URLs used"]
+        "advancedTreatment": "Chemical and organic options with safety rules. Follow the rules above on doses (markdown).",
+        "environmentalContext": "General seasonal conditions that favour this problem, from general knowledge (markdown).",
+        "biologicalCause": "Technical Pathogen details (provide this last)."
       }`;
       
       const config: any = {
@@ -743,18 +743,16 @@ ${outputRules(lang)}
             recoveryTimeline: { type: Type.STRING },
             advancedTreatment: { type: Type.STRING },
             environmentalContext: { type: Type.STRING },
-            biologicalCause: { type: Type.STRING },
-            sources: { type: Type.ARRAY, items: { type: Type.STRING } }
+            biologicalCause: { type: Type.STRING }
           },
           required: [
             'visibleSymptoms', 'severityScore', 'hypothesesEvaluation', 'possibleAlternatives', 
             'differentialReasoning', 'detailedDiagnosis', 'recoveryTimeline', 
-            'advancedTreatment', 'environmentalContext', 'biologicalCause', 'sources'
+            'advancedTreatment', 'environmentalContext', 'biologicalCause'
           ]
-        },
-        tools: [{ googleSearch: {} }]
+        }
       };
-      
+
       const contents = buildDiagnosisImageParts(images);
       contents.push({ parts: [{ text: prompt }] });
 
