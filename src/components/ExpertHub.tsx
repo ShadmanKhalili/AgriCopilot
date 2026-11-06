@@ -379,7 +379,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400/20 text-amber-100 border border-amber-300/40">
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
                   {bn
-                    ? 'এখন কোনো বিশেষজ্ঞ নেই • জরুরি হলে ফোন করুন ১৬১২৩ উত্তর'
+                    ? 'এখন কোনো বিশেষজ্ঞ নেই • জরুরি হলে ফোন করুন ১৬১২৩'
                     : 'No expert available now • If urgent, call 16123'}
                 </span>
               )}
@@ -564,8 +564,8 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                   <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {bn
-                      ? 'এখন কোনো বিশেষজ্ঞ তালিকাভুক্ত নন — সাধারণত ২৪ ঘণ্টার মধ্যে উত্তর পাওয়া যায়। Emergency হলে ১৬১২৩ কল করুন।'
-                      : 'No experts are listed yet. Typically answered within 24h. For emergencies call 16123.'}
+                      ? 'এখন কোনো বিশেষজ্ঞ তালিকাভুক্ত নন। জরুরি হলে ১৬১২৩ নম্বরে ফোন করুন।'
+                      : 'No experts are listed yet. For emergencies call 16123.'}
                   </p>
                 )}
               </div>
