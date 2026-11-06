@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, AreaChart, Area } from 'recharts';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
+import { auth } from '../firebase';
 import { getMarketInsights } from '../services/ai';
 import { aiErrorMessage } from '../utils/aiErrorMessage';
 import { detectUserLocation } from '../utils/geolocation';
@@ -260,11 +261,15 @@ export default function MarketConnect({
       const locKey = `${targetCoords?.latitude?.toFixed(2) || 'default'}_${targetCoords?.longitude?.toFixed(2) || 'default'}`;
       saveCachedMarket(targetProduce, locKey, result);
 
+      // The AI request may have just created this visitor's guest account, and `user`
+      // still holds the value from before it. Saving under that would lose the record.
+      const sessionUser = user ?? auth.currentUser;
+
       // Save query if user is logged in
-      if (user) {
+      if (sessionUser) {
         try {
           await addDoc(collection(db, 'market_queries'), {
-            userId: user.uid,
+            userId: sessionUser.uid,
             produce: targetProduce,
             insights: result.insights,
             isAdvanced: isPremiumAnalysis,
