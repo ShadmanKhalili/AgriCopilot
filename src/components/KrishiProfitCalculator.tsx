@@ -498,7 +498,7 @@ ${tenureNote}
                   key={preset.label}
                   type="button"
                   onClick={() => { setLandSize(preset.val); setLandUnit(preset.unit as any); }}
-                  className="text-[11px] px-2 py-0.5 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
+                  className="text-xs min-h-9 px-3 py-1 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
                 >
                   {preset.label}
                 </button>

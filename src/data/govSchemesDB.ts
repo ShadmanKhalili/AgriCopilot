@@ -42,7 +42,7 @@ export const govSchemesDB: GovScheme[] = [
     },
     crops: ["all"],
     districts: ["all"],
-    sourceLinks: ["http://www.badc.gov.bd/", "http://krishi.gov.bd/"]
+    sourceLinks: ["https://badc.gov.bd/", "https://dae.gov.bd/"]
   },
   {
     id: "bb-low-interest-loan",
@@ -86,7 +86,7 @@ export const govSchemesDB: GovScheme[] = [
     },
     crops: ["paddy"],
     districts: ["all"],
-    sourceLinks: ["http://www.dae.gov.bd/", "http://www.moa.gov.bd/"]
+    sourceLinks: ["https://dae.gov.bd/", "https://moa.gov.bd/"]
   },
   {
     id: "bmd-weather-insurance",
@@ -130,7 +130,7 @@ export const govSchemesDB: GovScheme[] = [
     },
     crops: ["tomato", "brinjal", "cucumber", "watermelon"],
     districts: ["dhaka", "comilla", "bogra", "narsingdi"],
-    sourceLinks: ["http://www.dae.gov.bd/", "http://www.bapex.com.bd/"]
+    sourceLinks: ["https://dae.gov.bd/"]
   },
   {
     id: "idcol-solar-irrigation",
@@ -174,7 +174,7 @@ export const govSchemesDB: GovScheme[] = [
     },
     crops: ["paddy", "potato", "onion", "watermelon"],
     districts: ["all"],
-    sourceLinks: ["http://www.badc.gov.bd/"]
+    sourceLinks: ["https://badc.gov.bd/"]
   },
   {
     id: "krishi-bank-general-loan",

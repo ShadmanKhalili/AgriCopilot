@@ -37,12 +37,19 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
   const [cropStage, setCropStage] = useState<'vegetative' | 'flowering' | 'grain_filling' | 'maturity'>('vegetative');
   
   // Imagery quality & boundary metadata
+  // Only describe an image when one was really read. The Sentinel request
+  // merges the last 30 days and masks cloud, so no single scene date exists.
+  const isObserved = dataSource === 'sentinel_2' && !isEstimated;
+  const notApplicable = lang === 'bn' ? 'প্রযোজ্য নয় — এটি মডেলের অনুমান' : 'Not applicable — model estimate';
   const imageryMetadata = {
-    acquisitionDate: '2026-10-12 (Sentinel-2A Overpass)',
-    cloudCoverPercent: 3.8,
-    qualityFlag: 'Valid L2A Surface Reflectance (Clear Sky QA)',
+    acquisitionDate: isObserved
+      ? (lang === 'bn' ? 'গত ৩০ দিনের মেঘমুক্ত চিত্র' : 'Cloud-free pixels, last 30 days')
+      : notApplicable,
+    qualityFlag: isObserved ? 'Sentinel-2 L2A' : notApplicable,
     sensor: 'Copernicus Sentinel-2 MSI (10m Resolution)',
-    boundaryType: 'Single Coordinate Pixel Sample (Non-Polygon)'
+    boundaryType: isObserved
+      ? (lang === 'bn' ? 'একটি বিন্দুর নমুনা, জমির সীমানা নয়' : 'Single point sample, not your field boundary')
+      : notApplicable
   };
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
@@ -189,7 +196,9 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
             />
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-stone-500 font-mono">
-                {lang === 'bn' ? '১০মি. পিক্সেল স্যাম্পল • বহুভুজ নয়' : '10m Point Pixel • Non-Polygon'}
+                {isObserved
+                  ? (lang === 'bn' ? '১০মি. পিক্সেল স্যাম্পল • বহুভুজ নয়' : '10m Point Pixel • Non-Polygon')
+                  : (lang === 'bn' ? 'স্যাটেলাইট চিত্র নয়' : 'Not a satellite image')}
               </span>
               <button
                 type="button"

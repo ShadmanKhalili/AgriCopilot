@@ -4,6 +4,7 @@ import { Sprout, MapPin, Droplets, Sun, AlertTriangle, CheckCircle2, XCircle, Ch
 import { getPlantingRecommendations } from '../services/ai';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { aiErrorMessage } from '../utils/aiErrorMessage';
 import { translations, Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { addDoc, collection } from 'firebase/firestore';
@@ -162,7 +163,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
       const isQuotaError = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED');
       const errorMsg = isQuotaError 
         ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
-        : (err.message || 'Failed to generate recommendations.');
+        : aiErrorMessage(err, lang);
       setError(errorMsg);
     } finally {
       setIsAnalyzing(false);

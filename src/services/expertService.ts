@@ -14,7 +14,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  getCountFromServer,
   setDoc,
   updateDoc,
   addDoc,
@@ -87,15 +86,14 @@ export const fetchActiveExperts = async (): Promise<ExpertPublic[]> => {
 };
 
 /**
- * Cheap live count of experts currently accepting requests (`status == 'active'`).
- * Uses an aggregate count query so we never download the expert list just to
- * light up the global availability badge. Requires signed-in list permission.
+ * Live count of real experts currently accepting requests. Demo profiles are
+ * also `active`, and nobody answers them, so they must not count: this number
+ * tells a farmer with an emergency that help is available. The filter runs here
+ * because real experts have no `isDemo` field for a query to match.
  */
 export const fetchActiveExpertCount = async (): Promise<number> => {
-  const snap = await getCountFromServer(
-    query(collection(db, 'experts_public'), where('status', '==', 'active'))
-  );
-  return snap.data().count || 0;
+  const experts = await fetchActiveExperts();
+  return experts.filter((e) => !e.isDemo).length;
 };
 
 export const fetchExpertProfile = async (uid: string): Promise<ExpertPublic | null> => {

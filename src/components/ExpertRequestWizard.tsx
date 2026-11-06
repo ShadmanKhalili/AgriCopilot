@@ -78,7 +78,7 @@ export default function ExpertRequestWizard({
   onCreated,
 }: ExpertRequestWizardProps) {
   const bn = lang === 'bn';
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, userRole } = useAuth();
 
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState(seed?.category || 'crop_disease');
@@ -133,23 +133,30 @@ export default function ExpertRequestWizard({
     [consent]
   );
 
+  // Nobody answers a demo profile, so a farmer's request must never go to one.
+  // Only the owner can pick them, to demonstrate the flow.
+  const bookable = useMemo(
+    () => (userRole === 'admin' ? experts : experts.filter((e) => !e.isDemo)),
+    [experts, userRole]
+  );
+
   const ranked = useMemo(() => {
-    const top = rankExperts(experts, { district: districtName, upazila: upazilaName, category, crop }, 3);
+    const top = rankExperts(bookable, { district: districtName, upazila: upazilaName, category, crop }, 3);
     // Keep a hand-picked expert visible even when they are outside the top 3.
     const picked = preselectedExpertUid
-      ? experts.find((e) => e.uid === preselectedExpertUid)
+      ? bookable.find((e) => e.uid === preselectedExpertUid)
       : null;
     if (picked && !top.some((e) => e.uid === picked.uid)) return [picked, ...top].slice(0, 3);
     return top;
-  }, [experts, districtName, upazilaName, category, crop, preselectedExpertUid]);
+  }, [bookable, districtName, upazilaName, category, crop, preselectedExpertUid]);
 
   const selectedExpert = useMemo(() => {
-    const picked = selectedExpertUid ? experts.find((e) => e.uid === selectedExpertUid) : null;
+    const picked = selectedExpertUid ? bookable.find((e) => e.uid === selectedExpertUid) : null;
     if (picked) return picked;
     // A stale hand-picked id must not silently fall back to a different person.
     if (selectedExpertUid) return null;
     return ranked[0] || null;
-  }, [experts, selectedExpertUid, ranked]);
+  }, [bookable, selectedExpertUid, ranked]);
 
   const selectedDistrict = geoData.find((d) => d.name === districtName);
 

@@ -64,6 +64,8 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
   const consultations = useFarmerConsultations(!!user?.uid && !isExpert);
 
   const [experts, setExperts] = useState<ExpertPublic[]>([]);
+  // Demo profiles stay in the directory, labelled, but nobody answers them.
+  const realExpertCount = experts.filter((e) => !e.isDemo).length;
   const [application, setApplication] = useState<ExpertApplication | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<any>(null);
@@ -362,23 +364,23 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
               </span>
               {/* Live availability — only for signed-in farmers whose expert
                   list has actually loaded. Never a fake claim for guests. */}
-              {user && !isExpert && experts.length > 0 && (
+              {user && !isExpert && realExpertCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-lime-400/25 text-lime-100 border border-lime-300/40">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-lime-300 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-lime-300" />
                   </span>
                   {bn
-                    ? `এখন ${toBn(experts.length)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন`
-                    : `${experts.length} experts accepting requests now`}
+                    ? `এখন ${toBn(realExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন`
+                    : `${realExpertCount} experts accepting requests now`}
                 </span>
               )}
-              {user && !isExpert && experts.length === 0 && (
+              {user && !isExpert && realExpertCount === 0 && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400/20 text-amber-100 border border-amber-300/40">
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
                   {bn
-                    ? 'এখন কেউ অনলাইনে নেই • সাধারণত ২৪ ঘণ্টায় উত্তর'
-                    : 'No one online now • Usually answers within 24h'}
+                    ? 'এখন কোনো বিশেষজ্ঞ নেই • জরুরি হলে ফোন করুন ১৬১২৩'
+                    : 'No expert available now • If urgent, call 16123'}
                 </span>
               )}
             </div>
@@ -530,7 +532,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                   <HeartHandshake className="w-5 h-5" />
                   {bn ? 'বিশেষজ্ঞের সাথে কথা বলুন' : 'Talk to an expert'}
                 </button>
-                {experts.length > 0 ? (
+                {realExpertCount > 0 ? (
                   <div className="space-y-2">
                     <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
                       <span className="relative flex h-2 w-2 shrink-0">
@@ -538,8 +540,8 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                       </span>
                       {bn
-                        ? `এখন ${toBn(experts.length)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — ফ্রি পাইলট সেবা`
-                        : `${experts.length} experts accepting requests now — free during the pilot`}
+                        ? `এখন ${toBn(realExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — ফ্রি পাইলট সেবা`
+                        : `${realExpertCount} experts accepting requests now — free during the pilot`}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black">
                       {SLA_CHIPS.map(({ urgency }) => (
@@ -562,8 +564,8 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                   <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {bn
-                      ? 'এখন কোনো বিশেষজ্ঞ তালিকাভুক্ত নন — সাধারণত ২৪ ঘণ্টার মধ্যে উত্তর পাওয়া যায়। Emergency হলে ১৬১২৩ কল করুন।'
-                      : 'No experts are listed yet. Typically answered within 24h. For emergencies call 16123.'}
+                      ? 'এখন কোনো বিশেষজ্ঞ তালিকাভুক্ত নন। জরুরি হলে ১৬১২৩ নম্বরে ফোন করুন।'
+                      : 'No experts are listed yet. For emergencies call 16123.'}
                   </p>
                 )}
               </div>

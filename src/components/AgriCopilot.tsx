@@ -25,6 +25,7 @@ import { detectUserLocation } from '../utils/geolocation';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import toBn from '../utils/banglaNum';
+import { aiErrorMessage } from '../utils/aiErrorMessage';
 import {
   buildPrescriptionData,
   topCandidate,
@@ -779,7 +780,7 @@ export default function AgriCopilot({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const { canUse, incrementUsage, tier, currentUsage, limit } = useUsageTracking();
   const t = translations[lang];
 
@@ -1451,8 +1452,8 @@ export default function AgriCopilot({
         ? safetyBlockMessage(lang)
         : isQuotaError
         ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দ\u09DFা করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
-        : (error.message || "Error connecting to AI service. Please try again.");
-      
+        : aiErrorMessage(error, lang);
+
       setDiagnosis(null);
       toast.error(errorMsg);
     } finally {
@@ -1774,7 +1775,8 @@ export default function AgriCopilot({
                 </div>
               </div>
 
-              {/* Quick Investor Pitch Sample Injector */}
+              {/* Quick Investor Pitch Sample Injector: for the owner's demos, not farmers */}
+              {userRole === 'admin' && (
               <div className="mb-4 p-3 rounded-2xl bg-amber-50/80 border border-amber-200/90 shadow-2xs">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center space-x-1.5">
@@ -1801,7 +1803,8 @@ export default function AgriCopilot({
                   ))}
                 </div>
               </div>
-              
+              )}
+
               {images.length > 0 && (
                 <div 
                   className="space-y-4 mb-4" 
@@ -2090,7 +2093,7 @@ export default function AgriCopilot({
                         </button>
                         <div className="flex items-center space-x-1.5 sm:space-x-2 bg-green-50 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-green-100 shadow-xs transition-all">
                           <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true"></div>
-                          <span className="text-[11px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">AI Verified</span>
+                          <span className="text-[11px] sm:text-[11px] font-black text-green-700 uppercase tracking-widest leading-none">{lang === 'bn' ? 'এআই পরামর্শ — যাচাই করে নিন' : 'AI suggestion — please verify'}</span>
                         </div>
                       </div>
                     </div>
@@ -2193,7 +2196,7 @@ export default function AgriCopilot({
                               {/* Helpfulness Rating Section */}
                               <div className="mt-8 pt-6 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
-                                  <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Feedback Algorithm Input</div>
+                                  <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{lang === 'bn' ? 'আপনার মতামত' : 'Your feedback'}</div>
                                   <p className="text-xs font-bold text-gray-500">{lang === 'en' ? 'Was this diagnosis helpful?' : 'এই পরামর্শটি কি আপনার উপকারে এসেছে?'}</p>
                                 </div>
                                 <div className="flex items-center space-x-2">
@@ -2460,8 +2463,8 @@ export default function AgriCopilot({
                                     ? `এখন ${toBn(onlineExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — সাধারণ প্রশ্নে ২৪ ঘণ্টার মধ্যে উত্তর`
                                     : `${onlineExpertCount} expert${onlineExpertCount > 1 ? 's' : ''} accepting requests now — general answers within 24h`
                                   : lang === 'bn'
-                                    ? 'যাচাইকৃত বিশেষজ্ঞ উপলব্ধ — সাধারণত ২৪ ঘণ্টার মধ্যে উত্তর'
-                                    : 'Verified experts available — usually within 24h'}
+                                    ? 'কৃষি বিশেষজ্ঞের সাহায্য চান • জরুরি হলে ফোন করুন ১৬১২৩'
+                                    : 'Ask an agriculture expert — if urgent, call 16123'}
                               </p>
                             </motion.div>
                           )}
@@ -2500,7 +2503,7 @@ export default function AgriCopilot({
                               {diagnosis.differentialDiagnosis && (
                                 <div className="bg-orange-50/50 p-4 rounded-2xl border border-orange-100">
                                   <p className="text-sm font-medium text-gray-700 leading-relaxed">
-                                    <span className="font-bold text-orange-600 mr-2">Why this diagnosis?</span>
+                                    <span className="font-bold text-orange-600 mr-2">{lang === 'bn' ? 'কেন এই রোগ নির্ণয়?' : 'Why this diagnosis?'}</span>
                                     {diagnosis.differentialDiagnosis}
                                   </p>
                                 </div>
@@ -2745,7 +2748,7 @@ export default function AgriCopilot({
                                 </div>
                                 <div className="flex items-center space-x-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                  <span className="text-[11px] font-black text-green-600 uppercase tracking-widest">Expert Online</span>
+                                  <span className="text-[11px] font-black text-green-600 uppercase tracking-widest">{lang === 'bn' ? 'এআই সহায়ক' : 'AI assistant'}</span>
                                 </div>
                               </div>
 

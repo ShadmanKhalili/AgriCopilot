@@ -1,3 +1,4 @@
+import { fixSchemeLinks } from '../utils/schemeLinks';
 import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
 import { ensureAiSession } from '../firebase';
@@ -276,6 +277,30 @@ const STANDARD_MODEL = 'gemini-3.5-flash-lite';
 const ADVANCED_MODEL = 'gemini-3.6-flash';
 const SEARCH_MODEL = 'gemini-3.6-flash';
 const getModelName = (isAdvanced?: boolean) => (isAdvanced ? ADVANCED_MODEL : STANDARD_MODEL);
+
+/**
+ * Rules for every answer a farmer reads. Added after a live diagnosis named a
+ * fungicide with Japanese letters in the middle of its Bangla spelling.
+ */
+const outputRules = (lang: string) => `
+      WRITING RULES:
+      - Write all farmer-facing text in ${lang === 'bn' ? 'Bangla' : 'English'}.${lang === 'bn' ? ' Use only Bengali script, plus Latin letters for an international product or chemical name that has no common Bangla spelling.' : ''} Never use characters from any other script, such as Japanese, Chinese, Korean, Hindi or Arabic. Check every name for this before you answer.
+      - Name a pesticide or fungicide only if you are sure of its spelling and that it is sold in Bangladesh. Otherwise describe the type of product and tell the farmer to ask their local SAAO or a licensed dealer.
+      - Never invent a dose, price, phone number, scheme or statistic. If you do not know, say so.`;
+
+/**
+ * Rules for reading crop photos. Without them the model gave 85-90% to drawings
+ * of leaves and called one of them certain.
+ */
+const DIAGNOSIS_HONESTY_RULES = `
+      HONESTY RULES:
+      - Real photo first: if the image is a drawing, illustration, computer-generated picture, or screenshot, or shows no real plant, set status to "Invalid", say why in the diagnosis field, ask for a clear real photo, and do not diagnose. Set confidence to 0 and give every candidate a score of 0.
+      - Crop second: identify the crop from what you can see before naming any disease. Every candidate must be a real problem of that crop. If you cannot identify the crop, say so and keep confidence at 50 or below. Do not assume rice.
+      - If the photos appear to show different plants or crops, say so instead of merging them into one diagnosis.
+      - Confidence scale: 85-90 only when the symptoms are distinctive, in sharp focus, and rule out the alternatives. 60-84 means likely. Below 60 means you cannot tell from the photo. A photo alone almost never confirms a disease, so never go above 90.
+      - If your top two candidates are within 15 points of each other, confidence must be 60 or below.
+      - Wording: write "likely" or "সম্ভবত", never "definitely", "certainly", "নিশ্চিতভাবে" or "অবশ্যই". Your answer is a suggestion for the farmer to check, not a confirmed result.
+      - If confidence is below 60, the first step in your advice must be to show the plant to the local SAAO or call 16123 before buying any chemical.`;
 const BACKUP_MODEL = 'gemini-3.5-flash-lite';
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-lite-tts';
 const TTS_BACKUP_MODEL = 'gemini-3.8-flash-tts'; 
@@ -527,7 +552,8 @@ export const diagnoseCrop = async (
       IMAGE READING RULES:
       - Some images are labelled "AUTO-CROPPED DETAIL VIEW". Those are close-ups of the most textured region of the full photo that precedes them. Read spot colour, lesion edges and surface texture from the close-up; read the whole-plant context from the full image.
       - The photos are high resolution. Look at the leaf surface itself — the spots, their colour, their edges — not just the outline of the plant. Tell chlorosis (even yellowing) apart from necrosis (dead brown tissue with defined edges) and from mosaic or mottling.
-      - If the image shows no plant at all, say so plainly instead of inventing a diagnosis.
+${DIAGNOSIS_HONESTY_RULES}
+${outputRules(lang)}
       ${cropKnowledge ? `\n${cropKnowledge}\n` : ''}
       CRITICAL ANALYSIS GUIDELINES & CHAIN OF THOUGHT:
       To ensure high accuracy, you MUST follow a deductive reasoning pattern. Do not jump to conclusions. Your JSON must include:
@@ -660,6 +686,9 @@ export const deepDiagnoseCrop = async (
       - Preliminary Claim: ${basicDiagnosis.diagnosis}
       - Symptoms Noted: ${basicDiagnosis.symptomsBreakdown?.join(', ')}
       ${cropKnowledge ? `\n${cropKnowledge}\n` : ''}
+${DIAGNOSIS_HONESTY_RULES}
+${outputRules(lang)}
+
       YOUR MISSION:
       Reach the GROUND TRUTH using forensic visual evidence. Do not blindly confirm the preliminary claim, but do not contradict it without definitive proof.
       
@@ -819,7 +848,7 @@ export const generateWeatherAdvisory = async (
         - Estimated Precipitation Spread: ${wn.ensemble?.precipitation_spread_mm?.p10 || 0}mm - ${wn.ensemble?.precipitation_spread_mm?.p90 || 0}mm`;
       }
 
-      const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.
+      const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.${outputRules(lang)}
       Current Date: ${currentDate}
       Current Time: ${currentTime}
       Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
@@ -950,7 +979,7 @@ export const summarizeConversation = async (messages: { role: string; text: stri
 export const gradeProduce = async (imageBase64: string, mimeType: string, produce: string, lang: string, isAdvanced?: boolean) => {
   return await callAiWithRetry(async () => {
     try {
-      const prompt = `You are an expert agricultural quality inspector. 
+      const prompt = `You are an expert agricultural quality inspector. ${outputRules(lang)}
       TASK: Grade this batch of ${produce}.
       
       CRITICAL VALIDATION:
@@ -1025,7 +1054,7 @@ export const getMarketInsights = async (
       const bulletin = await fetchOfficialBulletin();
       const officialPrices = bulletinPromptContext(bulletin, produce);
 
-      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.
+      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.${outputRules(lang)}
 Analyse the market for "${produce}" in Bangladesh as of TODAY (${today}, Year: ${currentYear}).
 
 ${officialPrices}
@@ -1347,7 +1376,7 @@ export const getPlantingRecommendations = async (
         satelliteContext = `SATELLITE DATA (30-day avg): NDVI (Vegetation Health): ${satelliteData.ndvi?.toFixed(2)}, NDMI (Moisture): ${satelliteData.ndmi?.toFixed(2)}.`;
       }
 
-      const prompt = `You are an expert agricultural recommendation engine for Bangladesh.
+      const prompt = `You are an expert agricultural recommendation engine for Bangladesh.${outputRules(lang)}
       Apply a 5-layer scoring system to recommend what crops a farmer should plant next.
       
       FARMER PROFILE:
@@ -1458,7 +1487,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
   return {
     sendMessage: async (req: { message: string }, signal?: AbortSignal) => {
       const prompt = history.length === 0 
-        ? `You are a helpful agricultural expert in Bangladesh. 
+        ? `You are a helpful agricultural expert in Bangladesh. ${outputRules(lang)}
            CONTEXT: The user has just received a diagnosis for their crop: "${context}".
            TASK: Handle the user's first follow-up question: "${req.message}".
            Respond in ${lang === 'bn' ? 'Bangla' : 'English'}. Concise markdown.`
@@ -1498,7 +1527,7 @@ export const startSchemeChat = (scheme: any, lang: string) => {
   return {
     sendMessage: async (req: { message: string }) => {
       const prompt = history.length === 0 
-        ? `You are an expert agricultural advisor specializing in government schemes in Bangladesh. 
+        ? `You are an expert agricultural advisor specializing in government schemes in Bangladesh. ${outputRules(lang)}
            The user is asking about the following scheme:
            ${schemeContext}
            
@@ -1536,6 +1565,7 @@ export const syncCuratedSchemes = async () => {
       Return a list of unique schemes. Ensure each scheme is distinct with no duplicates. 
       For each scheme, ensure the 'benefits' field is a concise, point-wise summary of unique benefits.
       Each scheme must follow the provided schema.
+      Links: use only addresses that appeared in your search results, on official .gov.bd sites or the scheme's own site. Never guess an address or a subdomain. If you have no real link, leave sourceLinks empty.
       Language: Ensure both 'en' and 'bn' fields are populated for all text fields.`;
       
       const config: any = {
@@ -1635,7 +1665,8 @@ export const syncCuratedSchemes = async () => {
 
           const docRef = doc(colRef, deterministicId);
           batch.set(docRef, { 
-            ...scheme, 
+            ...scheme,
+            sourceLinks: fixSchemeLinks(scheme.sourceLinks),
             id: deterministicId, // Ensure the field ID matches doc ID
             lastUpdated: today 
           });

@@ -5,6 +5,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
 import { getMarketInsights } from '../services/ai';
+import { aiErrorMessage } from '../utils/aiErrorMessage';
 import { detectUserLocation } from '../utils/geolocation';
 import { useAuth } from './AuthProvider';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
@@ -288,8 +289,8 @@ export default function MarketConnect({
         }
         setLastUpdated(new Date(cached.timestamp).toLocaleString());
         toast.success(lang === 'bn' 
-          ? 'অফলাইন ক্যাশ: কক্সবাজার ও স্থানীয় বাজারদর সংরক্ষিত তথ্য থেকে প্রদর্শিত হচ্ছে' 
-          : 'Loaded cached mandi rates from offline storage');
+          ? 'সরাসরি দর পাওয়া যায়নি — আগে সংরক্ষিত বাজারদর দেখানো হচ্ছে' 
+          : 'Live rates unavailable — showing saved market rates');
         setIsLoading(false);
         return;
       }
@@ -317,7 +318,7 @@ export default function MarketConnect({
       const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
       const errorMsg = isQuotaError 
         ? (lang === 'bn' ? 'সিস্টেমের চাপ বেশি, দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন।' : 'AI limit reached. Please try again in 5 minutes.')
-        : (error.message || "Error fetching market insights from AI. Please try again.");
+        : aiErrorMessage(error, lang);
       
       setInsights({ insights: errorMsg });
       setIsLoading(false);
@@ -502,8 +503,8 @@ export default function MarketConnect({
                       <Sparkles className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-stone-900 dark:text-stone-100">Premium Analysis</h4>
-                      <p className="text-[11px] text-stone-500 dark:text-stone-400">1 free daily run</p>
+                      <h4 className="text-xs font-bold text-stone-900 dark:text-stone-100">{lang === 'bn' ? 'প্রিমিয়াম বিশ্লেষণ' : 'Premium Analysis'}</h4>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400">{lang === 'bn' ? 'দিনে ১টি ফ্রি' : '1 free daily run'}</p>
                     </div>
                   </div>
                   <button
@@ -805,7 +806,7 @@ export default function MarketConnect({
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">Market Analytics</h3>
+                          <h3 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-stone-100 tracking-tight">{lang === 'bn' ? 'বাজার বিশ্লেষণ' : 'Market Analytics'}</h3>
                           {marketCacheInfo?.isCached && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 text-[11px] font-medium border border-amber-200 dark:border-amber-800">
                               <Database className="w-3 h-3 text-amber-600 dark:text-amber-400" />
@@ -822,7 +823,7 @@ export default function MarketConnect({
                         <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                           {marketCacheInfo?.isCached
                             ? (lang === 'bn' ? 'সংরক্ষিত পাইকারি আড়ৎ মূল্যায়ন' : 'Preserved Mandi Assessment')
-                            : 'Live Mandi Assessment'}
+                            : (lang === 'bn' ? 'মোকামের দর পর্যালোচনা' : 'Mandi assessment')}
                         </p>
                       </div>
                     </div>

@@ -186,7 +186,7 @@ export const CURRENT_PDF_SCHEMES = [
     howToApply: { en: "Contact your local authorized fertilizer dealer with your Farmer Card.", bn: "আপনার কৃষক কার্ড নিয়ে স্থানীয় অনুমোদিত সার ডিলারের সাথে যোগাযোগ করুন।" },
     crops: ["all"],
     districts: ["all"],
-    sourceLinks: ["http://www.badc.gov.bd/"]
+    sourceLinks: ["https://badc.gov.bd/"]
   },
   {
     id: "disaster-relief-seeds",
@@ -203,7 +203,7 @@ export const CURRENT_PDF_SCHEMES = [
     howToApply: { en: "Register your name at the local Union Parishad or Upazila Agriculture Office immediately after a disaster.", bn: "দুর্যোগের পরপরই স্থানীয় ইউনিয়ন পরিষদ বা উপজেলা কৃষি অফিসে আপনার নাম নিবন্ধন করুন।" },
     crops: ["paddy", "wheat", "mustard"],
     districts: ["all"],
-    sourceLinks: ["http://www.dae.gov.bd/"]
+    sourceLinks: ["https://dae.gov.bd/"]
   }
 ];
 

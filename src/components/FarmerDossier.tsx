@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Award, TrendingUp, Calendar, MapPin, Sprout, FileText, 
   Printer, CheckCircle2, AlertTriangle, Sparkles, RefreshCw, Layers, 
-  PhoneCall, Video, CloudRain, QrCode, ArrowRight, ExternalLink, HelpCircle, 
-  ChevronDown, ChevronUp, UserCheck, DollarSign, Edit3, Trash2, X, Save
+  PhoneCall, Video, CloudRain, ArrowRight, ExternalLink, HelpCircle, 
+  ChevronDown, ChevronUp, UserCheck, Edit3, Trash2, X, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from './AuthProvider';
@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const [profile, setProfile] = useState<FarmerProfileData | null>(null);
   const [timeline, setTimeline] = useState<FarmerTimelineEventData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,10 +204,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold uppercase tracking-wider border border-emerald-400/30">
               <Sparkles className="w-3.5 h-3.5" />
-              {lang === 'bn' ? 'প্রকৃত ব্যবহারের ভিত্তিতে সংকলিত প্রোফাইল' : 'Usage-Based Digital Dossier'}
+              {lang === 'bn' ? 'আপনার ব্যবহার থেকে তৈরি রেকর্ড' : 'Built from your app use'}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              {lang === 'bn' ? 'স্মার্ট কৃষি কার্ড ও ডিজিটাল ক্রেডিট প্রোফাইল' : 'Smart Krishi Card & Farmer Credit Dossier'}
+              {lang === 'bn' ? 'স্মার্ট কৃষি কার্ড ও খামার রেকর্ড' : 'Smart Krishi Card & Farm Record'}
             </h1>
             <p className="text-sm sm:text-base text-emerald-100/80 leading-relaxed">
               {lang === 'bn' 
@@ -233,6 +233,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <Trash2 className="w-4 h-4 text-rose-400" />
               {lang === 'bn' ? 'রিসেট' : 'Reset'}
             </button>
+            {userRole === 'admin' && (
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
@@ -241,6 +242,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
               {lang === 'bn' ? 'নমুনা লোড' : 'Demo Load'}
             </button>
+            )}
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-sm transition-all cursor-pointer"
@@ -326,15 +328,15 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 </div>
                 <div>
                   <h2 className="text-sm uppercase tracking-wider text-emerald-300 font-semibold">
-                    {lang === 'bn' ? 'সম্মতিভিত্তিক ডিজিটাল কৃষি ডসিয়ার' : 'Farmer-Consented Activity Dossier'}
+                    {lang === 'bn' ? 'আপনার সম্মতিতে রাখা খামার রেকর্ড' : 'Farm record kept with your consent'}
                   </h2>
                   <p className="text-base font-bold text-white tracking-wide">
-                    {lang === 'bn' ? 'স্মার্ট খামারি পরিচয় ও প্রামাণ্য রেকর্ড' : 'Smart Krishi Digital Record'}
+                    {lang === 'bn' ? 'স্মার্ট খামারি পরিচয় ও খামার রেকর্ড' : 'Smart Krishi Farm Record'}
                   </p>
                 </div>
               </div>
               <div className="px-2.5 py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-[11px] font-bold text-emerald-200">
-                {profile?.insuranceRiskTier === 'Low' ? 'GRADE A' : profile?.insuranceRiskTier === 'Moderate' ? 'GRADE B' : (lang === 'bn' ? 'মূল্যায়ন প্রক্রিয়াধীন' : 'Pending')}
+                {lang === 'bn' ? 'যাচাই করা হয়নি' : 'Not verified'}
               </div>
             </div>
 
@@ -399,22 +401,19 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               {/* Card Footer: Micro-QR and Security Code */}
               <div className="pt-4 mt-2 border-t border-emerald-700/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1 bg-white rounded-lg">
-                    <QrCode className="w-9 h-9 text-slate-900" />
-                  </div>
                   <div>
                     <p className="text-[11px] text-emerald-200 font-mono">
-                      ENCRYPTED AGRICULTURAL DOSSIER
+                      SELF-REPORTED FARM RECORD
                     </p>
                     <p className="text-[11px] text-emerald-300/70">
-                      {lang === 'bn' ? 'ব্যবহার-ভিত্তিক যাচাইকৃত' : 'Usage Verified Profile'}
+                      {lang === 'bn' ? 'নিজের দেওয়া ও অ্যাপ ব্যবহারের তথ্য' : 'Your details and app use'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-500/30">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    {lang === 'bn' ? 'প্রামাণ্য প্রোফাইল' : 'Verified Profile'}
+                    {lang === 'bn' ? 'ঋণের প্রমাণ নয়' : 'Not proof for a loan'}
                   </div>
                 </div>
               </div>
@@ -451,21 +450,21 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           </div>
         </div>
 
-        {/* Right: Credit Score & Underwriting Eligibility */}
+        {/* Right: Farm record score */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Credit Readiness Dial & Loan Eligibility */}
+          {/* Personal score: never shown as evidence to a lender until it is calculated on the server */}
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                  <DollarSign className="w-3.5 h-3.5" />
-                  {lang === 'bn' ? 'ব্যাংক-গ্রেড কৃষিঋণ ও বীমা স্কোরিং' : 'Bank-Grade Ag Credit Scoring'}
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {lang === 'bn' ? 'শুধু আপনার জন্য — ব্যাংক বা ঋণদাতার জন্য নয়' : 'For you only — not for banks or lenders'}
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1.5">
-                  {lang === 'bn' ? 'ডিজিটাল ক্রেডিট রেডিনেস স্কোর' : 'Digital Credit Readiness Score'}
+                  {lang === 'bn' ? 'খামার রেকর্ড স্কোর' : 'Farm Record Score'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  {creditAnalysis.grade}
+                  {lang === 'bn' ? 'অ্যাপে আপনি কতটা নিয়মিত রেকর্ড রাখছেন তার হিসাব। এটি আপনার ফোনে হিসাব হয়, তাই ঋণ বা বীমার প্রমাণ নয়।' : 'Shows how regularly you keep records in the app. It is worked out on your phone, so it is not proof for a loan or insurance.'}
                 </p>
               </div>
 
@@ -487,10 +486,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                 />
               </div>
               <div className="flex justify-between text-[11px] font-semibold text-slate-400">
-                <span>{lang === 'bn' ? 'প্রাথমিক (০-৩৪)' : 'Tier 3 (0-34)'}</span>
-                <span>{lang === 'bn' ? 'ইনপুট ঋণ (৩৫-৫৪)' : 'Tier 2 (35-54)'}</span>
-                <span>{lang === 'bn' ? 'ঋণযোগ্য (৫৫-৭৪)' : 'Tier 1 (55-74)'}</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lang === 'bn' ? 'প্রাক-অনুমোদিত (৭৫+)' : 'Tier 0 Prime (75+)'}</span>
+                <span>{lang === 'bn' ? 'শুরু (০-৩৪)' : 'Starting (0-34)'}</span>
+                <span>{lang === 'bn' ? 'চলছে (৩৫-৫৪)' : 'Building (35-54)'}</span>
+                <span>{lang === 'bn' ? 'ভালো (৫৫-৭৪)' : 'Good (55-74)'}</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lang === 'bn' ? 'নিয়মিত (৭৫+)' : 'Regular (75+)'}</span>
               </div>
             </div>
 
@@ -498,7 +497,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                  {lang === 'bn' ? '৫-স্তম্ভভিত্তিক স্কোর বিশ্লেষণ (৫ Cs of Credit)' : '5-Pillar Credit Evaluation Matrix'}
+                  {lang === 'bn' ? 'স্কোরের পাঁচটি অংশ' : 'The five parts of the score'}
                 </span>
                 <button
                   type="button"
@@ -574,70 +573,18 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                     className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 space-y-2 text-xs leading-relaxed overflow-hidden"
                   >
                     <p className="font-bold text-slate-800 dark:text-slate-200">
-                      {lang === 'bn' ? 'কেন এই স্কোরিং পদ্ধতি আর্থিক প্রতিষ্ঠান ও স্টেকহোল্ডারদের নিকট গ্রহণযোগ্য?' : 'Why this score is institutionally defensible & non-gameable:'}
+                      {lang === 'bn' ? 'এই স্কোর কীভাবে হিসাব হয়' : 'How this score is worked out'}
                     </p>
                     <ul className="list-disc pl-4 space-y-1">
-                      <li>
-                        <strong>{lang === 'bn' ? 'অ্যান্টি-গেমিং ক্যাপিং:' : 'Anti-Gaming Caps:'}</strong> {lang === 'bn' ? 'একই দিনে বারবার ক্লিক বা কল করলে পয়েন্ট বাড়ে না। প্রতিটি স্তরের জন্য কঠোর সীমা নির্ধারিত রয়েছে।' : 'Repeated clicks within the same day are throttled. Every pillar has a strict mathematical ceiling.'}
-                      </li>
-                      <li>
-                        <strong>{lang === 'bn' ? '৫টি নিরপেক্ষ স্তম্ভ:' : '5 Objective Pillars:'}</strong> {lang === 'bn' ? 'বাংলাদেশ ব্যাংকের কৃষিঋণ নীতিমালা ও এমআরএ (MRA) কাঠামোর সাথে সংগতিপূর্ণ।' : 'Aligned with Bangladesh Bank Agricultural Credit Policy & Microfinance Regulatory Authority (MRA) standards.'}
-                      </li>
-                      <li>
-                        <strong>{lang === 'bn' ? 'প্রমাণিত ডাটাবেস:' : 'Verified Audit Trail:'}</strong> {lang === 'bn' ? 'প্রতিটি পয়েন্টের পেছনে টাইমলাইনে সংরক্ষিত রিয়েল-টাইম কনসালটেশন ও ডায়াগনসিস লগ রয়েছে।' : 'Every point earned is backed by timestamped consultations, diagnosis logs, and sensor/vision events in Firestore.'}
-                      </li>
+                      <li>{lang === 'bn' ? 'আপনার পরামর্শ, ছবি পরীক্ষা ও খামারের তথ্য থেকে পয়েন্ট আসে। প্রতিটি অংশের সর্বোচ্চ সীমা আছে।' : 'Points come from your consultations, photo checks and farm details. Each part has a maximum.'}</li>
+                      <li>{lang === 'bn' ? 'হিসাবটি আপনার ফোনেই হয় এবং কেউ তা যাচাই করে না।' : 'It is worked out on your phone and nobody checks it.'}</li>
+                      <li>{lang === 'bn' ? 'এটি কোনো ব্যাংক, এনজিও বা নিয়ন্ত্রক সংস্থার অনুমোদিত পদ্ধতি নয়। ঋণ বা বীমার সিদ্ধান্তে ব্যবহার করবেন না।' : 'No bank, NGO or regulator has approved this method. Do not use it for loan or insurance decisions.'}</li>
                     </ul>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* Financial Institution & Program Evaluation (Indicative, Non-Statutory) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/50">
-                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-xs">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {lang === 'bn' ? 'বাংলাদেশ কৃষি ব্যাংক ঋণ উপাত্ত ভিত্তি' : 'BKB Micro-Loan Data Baseline'}
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
-                  {currentScore >= 75 ? (
-                    lang === 'bn' 
-                      ? 'ডকুমেন্টেশন প্রাক-যাচাইকৃত: শাখা ঋণ কর্মকর্তা ও মাঠ যাচাই সাপেক্ষে ৳১,৫০,০০০ টাকা পর্যন্ত ফসল ঋণ পর্যালোচনার উপযুক্ত।' 
-                      : 'Documentation baseline met for up to ৳150,000 crop loan consideration (Subject to human branch verification; non-automated).'
-                  ) : currentScore >= 55 ? (
-                    lang === 'bn'
-                      ? 'ক্ষুদ্র কৃষিঋণ পর্যালোচনার প্রাথমিক উপাত্ত সন্তোষজনক (৫০,০০০ টাকা সিলিং)।'
-                      : 'Initial micro-agricultural credit review baseline met (৳50,000 ceiling).'
-                  ) : currentScore >= 35 ? (
-                    lang === 'bn'
-                      ? 'বীজ ও সারের ইনপুট অর্থায়নের জন্য প্রাথমিক প্রোফাইল সক্রিয়।'
-                      : 'Initial profile active for seasonal micro-input financing.'
-                  ) : (
-                    lang === 'bn'
-                      ? 'ঋণ পর্যালোচনার জন্য জমি নিবন্ধন ও নিয়মিত লাইভ পরামর্শ রেকর্ড করুন।'
-                      : 'Record land profiling & consultations to complete documentation baseline.'
-                  )}
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200/60 dark:border-teal-800/50">
-                <div className="flex items-center gap-2 text-teal-800 dark:text-teal-300 font-bold text-xs">
-                  <ShieldCheck className="w-4 h-4 text-teal-600" />
-                  {lang === 'bn' ? 'প্যারামেট্রিক ফসল ঝুঁকি মূল্যায়ন' : 'Parametric Crop Risk Assessment'}
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
-                  {currentScore >= 55 ? (
-                    lang === 'bn' 
-                      ? 'প্রাকৃতিক দুর্যোগ ঝুঁকি মানচিত্রায়ণ সক্রিয়; ক্ষতিপূরণ নির্ধারণের জন্য মাঠ টিম বা স্যাটেলাইট ট্রিগার প্রযোজ্য।' 
-                      : 'Climate risk baseline mapped; payouts require certified satellite/field team verification.'
-                  ) : (
-                    lang === 'bn'
-                      ? 'ঝুঁকি নিরসনে নিয়মিত খামার পর্যবেক্ষণ ও পরামর্শ গ্রহণ করুন।'
-                      : 'Conduct regular farm observations to establish parametric baseline.'
-                  )}
-                </p>
-              </div>
-            </div>
 
             {/* Separated 4 Pillars of Proprietary Intelligence (Need, Eligibility, Intervention, Data Confidence) */}
             <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/70 border border-stone-200 dark:border-stone-700/80 space-y-3">
@@ -694,7 +641,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
                   </p>
                   <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
                     {timeline.length >= 3
-                      ? (lang === 'bn' ? 'উচ্চ আস্থা: ৩+ যাচাইকৃত টাইমলাইন ইভেন্ট সংগৃহীত' : 'High Confidence: 3+ verified timeline records')
+                      ? (lang === 'bn' ? '৩টির বেশি রেকর্ড আছে, যাচাই করা হয়নি' : '3+ records kept, not verified')
                       : (lang === 'bn' ? 'যাচাই প্রক্রিয়াধীন: তথ্যের ঘাটতি মাঠ পরিদর্শনকে সক্রিয় করে' : 'Verification Triggered: Missing data prompts field review')}
                   </p>
                 </div>
@@ -760,7 +707,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
             </h3>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {timeline.length} {lang === 'bn' ? 'টি যাচাইকৃত সেশন ও রেকর্ড' : 'verified session events'}
+            {timeline.length} {lang === 'bn' ? 'টি সেশন ও রেকর্ড' : 'sessions and records'}
           </p>
         </div>
 
@@ -775,10 +722,11 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               </p>
               <p className="text-xs text-slate-500">
                 {lang === 'bn' 
-                  ? 'লাইভ সেশন শেষ হলে বা ফসলের ছবি দিলে তা এখানে স্বয়ংক্রিয়ভাবে ক্রেডিট প্রোফাইলে যুক্ত হবে।' 
+                  ? 'লাইভ সেশন শেষ হলে বা ফসলের ছবি দিলে তা এখানে স্বয়ংক্রিয়ভাবে খামার রেকর্ডে যুক্ত হবে।'
                   : 'Start a live consultation or upload a crop photo to automatically log events.'}
               </p>
             </div>
+            {userRole === 'admin' && (
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
@@ -787,6 +735,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <RefreshCw className="w-3.5 h-3.5" />
               {lang === 'bn' ? 'নমুনা তথ্য লোড করুন' : 'Load Demo History'}
             </button>
+            )}
           </div>
         ) : (
           <div className="relative border-l-2 border-emerald-100 dark:border-emerald-900/60 ml-4 sm:ml-6 space-y-8">
@@ -842,15 +791,15 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
         )}
       </div>
 
-      {/* Printable Bank Dossier Template (Rendered only on print or clean preview) */}
+      {/* Printable farm record. Not a credit document: the score is left out until it is calculated on the server. */}
       <div className="hidden print:block print:p-8 bg-white text-slate-900 font-sans">
         <div className="border-b-2 border-emerald-800 pb-4 mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-emerald-900">
-              ডিজিটাল কৃষক ক্রেডিট ও ফসল বীমা যাচাইকরণ ডসিয়ার
+              খামারের কার্যক্রমের রেকর্ড
             </h1>
             <p className="text-xs text-slate-600">
-              Government of Bangladesh Verified Digital Farm Record & Underwriting Dossier
+              Self-reported farm activity record. Not verified by any government office, bank or insurer.
             </p>
           </div>
           <div className="text-right">
@@ -867,8 +816,6 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           </div>
           <div>
             <p><strong>চাষযোগ্য জমি:</strong> {profile?.totalLandDecimals ? `${profile.totalLandDecimals} শতক` : 'তথ্য নেই'}</p>
-            <p><strong>ক্রেডিট স্কোর:</strong> {profile?.creditReadinessScore ?? 0} / ১০০ ({profile?.creditReadinessScore && profile.creditReadinessScore >= 75 ? 'প্রাক-অনুমোদিত' : profile?.creditReadinessScore && profile.creditReadinessScore >= 55 ? 'ঋণযোগ্য' : 'মূল্যায়ন প্রক্রিয়াধীন'})</p>
-            <p><strong>বীমা ঝুঁকি রেটিং:</strong> {profile?.insuranceRiskTier || 'তথ্য নেই'}</p>
           </div>
         </div>
 
@@ -889,19 +836,8 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
           )}
         </div>
 
-        <div className="flex justify-between items-end pt-12 border-t text-xs">
-          <div className="text-center">
-            <div className="w-32 border-b border-black mb-1 mx-auto" />
-            <p>উপজেলা কৃষি কর্মকর্তা স্বাক্ষর</p>
-          </div>
-          <div className="text-center">
-            <div className="w-32 border-b border-black mb-1 mx-auto" />
-            <p>ব্যাংক ঋণ কর্মকর্তা স্বাক্ষর</p>
-          </div>
-          <div className="text-center">
-            <div className="w-32 border-b border-black mb-1 mx-auto" />
-            <p>বীমা প্রতিনিধি স্বাক্ষর</p>
-          </div>
+        <div className="pt-6 border-t text-xs text-slate-600">
+          <p>এটি কৃষকের নিজের দেওয়া তথ্য ও অ্যাপ ব্যবহারের রেকর্ড। ঋণ, বীমা বা সরকারি সহায়তার প্রমাণ হিসেবে ব্যবহারের জন্য নয়।</p>
         </div>
       </div>
 

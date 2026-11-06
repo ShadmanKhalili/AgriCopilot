@@ -91,8 +91,17 @@ const MAX_INLINE_IMAGES = 10;
  * ceiling; we observed a 504 "Inactivity Timeout" at ~30 s. The old budget of
  * 50 s sat above the platform limit, so the platform killed the function
  * mid-stream and the client saw a truncated response.
+ *
+ * `FIRST_TEXT_TIMEOUT_MS` bounds how long one attempt may stay silent, so a hung
+ * model still leaves time to try another. It must not bound the answer itself:
+ * five photos and their close-ups took Gemini about 9.6 s to start answering,
+ * and a limit over the whole attempt cut that answer off moments later. Once
+ * text is flowing, only the overall budget applies.
+ *
+ * `MODEL_TIMEOUT_MS` is the limit for an audio request, which does not stream.
  */
 const MODEL_TIMEOUT_MS = 10_000;
+const FIRST_TEXT_TIMEOUT_MS = 13_000;
 const STREAM_BUDGET_MS = 22_000;
 
 /**
@@ -253,12 +262,19 @@ const runModelOnce = async (
   model: string,
   contents: unknown,
   config: Record<string, unknown>,
+  deadline: number,
   onChunk: (text: string) => void
 ): Promise<StreamOutcome> => {
   const abortController = new AbortController();
-  const timer = setTimeout(() => abortController.abort(), MODEL_TIMEOUT_MS);
+  const remainingMs = () => Math.max(deadline - Date.now(), 1);
+  let timer = setTimeout(
+    () => abortController.abort(),
+    Math.min(FIRST_TEXT_TIMEOUT_MS, remainingMs())
+  );
   try {
-    const client = new GoogleGenAI({ apiKey, httpOptions: { timeout: MODEL_TIMEOUT_MS } });
+    // The SDK's own timeout also covers reading the whole answer, so it gets
+    // the overall budget; the timer above is what enforces the first-text limit.
+    const client = new GoogleGenAI({ apiKey, httpOptions: { timeout: remainingMs() } });
     const responseStream = await client.models.generateContentStream({
       model,
       contents: contents as any,
@@ -283,6 +299,10 @@ const runModelOnce = async (
       }
       const piece = chunk.text || "";
       if (piece) {
+        if (!text) {
+          clearTimeout(timer);
+          timer = setTimeout(() => abortController.abort(), remainingMs());
+        }
         text += piece;
         onChunk(piece);
       }
@@ -323,11 +343,12 @@ const runModel = async (
   model: string,
   contents: unknown,
   config: Record<string, unknown>,
+  deadline: number,
   onChunk: (text: string) => void
 ): Promise<StreamOutcome> => {
   let effectiveConfig = config;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const outcome = await runModelOnce(apiKey, model, contents, effectiveConfig, onChunk);
+    const outcome = await runModelOnce(apiKey, model, contents, effectiveConfig, deadline, onChunk);
     if (
       attempt === 0 &&
       outcome.status === "error" &&
@@ -398,7 +419,7 @@ const streamText = async (
         // any incoming line as proof the connection is alive.
         send({ type: "status", model, attempt: 1 });
 
-        const outcome = await runModel(apiKey, model, contents, attemptConfig, (piece) => {
+        const outcome = await runModel(apiKey, model, contents, attemptConfig, deadline, (piece) => {
           produced = true;
           send({ type: "chunk", text: piece, model });
         });
@@ -484,6 +505,7 @@ const bufferText = async (
   const candidateModels = getCandidateModels(requestedModel, false);
   const wantsTools =
     !!requestedTools && !groundingDisabledForInstance && SEARCH_GROUNDING_MODE !== "off";
+  const deadline = Date.now() + STREAM_BUDGET_MS;
 
   for (const model of candidateModels) {
     const attempts: Array<Record<string, unknown> | undefined> = wantsTools && GROUNDING_CAPABLE_MODELS.has(model)
@@ -491,7 +513,8 @@ const bufferText = async (
       : [stripTools(config)];
 
     for (const attemptConfig of attempts) {
-      const outcome = await runModel(apiKey, model, contents, attemptConfig, () => {});
+      if (deadline - Date.now() < 3_000) break;
+      const outcome = await runModel(apiKey, model, contents, attemptConfig, deadline, () => {});
       if (outcome.status === "ok") {
         await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
         return jsonResponse(200, {

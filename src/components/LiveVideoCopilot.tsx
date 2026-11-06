@@ -1338,7 +1338,7 @@ Return a JSON object with this exact structure:
   "sessionTitle": "Concise, descriptive title for this session (in ${lang === 'bn' ? 'Bangla' : 'English'})",
   "comprehensiveSummary": "A clear, professional synthesized 2-3 sentence summary labeled as preliminary AI guidance. DO NOT include verbatim dialogue.",
   "keyFacts": ["Array of 3-5 concise factual bullet points labeled with origin [Self-reported] or [AI-generated, unverified]"],
-  "insightForCreditProfile": "Credit & farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}",
+  "insightForCreditProfile": "Farm management observation in ${lang === 'bn' ? 'Bangla' : 'English'}",
   "actionSteps": "Array of exactly 2-3 extremely short imperative action steps for TODAY/THIS WEEK in ${lang === 'bn' ? 'Bangla' : 'English'} (max 8 words each, priority order, based only on what was discussed; at most ONE chemical step and only if clearly needed, phrased with a safety caution; never include banned chemicals)"
 }`;
 

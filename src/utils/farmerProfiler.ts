@@ -81,8 +81,9 @@ export interface CreditScoreResult {
   pillars: CreditScorePillars;
 }
 
-// Compute credit readiness score dynamically based on progressive behavior
-// Strictly aligned with Bangladesh Bank Ag-Credit & MFI Micro-Lending Standards
+// Farm record score: how regularly the farmer keeps records in the app.
+// It runs on the device and the farmer can edit its inputs, so it must never be
+// offered as evidence to a lender. That needs a server-side calculation first.
 export function calculateCreditScore(profile: {
   totalSessionsCompleted: number;
   totalDiagnoses: number;
@@ -103,7 +104,7 @@ export function calculateCreditScore(profile: {
     return {
       score: 0,
       riskTier: 'High',
-      grade: 'Tier 3 (Unprofiled)',
+      grade: 'Starting',
       recommendedLoanLimit: 0,
       pillars: {
         farmProvenance: 0,
@@ -157,24 +158,24 @@ export function calculateCreditScore(profile: {
   ));
 
   let riskTier: 'Low' | 'Moderate' | 'High' = 'High';
-  let grade = 'Tier 3 (Baseline)';
+  let grade = 'Starting';
   let recommendedLoanLimit = 0;
 
   if (totalScore >= 75) {
     riskTier = 'Low';
-    grade = 'Tier 0 (Prime Pre-Approved)';
+    grade = 'Regular';
     recommendedLoanLimit = 150000;
   } else if (totalScore >= 55) {
     riskTier = 'Moderate';
-    grade = 'Tier 1 (Crop Loan Eligible)';
+    grade = 'Good';
     recommendedLoanLimit = 50000;
   } else if (totalScore >= 35) {
     riskTier = 'Moderate';
-    grade = 'Tier 2 (Micro-Input Eligible)';
+    grade = 'Building';
     recommendedLoanLimit = 20000;
   } else {
     riskTier = 'High';
-    grade = 'Tier 3 (Baseline / Onboarding)';
+    grade = 'Starting';
     recommendedLoanLimit = 0;
   }
 

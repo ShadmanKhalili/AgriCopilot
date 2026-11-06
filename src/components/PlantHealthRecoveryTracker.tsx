@@ -237,15 +237,7 @@ export default function PlantHealthRecoveryTracker({
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(1); // Default Day 3
 
   // Interactive Farmer Field Observation Log
-  const [observations, setObservations] = useState<FarmerObservation[]>([
-    {
-      id: 'obs-init-1',
-      actionTaken: lang === 'bn' ? 'আক্রান্ত পাতা ছাঁটাই ও ট্রাইকোডার্মা জৈব স্প্রে' : 'Sanitation pruning of infected leaves & botanical bio-inoculation',
-      actionDate: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0],
-      whatChanged: lang === 'bn' ? 'ক্ষতের কিনারা শুকিয়ে গেছে; নতুন কুঁড়িতে সংক্রমণ নেই' : 'Lesion margins dried out; emerging shoots appear healthy green',
-      expertReviewed: false
-    }
-  ]);
+  const [observations, setObservations] = useState<FarmerObservation[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAction, setNewAction] = useState('');
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
