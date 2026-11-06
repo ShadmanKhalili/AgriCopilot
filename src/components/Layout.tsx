@@ -1037,8 +1037,8 @@ export default function Layout() {
                     <span className="block text-[11px] font-bold text-emerald-100/90 truncate">
                       {expertOnlineCount != null && expertOnlineCount > 0
                         ? (lang === 'bn'
-                            ? `এখন ${toBn(expertOnlineCount)} জন অনুরোধ নিচ্ছেন • জরুরি হলে ১৫ মিনিট`
-                            : `${expertOnlineCount} accepting requests now • emergency in 15 min`)
+                            ? `এখন ${toBn(expertOnlineCount)} জন অনুরোধ নিচ্ছেন • জরুরি হলে ফোন করুন ১৬১২৩`
+                            : `${expertOnlineCount} accepting requests now • if urgent, call 16123`)
                         : (lang === 'bn'
                             ? 'কৃষি বিশেষজ্ঞের সাহায্য চান • জরুরি হলে ফোন করুন ১৬১২৩'
                             : 'Ask an agriculture expert • if urgent, call 16123')}

@@ -310,7 +310,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
   // second fetch while one is already in flight.
   const syncingRef = useRef(false);
   const [lastSyncText, setLastSyncText] = useState<string>(
-    lang === 'bn' ? '৩০ সেপ্টেম্বর ২০২৬ • কৃষি বিপণন অধিদপ্তর (DAM)' : '30 Sep 2026 • DAM & TCB Bulletin'
+    lang === 'bn' ? 'আগের দর: ৩০ সেপ্টেম্বর ২০২৬ • কৃষি বিপণন অধিদপ্তর (DAM)' : 'Older prices: 30 Sep 2026 • DAM & TCB Bulletin'
   );
 
   const handleItemClick = (item: CommodityItem) => {
@@ -398,8 +398,8 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
           : `Official DAM bulletin • ${bulletinDate}${result.stale ? ' (cached)' : ''}`);
       } else {
         setLastSyncText(lang === 'bn'
-          ? 'যাচাইকৃত: ৩০ সেপ্টেম্বর ২০২৬ • DAM dam.gov.bd'
-          : 'Verified: 30 Sep 2026 • DAM dam.gov.bd');
+          ? 'আজকের দর পাওয়া যায়নি • আগের দর: ৩০ সেপ্টেম্বর ২০২৬'
+          : "Today's prices unavailable • older prices: 30 Sep 2026");
       }
     } catch (err) {
       console.warn("Bulletin refresh failed, keeping the last known prices:", err);
@@ -445,7 +445,7 @@ export default function LiveMandiTicker({ lang, onNavigateToMarket }: LiveMandiT
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <span className="text-[11px] sm:text-[11px] font-mono font-black tracking-wider uppercase text-emerald-400">
-              {lang === 'bn' ? 'লাইভ মান্ডি' : 'MANDI RADAR'}
+              {lang === 'bn' ? 'মান্ডি দর' : 'MANDI PRICES'}
             </span>
 
             {/* Wholesale vs Retail Toggle Pill */}

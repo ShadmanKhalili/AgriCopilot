@@ -114,8 +114,8 @@ export const CURRENT_PDF_SCHEMES = [
     provider: "Directorate General of Food",
     status: "Live seasonal channel",
     benefits: {
-      en: "Higher-than-market rates guaranteed. Direct payment to bank accounts.",
-      bn: "বাজারের চেয়ে উচ্চ মূল্যের নিশ্চয়তা। সরাসরি ব্যাংক অ্যাকাউন্টে পেমেন্ট।"
+      en: "Sell at the official procurement rate. Check the current rate and payment method with your local food office.",
+      bn: "সরকারি সংগ্রহ মূল্যে বিক্রি করুন। বর্তমান দর ও পেমেন্টের নিয়ম স্থানীয় খাদ্য অফিসে জেনে নিন।"
     },
     deadline: {
       en: "Seasonal (Aman/Boro cycles)",

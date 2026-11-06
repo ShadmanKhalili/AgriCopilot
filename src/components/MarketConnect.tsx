@@ -371,7 +371,7 @@ export default function MarketConnect({
               </h2>
               <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>{lang === 'bn' ? 'সরাসরি রেট' : 'Live Rates'}</span>
+                <span>{lang === 'bn' ? 'বাজার দর' : 'Market rates'}</span>
               </span>
             </div>
             <p className="text-stone-500 dark:text-stone-400 text-xs font-normal leading-normal mt-0.5">
@@ -905,12 +905,12 @@ export default function MarketConnect({
                         {lang === 'bn' ? 'বাজার পর্যবেক্ষণ ও নমুনা পরিস্থিতি' : 'Market Intelligence & Sample Scenarios'}
                       </h3>
                       <p className="text-[11px] text-stone-500 dark:text-stone-400 font-normal">
-                        {lang === 'bn' ? 'এক ক্লিকে প্রধান পাইকারি মোকামের বাস্তব দর ও প্রবাহ পরীক্ষা করুন' : 'Tap any live mandi scenario below to simulate wholesale demand & rate analysis'}
+                        {lang === 'bn' ? 'এক ক্লিকে প্রধান পাইকারি মোকামের বাজার বিশ্লেষণ দেখুন' : 'Tap a market below to see an AI market analysis'}
                       </p>
                     </div>
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400 px-2 py-0.5 rounded-full bg-stone-100 dark:bg-stone-800">
-                    {lang === 'bn' ? '১-ট্যাপ টেস্ট' : '1-Tap Run'}
+                    {lang === 'bn' ? 'উদাহরণ' : 'Examples'}
                   </span>
                 </div>
 

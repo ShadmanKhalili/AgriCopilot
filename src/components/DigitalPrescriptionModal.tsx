@@ -463,7 +463,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   {lang === 'bn' ? 'কৃষক / গ্রাহক' : 'Grower / User'}
                 </span>
                 <span className="font-bold text-stone-900 truncate block">
-                  {data.farmerName || user?.displayName || (lang === 'bn' ? 'নিবন্ধিত কৃষক (ডেমো)' : 'Registered Farmer')}
+                  {data.farmerName || user?.displayName || (lang === 'bn' ? 'নাম দেওয়া হয়নি' : 'Name not provided')}
                 </span>
               </div>
 

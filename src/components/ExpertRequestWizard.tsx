@@ -642,10 +642,13 @@ export default function ExpertRequestWizard({
                                 ? `★ ${toBn((expert.ratingAverage || 0).toFixed(1))} (${toBn(expert.ratingCount)})`
                                 : bn
                                 ? 'নতুন বিশেষজ্ঞ'
-                                : 'New expert'}{' '}
-                              • {bn
-                                ? `${toBn(expert.responseTimeMins || 30)} মিনিটে উত্তর`
-                                : `~${expert.responseTimeMins || 30} min response`}
+                                : 'New expert'}
+                              {/* Only a real figure: 0 or missing means no history yet. */}
+                              {expert.responseTimeMins
+                                ? bn
+                                  ? ` • সাধারণত ${toBn(expert.responseTimeMins)} মিনিটে উত্তর`
+                                  : ` • usually ~${expert.responseTimeMins} min`
+                                : ''}
                             </p>
                           </div>
                           {active && <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />}

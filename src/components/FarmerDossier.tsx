@@ -15,7 +15,8 @@ import {
   seedDemoFarmerProfile,
   updateFarmerProfileManual,
   resetFarmerProfile,
-  calculateCreditScore
+  calculateCreditScore,
+  FARMER_RECORD_UPDATED_EVENT
 } from '../utils/farmerProfiler';
 import { Language } from '../utils/translations';
 import toast from 'react-hot-toast';
@@ -68,6 +69,10 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
 
   useEffect(() => {
     loadData();
+    // This screen stays mounted between tabs, so it has to hear about new records.
+    const onRecordUpdated = () => { loadData(); };
+    window.addEventListener(FARMER_RECORD_UPDATED_EVENT, onRecordUpdated);
+    return () => window.removeEventListener(FARMER_RECORD_UPDATED_EVENT, onRecordUpdated);
   }, [effectiveUid]);
 
   const handleSimulateDemo = async () => {
@@ -171,7 +176,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
       case 'weather_alert':
         return lang === 'bn' ? 'আবহাওয়া ঝুঁকি প্রতিরোধ' : 'Weather Advisory';
       case 'smart_grading':
-        return lang === 'bn' ? 'ফসলের মান সনদ' : 'Quality Grading';
+        return lang === 'bn' ? 'ফসলের মান যাচাই' : 'Quality Grading';
       case 'planting_intent':
         return lang === 'bn' ? 'পরবর্তী ফসল পরিকল্পনা' : 'Planting Intent';
       default:
@@ -188,12 +193,13 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
     hasLandData: Boolean(profile?.totalLandDecimals && profile.totalLandDecimals > 0),
     hasLocationData: Boolean(profile?.locationDistrict || profile?.locationUpazila),
     hasSoilOrIrrigation: Boolean(profile?.soilType || profile?.irrigationType),
-    hasCertificates: timeline.some(t => t.eventType === 'smart_grading') || (profile?.creditReadinessScore || 0) > 65,
+    hasCertificates: timeline.some(t => t.eventType === 'smart_grading'),
     hasWeatherAction: timeline.some(t => t.eventType === 'weather_alert'),
     totalEventsCount: timeline.length
   });
 
-  const currentScore = profile?.creditReadinessScore ?? creditAnalysis.score;
+  // The headline and the five bars must come from the same calculation.
+  const currentScore = creditAnalysis.score;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16">
@@ -544,7 +550,7 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
 
                 <div>
                   <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🏅 {lang === 'bn' ? 'মান সনদ ও বাজার সংযোগ' : 'Quality Grading & Mandi'}</span>
+                    <span>🏅 {lang === 'bn' ? 'মান যাচাই ও বাজার সংযোগ' : 'Quality Grading & Mandi'}</span>
                     <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.qualityAndMarket}/১৫</span>
                   </div>
                   <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">

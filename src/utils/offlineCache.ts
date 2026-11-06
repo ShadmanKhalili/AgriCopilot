@@ -89,8 +89,8 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 25,
-      middlemanMarkupEstimate: 'পাইকারি মোকাম থেকে সুপারমার্কেটের শেলফ পর্যন্ত গ্রেডিং ও কোল্ড স্টোরেজের কারণে ২৫% মার্জিন থাকে।',
-      farmerDirectOpportunity: 'গ্রেড-১ আলু সরাসরি সুপারমার্কেটের কন্ট্রাক্ট ফার্মিং ভেন্ডরকে দিলে কেজিতে ৳৪-৳৫ বেশি পাওয়া যায়।'
+      middlemanMarkupEstimate: 'পাইকারি মোকাম থেকে সুপারমার্কেটের শেলফ পর্যন্ত গ্রেডিং ও কোল্ড স্টোরেজের কারণে দামের ব্যবধান থাকে।',
+      farmerDirectOpportunity: 'গ্রেড-১ আলু সরাসরি সুপারমার্কেটের কন্ট্রাক্ট ফার্মিং ভেন্ডরকে দিলে ভালো দাম পাওয়ার সুযোগ থাকতে পারে।'
     },
     priceDrivers: [
       'উত্তরাঞ্চলের হিমাগার থেকে নিয়মিত আলু সরবরাহ বহাল',
@@ -103,7 +103,7 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ]
   },
   tomato: {
-    insights: `### 🍅 টমেটোর বাজারদর ও সুপারমার্কেট ট্রেন্ড (ডিএএম ও লাইভ ওয়েব যাচাইকৃত)
+    insights: `### 🍅 টমেটোর বাজারদর ও সুপারমার্কেট ট্রেন্ড (অফলাইন আনুমানিক তথ্য)
 * **কারওয়ান বাজার পাইকারি আড়ৎ**: ৳৮০ - ৳৯০ / কেজি
 * **চট্টগ্রাম রিয়াজউদ্দিন ও কক্সবাজার চকরিয়া আড়ৎ**: ৳৮৫ - ৳৯৫ / কেজি
 * **স্বপ্ন (Shwapno)**: ৳১১০ / কেজি (সালাদ টমেটো)
@@ -130,8 +130,8 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 30,
-      middlemanMarkupEstimate: 'কাঁচামাল নষ্ট হওয়ার ঝুঁকি (পোস্ট-হারভেস্ট লস) ও কুলিং ভ্যানের ব্যয়ের কারণে রিটেইল চেইনে ৩০% ব্যবধান।',
-      farmerDirectOpportunity: 'প্লাস্টিক ক্রেটে গ্রেডিং করে সরাসরি সুপারমার্কেট সাপ্লাই চেইনে দিলে নষ্ট হওয়ার হার ৮০% কমে যায়।'
+      middlemanMarkupEstimate: 'কাঁচামাল নষ্ট হওয়ার ঝুঁকি (পোস্ট-হারভেস্ট লস) ও কুলিং ভ্যানের ব্যয়ের কারণে রিটেইল চেইনে দামের ব্যবধান থাকে।',
+      farmerDirectOpportunity: 'প্লাস্টিক ক্রেটে গ্রেডিং করে সরাসরি সুপারমার্কেট সাপ্লাই চেইনে দিলে নষ্ট হওয়া কমতে পারে।'
     },
     priceDrivers: [
       'আগাম শীতকালীন পাকা টমেটোর নতুন চালান বাজারে প্রবেশ',
@@ -170,8 +170,8 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 140,
-      middlemanMarkupEstimate: 'ধান মিলিং, পলিশিং, ব্র্যান্ডিং এবং সুপারশপ লিস্টিং ফির কারণে ধান থেকে খুচরা চালের মূল্যে ১৪০% বিস্তার তৈরি হয়।',
-      farmerDirectOpportunity: 'কৃষক সমিতি তৈরি করে স্থানীয় অটো রাইস মিলে কাস্টম মিলিং করালে ২০-২৫% বেশি লাভ অর্জিত হয়।'
+      middlemanMarkupEstimate: 'ধান মিলিং, পলিশিং, ব্র্যান্ডিং এবং সুপারশপ লিস্টিং ফির কারণে ধান ও খুচরা চালের দামে বড় ব্যবধান থাকে।',
+      farmerDirectOpportunity: 'কৃষক সমিতি তৈরি করে স্থানীয় অটো রাইস মিলে কাস্টম মিলিং করালে লাভ বাড়ার সুযোগ থাকতে পারে।'
     },
     priceDrivers: [
       'সরকারি সংগ্রহ অভিযান ও মিলারদের প্রতিযোগিতা',
@@ -191,7 +191,7 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
 * **আগোরা (Agora)**: ৳৭৫ / কেজি
 * **চালডাল (Chaldal)**: ৳৬৮ / কেজি
 
-**বাজারের গতিপ্রকৃতি**: চকচকে গোল বেগুনের পাইকারি চাহিদা বেশি। সুপারমার্কেটে পোকার ছিদ্রমুক্ত প্রিমিয়াম গোল বেগুন প্রায় ৭৫% বেশি মূল্যে বিক্রি হচ্ছে।`,
+**বাজারের গতিপ্রকৃতি**: চকচকে গোল বেগুনের পাইকারি চাহিদা বেশি। সুপারমার্কেটে পোকার ছিদ্রমুক্ত প্রিমিয়াম গোল বেগুনের দাম সাধারণত বেশি থাকে।`,
     priceRange: { min: 40, max: 50, avg: 45, unit: 'kg' },
     trend: 'stable',
     wholesaleRates: { minPriceBdt: 40, maxPriceBdt: 50, avgPriceBdt: 45, unit: 'kg', primaryMarket: 'কারওয়ান বাজার', trend: 'স্থিতিশীল' },
@@ -209,7 +209,7 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 58,
-      middlemanMarkupEstimate: 'সুপারশপে কঠোর গুণমান ফিল্টারিংয়ের কারণে পাইকারি থেকে ৫৮% দামের ব্যবধান থাকে।',
+      middlemanMarkupEstimate: 'সুপারশপে কঠোর গুণমান ফিল্টারিংয়ের কারণে পাইকারি থেকে দামের ব্যবধান থাকে।',
       farmerDirectOpportunity: 'ক্ষতিকর রাসায়নিকমুক্ত সার্টিফিকেট থাকলে সুপারশপ ভেন্ডররা সরাসরি খেত থেকেই অগ্রিম তুলে নেয়।'
     },
     priceDrivers: [
@@ -248,8 +248,8 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 23,
-      middlemanMarkupEstimate: 'খুচরা সুপারশপে ২৫০ গ্রাম ছোট প্যাকে বিক্রি ও কোল্ড চেইনে ২৩% মার্জিন থাকে।',
-      farmerDirectOpportunity: 'বোঁটা অক্ষত রেখে শুকনা প্যাকিং করলে সুপারশপ সরবরাহকারীরা ২০% বাড়তি দর অফার করে।'
+      middlemanMarkupEstimate: 'খুচরা সুপারশপে ২৫০ গ্রাম ছোট প্যাকে বিক্রি ও কোল্ড চেইনের কারণে দামের ব্যবধান থাকে।',
+      farmerDirectOpportunity: 'বোঁটা অক্ষত রেখে শুকনা প্যাকিং করলে সুপারশপ সরবরাহকারীদের কাছে ভালো দর পাওয়ার সুযোগ থাকতে পারে।'
     },
     priceDrivers: [
       'বৃষ্টিপাতের পর নতুন মরিচের উত্তোলন বৃদ্ধি',
@@ -286,7 +286,7 @@ export const COX_BAZAR_OFFLINE_MARKET: Record<string, any> = {
     ],
     marginSpread: {
       spreadPercentage: 64,
-      middlemanMarkupEstimate: 'পরিবহনে ফেটে যাওয়া ও ওজনের ঘাটতির ঝুঁকি কাভার করতে রিটেইল চেইনে ৬৪% মার্জিন রাখা হয়।',
+      middlemanMarkupEstimate: 'পরিবহনে ফেটে যাওয়া ও ওজনের ঘাটতির ঝুঁকি কাভার করতে রিটেইল চেইনে দামের ব্যবধান থাকে।',
       farmerDirectOpportunity: 'সরাসরি ওজন স্কেলে মেপে পাইকারদের সঙ্গে চুক্তি করুন, পিস হিসেবে বিক্রি পরিহার করুন।'
     },
     priceDrivers: [

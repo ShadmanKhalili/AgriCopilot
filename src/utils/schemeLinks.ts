@@ -46,3 +46,21 @@ export const fixSchemeLink = (raw: string): string => {
 /** Corrects a scheme's links and drops the duplicates a correction can create. */
 export const fixSchemeLinks = (links: readonly string[] | null | undefined): string[] =>
   Array.from(new Set((links || []).map(fixSchemeLink)));
+
+/**
+ * Corrects scheme text already saved in Firestore. The seed file was fixed, but
+ * the saved record keeps the old promise until the catalogue is re-seeded, which
+ * would also overwrite anything added since.
+ */
+export const fixSchemeRecord = <T extends { benefits?: any }>(scheme: T): T => {
+  const benefits = scheme.benefits;
+  if (!/higher-than-market/i.test(benefits?.en || '') && !/উচ্চ মূল্যের নিশ্চ/.test(benefits?.bn || '')) return scheme;
+  return {
+    ...scheme,
+    benefits: {
+      ...benefits,
+      en: 'Sell at the official procurement rate. Check the current rate and payment method with your local food office.',
+      bn: 'সরকারি সংগ্রহ মূল্যে বিক্রি করুন। বর্তমান দর ও পেমেন্টের নিয়ম স্থানীয় খাদ্য অফিসে জেনে নিন।',
+    },
+  };
+};

@@ -282,6 +282,9 @@ export async function fetchFarmerTimeline(userId: string): Promise<FarmerTimelin
 /**
  * Progressively compiles the farmer profile and logs a new event
  */
+/** Fired after a new event is saved, so a screen that is already open can refresh. */
+export const FARMER_RECORD_UPDATED_EVENT = 'farmer-record-updated';
+
 export async function recordFarmerInteractionEvent(params: RecordEventParams): Promise<{
   profile: FarmerProfileData;
   event: FarmerTimelineEventData;
@@ -450,6 +453,11 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     const updatedEvents = [newEvent, ...cachedEvents.filter(e => e.title !== newEvent.title)];
     safeStorage.setItem(LOCAL_EVENTS_KEY(cleanUserId), updatedEvents);
   } catch (e) {}
+
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(FARMER_RECORD_UPDATED_EVENT));
+  }
 
   return { profile, event: newEvent };
 }

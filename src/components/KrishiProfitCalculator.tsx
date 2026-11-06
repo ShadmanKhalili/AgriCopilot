@@ -296,6 +296,22 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
 
   const landRatio = normalizedDecimals / 33; // multiplier relative to 1 bigha
 
+  // A typed yield or cost is for the land size it was typed against. Keep it in
+  // proportion when the land changes, otherwise 20 Mon on 1 bigha stays 20 Mon on
+  // 5 bigha while the other costs grow, and the screen shows a false loss.
+  const changeLand = (nextSize: number, nextUnit: typeof landUnit) => {
+    const perUnit = { decimal: 1, bigha: 33, acre: 100, katha: 1.65 };
+    const ratio = (nextSize * perUnit[nextUnit]) / normalizedDecimals;
+    if (Number.isFinite(ratio) && ratio > 0) {
+      setCustomCosts((prev) =>
+        Object.fromEntries(Object.entries(prev).map(([key, cost]) => [key, Math.round(Number(cost) * ratio)]))
+      );
+      setCustomYieldMon((prev) => (prev === null ? null : Math.max(1, Math.round(prev * ratio * 10) / 10)));
+    }
+    setLandSize(nextSize);
+    setLandUnit(nextUnit);
+  };
+
   // Cost items state (calculated based on benchmark * land ratio, but editable)
   const [customCosts, setCustomCosts] = useState<Record<string, number>>({});
   const [customYieldMon, setCustomYieldMon] = useState<number | null>(null);
@@ -467,7 +483,7 @@ ${tenureNote}
             <div className="flex items-center gap-2">
               <TactileStepper
                 value={landSize}
-                onChange={(val) => setLandSize(Math.max(0.1, val))}
+                onChange={(val) => changeLand(Math.max(0.1, val), landUnit)}
                 min={0.1}
                 max={500}
                 step={landUnit === 'bigha' || landUnit === 'acre' ? 0.5 : 1}
@@ -477,7 +493,7 @@ ${tenureNote}
               <select
                 aria-label={lang === 'bn' ? '\u098F\u0995\u0995' : 'Area unit'}
                 value={landUnit}
-                onChange={(e: any) => setLandUnit(e.target.value)}
+                onChange={(e: any) => changeLand(landSize, e.target.value)}
                 className="bg-stone-100 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 dark:text-stone-200 outline-none cursor-pointer shrink-0"
               >
                 <option value="bigha">{lang === 'bn' ? 'বিঘা (৩৩ শ.)' : 'Bigha'}</option>
@@ -497,7 +513,7 @@ ${tenureNote}
                 <button
                   key={preset.label}
                   type="button"
-                  onClick={() => { setLandSize(preset.val); setLandUnit(preset.unit as any); }}
+                  onClick={() => changeLand(preset.val, preset.unit as typeof landUnit)}
                   className="text-xs min-h-9 px-3 py-1 rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 transition-colors cursor-pointer"
                 >
                   {preset.label}
@@ -781,7 +797,7 @@ ${tenureNote}
         </div>
         <p className="text-sm text-amber-950 leading-relaxed font-medium">
           {lang === 'bn'
-            ? `আপনার প্রতি মণ ${currentBenchmark.nameBn} উৎপাদনে প্রকৃত খরচ হচ্ছে ৳${breakEvenCostPerMon} টাকা (৳${breakEvenCostPerKg}/কেজি)। স্থানীয় ফড়িয়া বা পাইকাররা এর চেয়ে কম দাম অফার করলে আপনি নিশ্চিতভাবে লোকসানে পড়বেন। নিকটস্থ আড়তে নিয়ে সরাসরি বিক্রি করলে গড়ে ১০-১৫% বেশি দাম পাওয়া যায়।`
+            ? `আপনার প্রতি মণ ${currentBenchmark.nameBn} উৎপাদনে প্রকৃত খরচ হচ্ছে ৳${breakEvenCostPerMon} টাকা (৳${breakEvenCostPerKg}/কেজি)। এই খরচের হিসাবে স্থানীয় ফড়িয়া বা পাইকাররা এর চেয়ে কম দাম অফার করলে আপনার লোকসান হবে। বিক্রির আগে নিকটস্থ আড়তের দর জেনে নিন।`
             : `Your net cost to produce 1 Mon of ${currentBenchmark.nameEn} is ৳${breakEvenCostPerMon} BDT (৳${breakEvenCostPerKg}/kg). Reject any local middleman offer lower than this threshold to protect your baseline investment.`}
         </p>
       </div>
@@ -817,11 +833,11 @@ ${tenureNote}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-black text-xs text-white leading-tight flex items-center justify-between">
-                  <span>{lang === 'bn' ? 'পাইকারি বাজারদর দেখুন' : 'Live Mandi Prices'}</span>
+                  <span>{lang === 'bn' ? 'পাইকারি বাজারদর দেখুন' : 'Wholesale prices'}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="text-[11px] text-amber-200 mt-0.5 truncate font-medium">
-                  {lang === 'bn' ? 'শ্যামবাজার ও আড়তের লাইভ রেট' : 'Check wholesale trends'}
+                  {lang === 'bn' ? 'শ্যামবাজার ও আড়তের দর' : 'Check wholesale trends'}
                 </div>
               </div>
             </button>
