@@ -216,8 +216,12 @@ export const logout = async () => {
 async function testConnection() {
   if (!import.meta.env.DEV) return;
   try {
-    const { getFirestore, doc, getDocFromServer } = await import('firebase/firestore');
-    const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    // Use the app's one Firestore instance: creating a second one here first
+    // would stop `src/firestore.ts` from turning on offline storage.
+    const [{ doc, getDocFromServer }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('./firestore'),
+    ]);
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {

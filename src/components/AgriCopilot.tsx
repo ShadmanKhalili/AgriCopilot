@@ -27,6 +27,8 @@ import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import toBn from '../utils/banglaNum';
 import { aiErrorMessage } from '../utils/aiErrorMessage';
+import { buildLocationContext } from '../utils/farmerContext';
+import { speakWithBrowser } from '../utils/speech';
 import {
   buildPrescriptionData,
   topCandidate,
@@ -874,7 +876,7 @@ export default function AgriCopilot({
     if (setPersistedDiagnosis) setPersistedDiagnosis(sampleDiag);
     
     // Initialize active chat session for this sample
-    const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+    const locationContext = buildLocationContext(globalLocation);
     const sampleDiagText = `${sc.sampleDiagnosis.diseaseBn} (${sc.sampleDiagnosis.disease}). Symptoms: ${sc.sampleDiagnosis.symptomsBreakdown.join(', ')}. Remedies: ${sc.sampleDiagnosis.chemicalRemedy}`;
     const session = startAgriChat(sampleDiagText, lang, locationContext);
     setChatSession(session);
@@ -1062,7 +1064,7 @@ export default function AgriCopilot({
     let activeSession = chatSession;
     if (!activeSession && diagnosis) {
       const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
-      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      const locationContext = buildLocationContext(globalLocation);
       activeSession = startAgriChat(diagText, lang, locationContext);
       setChatSession(activeSession);
     }
@@ -1100,7 +1102,7 @@ export default function AgriCopilot({
     let activeSession = chatSession;
     if (!activeSession) {
       const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
-      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      const locationContext = buildLocationContext(globalLocation);
       activeSession = startAgriChat(diagText, lang, locationContext);
       setChatSession(activeSession);
     }
@@ -1268,19 +1270,10 @@ export default function AgriCopilot({
         return;
       }
       console.error("Audio generation failed, trying Web Speech fallback:", error);
-      if ('speechSynthesis' in window) {
-        try {
-          const plainText = diagnosis.diagnosis.replace(/[*#_`]/g, '');
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(plainText);
-          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-          window.speechSynthesis.speak(utterance);
-          toast.success(lang === 'bn' ? 'অডিও চালানো হচ্ছে...' : 'Playing voice advisory...');
-        } catch (synthErr) {
-          toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হ\u09DFেছে।' : 'Failed to generate audio advisory.');
-        }
+      if (speakWithBrowser(diagnosis.diagnosis, lang, { rate: 1 })) {
+        toast.success(lang === 'bn' ? 'অডিও চালানো হচ্ছে...' : 'Playing voice advisory...');
       } else {
-        toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হ\u09DFেছে।' : 'Failed to generate audio advisory.');
+        toast.error(lang === 'bn' ? 'অডিও তৈরিতে সমস্যা হয়েছে।' : 'Failed to generate audio advisory.');
       }
     } finally {
       endAiRequest(controller);
@@ -1290,20 +1283,10 @@ export default function AgriCopilot({
 
   // Voice-first: read a chat answer aloud with Web Speech (one tap per bubble).
   const speakChatMessage = (rawText: string) => {
-    if (!('speechSynthesis' in window)) {
-      toast.error(lang === 'bn' ? 'এই ফোনে কণ্ঠস্বর সমর্থিত নয়।' : 'Speech is not supported on this device.');
-      return;
-    }
-    try {
-      window.speechSynthesis.cancel();
-      const plainText = rawText.replace(/[*#_`>|-]/g, ' ').replace(/\s+/g, ' ').trim();
-      const utterance = new SpeechSynthesisUtterance(plainText);
-      utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
+    if (speakWithBrowser(rawText, lang)) {
       toast.success(lang === 'bn' ? 'উত্তরটি পড়ে শোনানো হচ্ছে...' : 'Reading the answer aloud...');
-    } catch {
-      toast.error(lang === 'bn' ? 'কণ্ঠস্বর চালানো যায়নি।' : 'Could not play speech.');
+    } else {
+      toast.error(lang === 'bn' ? 'এই ফোনে কণ্ঠস্বর সমর্থিত নয়।' : 'Speech is not supported on this device.');
     }
   };
 
@@ -1372,7 +1355,7 @@ export default function AgriCopilot({
       }
 
       // Initialize chat session
-      const locationContext = globalLocation ? `GPS Coordinates: ${globalLocation.latitude}, ${globalLocation.longitude}` : "Bangladesh";
+      const locationContext = buildLocationContext(globalLocation);
       const session = startAgriChat(result.diagnosis, lang, locationContext);
       setChatSession(session);
       setChatMessages([]);

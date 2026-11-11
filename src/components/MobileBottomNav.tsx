@@ -4,9 +4,9 @@ import { motion } from 'motion/react';
 import { Language, translations } from '../utils/translations';
 import toBn from '../utils/banglaNum';
 
-type Tab = 'agri-copilot' | 'smart-grade' | 'smart-planting' | 'climate-resilience' | 'krishi-profit' | 'market-connect' | 'weather-advisory' | 'crop-health' | 'community-radar' | 'gov-schemes' | 'farmer-dossier' | 'expert-hub' | 'user-guide' | 'profile' | 'admin-dashboard';
+import type { PillarKey, Tab } from '../nav/tabs';
 
-export type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
+export type { PillarKey };
 
 interface PrimaryNavItem {
   id: string;

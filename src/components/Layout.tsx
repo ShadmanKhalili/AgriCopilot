@@ -8,8 +8,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
 
-// Persistent top ticker is statically imported so it never suffers dynamic import failures
-import LiveMandiTicker from './LiveMandiTicker';
 
 // Resilient dynamic loader that retries transient module fetch errors
 function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) {
@@ -19,6 +17,15 @@ function lazyWithRetry<T extends React.ComponentType<any>>(factory: () => Promis
     })
   );
 }
+
+// The price ticker pulls in the AI service and the disease reference, so it
+// loads after the shell. If its file cannot be fetched the bar is simply left
+// out; the rest of the app does not depend on it.
+const LiveMandiTicker = lazy(() =>
+  import('./LiveMandiTicker').catch(() => ({ default: (() => null) as unknown as typeof import('./LiveMandiTicker').default }))
+);
+// The area picker carries the full list of districts and upazilas.
+const RegionModal = lazyWithRetry(() => import('./RegionModal'));
 
 // Lazy load tab components
 const AgriCopilot = lazyWithRetry(() => import('./AgriCopilot'));
@@ -46,7 +53,6 @@ import { PWAInstallButton } from './PWAInstallButton';
 import { OfflineIndicator } from './OfflineIndicator';
 import LegalModal from './LegalModal';
 import AuthModal from './AuthModal';
-import RegionModal from './RegionModal';
 import MobileBottomNav from './MobileBottomNav';
 import InAppBrowserBanner from './InAppBrowserBanner';
 import { useLocationName } from '../hooks/useLocationName';
@@ -56,34 +62,8 @@ import toBn from '../utils/banglaNum';
 import { detectUserLocation } from '../utils/geolocation';
 import { safeStorage } from '../utils/security';
 import { ErrorBoundary } from './ErrorBoundary';
-
-const TAB_IDS = ['agri-copilot', 'smart-grade', 'smart-planting', 'climate-resilience', 'krishi-profit', 'market-connect', 'weather-advisory', 'crop-health', 'community-radar', 'gov-schemes', 'farmer-dossier', 'expert-hub', 'user-guide', 'profile', 'admin-dashboard'] as const;
-type Tab = typeof TAB_IDS[number];
-
-// Short names used by the sitemap and older shared links.
-const TAB_HASH_ALIASES: Record<string, Tab> = {
-  copilot: 'agri-copilot',
-  weather: 'weather-advisory',
-  calculator: 'krishi-profit',
-};
-
-/**
- * The tab a URL hash points at. An empty hash is the home tab; a hash that
- * names no tab returns null so the caller can leave the current tab alone.
- */
-const tabFromHash = (hash: string): Tab | null => {
-  let key = hash.replace(/^#/, '').trim().toLowerCase();
-  try {
-    key = decodeURIComponent(key);
-  } catch {
-    // Keep the raw value; it simply will not match a tab.
-  }
-  if (!key) return 'agri-copilot';
-  if ((TAB_IDS as readonly string[]).includes(key)) return key as Tab;
-  return TAB_HASH_ALIASES[key] || null;
-};
-
-type PillarKey = 'all' | 'health' | 'weather' | 'economics' | 'support';
+import { HOME_TAB, hashForTab, tabFromHash, type PillarKey, type Tab } from '../nav/tabs';
+import { useAppSettings } from '../context/AppSettingsContext';
 
 interface TabItem {
   id: Tab;
@@ -136,8 +116,8 @@ function TabPanel({
 }
 
 export default function Layout() {
-  const [activeTab, setActiveTab] = useState<Tab>(() => tabFromHash(window.location.hash) || 'agri-copilot');
-  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set(['agri-copilot']));
+  const [activeTab, setActiveTab] = useState<Tab>(() => tabFromHash(window.location.hash) || HOME_TAB);
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(new Set([HOME_TAB]));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
@@ -145,47 +125,12 @@ export default function Layout() {
   const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
   const [selectedPillarFilter, setSelectedPillarFilter] = useState<PillarKey>('all');
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
-  const [lang, setLang] = useState<Language>(() => {
-    // A `?lang=` link (the sitemap's alternate-language URLs) wins; otherwise
-    // the farmer's last choice is kept across visits.
-    const fromUrl = new URLSearchParams(window.location.search).get('lang');
-    if (fromUrl === 'en' || fromUrl === 'bn') return fromUrl;
-    return safeStorage.getItem<string>('krishi_lang', 'bn') === 'en' ? 'en' : 'bn';
-  });
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    // safeStorage swallows SecurityError / QuotaExceededError. A locked-down
-    // in-app browser (Messenger/Facebook webview) must not brick the app on
-    // the very first render of the root component.
-    const saved = safeStorage.getItem<string>('krishi_theme', 'light');
-    return saved === 'dark' ? 'dark' : 'light';
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    root.setAttribute('data-theme', theme);
-    safeStorage.setItem('krishi_theme', theme);
-  }, [theme]);
+  const { lang, setLang, theme, setTheme, location: globalLocation, setLocation: setGlobalLocation } = useAppSettings();
 
   const toggleTheme = () => {
     audioFeedback.playTactileClick();
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
-
-  useEffect(() => {
-    safeStorage.setItem('krishi_lang', lang);
-    // Keep a `?lang=` link in step with a manual switch, so a reload does not
-    // flip the language back.
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('lang') && url.searchParams.get('lang') !== lang) {
-      url.searchParams.set('lang', lang);
-      window.history.replaceState(window.history.state, '', url.toString());
-    }
-  }, [lang]);
 
   useEffect(() => {
     setVisitedTabs(prev => new Set(prev).add(activeTab));
@@ -199,8 +144,7 @@ export default function Layout() {
     const firstSync = isFirstTabSync.current;
     isFirstTabSync.current = false;
     if (tabFromHash(window.location.hash) === activeTab) return;
-    const hash = activeTab === 'agri-copilot' ? '' : `#${activeTab}`;
-    const url = `${window.location.pathname}${window.location.search}${hash}`;
+    const url = `${window.location.pathname}${window.location.search}${hashForTab(activeTab)}`;
     // Tidying an unknown hash on load must not add a back-button step.
     if (firstSync) window.history.replaceState(null, '', url);
     else window.history.pushState(null, '', url);
@@ -242,37 +186,6 @@ export default function Layout() {
   // MarketConnect State Persistence
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
-
-  // Global Location State with localStorage persistence (cleansed for Bangladesh regional bounds)
-  const [globalLocation, setGlobalLocationState] = useState<{ latitude: number; longitude: number } | null>(() => {
-    try {
-      const saved = localStorage.getItem('smart_krishi_global_location');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
-          // Invalidate any stale foreign coordinates previously cached outside Bangladesh territory
-          if (parsed.latitude >= 20.4 && parsed.latitude <= 26.9 && parsed.longitude >= 87.8 && parsed.longitude <= 92.9) {
-            return parsed;
-          }
-          localStorage.removeItem('smart_krishi_global_location');
-        }
-      }
-    } catch (e) {
-      console.warn("Could not parse saved location:", e);
-    }
-    return null;
-  });
-
-  const setGlobalLocation = (loc: { latitude: number; longitude: number } | null) => {
-    setGlobalLocationState(loc);
-    if (loc) {
-      try {
-        localStorage.setItem('smart_krishi_global_location', JSON.stringify(loc));
-      } catch (e) {
-        console.warn("Could not save location:", e);
-      }
-    }
-  };
 
   // Initialize location with high accuracy GPS on first launch
   useEffect(() => {
@@ -877,10 +790,12 @@ export default function Layout() {
         <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
           
           {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
-          <LiveMandiTicker 
-            lang={lang} 
-            onNavigateToMarket={() => handleNavigateTab('market-connect')} 
-          />
+          <Suspense fallback={null}>
+            <LiveMandiTicker
+              lang={lang}
+              onNavigateToMarket={() => handleNavigateTab('market-connect')}
+            />
+          </Suspense>
 
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
@@ -1342,14 +1257,18 @@ export default function Layout() {
 
         {/* ================= MODALS ================= */}
         {/* Universal Region / District Selector */}
-        <RegionModal
-          isOpen={isRegionModalOpen}
-          onClose={() => setIsRegionModalOpen(false)}
-          lang={lang}
-          globalLocation={globalLocation}
-          setGlobalLocation={setGlobalLocation}
-          currentLocationName={locationName}
-        />
+        {isRegionModalOpen && (
+          <Suspense fallback={null}>
+            <RegionModal
+              isOpen={isRegionModalOpen}
+              onClose={() => setIsRegionModalOpen(false)}
+              lang={lang}
+              globalLocation={globalLocation}
+              setGlobalLocation={setGlobalLocation}
+              currentLocationName={locationName}
+            />
+          </Suspense>
+        )}
 
         {/* Pricing Modal */}
         <PricingModal 

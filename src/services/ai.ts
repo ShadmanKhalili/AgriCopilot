@@ -8,6 +8,7 @@ import { readAiNdjsonStream } from '../utils/ndjsonStream';
 import { bulletinPromptContext, fetchOfficialBulletin } from './marketPrices';
 import { buildCropKnowledge } from '../data/diseaseKb';
 import type { DiagnosisImage } from '../utils/diagnosisTypes';
+import { buildLocationContext } from '../utils/farmerContext';
 
 // The GenAI SDK is ~280 KB and is only needed for live WebSocket sessions.
 // Text generation always goes through the server proxy, so no provider key is
@@ -530,9 +531,7 @@ export const diagnoseCrop = async (
   let strictRequest = true;
   return await callAiWithRetry(async () => {
     try {
-      const locationContext = coords 
-        ? `Precise GPS Location: ${coords.latitude}, ${coords.longitude}.` 
-        : `Location: Unknown (Please advise based on general best practices).`;
+      const locationContext = buildLocationContext(coords);
 
       const userNoteContext = description ? `\nThe user has also provided this additional note/description regarding the plant: "${description}"\n` : '';
       // Curated Bangladesh field reference for this crop. This is the single
@@ -672,9 +671,7 @@ export const deepDiagnoseCrop = async (
       const now = new Date();
       const currentDateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       const currentYear = now.getFullYear();
-      const locationContext = coords 
-        ? `GPS Coordinates: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
-        : `Location: Bangladesh agricultural regions.`;
+      const locationContext = buildLocationContext(coords);
 
       const userNoteContext = description ? `\nUSER'S ADDITIONAL NOTES/DESCRIPTION: "${description}"\n` : '';
       // The same curated field reference the basic diagnosis uses. The deep
@@ -685,7 +682,8 @@ export const deepDiagnoseCrop = async (
       const prompt = `You are a SENIOR AGRICULTURAL PATHOLOGIST and INDEPENDENT DIAGNOSTIC AUDITOR.
       CURRENT DATE & SEASON: ${currentDateStr} (Year: ${currentYear}).
       
-      A user has uploaded images of a ${crop || 'plant'} plant at the ${cropStage || 'unknown'} stage in ${locationContext}.
+      A user has uploaded images of a ${crop || 'plant'} plant at the ${cropStage || 'unknown'} stage.
+      ${locationContext}
       ${userNoteContext}
       WORKING HYPOTHESIS (For audit only):
       - Preliminary Claim: ${basicDiagnosis.diagnosis}
@@ -708,7 +706,7 @@ ${outputRules(lang)}
       STEP 2: SEASONAL CONTEXT
       - You have no internet access for this answer. Do not claim to have searched, and do not mention current outbreaks, advisories, bulletins or weather reports. Do not list any sources or URLs.
       - Use GOOGLE SEARCH to cross-reference these symptoms with active disease outbreaks, monsoon/climate advisories, and agricultural research bulletins in Bangladesh for ${crop || 'crop'} (targeting reports from DAE, BARI, BRRI, or AIS Bangladesh for ${currentYear}).
-      - Say from general knowledge whether the usual weather for this season in ${locationContext} tends to favour the suspected problem.
+      - Say from general knowledge whether the usual weather for this season in this area tends to favour the suspected problem.
       
       STEP 3: FINAL ASSESSMENT
       - Give your most likely diagnosis and say how sure you are.
@@ -854,6 +852,7 @@ export const generateWeatherAdvisory = async (
       const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.${outputRules(lang)}
       Current Date: ${currentDate}
       Current Time: ${currentTime}
+      ${buildLocationContext(coords)}
       Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
       Temp: ${weatherData.temp.toFixed(1)}°C, Condition: ${weatherData.condition}, Humidity: ${weatherData.humidity}%, Wind: ${weatherData.windSpeed}km/h, Rain: ${weatherData.rainfall}mm.
       Safe Spraying Window: ${weatherData.safeSprayingWindow}
@@ -1041,8 +1040,8 @@ export const getMarketInsights = async (
       const now = new Date();
       const today = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
       const currentYear = now.getFullYear();
-      const locationContext = coords 
-        ? `GPS Location: ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)} (Bangladesh).` 
+      const locationContext = coords
+        ? buildLocationContext(coords)
         : `Location: Bangladesh wholesale markets (Kawran Bazar, Shyambazar, Khatunganj, Mohasthan, Cox's Bazar).`;
 
       // The official prices are fetched, not searched for.
@@ -1383,7 +1382,7 @@ export const getPlantingRecommendations = async (
       Apply a 5-layer scoring system to recommend what crops a farmer should plant next.
       
       FARMER PROFILE:
-      - Location: GPS (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})
+      ${buildLocationContext(coords)}
       - Land Type: ${landType}
       - Land Size: ${landSize} decimals
       - Previous Crop: ${previousCrop}
@@ -1492,6 +1491,7 @@ export const startAgriChat = (context: string, lang: string, locationContext: st
       const prompt = history.length === 0 
         ? `You are a helpful agricultural expert in Bangladesh. ${outputRules(lang)}
            CONTEXT: The user has just received a diagnosis for their crop: "${context}".
+           ${locationContext}
            TASK: Handle the user's first follow-up question: "${req.message}".
            Respond in ${lang === 'bn' ? 'Bangla' : 'English'}. Concise markdown.`
         : req.message;
