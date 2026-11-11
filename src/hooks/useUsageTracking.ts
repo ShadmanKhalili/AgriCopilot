@@ -3,6 +3,7 @@ import { useAuth } from '../components/AuthProvider';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
+import { hasGuestAllowance } from '../firebase';
 
 export function useUsageTracking(tabId: string = 'global') {
   const { user, userProfile } = useAuth();
@@ -31,12 +32,14 @@ export function useUsageTracking(tabId: string = 'global') {
     }
   }, [user, tabId]);
 
-  // The AI proxy enforces the real allowance (AI_FREE_DAILY_LIMIT and
-  // AI_PREMIUM_DAILY_LIMIT, 100 and 1000 by default). A visitor who is not
-  // signed in is given a guest account on their first AI call and gets the
-  // free allowance, so the numbers shown here must match the server's.
+  // The AI proxy enforces the real allowance (AI_GUEST_DAILY_LIMIT,
+  // AI_FREE_DAILY_LIMIT and AI_PREMIUM_DAILY_LIMIT, 10, 100 and 1000 by
+  // default). A visitor who is not signed in is given a guest account on their
+  // first AI call, and guests and unverified email accounts get the guest
+  // allowance, so the numbers shown here must match the server's.
   const getLimit = () => {
     if (userProfile?.tier === 'premium') return 1000;
+    if (hasGuestAllowance(user)) return 10;
     return 100;
   };
 

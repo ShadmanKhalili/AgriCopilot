@@ -18,6 +18,7 @@
 import {
   countAiUsageToday,
   dailyAiLimit,
+  dailyLimitMessage,
   dailyLiveSessionLimit,
   getUserPlan,
   recordAiUsage,
@@ -61,7 +62,8 @@ export const issueLiveToken = async (
   client: { authTokens: { create: (params: any) => Promise<any> } },
   uid: string,
   idToken: string,
-  requestedModel: unknown
+  requestedModel: unknown,
+  isGuest: boolean
 ): Promise<LiveTokenResult> => {
   const allowed = liveModels();
   const wanted = typeof requestedModel === 'string' ? requestedModel.trim() : '';
@@ -71,7 +73,7 @@ export const issueLiveToken = async (
   const model = wanted || allowed[0];
 
   const dayNumber = utcDayNumber();
-  const plan = await getUserPlan(uid, idToken);
+  const plan = await getUserPlan(uid, idToken, isGuest);
   const [used, liveUsed] = await Promise.all([
     countAiUsageToday(uid, idToken, dayNumber),
     countAiUsageToday(uid, idToken, dayNumber, 'live'),
@@ -80,7 +82,7 @@ export const issueLiveToken = async (
     return { ok: false, status: 503, error: 'The AI service is busy. Please try again in a moment.' };
   }
   if (used >= dailyAiLimit(plan)) {
-    return { ok: false, status: 429, error: "You have used all of today's AI advice. It resets tomorrow." };
+    return { ok: false, status: 429, error: dailyLimitMessage(plan) };
   }
   if (liveUsed >= dailyLiveSessionLimit(plan)) {
     return {

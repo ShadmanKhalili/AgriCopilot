@@ -72,3 +72,53 @@ export const sanitizeGenerationConfig = (
 
   return config;
 };
+
+/** Largest system instruction and response schema together, in characters. */
+export const MAX_CONFIG_TEXT_CHARS = 20_000;
+
+/**
+ * Text in the settings is billed like the prompt but isn't part of `contents`,
+ * so it needs its own limit.
+ */
+export const configTextChars = (config: Record<string, unknown>): number => {
+  const size = (value: unknown): number => {
+    if (value === undefined || value === null) return 0;
+    return typeof value === 'string' ? value.length : JSON.stringify(value).length;
+  };
+  return size(config.systemInstruction) + size(config.responseSchema);
+};
+
+const MAX_CONTENT_DEPTH = 8;
+const ALLOWED_PART_KEYS = new Set(['role', 'parts', 'text', 'inlineData']);
+
+/**
+ * Returns what's wrong with a request's content, or null if it's fine.
+ *
+ * The app only sends text and inline images. Anything else, such as `fileData`
+ * pointing at a remote video or PDF, could be billed for millions of tokens while
+ * the size limits see nothing, so it's refused rather than measured.
+ */
+export const findUnsupportedContent = (contents: unknown): string | null => {
+  const visit = (node: unknown, depth: number): string | null => {
+    if (depth > MAX_CONTENT_DEPTH) return 'nested too deeply';
+    if (typeof node === 'string') return null;
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const problem = visit(item, depth + 1);
+        if (problem) return problem;
+      }
+      return null;
+    }
+    if (!node || typeof node !== 'object') return 'not text or an image';
+    const part = node as Record<string, any>;
+    for (const key of Object.keys(part)) {
+      if (!ALLOWED_PART_KEYS.has(key)) return `"${key}" is not allowed`;
+    }
+    if (part.inlineData !== undefined) {
+      const mimeType = String(part.inlineData?.mimeType || '');
+      if (!/^(image|audio)\//.test(mimeType)) return 'only images and audio can be attached';
+    }
+    return part.parts === undefined ? null : visit(part.parts, depth + 1);
+  };
+  return visit(contents, 0);
+};

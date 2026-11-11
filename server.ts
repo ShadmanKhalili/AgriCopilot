@@ -11,8 +11,8 @@ import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
 import { validateOutboundUrl, safeFetch, readTextWithLimit } from "./netlify/functions/_shared/safe-url.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
-import { countAiUsageToday, dailyAiLimit, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
-import { maxOutputTokensFromEnv, sanitizeGenerationConfig } from "./netlify/functions/_shared/ai-config.ts";
+import { countAiUsageToday, dailyAiLimit, dailyLimitMessage, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
+import { maxOutputTokensFromEnv, sanitizeGenerationConfig, findUnsupportedContent, configTextChars, MAX_CONFIG_TEXT_CHARS } from "./netlify/functions/_shared/ai-config.ts";
 import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
 import {
   getFreshMarketBulletin,
@@ -363,7 +363,7 @@ async function startServer() {
         });
       }
 
-      const result = await issueLiveToken(client as any, user.uid, idToken, req.body?.model);
+      const result = await issueLiveToken(client as any, user.uid, idToken, req.body?.model, user.isGuest);
       if (result.ok === false) {
         return res.status(result.status).json({ error: result.error });
       }
@@ -423,7 +423,7 @@ async function startServer() {
 
       // ── Daily allowance ───────────────────────────────────────────────────
       const dayNumber = utcDayNumber();
-      const plan = await getUserPlan(user.uid, idToken);
+      const plan = await getUserPlan(user.uid, idToken, user.isGuest);
       const limit = dailyAiLimit(plan);
       const used = await countAiUsageToday(user.uid, idToken, dayNumber);
       if (used === null) {
@@ -431,9 +431,7 @@ async function startServer() {
       }
       if (used >= limit) {
         return res.status(429).json({
-          error: plan === "premium"
-            ? "You have reached your daily AI limit. It resets tomorrow."
-            : "You have used all of today's free AI advice. It resets tomorrow.",
+          error: dailyLimitMessage(plan),
           limit,
           used,
         });
@@ -466,6 +464,9 @@ async function startServer() {
         if (node.parts) { const r = measureContents(node.parts, depth + 1); chars += r.chars; images += r.images; }
         return { chars, images };
       };
+      if (findUnsupportedContent(contents)) {
+        return res.status(400).json({ error: "That request contains content that can't be sent." });
+      }
       const measured = measureContents(contents);
       if (measured.chars > 40000) {
         return res.status(413).json({ error: "That request contains too much text." });
@@ -489,12 +490,28 @@ async function startServer() {
         },
         maxOutputTokensFromEnv()
       );
+      if (configTextChars(mergedConfig) > MAX_CONFIG_TEXT_CHARS) {
+        return res.status(413).json({ error: "That request contains too much text." });
+      }
       // Only Google Search may be requested, and only when the caller asked.
       const requestedTools = Array.isArray(tools) ? tools : config?.tools;
       if (Array.isArray(requestedTools)) {
         const allowed = requestedTools.filter((t: any) =>
           t && typeof t === "object" && Object.keys(t).length === 1 && "googleSearch" in t);
         if (allowed.length) mergedConfig.tools = allowed;
+      }
+
+      // Charge the allowance before spending anything, as the Netlify proxy does.
+      const reserved = await recordAiUsage(user.uid, idToken, dayNumber, "text");
+      if (!reserved) {
+        return res.status(503).json({ error: "The AI service is busy. Please try again in a moment." });
+      }
+      const usedNow = await countAiUsageToday(user.uid, idToken, dayNumber);
+      if (usedNow === null) {
+        return res.status(503).json({ error: "The AI service is busy. Please try again in a moment." });
+      }
+      if (usedNow > dailyAiLimit(plan)) {
+        return res.status(429).json({ error: dailyLimitMessage(plan) });
       }
 
       const candidateModels = getCandidateModels(requestedModel);
@@ -509,7 +526,6 @@ async function startServer() {
             config: mergedConfig
           });
 
-          await recordAiUsage(user.uid, idToken, dayNumber, "text");
           return res.json({
             text: aiResponse.text || "",
             candidates: aiResponse.candidates || [],

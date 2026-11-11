@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 import FarmerDossier from './FarmerDossier';
 import { DataStatusCard } from './DataStatusCard';
+import { auth, needsEmailVerification, resendVerificationEmail } from '../firebase';
 
 interface Props {
   lang: Language;
@@ -287,7 +288,48 @@ export default function Profile({ lang, onUpgrade }: Props) {
                     </button>
                   </div>
                 ) : (
-                  <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
+                  <div className="space-y-2">
+                    <p className="text-lg font-black text-gray-900 break-all tracking-tight">{user.email}</p>
+                    {needsEmailVerification(user) && (
+                      <>
+                        <p className="text-[11px] font-medium text-amber-700">
+                          {lang === 'bn'
+                            ? 'ইমেইল যাচাই হয়নি। যাচাই না হওয়া পর্যন্ত প্রতিদিন ১০টি এআই পরামর্শ পাবেন; যাচাই করলে ১০০টি।'
+                            : 'Email not verified. Until it is, you get 10 AI answers a day; after, 100.'}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await resendVerificationEmail();
+                                toast.success(lang === 'bn' ? 'যাচাইয়ের ইমেইল পাঠানো হয়েছে।' : 'Verification email sent.');
+                              } catch {
+                                toast.error(lang === 'bn' ? 'ইমেইল পাঠানো যায়নি। একটু পরে চেষ্টা করুন।' : 'Could not send the email. Please try again later.');
+                              }
+                            }}
+                            className="min-h-[44px] px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black active:scale-95 transition-all"
+                          >
+                            {lang === 'bn' ? 'যাচাইয়ের ইমেইল পাঠান' : 'Send verification email'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await auth.currentUser?.reload().catch(() => undefined);
+                              if (auth.currentUser?.emailVerified) {
+                                window.location.reload();
+                              } else {
+                                toast.error(lang === 'bn' ? 'এখনও যাচাই হয়নি। ইমেইলের লিংকে চাপ দিন।' : 'Not verified yet. Open the link in the email first.');
+                              }
+                            }}
+                            className="min-h-[44px] px-4 rounded-xl border border-emerald-700 text-emerald-800 text-xs font-black active:scale-95 transition-all"
+                          >
+                            {lang === 'bn' ? 'যাচাই করেছি' : "I've verified"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="group/item">

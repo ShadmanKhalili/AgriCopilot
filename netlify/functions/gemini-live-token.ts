@@ -90,7 +90,7 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON body.' }) };
     }
 
-    const result = await issueLiveToken(client, user.uid, token, requestedModel);
+    const result = await issueLiveToken(client, user.uid, token, requestedModel, user.isGuest);
     if (result.ok === false) {
       return {
         statusCode: result.status,

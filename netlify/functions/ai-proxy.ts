@@ -1,9 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
 import { aiCallsPerIpPerMinute, checkIpRateLimit, extractClientIp } from "./_shared/ip-limit.ts";
-import { countAiUsageToday, dailyAiLimit, getUserPlan, recordAiUsage, utcDayNumber } from "./_shared/usage-quota.ts";
+import {
+  countAiUsageToday,
+  dailyAiLimit,
+  dailyLimitMessage,
+  getUserPlan,
+  recordAiUsage,
+  utcDayNumber,
+} from "./_shared/usage-quota.ts";
 import { recordModerationEvent } from "./_shared/moderation-events.ts";
-import { maxOutputTokensFromEnv, sanitizeGenerationConfig } from "./_shared/ai-config.ts";
+import {
+  MAX_CONFIG_TEXT_CHARS,
+  configTextChars,
+  findUnsupportedContent,
+  maxOutputTokensFromEnv,
+  sanitizeGenerationConfig,
+} from "./_shared/ai-config.ts";
 import {
   SAFETY_BLOCK_CODE,
   SAFETY_BLOCK_MESSAGE,
@@ -442,8 +455,6 @@ const streamText = async (
             modelUsed: outcome.model,
           });
           close();
-          // The call produced a billable answer: charge it to the allowance.
-          await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
           return;
         }
 
@@ -462,7 +473,6 @@ const streamText = async (
             model: outcome.model,
             severity: outcome.severity,
           });
-          await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
           send({ type: "error", error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
           close();
           return;
@@ -527,7 +537,6 @@ const bufferText = async (
       if (deadline - Date.now() < 3_000) break;
       const outcome = await runModel(apiKey, model, contents, attemptConfig, deadline, () => {});
       if (outcome.status === "ok") {
-        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
         return jsonResponse(200, {
           text: outcome.text,
           modelUsed: outcome.model,
@@ -541,7 +550,6 @@ const bufferText = async (
           model: outcome.model,
           severity: outcome.severity,
         });
-        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "text");
         return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
       }
       if (attemptConfig === config && isSearchToolRejection(outcome)) {
@@ -585,11 +593,9 @@ const generateAudio = async (
           model: candidate,
           severity: block.severity,
         });
-        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
         return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
       }
 
-      await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
       return jsonResponse(200, {
         text: response.text || "",
         candidates: response.candidates || [],
@@ -606,7 +612,6 @@ const generateAudio = async (
           model: candidate,
           severity: block.severity,
         });
-        await recordAiUsage(quota.uid, quota.idToken, quota.dayNumber, "audio");
         return jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE });
       }
       console.warn(`[AI Proxy] Audio model ${candidate} failed: ${errorMessage(error)}`);
@@ -661,7 +666,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
 
   // ── 3. Enforce the daily allowance ──────────────────────────────────────
   const dayNumber = utcDayNumber();
-  const plan = await getUserPlan(user.uid, idToken);
+  const plan = await getUserPlan(user.uid, idToken, user.isGuest);
   const limit = dailyAiLimit(plan);
   const used = await countAiUsageToday(user.uid, idToken, dayNumber);
   if (used === null) {
@@ -671,10 +676,7 @@ export default async (request: Request, _context: any): Promise<Response> => {
   }
   if (used >= limit) {
     return jsonResponse(429, {
-      error:
-        plan === "premium"
-          ? "You have reached your daily AI limit. It resets tomorrow."
-          : "You have used all of today's free AI advice. It resets tomorrow.",
+      error: dailyLimitMessage(plan),
       limit,
       used,
     });
@@ -703,6 +705,11 @@ export default async (request: Request, _context: any): Promise<Response> => {
     return jsonResponse(400, { error: "Missing contents." });
   }
 
+  const contentProblem = findUnsupportedContent(contents);
+  if (contentProblem) {
+    return jsonResponse(400, { error: "That request contains content that can't be sent." });
+  }
+
   const { textChars, images } = measureContents(contents);
   if (textChars > MAX_TOTAL_TEXT_CHARS) {
     return jsonResponse(413, { error: "That request contains too much text." });
@@ -726,6 +733,9 @@ export default async (request: Request, _context: any): Promise<Response> => {
     if (body[key] !== undefined) callerConfig[key] = body[key];
   }
   const config = sanitizeGenerationConfig(callerConfig, MAX_OUTPUT_TOKENS);
+  if (configTextChars(config) > MAX_CONFIG_TEXT_CHARS) {
+    return jsonResponse(413, { error: "That request contains too much text." });
+  }
   // Safety settings are the server's decision, not the caller's.
   //
   // The caller's own `safetySettings` are dropped here and replaced with the
@@ -744,6 +754,24 @@ export default async (request: Request, _context: any): Promise<Response> => {
   const requestedModel = body?.model;
 
   const quota = { uid: user.uid, idToken, dayNumber };
+
+  // ── 6. Charge the allowance before spending anything ─────────────────────
+  // Recording after the answer let a call go free when the write failed, for
+  // example with a token about to expire, and let parallel requests all pass the
+  // check above before any of them was counted. Now no write means no call, and
+  // counting again after the write catches a burst. A call that fails upstream
+  // stays counted, because the ledger can't be edited.
+  const reserved = await recordAiUsage(user.uid, idToken, dayNumber, isAudio ? "audio" : "text");
+  if (!reserved) {
+    return jsonResponse(503, { error: "The AI service is busy. Please try again in a moment." });
+  }
+  const usedNow = await countAiUsageToday(user.uid, idToken, dayNumber);
+  if (usedNow === null) {
+    return jsonResponse(503, { error: "The AI service is busy. Please try again in a moment." });
+  }
+  if (usedNow > limit) {
+    return jsonResponse(429, { error: dailyLimitMessage(plan), limit, used: usedNow });
+  }
 
   if (isAudio) {
     return generateAudio(apiKey, contents, config, requestedModel, quota);
