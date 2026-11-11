@@ -12,6 +12,8 @@ interface Props {
   globalLocation: { latitude: number; longitude: number } | null;
   setGlobalLocation: (loc: { latitude: number; longitude: number }) => void;
   currentLocationName?: string | null;
+  /** Called with the names of the district and upazila the farmer picked from the list. */
+  onPlaceChosen?: (place: { district: string; districtBn: string; upazila?: string; upazilaBn?: string }) => void;
 }
 
 export default function RegionModal({
@@ -20,7 +22,8 @@ export default function RegionModal({
   lang,
   globalLocation,
   setGlobalLocation,
-  currentLocationName
+  currentLocationName,
+  onPlaceChosen
 }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDistrictId, setSelectedDistrictId] = useState<string>(geoData[0]?.id || '1');
@@ -56,6 +59,12 @@ export default function RegionModal({
     setGlobalLocation({
       latitude: upazila.lat || district.lat,
       longitude: upazila.lng || district.lng
+    });
+    onPlaceChosen?.({
+      district: district.name,
+      districtBn: district.bn_name,
+      upazila: upazila.name,
+      upazilaBn: upazila.bn_name,
     });
     onClose();
   };

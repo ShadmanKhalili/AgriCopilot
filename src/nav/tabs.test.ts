@@ -14,6 +14,7 @@ describe('tabFromHash', () => {
 
   it('accepts the short names used in older links', () => {
     expect(tabFromHash('#copilot')).toBe('agri-copilot');
+    expect(tabFromHash('#agri-copilot')).toBe('agri-copilot');
     expect(tabFromHash('#weather')).toBe('weather-advisory');
     expect(tabFromHash('#calculator')).toBe('krishi-profit');
   });

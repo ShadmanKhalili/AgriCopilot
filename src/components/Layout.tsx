@@ -3,7 +3,7 @@ import {
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
   ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown,
-  Search, Sun, Moon, Sparkles, Grid, HeartHandshake
+  Search, Sun, Moon, Sparkles, Grid, HeartHandshake, Home as HomeIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -59,18 +59,20 @@ import { useLocationName } from '../hooks/useLocationName';
 import { useExpertAvailability } from '../hooks/useExpertAvailability';
 import { useExpertUnread } from '../hooks/useExpertUnread';
 import toBn from '../utils/banglaNum';
-import { detectUserLocation } from '../utils/geolocation';
 import { safeStorage } from '../utils/security';
 import { ErrorBoundary } from './ErrorBoundary';
 import { HOME_TAB, hashForTab, tabFromHash, type PillarKey, type Tab } from '../nav/tabs';
 import { useAppSettings } from '../context/AppSettingsContext';
+import { useUiMode } from '../context/useUiMode';
+import HomeToday from './HomeToday';
+import Onboarding from './Onboarding';
 
 interface TabItem {
   id: Tab;
   name: string;
   icon: any;
   description: string;
-  pillar: 'health' | 'weather' | 'economics' | 'support';
+  pillar: 'home' | 'health' | 'weather' | 'economics' | 'support';
   subcategory: string;
   badge?: string;
 }
@@ -125,7 +127,10 @@ export default function Layout() {
   const [isRegionModalOpen, setIsRegionModalOpen] = useState(false);
   const [selectedPillarFilter, setSelectedPillarFilter] = useState<PillarKey>('all');
   const [menuSearchQuery, setMenuSearchQuery] = useState('');
-  const { lang, setLang, theme, setTheme, location: globalLocation, setLocation: setGlobalLocation } = useAppSettings();
+  const {
+    lang, setLang, theme, setTheme, location: globalLocation, setLocation: setGlobalLocation,
+    hasOnboarded, setModePreference, place, setPlace,
+  } = useAppSettings();
 
   const toggleTheme = () => {
     audioFeedback.playTactileClick();
@@ -187,27 +192,6 @@ export default function Layout() {
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
   const [marketProduce, setMarketProduce] = useState<string>('tomato');
 
-  // Initialize location with high accuracy GPS on first launch
-  useEffect(() => {
-    if (globalLocation) return;
-    
-    detectUserLocation()
-      .then((coords) => {
-        setGlobalLocation({
-          latitude: Number(coords.latitude.toFixed(5)),
-          longitude: Number(coords.longitude.toFixed(5)),
-        });
-        localStorage.setItem('smart_krishi_gps_checked', 'true');
-      })
-      .catch((err) => {
-        console.warn("GPS initial auto-detection skipped or denied:", err);
-        // Fallback default: Dhaka center
-        const defaultLoc = { latitude: 23.8103, longitude: 90.4125 };
-        setGlobalLocation(defaultLoc);
-        localStorage.setItem('smart_krishi_gps_checked', 'true');
-      });
-  }, []);
-
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
     if (payload?.crop) {
       const cropMap: Record<string, string> = {
@@ -240,11 +224,22 @@ export default function Layout() {
   const tabErrorBoundaryProps = {
     variant: 'compact' as const,
     lang,
-    onGoHome: () => handleNavigateTab('agri-copilot')
+    onGoHome: () => handleNavigateTab(HOME_TAB)
   };
 
-  const { locationName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
+  const { locationName: lookedUpName, isLoading: isLocNameLoading } = useLocationName(globalLocation, lang);
+  // An area the farmer picked by name is shown as picked. The lookup from
+  // coordinates can only tell the district reliably, so it would often name
+  // the wrong upazila.
+  const locationName = place
+    ? [lang === 'bn' ? place.upazilaBn : place.upazila, lang === 'bn' ? place.districtBn : place.district]
+        .filter(Boolean)
+        .join(', ')
+    : lookedUpName;
   const { user, userRole, isAuthReady, isGuest, signOut } = useAuth();
+  // Simple view: the few core tools, large and uncluttered. Full view: everything.
+  const mode = useUiMode();
+  const simple = mode === 'simple';
   // Live "experts accepting requests" count for the global availability badges.
   const { onlineCount: expertOnlineCount } = useExpertAvailability();
   // Unread expert replies (per-device read markers) for the nav badge.
@@ -252,6 +247,14 @@ export default function Layout() {
   const t = translations[lang];
 
   const allTabs: TabItem[] = [
+    {
+      id: 'home',
+      name: lang === 'bn' ? 'আজ' : 'Today',
+      icon: HomeIcon,
+      description: lang === 'bn' ? 'আজকের আবহাওয়া ও করণীয়' : "Today's weather and what to do",
+      pillar: 'home',
+      subcategory: lang === 'bn' ? 'হোম' : 'Home'
+    },
     // Pillar 1: Crop Health & Protection (শস্য স্বাস্থ্য ও সুরক্ষা)
     { 
       id: 'agri-copilot', 
@@ -472,6 +475,25 @@ export default function Layout() {
     }
   }, [activeTabDetails, lang]);
 
+  const areaNeeded = (
+    <div className="max-w-md mx-auto w-full text-center space-y-3 rounded-3xl bg-white dark:bg-[#0c1c13] border border-stone-200 dark:border-emerald-900/50 p-6 mt-4">
+      <MapPin className="w-10 h-10 mx-auto text-amber-600" aria-hidden="true" />
+      <p className="text-lg font-bold text-stone-900 dark:text-white">
+        {lang === 'bn' ? 'আগে আপনার এলাকা বেছে নিন' : 'Choose your area first'}
+      </p>
+      <p className="text-base text-stone-700 dark:text-stone-300">
+        {lang === 'bn' ? 'এই সেবাটি আপনার এলাকার তথ্য ব্যবহার করে।' : 'This service uses information for your area.'}
+      </p>
+      <button
+        type="button"
+        onClick={() => setIsRegionModalOpen(true)}
+        className="w-full min-h-[56px] rounded-2xl bg-emerald-700 text-white text-lg font-bold active:scale-[0.98] transition-transform cursor-pointer"
+      >
+        {lang === 'bn' ? 'এলাকা বেছে নিন' : 'Choose area'}
+      </button>
+    </div>
+  );
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-emerald-800">
@@ -485,6 +507,7 @@ export default function Layout() {
 
   return (
     <>
+      {!hasOnboarded && <Onboarding onDone={() => undefined} />}
       <OfflineBanner lang={lang} />
       
       <div className="h-[100dvh] w-full bg-[#F4F6F4] dark:bg-[#09110c] text-slate-900 dark:text-emerald-50 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
@@ -497,7 +520,7 @@ export default function Layout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-40 ${simple ? '' : 'md:hidden'}`}
               onClick={() => setIsMobileMenuOpen(false)}
             />
           )}
@@ -507,8 +530,8 @@ export default function Layout() {
           id="sidebar-nav"
           className={`
             fixed inset-y-0 left-0 transform ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-            md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
-            w-[86vw] max-w-sm md:w-80 rounded-r-3xl md:rounded-none 
+            ${simple ? '' : 'md:relative md:translate-x-0 md:w-80 md:rounded-none'} transition-transform duration-300 ease-in-out
+            w-[86vw] max-w-sm rounded-r-3xl 
             bg-white dark:bg-gradient-to-b dark:from-emerald-950 dark:via-[#0c1c13] dark:to-[#08150d] 
             text-slate-900 dark:text-white flex flex-col shadow-2xl z-50 h-full shrink-0 
             border-r border-emerald-200/80 dark:border-emerald-800/40 
@@ -549,13 +572,14 @@ export default function Layout() {
               type="button"
               onClick={() => setIsMobileMenuOpen(false)}
               aria-label={lang === 'bn' ? 'মেনু বন্ধ করুন' : 'Close Menu'}
-              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-white/10 dark:text-white/90 rounded-2xl active:scale-90 focus:outline-none transition-all cursor-pointer"
+              className={`${simple ? '' : 'md:hidden'} min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-white/10 dark:text-white/90 rounded-2xl active:scale-90 focus:outline-none transition-all cursor-pointer`}
             >
               <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
           {/* Pillar Category Filter Tabs (Quick Filter) & Search */}
+          {!simple && (
           <div className="px-3 pt-3 pb-1 space-y-2 shrink-0">
             <div className="grid grid-cols-5 gap-1 p-1 bg-emerald-50/90 dark:bg-emerald-950/80 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/40">
               {pillarCategories.map((cat) => {
@@ -599,6 +623,7 @@ export default function Layout() {
               )}
             </div>
           </div>
+          )}
           
           {/* Categorized and Subcategorized Navigation List (Smoothly Scrollable) */}
           <nav 
@@ -606,6 +631,24 @@ export default function Layout() {
             role="tablist"
             aria-orientation="vertical"
           >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === HOME_TAB}
+              onClick={() => {
+                audioFeedback.playTactileClick();
+                setActiveTab(HOME_TAB);
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 min-h-[52px] px-3 rounded-2xl text-left text-base font-bold cursor-pointer ${
+                activeTab === HOME_TAB
+                  ? 'bg-emerald-700 text-white dark:bg-white dark:text-emerald-950'
+                  : 'text-slate-800 hover:bg-emerald-50 dark:text-emerald-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <HomeIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
+              <span>{lang === 'bn' ? 'হোম (আজ)' : 'Home (Today)'}</span>
+            </button>
             {filteredPillars.length === 0 ? (
               <div className="py-8 text-center px-4">
                 <div className="p-3 bg-emerald-100/60 dark:bg-white/5 rounded-2xl inline-flex text-emerald-700 dark:text-emerald-400 mb-2">
@@ -740,6 +783,41 @@ export default function Layout() {
           
           {/* Sidebar Footer: Auth */}
           <div className="p-3 border-t border-emerald-100 dark:border-white/10 bg-emerald-50/70 dark:bg-black/15 shrink-0">
+            <div className="mb-2 rounded-2xl border border-emerald-200 dark:border-white/10 bg-white dark:bg-white/5 p-2.5 space-y-2">
+              <label className="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer">
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">
+                    {lang === 'bn' ? 'সব ফিচার দেখান' : 'Show all features'}
+                  </span>
+                  <span className="block text-xs text-slate-600 dark:text-emerald-200">
+                    {lang === 'bn' ? 'বন্ধ রাখলে সহজ ভিউ থাকবে' : 'Off keeps the simple view'}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={!simple}
+                  onChange={(e) => {
+                    audioFeedback.playTactileClick();
+                    setModePreference(e.target.checked ? 'full' : 'simple');
+                  }}
+                  className="w-6 h-6 accent-emerald-700 shrink-0 cursor-pointer"
+                />
+              </label>
+              {simple && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-slate-200 dark:border-emerald-800/60 text-sm font-bold text-slate-800 dark:text-emerald-100 cursor-pointer"
+                  >
+                    {theme === 'light' ? <Moon className="w-4 h-4" aria-hidden="true" /> : <Sun className="w-4 h-4" aria-hidden="true" />}
+                    <span>{theme === 'light' ? (lang === 'bn' ? 'ডার্ক' : 'Dark') : (lang === 'bn' ? 'লাইট' : 'Light')}</span>
+                  </button>
+                  <PWAInstallButton lang={lang} />
+                </div>
+              )}
+            </div>
             {/* Auth Button */}
             {user ? (
               <div className="flex items-center justify-between bg-white dark:bg-white/5 p-2 rounded-2xl border border-emerald-200 dark:border-white/10 shadow-2xs">
@@ -790,12 +868,14 @@ export default function Layout() {
         <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
           
           {/* ================= BLOOMBERG-STYLE LIVE MANDI COMMODITY TICKER ================= */}
-          <Suspense fallback={null}>
-            <LiveMandiTicker
-              lang={lang}
-              onNavigateToMarket={() => handleNavigateTab('market-connect')}
-            />
-          </Suspense>
+          {!simple && (
+            <Suspense fallback={null}>
+              <LiveMandiTicker
+                lang={lang}
+                onNavigateToMarket={() => handleNavigateTab('market-connect')}
+              />
+            </Suspense>
+          )}
 
           {/* ================= STANDARDIZED PERSISTENT TOP BAR ================= */}
           <header className="bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md sticky top-0 border-b border-gray-200/80 dark:border-emerald-900/60 px-2.5 sm:px-4 md:px-6 py-2 sm:py-2.5 flex items-center justify-between z-30 shrink-0 shadow-xs pt-[max(0.5rem,env(safe-area-inset-top))]">
@@ -807,11 +887,26 @@ export default function Layout() {
                   audioFeedback.playTactileClick();
                   setIsMobileMenuOpen(true);
                 }}
-                className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:hover:bg-emerald-800 dark:text-emerald-200 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
+                className={`${simple ? 'hidden' : 'md:hidden'} min-h-[44px] min-w-[44px] flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:hover:bg-emerald-800 dark:text-emerald-200 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer`}
                 aria-label={lang === 'bn' ? 'মেনু খুলুন' : 'Open Menu'}
               >
                 <Menu className="w-5 h-5" />
               </button>
+              {simple && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(HOME_TAB)}
+                  aria-label={lang === 'bn' ? 'হোম' : 'Home'}
+                  className="flex items-center gap-2 min-h-[44px] min-w-0 cursor-pointer"
+                >
+                  <span className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0">
+                    <Leaf className="w-5 h-5" aria-hidden="true" />
+                  </span>
+                  <span className="hidden min-[400px]:inline text-base font-bold text-emerald-950 dark:text-white truncate">
+                    {lang === 'bn' ? 'কৃষি সেবা' : 'Agri-Tools'}
+                  </span>
+                </button>
+              )}
             </div>
 
 
@@ -840,7 +935,7 @@ export default function Layout() {
                   </span>
                   <MapPin className={`w-3.5 h-3.5 shrink-0 ${globalLocation ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
                   <span className="text-[11px] sm:text-xs font-black truncate max-w-[70px] sm:max-w-[160px]">
-                    {isLocNameLoading ? (
+                    {isLocNameLoading && !place ? (
                       <span className="opacity-60">{lang === 'bn' ? 'খোঁজা হচ্ছে...' : 'Locating...'}</span>
                     ) : (
                       locationName || (lang === 'bn' ? 'অবস্থান নির্বাচন' : 'Set Location')
@@ -851,6 +946,7 @@ export default function Layout() {
               </Tooltip>
 
               {/* Quick Light/Dark Mode Switcher */}
+              {!simple && (
               <button 
                 type="button"
                 onClick={toggleTheme} 
@@ -872,6 +968,7 @@ export default function Layout() {
                   </>
                 )}
               </button>
+              )}
 
               {/* Language Switcher Pill */}
               <button 
@@ -885,7 +982,7 @@ export default function Layout() {
               </button>
 
               {/* Install PWA Button for Android / Desktop / iOS */}
-              <PWAInstallButton lang={lang} />
+              {!simple && <PWAInstallButton lang={lang} />}
 
               {/* Profile or Sign-in Quick Pill */}
               {user ? (
@@ -913,7 +1010,7 @@ export default function Layout() {
           </header>
 
           {/* ================= SCROLLABLE MAIN CONTENT ================= */}
-          <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#090d16] pb-28 md:pb-6 transition-colors duration-200">
+          <main className={`flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden custom-scrollbar w-full relative bg-[#F7F8F6] dark:bg-[#090d16] ${simple ? 'pb-28' : 'pb-28 md:pb-6'} transition-colors duration-200`}>
             
             {/* FinTech Ambient Mesh Glow & Texture Grid */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -934,7 +1031,7 @@ export default function Layout() {
                   not only in the post-diagnosis CTA. Desktop skips it because
                   the quick-action bar above already carries the expert button.
                   Honest wording: claims "live now" only when the count says so. */}
-              {activeTab === 'agri-copilot' && (
+              {!simple && activeTab === 'agri-copilot' && (
                 <button
                   type="button"
                   onClick={() => setActiveTab('expert-hub')}
@@ -976,7 +1073,7 @@ export default function Layout() {
                   window the four chips do not fit on one line, and a
                   horizontal scroll left the last one clipped with no
                   visible way to reach it. */}
-              <div className="mb-3 sm:mb-4 hidden md:flex flex-wrap items-center justify-between gap-2 py-0.5 shrink-0">
+              <div className={`mb-3 sm:mb-4 ${simple ? 'hidden' : 'hidden md:flex'} flex-wrap items-center justify-between gap-2 py-0.5 shrink-0`}>
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <button
                     onClick={() => setActiveTab('agri-copilot')}
@@ -1072,6 +1169,21 @@ export default function Layout() {
                       </div>
                     </div>
                   }>
+                    <TabPanel id="home" active={activeTab === 'home'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
+                        <HomeToday
+                          lang={lang}
+                          onNavigate={(tab) => handleNavigateTab(tab)}
+                          onOpenAllServices={() => {
+                            setSelectedPillarFilter('all');
+                            setIsMobileMenuOpen(true);
+                          }}
+                          onSetArea={() => setIsRegionModalOpen(true)}
+                          locationName={locationName}
+                          unreadExpertCount={unreadExpertCount}
+                        />
+                      </ErrorBoundary>
+                    </TabPanel>
                     <TabPanel id="agri-copilot" active={activeTab === 'agri-copilot'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
                       {visitedTabs.has('agri-copilot') && (
@@ -1121,7 +1233,8 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="weather-advisory" active={activeTab === 'weather-advisory'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('weather-advisory') && (
+                      {!globalLocation && areaNeeded}
+                      {visitedTabs.has('weather-advisory') && globalLocation && (
                         <WeatherAdvisory 
                           lang={lang} 
                           globalLocation={globalLocation}
@@ -1156,7 +1269,8 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="crop-health" active={activeTab === 'crop-health'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('crop-health') && (
+                      {!globalLocation && areaNeeded}
+                      {visitedTabs.has('crop-health') && globalLocation && (
                         <SatelliteHealth 
                           lang={lang} 
                           globalLocation={globalLocation}
@@ -1172,7 +1286,8 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="smart-planting" active={activeTab === 'smart-planting'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('smart-planting') && (
+                      {!globalLocation && areaNeeded}
+                      {visitedTabs.has('smart-planting') && globalLocation && (
                         <SmartPlanting 
                           lang={lang} 
                           globalLocation={globalLocation}
@@ -1239,6 +1354,7 @@ export default function Layout() {
 
           {/* ================= SLEEK MOBILE BOTTOM ACTION BAR ================= */}
           <MobileBottomNav 
+            mode={mode}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             lang={lang}
@@ -1266,6 +1382,7 @@ export default function Layout() {
               globalLocation={globalLocation}
               setGlobalLocation={setGlobalLocation}
               currentLocationName={locationName}
+              onPlaceChosen={setPlace}
             />
           </Suspense>
         )}
