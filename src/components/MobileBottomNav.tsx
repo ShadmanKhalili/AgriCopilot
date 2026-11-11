@@ -1,10 +1,10 @@
 import React from 'react';
-import { Sprout, Cloud, FileText, Grid, HeartHandshake } from 'lucide-react';
+import { Sprout, Cloud, FileText, Grid, HeartHandshake, Home, TrendingUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../utils/translations';
 import toBn from '../utils/banglaNum';
 
-import type { PillarKey, Tab } from '../nav/tabs';
+import type { PillarKey, Tab, UiMode } from '../nav/tabs';
 
 export type { PillarKey };
 
@@ -17,6 +17,8 @@ interface PrimaryNavItem {
 }
 
 interface Props {
+  /** The simple view shows Home, Crop, Weather and Market; the full view keeps the earlier bar. */
+  mode: UiMode;
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   lang: Language;
@@ -32,6 +34,7 @@ export default function MobileBottomNav({
   activeTab, 
   setActiveTab, 
   lang, 
+  mode,
   onOpenAllTools,
   onSelectPillar,
   onlineExpertCount,
@@ -39,8 +42,17 @@ export default function MobileBottomNav({
 }: Props) {
   const t = translations[lang];
 
-  // Simplified First Experience: Ask about my crop, Weather, Expert help, My farm record. Specialist tools under "More".
-  const primaryNavItems: PrimaryNavItem[] = [
+  const simple = mode === 'simple';
+
+  const simpleNavItems: PrimaryNavItem[] = [
+    { id: 'home', targetTab: 'home', label: lang === 'bn' ? 'হোম' : 'Home', sublabel: '', icon: Home },
+    { id: 'ask-crop', targetTab: 'agri-copilot', label: lang === 'bn' ? 'ফসল' : 'Crop', sublabel: '', icon: Sprout },
+    { id: 'check-weather', targetTab: 'weather-advisory', label: lang === 'bn' ? 'আবহাওয়া' : 'Weather', sublabel: '', icon: Cloud },
+    { id: 'market', targetTab: 'market-connect', label: lang === 'bn' ? 'বাজার' : 'Market', sublabel: '', icon: TrendingUp },
+  ];
+
+  // Full view: Ask about my crop, Weather, Expert help, My farm record. Specialist tools under "More".
+  const fullNavItems: PrimaryNavItem[] = [
     {
       id: 'ask-crop',
       targetTab: 'agri-copilot',
@@ -73,12 +85,14 @@ export default function MobileBottomNav({
     }
   ];
 
+  const primaryNavItems = simple ? simpleNavItems : fullNavItems;
+
   const isSpecialistToolActive = !primaryNavItems.some(item => item.targetTab === activeTab);
 
   return (
     <nav 
       aria-label={lang === 'bn' ? 'মোবাইল প্রধান নেভিগেশন' : 'Mobile primary navigation'}
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md border-t border-stone-200/80 dark:border-stone-800 shadow-xs px-2 pt-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] transition-colors duration-200"
+      className={`${simple ? '' : 'md:hidden'} fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0c1c13]/95 backdrop-blur-md border-t border-stone-200/80 dark:border-stone-800 shadow-xs px-2 pt-1 pb-[max(0.4rem,env(safe-area-inset-bottom))] transition-colors duration-200`}
     >
       <div className="flex items-center justify-around max-w-md mx-auto gap-1">
         {primaryNavItems.map((item) => {
@@ -103,10 +117,10 @@ export default function MobileBottomNav({
               )}
 
               <div className="p-1">
-                <Icon className={`w-5 h-5 transition-colors ${isActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
+                <Icon className={`${simple ? 'w-6 h-6' : 'w-5 h-5'} transition-colors ${isActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
               </div>
 
-              <span className="text-[11px] leading-tight tracking-tight truncate max-w-[70px] text-center">
+              <span className={`${simple ? 'text-sm' : 'text-[11px]'} leading-tight tracking-tight truncate max-w-[70px] text-center`}>
                 {item.label}
               </span>
 
@@ -150,10 +164,10 @@ export default function MobileBottomNav({
             />
           )}
           <div className="p-1">
-            <Grid className={`w-5 h-5 transition-colors ${isSpecialistToolActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
+            <Grid className={`${simple ? 'w-6 h-6' : 'w-5 h-5'} transition-colors ${isSpecialistToolActive ? 'text-emerald-800 dark:text-emerald-300 stroke-[2.2]' : 'text-stone-500 dark:text-stone-400 stroke-[1.8]'}`} />
           </div>
-          <span className="text-[11px] leading-tight tracking-tight truncate max-w-[70px] text-center">
-            {lang === 'bn' ? 'আরও সেবা' : 'More'}
+          <span className={`${simple ? 'text-sm' : 'text-[11px]'} leading-tight tracking-tight truncate max-w-[70px] text-center`}>
+            {simple ? (lang === 'bn' ? 'সব সেবা' : 'All') : (lang === 'bn' ? 'আরও সেবা' : 'More')}
           </span>
         </button>
       </div>

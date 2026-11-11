@@ -16,15 +16,34 @@ interface AppSettings {
   setLang: React.Dispatch<React.SetStateAction<Language>>;
   theme: Theme;
   setTheme: React.Dispatch<React.SetStateAction<Theme>>;
-  /** How much of the app is shown: the few core tools, or everything. */
-  mode: UiMode;
-  setMode: (mode: UiMode) => void;
+  /**
+   * The view the farmer picked: the few core tools, or everything. Null until
+   * they pick one; `useUiMode` then chooses a default from their role.
+   */
+  modePreference: UiMode | null;
+  setModePreference: (mode: UiMode) => void;
   /** Whether this device has been through the first-run welcome. */
   hasOnboarded: boolean;
   setHasOnboarded: (done: boolean) => void;
   /** The farmer's saved position; null until GPS or a manual choice sets it. */
   location: Coordinates | null;
   setLocation: (location: Coordinates | null) => void;
+  /**
+   * The district and upazila the farmer chose by name. GPS alone can only
+   * tell the district reliably, so the upazila is kept only when picked.
+   */
+  place: Place | null;
+  setPlace: (place: Place | null) => void;
+  /** The crop the farmer mainly grows, as picked in the welcome screens. */
+  mainCrop: string | null;
+  setMainCrop: (crop: string | null) => void;
+}
+
+export interface Place {
+  district: string;
+  districtBn: string;
+  upazila?: string;
+  upazilaBn?: string;
 }
 
 const LANG_KEY = 'krishi_lang';
@@ -32,6 +51,24 @@ const THEME_KEY = 'krishi_theme';
 const MODE_KEY = 'krishi_ui_mode';
 const ONBOARDED_KEY = 'krishi_onboarded';
 const LOCATION_KEY = 'smart_krishi_global_location';
+const PLACE_KEY = 'krishi_place';
+const MAIN_CROP_KEY = 'krishi_main_crop';
+
+const readMode = (): UiMode | null => {
+  const saved = safeStorage.getItem<string>(MODE_KEY, '');
+  return saved === 'simple' || saved === 'full' ? saved : null;
+};
+
+const readPlace = (): Place | null => {
+  const saved = safeStorage.getItem<any>(PLACE_KEY, null);
+  if (!saved || typeof saved.district !== 'string' || !saved.district) return null;
+  return {
+    district: saved.district,
+    districtBn: typeof saved.districtBn === 'string' ? saved.districtBn : saved.district,
+    upazila: typeof saved.upazila === 'string' ? saved.upazila : undefined,
+    upazilaBn: typeof saved.upazilaBn === 'string' ? saved.upazilaBn : undefined,
+  };
+};
 
 const AppSettingsContext = createContext<AppSettings | null>(null);
 
@@ -85,8 +122,10 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   const [theme, setTheme] = useState<Theme>(() =>
     safeStorage.getItem<string>(THEME_KEY, 'light') === 'dark' ? 'dark' : 'light'
   );
-  const [mode, setModeState] = useState<UiMode>(() =>
-    safeStorage.getItem<string>(MODE_KEY, 'full') === 'simple' ? 'simple' : 'full'
+  const [modePreference, setModeState] = useState<UiMode | null>(readMode);
+  const [place, setPlaceState] = useState<Place | null>(readPlace);
+  const [mainCrop, setMainCropState] = useState<string | null>(
+    () => safeStorage.getItem<string>(MAIN_CROP_KEY, '') || null
   );
   const [hasOnboarded, setHasOnboardedState] = useState<boolean>(
     () => safeStorage.getItem<string>(ONBOARDED_KEY, '') === 'true'
@@ -111,9 +150,20 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     }
   }, [lang]);
 
-  const setMode = useCallback((next: UiMode) => {
+  const setModePreference = useCallback((next: UiMode) => {
     setModeState(next);
     safeStorage.setItem(MODE_KEY, next);
+  }, []);
+
+  const setPlace = useCallback((next: Place | null) => {
+    setPlaceState(next);
+    if (next) safeStorage.setItem(PLACE_KEY, next);
+    else safeStorage.removeItem(PLACE_KEY);
+  }, []);
+
+  const setMainCrop = useCallback((next: string | null) => {
+    setMainCropState(next);
+    safeStorage.setItem(MAIN_CROP_KEY, next || '');
   }, []);
 
   const setHasOnboarded = useCallback((done: boolean) => {
@@ -123,6 +173,10 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
 
   const setLocation = useCallback((next: Coordinates | null) => {
     setLocationState(next);
+    // A new position makes the previously chosen district and upazila stale.
+    // Callers that know the names call `setPlace` right after.
+    setPlaceState(null);
+    safeStorage.removeItem(PLACE_KEY);
     if (!next) return;
     try {
       localStorage.setItem(LOCATION_KEY, JSON.stringify(next));
@@ -132,8 +186,14 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const value = useMemo<AppSettings>(
-    () => ({ lang, setLang, theme, setTheme, mode, setMode, hasOnboarded, setHasOnboarded, location, setLocation }),
-    [lang, theme, mode, setMode, hasOnboarded, setHasOnboarded, location, setLocation]
+    () => ({
+      lang, setLang, theme, setTheme, modePreference, setModePreference,
+      hasOnboarded, setHasOnboarded, location, setLocation, place, setPlace, mainCrop, setMainCrop,
+    }),
+    [
+      lang, theme, modePreference, setModePreference, hasOnboarded, setHasOnboarded,
+      location, setLocation, place, setPlace, mainCrop, setMainCrop,
+    ]
   );
 
   return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>;

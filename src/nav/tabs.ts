@@ -7,6 +7,7 @@
  */
 
 export const TAB_IDS = [
+  'home',
   'agri-copilot',
   'smart-grade',
   'smart-planting',
@@ -27,7 +28,7 @@ export const TAB_IDS = [
 export type Tab = (typeof TAB_IDS)[number];
 
 /** The tab shown when the address has no hash. */
-export const HOME_TAB: Tab = 'agri-copilot';
+export const HOME_TAB: Tab = 'home';
 
 export type Pillar = 'health' | 'weather' | 'economics' | 'support';
 export type PillarKey = 'all' | Pillar;
@@ -44,6 +45,7 @@ export type UiMode = 'simple' | 'full';
  * a `full` tool is shown in full mode and stays reachable from "All services".
  */
 export const TAB_LEVEL: Record<Tab, UiMode> = {
+  'home': 'simple',
   'agri-copilot': 'simple',
   'weather-advisory': 'simple',
   'market-connect': 'simple',
