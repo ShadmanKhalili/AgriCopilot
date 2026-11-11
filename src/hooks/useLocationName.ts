@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { findNearestLocation } from '../utils/geoData';
 
 // In-memory cache across hook instances and tab navigation
 const locationCache = new Map<string, string>();
+
+// The list of districts and upazilas is large, so it is fetched on first use
+// instead of being part of the app's first download.
+const loadGeoData = () => import('../utils/geoData');
 
 export function useLocationName(coords: { latitude: number; longitude: number } | null, lang: string) {
   const lat = coords?.latitude ? Number(coords.latitude.toFixed(4)) : null;
@@ -10,11 +13,7 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
 
   const [locationName, setLocationName] = useState<string | null>(() => {
     if (lat === null || lon === null) return null;
-    const cacheKey = `${lat}_${lon}_${lang}`;
-    if (locationCache.has(cacheKey)) return locationCache.get(cacheKey)!;
-    // Compute immediate exact nearest Bangladesh administrative location
-    const nearest = findNearestLocation(lat, lon, lang);
-    return nearest.shortName;
+    return locationCache.get(`${lat}_${lon}_${lang}`) ?? null;
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,15 +29,24 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
       return;
     }
 
-    // Immediately calculate exact local Upazila / District match
-    const localMatch = findNearestLocation(lat, lon, lang);
-    setLocationName(localMatch.shortName);
-
     let isMounted = true;
     const controller = new AbortController();
     setIsLoading(true);
 
-    const fetchLocation = async () => {
+    const resolveName = async () => {
+      // First the nearest district from the built-in list (no network needed)...
+      let localMatch: ReturnType<typeof import('../utils/geoData').findNearestLocation>;
+      try {
+        const { findNearestLocation } = await loadGeoData();
+        localMatch = findNearestLocation(lat, lon, lang);
+      } catch {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+      if (!isMounted) return;
+      setLocationName(localMatch.shortName);
+
+      // ...then a finer place name from the lookup service, when it answers.
       try {
         const response = await fetch(
           `/api/loc-lookup?latitude=${lat}&longitude=${lon}&localityLanguage=${lang}`,
@@ -50,7 +58,7 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
         }
 
         const data = await response.json();
-        
+
         if (isMounted) {
           let resolvedName = localMatch.shortName;
 
@@ -72,7 +80,7 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
         }
       } catch (error: any) {
         if (error?.name === 'AbortError') return;
-        
+
         if (isMounted) {
           locationCache.set(cacheKey, localMatch.shortName);
           setLocationName(localMatch.shortName);
@@ -84,7 +92,7 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
       }
     };
 
-    fetchLocation();
+    resolveName();
 
     return () => {
       isMounted = false;
@@ -94,4 +102,3 @@ export function useLocationName(coords: { latitude: number; longitude: number } 
 
   return { locationName, isLoading };
 }
-

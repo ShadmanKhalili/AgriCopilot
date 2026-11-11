@@ -49,6 +49,7 @@ import {
 import toBn from '../utils/banglaNum';
 import { markConsultationRead } from '../utils/expertReadState';
 import { audioFeedback } from '../utils/audioFeedback';
+import { speakWithBrowser } from '../utils/speech';
 
 interface ConsultationRoomProps {
   lang: 'bn' | 'en';
@@ -203,17 +204,7 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
   );
 
   const speak = (value: string) => {
-    try {
-      const synth = window.speechSynthesis;
-      if (!synth) return;
-      synth.cancel();
-      const utter = new SpeechSynthesisUtterance(value);
-      utter.lang = 'bn-BD';
-      utter.rate = 0.95;
-      synth.speak(utter);
-    } catch (e) {
-      console.warn('Speech synthesis unavailable');
-    }
+    speakWithBrowser(value, 'bn');
   };
 
   const handleSend = async (partial: {
