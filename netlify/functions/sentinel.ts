@@ -1,8 +1,15 @@
 import { Handler } from '@netlify/functions';
 import axios from 'axios';
+import { checkIpRateLimit, extractClientIpFromHeaders, sentinelCallsPerIpPerMinute } from './_shared/ip-limit.ts';
 
 // Upstream call deadline for Copernicus/Sentinel requests
 const UPSTREAM_TIMEOUT_MS = 8_000;
+
+// A reading covers the last 30 days and about 100 m, so nearby repeat requests can
+// share one. Each uncached lookup spends the server's Copernicus credentials.
+const READING_CACHE_MS = 6 * 60 * 60 * 1000;
+const READING_CACHE_MAX = 1000;
+const readingCache = new Map<string, { at: number; body: string }>();
 
 /**
  * Agro-Climatic Vegetation & Moisture Index Model (Calibrated Bangladesh AEZ Baseline)
@@ -78,6 +85,29 @@ export const handler: Handler = async (event) => {
 
   // If credentials are unconfigured or placeholder, immediately serve calibrated agro-climatic model
   if (!clientId || !clientSecret || clientId.includes("placeholder") || clientId.length < 5) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(getAgroClimaticVegetationIndex(latNum, lngNum))
+    };
+  }
+
+  const cacheKey = `${latNum.toFixed(3)}_${lngNum.toFixed(3)}`;
+  const cached = readingCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < READING_CACHE_MS) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: cached.body
+    };
+  }
+
+  const ipLimit = checkIpRateLimit(
+    extractClientIpFromHeaders(event.headers as Record<string, string | undefined>),
+    sentinelCallsPerIpPerMinute(),
+    'sentinel'
+  );
+  if (!ipLimit.allowed) {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -212,15 +242,18 @@ export const handler: Handler = async (event) => {
       };
     }
     
+    const body = JSON.stringify({
+      ndvi: ndviValue,
+      ndmi: ndmiValue,
+      source: 'sentinel_2',
+      isEstimated: false
+    });
+    if (readingCache.size >= READING_CACHE_MAX) readingCache.clear();
+    readingCache.set(cacheKey, { at: Date.now(), body });
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ndvi: ndviValue,
-        ndmi: ndmiValue,
-        source: 'sentinel_2',
-        isEstimated: false
-      })
+      body
     };
 
   } catch (error: any) {

@@ -190,6 +190,18 @@ export const weatherCallsPerIpPerMinute = (): number => {
 };
 
 /**
+ * The per-minute ceiling for Sentinel satellite lookups.
+ *
+ * `SENTINEL_MAX_CALLS_PER_IP_PER_MINUTE` (default 30). Answers from the cache
+ * don't count, and a caller over the limit gets the labelled model estimate.
+ */
+export const sentinelCallsPerIpPerMinute = (): number => {
+  const raw = Number(process.env.SENTINEL_MAX_CALLS_PER_IP_PER_MINUTE);
+  if (!Number.isFinite(raw) || raw <= 0) return 30;
+  return Math.min(1000, Math.trunc(raw));
+};
+
+/**
  * The per-minute ceiling for the live-token endpoint.
  *
  * `AI_MAX_LIVE_TOKENS_PER_IP_PER_MINUTE` (default 10) — each token starts a

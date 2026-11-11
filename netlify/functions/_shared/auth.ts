@@ -25,7 +25,29 @@ export interface VerifiedUser {
   uid: string;
   email: string | null;
   emailVerified: boolean;
+  /**
+   * True for an account anyone can create in bulk without proving anything:
+   * an anonymous guest, the throwaway `@agri.local` guest, or an email account
+   * whose address was never verified. These get the smaller guest allowance.
+   */
+  isGuest: boolean;
 }
+
+/**
+ * Whether an `accounts:lookup` record is a guest. Google or phone sign-in, or a
+ * verified email address, makes an account a full one.
+ */
+export const isGuestAccount = (record: any): boolean => {
+  const providers: string[] = Array.isArray(record?.providerUserInfo)
+    ? record.providerUserInfo.map((p: any) => String(p?.providerId || ''))
+    : [];
+  if (providers.includes('google.com') || providers.includes('phone') || record?.phoneNumber) {
+    return false;
+  }
+  const email = record?.email ? String(record.email).toLowerCase() : '';
+  if (!email || email.endsWith('@agri.local')) return true;
+  return !record?.emailVerified;
+};
 
 /**
  * Pull the bearer token out of an Authorization header value.
@@ -67,6 +89,7 @@ export const verifyIdToken = async (idToken: string): Promise<VerifiedUser | nul
       uid: String(user.localId),
       email: user.email ? String(user.email) : null,
       emailVerified: !!user.emailVerified,
+      isGuest: isGuestAccount(user),
     };
   } catch {
     return null;

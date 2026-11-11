@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, linkWithPopup, signInAnonymously } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, linkWithPopup, signInAnonymously, sendEmailVerification } from 'firebase/auth';
 import type { User } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -44,6 +44,12 @@ export const signUpWithEmail = async (email: string, password: string, name: str
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: name });
+    // Until the address is verified the account has the guest AI allowance.
+    try {
+      await sendEmailVerification(userCredential.user);
+    } catch (error) {
+      console.warn('Could not send the verification email', error);
+    }
     return userCredential.user;
   } catch (error) {
     console.error("Error signing up with email", error);
@@ -138,6 +144,28 @@ export const isGuestUser = (user: User | null): boolean => {
   if (hasGoogle) return false;
   if (user.isAnonymous) return true;
   return isGuestEmail(user.email);
+};
+
+/**
+ * Whether the AI proxy gives this account the smaller guest allowance. Mirrors
+ * `isGuestAccount` on the server: guests, and email accounts whose address
+ * hasn't been verified, because both can be created in bulk.
+ */
+export const hasGuestAllowance = (user: User | null): boolean => {
+  if (!user) return true;
+  const providers = user.providerData.map((p) => p.providerId);
+  if (providers.includes('google.com') || providers.includes('phone') || user.phoneNumber) return false;
+  if (isGuestUser(user)) return true;
+  return !user.emailVerified;
+};
+
+/** An email account that still needs to confirm its address. */
+export const needsEmailVerification = (user: User | null): boolean =>
+  !!user && !isGuestUser(user) && hasGuestAllowance(user) && !!user.email;
+
+export const resendVerificationEmail = async (): Promise<void> => {
+  if (!auth.currentUser) throw new Error('Not signed in.');
+  await sendEmailVerification(auth.currentUser);
 };
 
 const isGuestEmail = (email?: string | null): boolean =>

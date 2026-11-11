@@ -51,23 +51,43 @@ const limitFromEnv = (raw: string | undefined, fallback: number): number => {
 };
 
 /**
- * AI calls an account may make per day, of every kind together
- * (`AI_FREE_DAILY_LIMIT`, default 100; `AI_PREMIUM_DAILY_LIMIT`, default 1000).
+ * `guest` is an account that costs nothing to create (see `isGuestAccount`).
+ * Anyone can make many of them, so each gets a small allowance; linking Google
+ * or verifying an email address moves the same account up to `free`.
  */
-export const dailyAiLimit = (plan: 'free' | 'premium'): number =>
+export type AiPlan = 'guest' | 'free' | 'premium';
+
+/**
+ * AI calls an account may make per day, of every kind together
+ * (`AI_GUEST_DAILY_LIMIT`, default 10; `AI_FREE_DAILY_LIMIT`, default 100;
+ * `AI_PREMIUM_DAILY_LIMIT`, default 1000).
+ */
+export const dailyAiLimit = (plan: AiPlan): number =>
   plan === 'premium'
     ? limitFromEnv(process.env.AI_PREMIUM_DAILY_LIMIT, 1000)
-    : limitFromEnv(process.env.AI_FREE_DAILY_LIMIT, 100);
+    : plan === 'guest'
+      ? limitFromEnv(process.env.AI_GUEST_DAILY_LIMIT, 10)
+      : limitFromEnv(process.env.AI_FREE_DAILY_LIMIT, 100);
+
+/** What a caller sees when today's allowance is spent. */
+export const dailyLimitMessage = (plan: AiPlan): string =>
+  plan === 'premium'
+    ? 'You have reached your daily AI limit. It resets tomorrow.'
+    : plan === 'guest'
+      ? `Guest accounts get ${dailyAiLimit('guest')} AI answers a day. Link Google in your profile for ${dailyAiLimit('free')} a day, or try again tomorrow.`
+      : "You have used all of today's free AI advice. It resets tomorrow.";
 
 /**
  * Live sessions an account may start per day, on top of the overall limit
- * (`AI_FREE_DAILY_LIVE_SESSIONS`, default 20;
- * `AI_PREMIUM_DAILY_LIVE_SESSIONS`, default 200).
+ * (`AI_GUEST_DAILY_LIVE_SESSIONS`, default 1; `AI_FREE_DAILY_LIVE_SESSIONS`,
+ * default 20; `AI_PREMIUM_DAILY_LIVE_SESSIONS`, default 200).
  */
-export const dailyLiveSessionLimit = (plan: 'free' | 'premium'): number =>
+export const dailyLiveSessionLimit = (plan: AiPlan): number =>
   plan === 'premium'
     ? limitFromEnv(process.env.AI_PREMIUM_DAILY_LIVE_SESSIONS, 200)
-    : limitFromEnv(process.env.AI_FREE_DAILY_LIVE_SESSIONS, 20);
+    : plan === 'guest'
+      ? limitFromEnv(process.env.AI_GUEST_DAILY_LIVE_SESSIONS, 1)
+      : limitFromEnv(process.env.AI_FREE_DAILY_LIVE_SESSIONS, 20);
 
 /**
  * The current UTC day as `YYYYMMDD`.
@@ -167,10 +187,9 @@ export const countAiUsageToday = async (
 };
 
 /**
- * Record one AI call against today's allowance. Returns whether the event
- * was stored. Failures are never thrown: an unwritable counter must not break
- * the farmer's request that already produced an answer, so callers that do
- * not need the result can ignore it.
+ * Record one AI call against today's allowance. Returns whether the event was
+ * stored, and never throws. Callers record before spending anything and refuse
+ * the call when this returns false, so a failed write can't mean a free call.
  */
 export const recordAiUsage = async (
   uid: string,
@@ -203,23 +222,27 @@ export const recordAiUsage = async (
 };
 
 /**
- * The account's plan, as stored on the profile. Premium accounts get a larger
- * allowance. A profile that cannot be read is treated as free.
+ * The account's plan. Premium is stored on the profile and only an admin can
+ * set it, so it wins. Otherwise a guest account (`isGuest` from the verified
+ * token) gets the guest allowance, and everyone else the free one. A profile
+ * that cannot be read is treated as not premium.
  */
 export const getUserPlan = async (
   uid: string,
-  idToken: string
-): Promise<'free' | 'premium'> => {
+  idToken: string,
+  isGuest: boolean
+): Promise<AiPlan> => {
+  const fallback: AiPlan = isGuest ? 'guest' : 'free';
   try {
     const response = await fetch(`${DOCUMENTS_BASE}/users/${encodeURIComponent(uid)}`, {
       headers: bearer(idToken),
       signal: AbortSignal.timeout(FIRESTORE_TIMEOUT_MS),
     });
-    if (!response.ok) return 'free';
+    if (!response.ok) return fallback;
     const data: any = await response.json();
     const tier = data?.fields?.tier?.stringValue;
-    return tier === 'premium' ? 'premium' : 'free';
+    return tier === 'premium' ? 'premium' : fallback;
   } catch {
-    return 'free';
+    return fallback;
   }
 };

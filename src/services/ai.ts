@@ -143,9 +143,14 @@ const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyRe
         });
         
         if (response.status === 429 && attempt < 2) {
-          console.warn("[AI Client Queue] 429 rate limit encountered, applying 1.5s exponential backoff...");
-          await waitOrAbort(1500, signal);
-          continue;
+          // A spent daily allowance carries `limit` and won't change on retry;
+          // only the per-minute limit is worth waiting out.
+          const info = await response.clone().json().catch(() => null);
+          if (!info || info.limit === undefined) {
+            console.warn("[AI Client Queue] 429 rate limit encountered, applying 1.5s exponential backoff...");
+            await waitOrAbort(1500, signal);
+            continue;
+          }
         }
 
         if (!response.ok) {
