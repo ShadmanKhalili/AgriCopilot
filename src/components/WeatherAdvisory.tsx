@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight, ChevronDown, ChevronUp, Sliders, Database, WifiOff } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight, ChevronDown, ChevronUp, Sliders, Database, WifiOff, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
 import { detectUserLocation } from '../utils/geolocation';
-import MicroclimateRadarSimulator from './MicroclimateRadarSimulator';
+import MicroclimateRadarSimulator, { type HourlyPoint } from './MicroclimateRadarSimulator';
 import { saveCachedWeather, getCachedWeather, formatCacheAge, formatExactSyncTime } from '../utils/offlineCache';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
@@ -15,6 +15,35 @@ import SevereWeatherAlerts, { WeatherAlertItem } from './SevereWeatherAlerts';
 import PrecipitationRiskCurve, { HourlySpreadItem } from './PrecipitationRiskCurve';
 import DualModelComparison from './DualModelComparison';
 import GoogleWeatherMap from './GoogleWeatherMap';
+import { useUiMode } from '../context/useUiMode';
+import { useAppSettings } from '../context/AppSettingsContext';
+import { useLocationName } from '../hooks/useLocationName';
+import { todaySignals, todayWeatherFromFeed, weekSignalsFromFeed, type TodayWeather } from '../utils/todaySignals';
+import Disclosure from './ui/Disclosure';
+import Card from './ui/Card';
+import TodayCard from './weather/TodayCard';
+import WeekStrip from './weather/WeekStrip';
+
+/** A number from the feed, or undefined when it is missing or not a number. */
+const numOrUndef = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+/** A number for display, or a dash when it is missing. */
+const fmtNum = (value: number | undefined, digits = 0): string =>
+  value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits);
+
+/**
+ * In the simple view the dashboard sits behind one "More details" row; in
+ * the full view it is shown as before.
+ */
+function DetailsWrap({ simple, label, children }: { simple: boolean; label: string; children: React.ReactNode }) {
+  if (!simple) return <>{children}</>;
+  return (
+    <Disclosure label={label} keepMounted>
+      <div className="space-y-3 sm:space-y-4">{children}</div>
+    </Disclosure>
+  );
+}
 
 interface Props {
   lang: Language;
@@ -24,10 +53,11 @@ interface Props {
 
 interface HourlyForecastItem {
   time: string;
-  temp: number;
-  humidity: number;
-  rainProb: number;
-  wind: number;
+  // Undefined when the feed does not have the value; shown as a dash.
+  temp?: number;
+  humidity?: number;
+  rainProb?: number;
+  wind?: number;
   condition: string;
   dni?: number;
   rawTime?: string;
@@ -68,10 +98,8 @@ interface WeatherData {
   dewPoint?: number;
   dewPointDepression?: number;
   fungalBlightRisk?: 'low' | 'moderate' | 'high';
-  ensembleConfidence?: number;
-  precipitationSpread?: { p10: number; median: number; p90: number };
-  temperatureSpread?: { p10: number; median: number; p90: number };
-  heavyRainRisk?: number;
+  /** Forecast rain total for today, mm, from the feed's daily data. */
+  expectedRainToday?: number;
   hourlyForecast?: HourlyForecastItem[];
 }
 
@@ -89,6 +117,16 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [cacheInfo, setCacheInfo] = useState<{ isCached: boolean; timestamp?: number; isFallback?: boolean } | null>(null);
   const [isRefreshingLive, setIsRefreshingLive] = useState(false);
   const [configStatus, setConfigStatus] = useState<{ googleMapsConfigured: boolean; weatherNextConfigured: boolean; activeProviders?: any } | null>(null);
+  // Set when the last request failed and there was no saved forecast to show.
+  const [loadError, setLoadError] = useState(false);
+  const simple = useUiMode() === 'simple';
+  const bn = lang === 'bn';
+  // The area's name, worked out the same way as the header and Home do.
+  const { place } = useAppSettings();
+  const { locationName: lookedUpName } = useLocationName(globalLocation, lang);
+  const placeName = place
+    ? [bn ? place.upazilaBn : place.upazila, bn ? place.districtBn : place.district].filter(Boolean).join(', ')
+    : lookedUpName;
   const prevCoordsRef = React.useRef<string | null>(null);
   // Monotonic id of the latest weather request. The farmer can move the map
   // pin (or the GPS can resolve again) while a request is still in flight.
@@ -149,6 +187,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     const requestId = ++weatherRequestRef.current;
     const activeModel = overrideModel || forecastModelRef.current;
     setIsLoading(true);
+    setLoadError(false);
     if (forceFresh) {
       setIsRefreshingLive(true);
     }
@@ -218,8 +257,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           const maxHours = Math.min(currentIndex + 48, wnData.hourly.time.length);
           for (let i = currentIndex; i < maxHours; i++) {
             const hTime = new Date(wnData.hourly.time[i]).toLocaleTimeString([], { hour: 'numeric' });
-            const hCode = wnData.hourly.weather_code?.[i] || 0;
-            let hCond = 'Sunny';
+            // No weather code: show a neutral cloud, not an invented sunny hour.
+            const hCodeRaw = numOrUndef(wnData.hourly.weather_code?.[i]);
+            const hCode = hCodeRaw ?? 0;
+            let hCond = hCodeRaw === undefined ? 'Unknown' : 'Sunny';
             if (hCode >= 1 && hCode <= 3) hCond = 'Partly Cloudy';
             else if (hCode >= 51 && hCode <= 67) hCond = 'Rainy';
             else if (hCode >= 80 && hCode <= 82) hCond = 'Showers';
@@ -227,12 +268,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
             hourlyItems.push({
               time: hTime,
-              temp: wnData.hourly.temperature_2m?.[i] ?? 0,
-              humidity: wnData.hourly.relative_humidity_2m?.[i] ?? 0,
-              rainProb: wnData.hourly.precipitation_probability?.[i] ?? 0,
-              wind: wnData.hourly.wind_speed_10m?.[i] ?? 0,
+              temp: numOrUndef(wnData.hourly.temperature_2m?.[i]),
+              humidity: numOrUndef(wnData.hourly.relative_humidity_2m?.[i]),
+              rainProb: numOrUndef(wnData.hourly.precipitation_probability?.[i]),
+              wind: numOrUndef(wnData.hourly.wind_speed_10m?.[i]),
               condition: hCond,
-              dni: wnData.hourly.direct_normal_irradiance?.[i] ?? 0,
+              dni: numOrUndef(wnData.hourly.direct_normal_irradiance?.[i]),
               rawTime: wnData.hourly.time[i]
             });
           }
@@ -265,10 +306,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           dewPoint: wnData.agro_metrics?.dew_point_celsius,
           dewPointDepression: wnData.agro_metrics?.dew_point_depression_celsius,
           fungalBlightRisk: wnData.agro_metrics?.fungal_blight_risk,
-          ensembleConfidence: wnData.ensemble?.convergence_score_pct,
-          precipitationSpread: wnData.ensemble?.precipitation_spread_mm,
-          temperatureSpread: wnData.ensemble?.temperature_spread,
-          heavyRainRisk: wnData.ensemble?.heavy_rain_risk_prob,
+          expectedRainToday: numOrUndef(wnData.daily?.precipitation_sum?.[0]),
           hourlyForecast: hourlyItems
         };
       } else {
@@ -277,7 +315,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         }
         // Standard Multi-Model Open-Meteo
         const weatherRes = await fetchWithTimeout(
-          `/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,wind_speed_10m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,et0_fao_evapotranspiration&timezone=auto${cacheBustParam}`,
+          `/api/daily-forecast?latitude=${globalLocation.latitude}&longitude=${globalLocation.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_speed_100m,soil_moisture_0_to_7cm&daily=uv_index_max,precipitation_probability_max,precipitation_sum,et0_fao_evapotranspiration&timezone=auto${cacheBustParam}`,
           { ...liveFetchOptions, timeoutMs: 12000, retries: 1 }
         );
         
@@ -313,19 +351,23 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           const maxHours = Math.min(currentIndex + 48, times.length);
           for (let i = currentIndex; i < maxHours; i++) {
             const hTime = new Date(times[i]).toLocaleTimeString([], { hour: 'numeric' });
-            const hCode = weatherData.hourly.weather_code?.[i] || 0;
-            let hCond = 'Sunny';
+            const hCodeRaw = numOrUndef(weatherData.hourly.weather_code?.[i]);
+            const hCode = hCodeRaw ?? 0;
+            let hCond = hCodeRaw === undefined ? 'Unknown' : 'Sunny';
             if (hCode >= 1 && hCode <= 3) hCond = 'Partly Cloudy';
             else if (hCode >= 51 && hCode <= 67) hCond = 'Rainy';
             else if (hCode >= 80 && hCode <= 82) hCond = 'Showers';
             else if (hCode >= 95) hCond = 'Thunderstorm';
 
+            const hTemp = numOrUndef(temps?.[i]);
+            const hRain = numOrUndef(rainProbs?.[i]);
+            const hWind = numOrUndef(windSpeeds?.[i]);
             standardHourlyItems.push({
               time: hTime,
-              temp: Math.round(temps?.[i] ?? 0),
-              humidity: 75,
-              rainProb: Math.round(rainProbs?.[i] ?? 0),
-              wind: Math.round(windSpeeds?.[i] ?? 0),
+              temp: hTemp === undefined ? undefined : Math.round(hTemp),
+              humidity: numOrUndef(weatherData.hourly.relative_humidity_2m?.[i]),
+              rainProb: hRain === undefined ? undefined : Math.round(hRain),
+              wind: hWind === undefined ? undefined : Math.round(hWind),
               condition: hCond,
               rawTime: times[i]
             });
@@ -335,11 +377,16 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             let isSafe = true;
             for (let j = 0; j < 3; j++) {
               const idx = i + j;
+              const r = numOrUndef(rainProbs?.[idx]);
+              const w = numOrUndef(windSpeeds?.[idx]);
+              const tt = numOrUndef(temps?.[idx]);
+              // A missing reading cannot show the hour is safe.
               if (
-                (rainProbs[idx] || 0) > 20 ||
-                (windSpeeds[idx] || 0) > 15 ||
-                (temps[idx] || 0) > 30 ||
-                (temps[idx] || 0) < 10
+                r === undefined || w === undefined || tt === undefined ||
+                r > 20 ||
+                w > 15 ||
+                tt > 30 ||
+                tt < 10
               ) {
                 isSafe = false;
                 break;
@@ -371,23 +418,30 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
         const currentSoilMoisture = weatherData.hourly?.soil_moisture_0_to_7cm ? weatherData.hourly.soil_moisture_0_to_7cm[currentIndex] : undefined;
 
-        const stdHourlySpread: HourlySpreadItem[] = standardHourlyItems.map((h, i) => {
-          const rProb = h.rainProb;
-          const rQpf = rProb > 50 ? parseFloat(((rProb / 100) * 3).toFixed(1)) : 0;
-          return {
+        // The rain curve from the feed's own hourly rain amounts. This path has
+        // no spread, so the low and high edges equal the forecast amount.
+        // Hours missing a reading are left out rather than drawn as zero.
+        const hourlyRainMm: unknown[] = weatherData.hourly?.precipitation || [];
+        const hourlyWind100: unknown[] = weatherData.hourly?.wind_speed_100m || [];
+        const stdHourlySpread: HourlySpreadItem[] = [];
+        standardHourlyItems.forEach((h, i) => {
+          const rQpf = numOrUndef(hourlyRainMm[currentIndex + i]);
+          const w100 = numOrUndef(hourlyWind100[currentIndex + i]);
+          if (h.rainProb === undefined || h.wind === undefined || h.temp === undefined || rQpf === undefined || w100 === undefined) return;
+          stdHourlySpread.push({
             time: h.rawTime || new Date(Date.now() + i * 3600000).toISOString(),
             displayTime: h.time,
             temp: h.temp,
-            p10: Math.max(0, parseFloat((rQpf * 0.5).toFixed(1))),
-            p50: parseFloat(rQpf.toFixed(1)),
-            p90: parseFloat((rQpf * 1.5 + (rProb > 40 ? 2 : 0)).toFixed(1)),
-            rainProb: rProb,
+            p10: rQpf,
+            p50: rQpf,
+            p90: rQpf,
+            rainProb: h.rainProb,
             rainQpf: rQpf,
             windSpeed: h.wind,
-            wind100m: parseFloat((h.wind * 1.35).toFixed(1)),
+            wind100m: w100,
             condition: h.condition,
-            isSafeSpray: rProb <= 18 && h.wind <= 14 && h.temp >= 12 && h.temp <= 31
-          };
+            isSafeSpray: h.rainProb <= 18 && h.wind <= 14 && h.temp >= 12 && h.temp <= 31
+          });
         });
 
         newWeather = {
@@ -401,6 +455,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           locationName: "Local Area",
           soilMoisture: currentSoilMoisture,
           evapotranspiration: weatherData.daily?.et0_fao_evapotranspiration?.[0],
+          expectedRainToday: numOrUndef(weatherData.daily?.precipitation_sum?.[0]),
           safeSprayingWindow,
           isWeatherNext3: false,
           hourlyForecast: standardHourlyItems,
@@ -541,6 +596,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           );
         }
       } else {
+        setLoadError(true);
         toast.error(
           lang === 'bn' ? 'আবহাওয়া তথ্য লোড করা যায়নি' : 'Unable to load weather forecast',
           { id: 'weather-fetch-error' }
@@ -617,12 +673,107 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     return t.weatherTooltips?.uvVeryHigh;
   };
 
+  // --- Simple view data -------------------------------------------------
+  // The raw /api/weathernext-3 response, kept on the weather object (and in
+  // the offline cache) as `weatherNext3`. Undefined on the standard model.
+  const feed = weather?.weatherNext3;
+  const todayWeather: TodayWeather | null = useMemo(() => {
+    if (!weather) return null;
+    const fromFeed = feed ? todayWeatherFromFeed(feed) : null;
+    if (fromFeed) return fromFeed;
+    // Standard model: the same numbers from the reshaped data.
+    const next12 = (weather.hourlyForecast || [])
+      .slice(0, 12)
+      .map((h) => h.rainProb)
+      .filter((p): p is number => typeof p === 'number');
+    return {
+      temp: weather.temp,
+      humidity: weather.humidity,
+      windSpeed: weather.windSpeed,
+      rainChanceToday: weather.rainChance,
+      rainChanceNext12h: next12.length > 0 ? Math.max(...next12) : weather.rainChance,
+      soilMoisture: numOrUndef(weather.soilMoisture),
+    };
+  }, [weather, feed]);
+  const signals = useMemo(() => (todayWeather ? todaySignals(todayWeather) : []), [todayWeather]);
+  const weekDays = useMemo(() => {
+    if (!feed) return [];
+    try {
+      return weekSignalsFromFeed(feed);
+    } catch (error) {
+      console.warn('Could not read the week from the forecast:', error);
+      return [];
+    }
+  }, [feed]);
+
+  // The hourly rows for the hour-by-hour forecast, which marks NaN as missing.
+  const hourlyPoints: HourlyPoint[] | undefined = weather?.hourlyForecast?.map((h) => ({
+    ...h,
+    temp: h.temp ?? NaN,
+    humidity: h.humidity ?? NaN,
+    rainProb: h.rainProb ?? NaN,
+    wind: h.wind ?? NaN,
+  }));
+
+  const retryLoad = () => fetchWeatherAndAdvisory(forecastModel, true);
+
+  const simpleToday = !weather ? (
+    loadError && !isLoading ? (
+      <Card>
+        <div className="text-center space-y-3 py-2">
+          <p className="text-lg font-bold text-stone-900 dark:text-white">
+            {bn ? 'আবহাওয়া আনা যায়নি' : 'Could not load the weather'}
+          </p>
+          <p className="text-base text-stone-700 dark:text-stone-300">
+            {bn ? 'ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।' : 'Check your connection and try again.'}
+          </p>
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="w-full min-h-[56px] rounded-2xl border-2 border-emerald-700 text-emerald-800 dark:text-emerald-300 text-lg font-bold active:scale-[0.98] transition-transform"
+          >
+            {bn ? 'আবার চেষ্টা করুন' : 'Try again'}
+          </button>
+        </div>
+      </Card>
+    ) : (
+      <Card>
+        <div className="flex items-center justify-center gap-3 py-8 text-stone-700 dark:text-stone-300" role="status">
+          <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
+          <span className="text-base font-bold">{bn ? 'আবহাওয়া আনা হচ্ছে...' : 'Loading the weather...'}</span>
+        </div>
+      </Card>
+    )
+  ) : (
+    <>
+      <TodayCard
+        lang={lang}
+        placeName={placeName}
+        temp={todayWeather ? todayWeather.temp : null}
+        rainChance={todayWeather ? todayWeather.rainChanceToday : null}
+        signals={signals}
+      />
+      {cacheInfo?.isCached && cacheInfo.timestamp && (
+        <p className="flex items-center gap-2 text-base text-stone-700 dark:text-stone-300">
+          <Clock className="w-5 h-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <span>
+            {bn ? 'আগে সংরক্ষিত পূর্বাভাস দেখানো হচ্ছে' : 'Showing a saved forecast'} ({formatCacheAge(cacheInfo.timestamp, lang)})
+          </span>
+        </p>
+      )}
+      <WeekStrip lang={lang} days={weekDays} />
+    </>
+  );
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 w-full"
     >
+      {simple ? (
+        <h1 className="text-2xl font-bold text-stone-900 dark:text-white">{bn ? 'আবহাওয়া ও খামারের কাজ' : 'Weather and farm work'}</h1>
+      ) : (
       <div className="bg-white dark:bg-stone-900 rounded-2xl p-4 md:p-6 border border-stone-200/80 dark:border-stone-800 mb-4 md:mb-6 shadow-xs">
         <div className="flex items-center space-x-3 md:space-x-4">
           <div className="bg-blue-50 dark:bg-blue-950/60 p-2 md:p-3 rounded-xl flex-shrink-0 text-blue-600 dark:text-blue-400">
@@ -634,8 +785,73 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
           </div>
         </div>
       </div>
+      )}
 
-      {!globalLocation ? (
+      {!globalLocation && simple ? (
+        <Card>
+          <div className="text-center space-y-3 py-2">
+            <MapPin className="w-10 h-10 mx-auto text-amber-600" aria-hidden="true" />
+            <p className="text-lg font-bold text-stone-900 dark:text-white">
+              {bn ? 'আপনার এলাকা ঠিক করুন' : 'Set your area'}
+            </p>
+            <p className="text-base text-stone-700 dark:text-stone-300">
+              {bn ? 'তাহলে আবহাওয়া ও করণীয় দেখাতে পারব।' : 'Then we can show the weather and what to do.'}
+            </p>
+            {isManualLocation && (
+              <div className="space-y-2">
+                <select
+                  value={selectedDistrict}
+                  aria-label={bn ? 'জেলা' : 'District'}
+                  onChange={(e) => {
+                    setSelectedDistrict(e.target.value);
+                    const newDistrict = geoData.find(d => d.id === e.target.value);
+                    if (newDistrict && newDistrict.upazilas.length > 0) {
+                      handleManualLocationChange(newDistrict.upazilas[0].id);
+                    } else {
+                      setSelectedUpazila('');
+                    }
+                  }}
+                  className="w-full min-h-[56px] rounded-2xl border-2 border-stone-300 dark:border-emerald-900/60 bg-white dark:bg-[#0c1c13] px-4 text-lg font-bold text-stone-900 dark:text-white"
+                >
+                  {geoData.map(d => (
+                    <option key={d.id} value={d.id}>{bn ? d.bn_name : d.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedUpazila}
+                  aria-label={bn ? 'উপজেলা' : 'Upazila'}
+                  onChange={(e) => handleManualLocationChange(e.target.value)}
+                  disabled={!activeDistrict || activeDistrict.upazilas.length === 0}
+                  className="w-full min-h-[56px] rounded-2xl border-2 border-stone-300 dark:border-emerald-900/60 bg-white dark:bg-[#0c1c13] px-4 text-lg font-bold text-stone-900 dark:text-white"
+                >
+                  {activeDistrict?.upazilas.map(u => (
+                    <option key={u.id} value={u.id}>{bn ? u.bn_name : u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {locationError && <p className="text-base text-red-700 dark:text-red-400">{locationError}</p>}
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={isDetecting}
+              className="flex items-center justify-center gap-2 w-full min-h-[56px] rounded-2xl bg-emerald-700 text-white text-lg font-bold active:scale-[0.98] transition-transform"
+            >
+              {isDetecting ? <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" /> : <Navigation className="w-6 h-6" aria-hidden="true" />}
+              <span>{isDetecting ? (bn ? 'এলাকা খোঁজা হচ্ছে...' : 'Finding your area...') : (bn ? 'আমার এলাকা খুঁজুন' : 'Find my area')}</span>
+            </button>
+            {!isManualLocation && (
+              <button
+                type="button"
+                onClick={() => setIsManualLocation(true)}
+                className="w-full min-h-[56px] rounded-2xl border-2 border-emerald-700 text-emerald-800 dark:text-emerald-300 text-lg font-bold active:scale-[0.98] transition-transform"
+              >
+                {bn ? 'তালিকা থেকে বেছে নিন' : 'Choose from a list'}
+              </button>
+            )}
+          </div>
+        </Card>
+      ) : !globalLocation ? (
         <motion.div 
           whileHover={{ y: -5 }}
           className="bg-white p-16 rounded-[40px] border border-blue-100 shadow-xl shadow-blue-50/50 text-center relative overflow-hidden group"
@@ -723,6 +939,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             <SevereWeatherAlerts alerts={weather.alerts} lang={lang} />
           )}
 
+          {/* Simple view: today, the week, then everything else one tap away */}
+          {simple && simpleToday}
+
+          <DetailsWrap
+            simple={simple}
+            label={bn ? 'আরও বিস্তারিত (ঘণ্টাভিত্তিক, মাটি, মানচিত্র)' : 'More details (hourly, soil, map)'}
+          >
           {/* Dual-Model Comparison Toggle Bar */}
           <DualModelComparison
             activeModel={forecastModel}
@@ -818,20 +1041,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                             <span className="truncate">
                               {weather.source === 'google_weather_api'
                                 ? (lang === 'bn' ? 'আপনার গুগল ম্যাপস এপিআই কি দ্বারা সরাসরি সংযুক্ত' : 'Live Google Weather API · Authenticated via Secret Key')
-                                : (lang === 'bn' ? 'স্বয়ংক্রিয় Open-Meteo এনসেম্বল ফলব্যাক সক্রিয়' : 'Automatic Open-Meteo Ensemble Fallback Active')}
+                                : (lang === 'bn' ? 'Open-Meteo মডেলের পূর্বাভাস তথ্য' : 'Forecast data from Open-Meteo models')}
                             </span>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">
-                          {lang === 'bn' ? 'মডেল কনসেন্সাস (আনুমানিক)' : 'Consensus (est.)'}
-                        </span>
-                        <span className="text-xs font-black text-emerald-400 tabular-nums">
-                          {weather.ensembleConfidence !== undefined 
-                            ? `${weather.ensembleConfidence}% ${lang === 'bn' ? 'কনভারজেন্স' : 'Confidence'}`
-                            : (lang === 'bn' ? 'অপ্রাপ্য' : 'Not Assessed')}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -965,9 +1178,6 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <Zap className="w-3.5 h-3.5 text-amber-500" />
                         {lang === 'bn' ? 'কৃষি-আবহাওয়া ও মাইক্রোক্লাইমেট' : 'Agro-Microclimate Insights'}
                       </h4>
-                      <span className="text-[11px] bg-blue-100/80 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full font-bold">
-                        {lang === 'bn' ? 'উচ্চ নির্ভুলতা' : 'High Accuracy'}
-                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
@@ -976,11 +1186,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
                           <Wind className="w-3 h-3" />
                           <span className="text-[11px] font-bold uppercase tracking-wider truncate">
-                            {lang === 'bn' ? '১০০মি বাতাস' : 'Canopy Wind'}
+                            {lang === 'bn' ? '১০০মি বাতাস' : 'Wind at 100 m'}
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {weather.boundaryWind100m !== undefined ? weather.boundaryWind100m.toFixed(1) : (weather.windSpeed * 1.35).toFixed(1)}
+                          {fmtNum(numOrUndef(weather.boundaryWind100m), 1)}
                           <span className="text-[11px] text-gray-500 ml-0.5 font-normal">km/h</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
@@ -997,7 +1207,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {weather.solarRadiationDNI !== undefined ? Math.round(weather.solarRadiationDNI) : 480}
+                          {fmtNum(numOrUndef(weather.solarRadiationDNI))}
                           <span className="text-[11px] text-gray-500 ml-0.5 font-normal">W/m²</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
@@ -1014,15 +1224,20 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               {lang === 'bn' ? 'ছত্রাক ঝুঁকি' : 'Blight Risk'}
                             </span>
                           </div>
-                          <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
-                            weather.fungalBlightRisk === 'high'
-                              ? 'bg-red-100 text-red-700'
-                              : weather.fungalBlightRisk === 'moderate'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}>
-                            {weather.fungalBlightRisk || 'low'}
-                          </span>
+                          {/* Shown only when the feed assessed it; a missing value is not "low". */}
+                          {weather.fungalBlightRisk ? (
+                            <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold uppercase ${
+                              weather.fungalBlightRisk === 'high'
+                                ? 'bg-red-100 text-red-700'
+                                : weather.fungalBlightRisk === 'moderate'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {weather.fungalBlightRisk}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-stone-500">—</span>
+                          )}
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                           {weather.dewPoint !== undefined ? `${weather.dewPoint.toFixed(1)}°C` : '—'}
@@ -1030,7 +1245,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {weather.dewPointDepression !== undefined 
                             ? (lang === 'bn' ? `শিশিরাঙ্ক ${weather.dewPointDepression.toFixed(1)}°C` : `Depr: ${weather.dewPointDepression.toFixed(1)}°C`)
-                            : (lang === 'bn' ? 'শিশিরাঙ্ক অপ্রাপ্য' : 'Depression: N/A')}
+                            : (lang === 'bn' ? 'তথ্য নেই' : 'Depression: N/A')}
                         </p>
                       </div>
 
@@ -1039,19 +1254,15 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <div className="flex items-center gap-1 text-sky-700 dark:text-sky-300 mb-1">
                           <CloudRain className="w-3 h-3" />
                           <span className="text-[11px] font-bold uppercase tracking-wider truncate">
-                            {lang === 'bn' ? 'বৃষ্টির পরিধি' : 'Rain Range'}
+                            {lang === 'bn' ? 'আজকের বৃষ্টি' : 'Rain today'}
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {weather.precipitationSpread 
-                            ? `${weather.precipitationSpread.p10} - ${weather.precipitationSpread.p90}` 
-                            : (weather.rainfall !== undefined ? `${weather.rainfall.toFixed(1)}` : '—')}
+                          {fmtNum(numOrUndef(weather.expectedRainToday), 1)}
                           <span className="text-[11px] text-stone-500 ml-0.5 font-normal">mm</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
-                          {weather.heavyRainRisk !== undefined 
-                            ? (lang === 'bn' ? `ভারী বৃষ্টি ঝুঁকি: ${weather.heavyRainRisk}%` : `Heavy Risk: ${weather.heavyRainRisk}%`)
-                            : (lang === 'bn' ? 'ঝুঁকি পরিমাপ অপ্রাপ্য' : 'Heavy Risk: N/A')}
+                          {lang === 'bn' ? 'আজকের মোট পূর্বাভাস' : 'Forecast total today'}
                         </p>
                       </div>
                     </div>
@@ -1100,11 +1311,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               <Cloud className={`w-4 h-4 ${idx === 0 ? 'text-blue-200' : 'text-blue-400'}`} />
                             )}
                           </div>
-                          <span className="text-xs font-bold tabular-nums">{Math.round(hour.temp)}°C</span>
+                          <span className="text-xs font-bold tabular-nums">{hour.temp === undefined ? '—' : `${Math.round(hour.temp)}°C`}</span>
                           <div className="mt-0.5 flex items-center gap-0.5 text-[11px]">
                             <Droplets className={`w-2 h-2 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
                             <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
-                              {hour.rainProb}%
+                              {hour.rainProb === undefined ? '—' : `${hour.rainProb}%`}
                             </span>
                           </div>
                         </div>
@@ -1198,7 +1409,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       const avgMax = weather.historicalAvgMax;
                       const forecastHigh = Math.max(
                         weather.temp,
-                        ...(weather.hourlyForecast || []).map(h => h.temp).filter(Number.isFinite)
+                        ...(weather.hourlyForecast || []).slice(0, 24).map(h => h.temp).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
                       );
                       const diff = forecastHigh - avgMax;
                       const nearNormal = Math.abs(diff) < 0.5;
@@ -1230,7 +1441,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             )}
           </motion.div>
 
-          {/* Microclimate Radar & Simulation in clean toggle below the top card */}
+          {/* Hour-by-hour forecast in a toggle below the top card */}
           {globalLocation && weather && (
             <div className="pt-1">
               <button
@@ -1244,7 +1455,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                   </div>
                   <div>
                     <span className="font-semibold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
-                      {lang === 'bn' ? '৪৮ ঘণ্টার মাইক্রোক্লাইমেট রাডার সিমুলেশন' : '48-Hour Microclimate Radar Simulator'}
+                      {lang === 'bn' ? 'ঘণ্টাভিত্তিক পূর্বাভাস দেখুন' : 'Show hour-by-hour forecast'}
                     </span>
                   </div>
                 </div>
@@ -1270,7 +1481,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     <MicroclimateRadarSimulator
                       lang={lang}
                       coords={globalLocation}
-                      hourlyForecast={weather?.hourlyForecast}
+                      hourlyForecast={hourlyPoints}
                       currentTemp={weather?.temp}
                       currentWind={weather?.windSpeed}
                       currentRainProb={weather?.rainChance}
@@ -1291,6 +1502,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
               lang={lang}
             />
           )}
+          </DetailsWrap>
         </div>
       )}
     </motion.div>

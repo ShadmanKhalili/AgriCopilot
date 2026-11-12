@@ -75,7 +75,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
   const renderWeatherChip = () => {
     if (temp === undefined) return null;
     return (
-      <div className="absolute top-2.5 left-2.5 z-10 bg-stone-950/85 backdrop-blur-md text-white px-3 py-1.5 rounded-xl border border-white/15 shadow-lg text-xs font-mono flex items-center gap-2.5 select-none">
+      <div className="absolute top-2.5 left-2.5 z-10 bg-stone-950/85 backdrop-blur-md text-white px-3 py-1.5 rounded-xl border border-white/15 shadow-lg text-sm font-mono flex items-center gap-2.5 select-none">
         <span className="font-bold text-emerald-400 text-sm">{temp.toFixed(1)}°C</span>
         {condition && (
           <span className="text-stone-300 font-sans border-l border-white/20 pl-2">
@@ -112,7 +112,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
           type="button"
           onClick={handleZoomIn}
           aria-label={lang === 'bn' ? 'জুম ইন' : 'Zoom in'}
-          className="w-8 h-8 flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+          className="w-11 h-11 flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -120,7 +120,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
           type="button"
           onClick={handleZoomOut}
           aria-label={lang === 'bn' ? 'জুম আউট' : 'Zoom out'}
-          className="w-8 h-8 flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+          className="w-11 h-11 flex items-center justify-center text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
         >
           <Minus className="w-4 h-4" />
         </button>
@@ -129,16 +129,16 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
           onClick={handleResetZoom}
           aria-label={lang === 'bn' ? 'রিসেট' : 'Reset view'}
           title={lang === 'bn' ? 'মূল অবস্থানে রিসেট' : 'Reset to farm'}
-          className="w-8 h-8 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer border-t border-stone-200/60 dark:border-stone-800"
+          className="w-11 h-11 flex items-center justify-center text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-lg transition-colors cursor-pointer border-t border-stone-200/60 dark:border-stone-800"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Live Coordinate Pin Badge at bottom-left */}
-      <div className="absolute bottom-3 left-3 z-10 bg-stone-950/80 backdrop-blur-xs text-white/90 px-2.5 py-1 rounded-lg text-[10px] font-mono border border-white/10 flex items-center gap-1.5">
+      <div className="absolute bottom-3 left-3 z-10 bg-stone-950/80 backdrop-blur-xs text-white/90 px-2.5 py-1 rounded-lg text-sm font-mono border border-white/10 flex items-center gap-1.5">
         <Compass className="w-3 h-3 text-emerald-400 animate-pulse" />
-        <span>GPS: {coords.latitude.toFixed(4)}°, {coords.longitude.toFixed(4)}°</span>
+        <span>{lang === 'bn' ? 'জিপিএস' : 'GPS'}: {coords.latitude.toFixed(4)}°, {coords.longitude.toFixed(4)}°</span>
       </div>
     </div>
   );
@@ -152,15 +152,15 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
+              <h4 className="text-sm sm:text-sm font-bold text-stone-900 dark:text-stone-100">
                 {lang === 'bn' ? 'খামার ও মাইক্রোক্লাইমেট অবস্থান মানচিত্র' : 'Farm & Microclimate Location Map'}
               </h4>
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60">
+              <span className="inline-flex items-center gap-1 text-sm font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60">
                 <ShieldCheck className="w-2.5 h-2.5" />
                 {apiKey && !hasGoogleError ? 'Google Maps Platform' : 'OpenStreetMap GIS'}
               </span>
             </div>
-            <span className="text-[11px] text-stone-500 dark:text-stone-400 font-mono">
+            <span className="text-sm text-stone-500 dark:text-stone-400 font-mono">
               {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E · {lang === 'bn' ? 'বাংলাদেশ কৃষি অঞ্চল' : 'Bangladesh Agro Zone'}
             </span>
           </div>
@@ -168,11 +168,11 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
 
         {/* Map Type / Layer Toggle */}
         {apiKey && !hasGoogleError && (
-          <div className="flex items-center gap-1 bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl text-[11px] font-mono self-start sm:self-auto">
+          <div className="flex items-center gap-1 bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl text-sm font-mono self-start sm:self-auto">
             <button
               type="button"
               onClick={() => setMapType('hybrid')}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 min-h-[44px] rounded-lg transition-colors cursor-pointer ${
                 mapType === 'hybrid'
                   ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white font-bold shadow-xs'
                   : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
@@ -183,7 +183,7 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
             <button
               type="button"
               onClick={() => setMapType('roadmap')}
-              className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 min-h-[44px] rounded-lg transition-colors cursor-pointer ${
                 mapType === 'roadmap'
                   ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white font-bold shadow-xs'
                   : 'text-stone-500 hover:text-stone-800 dark:hover:text-stone-200'
@@ -239,10 +239,10 @@ export default function GoogleWeatherMap({ coords, temp, condition, rainChance, 
       )}
 
       {/* Bottom Attribution and Status Footer */}
-      <div className="mt-2.5 flex items-center justify-between text-[11px] text-stone-400 dark:text-stone-500 font-mono">
+      <div className="mt-2.5 flex items-center justify-between text-sm text-stone-400 dark:text-stone-500 font-mono">
         <span>
           {apiKey && !hasGoogleError 
-            ? 'Google Maps Platform · Vector Rendering' 
+            ? (lang === 'bn' ? 'গুগল ম্যাপ প্ল্যাটফর্ম · ভেক্টর ম্যাপ' : 'Google Maps Platform · Vector Rendering') 
             : (lang === 'bn' ? 'মুক্ত ভৌগোলিক উপাত্ত (OpenStreetMap) · জিপিএস ট্র্যাকড' : 'OpenStreetMap GIS · GPS Tracked')}
         </span>
         <a

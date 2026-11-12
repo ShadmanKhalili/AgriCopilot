@@ -74,7 +74,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
               {lang === 'bn' ? '৪৮ ঘণ্টার সম্ভাব্য বৃষ্টিপাত বিস্তার (P10 / P50 / P90)' : '48-Hour Probabilistic Precipitation Risk Envelope'}
             </h4>
           </div>
-          <p className="text-xs text-stone-400 mt-0.5">
+          <p className="text-sm text-stone-400 mt-0.5">
             {lang === 'bn' 
               ? 'মডেল-ভিত্তিক বৃষ্টিপাত বিস্তার (P10-P90) ও অতি-বৃষ্টির ঝুঁকি'
               : 'Model-derived precipitation spread (P10-P90) & cloudburst tail risk'}
@@ -82,7 +82,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 text-[11px] text-stone-300 font-mono flex-wrap">
+        <div className="flex items-center gap-3 text-sm text-stone-300 font-mono flex-wrap">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-2 rounded-xs bg-blue-500/30 border border-blue-400/60 inline-block" />
             <span className="text-stone-400">P10-P90 {lang === 'bn' ? 'বিস্তার' : 'Spread'}</span>
@@ -261,9 +261,9 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
 
         {/* Hover Inspector Card */}
         {activeItem && (
-          <div className="mt-2 p-3 bg-stone-950/90 rounded-xl border border-stone-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+          <div className="mt-2 p-3 bg-stone-950/90 rounded-xl border border-stone-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm font-mono">
             <div>
-              <span className="text-[11px] text-stone-400 block font-sans">
+              <span className="text-sm text-stone-400 block font-sans">
                 {lang === 'bn' ? 'সময় ও তাপমাত্রা' : 'Hour & Temp'}
               </span>
               <span className="font-bold text-white tabular-nums">
@@ -272,7 +272,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[11px] text-stone-400 block font-sans">
+              <span className="text-sm text-stone-400 block font-sans">
                 {lang === 'bn' ? 'বৃষ্টিপাত সম্ভাবনা' : 'Rain Prob'}
               </span>
               <span className="font-bold text-cyan-400 tabular-nums">
@@ -281,7 +281,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[11px] text-stone-400 block font-sans">
+              <span className="text-sm text-stone-400 block font-sans">
                 {lang === 'bn' ? 'সম্ভাব্য বৃষ্টি বিস্তার' : 'P10 - P90 Spread'}
               </span>
               <span className="font-bold text-sky-300 tabular-nums">
@@ -290,7 +290,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </div>
 
             <div>
-              <span className="text-[11px] text-stone-400 block font-sans">
+              <span className="text-sm text-stone-400 block font-sans">
                 {lang === 'bn' ? 'স্প্রে নিরাপত্তা অবস্থা' : 'Spray Safety'}
               </span>
               <span className={`font-bold inline-flex items-center gap-1 ${
@@ -315,19 +315,19 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
 
       {/* Certified Safe Spraying Window Callout */}
       {safeSprayingWindow && (
-        <div className="mt-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40 flex items-start gap-2.5 text-xs">
+        <div className="mt-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-700/40 flex items-start gap-2.5 text-sm">
           <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
             <ShieldCheck className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <span className="font-bold text-emerald-300 uppercase tracking-wider block text-[11px]">
-              {lang === 'bn' ? 'প্রত্যয়িত নিরাপদ রাসায়নিক স্প্রে উইন্ডো' : 'Certified Agrochemical Spray Window'}
+            <span className="font-bold text-emerald-300 block text-sm">
+              {lang === 'bn' ? 'স্প্রে করার ভালো সময় (পূর্বাভাস অনুযায়ী)' : 'Good time to spray (from the forecast)'}
             </span>
             <p className="text-stone-200 mt-0.5 font-medium">
               {safeSprayingWindow}
             </p>
             {safeWindowDetail && (
-              <p className="text-[11px] text-stone-400 mt-0.5 font-mono">
+              <p className="text-sm text-stone-400 mt-0.5 font-mono">
                 {lang === 'bn' ? 'বাতাস:' : 'Wind:'} {safeWindowDetail.avgWind} km/h · {lang === 'bn' ? 'তাপমাত্রা:' : 'Temp:'} {safeWindowDetail.avgTemp}°C · {lang === 'bn' ? 'বৃষ্টির ঝুঁকি:' : 'Rain Risk:'} {safeWindowDetail.rainRisk}%
               </p>
             )}

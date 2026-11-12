@@ -42,9 +42,9 @@ export default function DualModelComparison({
             <Cpu className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+            <h4 className="text-sm sm:text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
               <span>{lang === 'bn' ? 'আবহাওয়া মডেল ইঞ্জিন নির্বাচন' : 'Meteorological Engine'}</span>
-              <span className="text-[11px] text-cyan-600 dark:text-cyan-400 font-mono font-normal">
+              <span className="text-sm text-cyan-600 dark:text-cyan-400 font-mono font-normal">
                 {activeModel === 'weathernext3' ? '(AgroCast AI)' : '(ECMWF/GFS Ensemble)'}
               </span>
             </h4>
@@ -56,7 +56,7 @@ export default function DualModelComparison({
           <button
             type="button"
             onClick={() => onModelChange('weathernext3')}
-            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-sm font-bold transition-all cursor-pointer ${
               activeModel === 'weathernext3'
                 ? 'bg-cyan-500 text-white shadow-xs'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white'
@@ -69,7 +69,7 @@ export default function DualModelComparison({
           <button
             type="button"
             onClick={() => onModelChange('standard')}
-            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-lg text-sm font-bold transition-all cursor-pointer ${
               activeModel === 'standard'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white'
@@ -81,7 +81,7 @@ export default function DualModelComparison({
       </div>
 
       {/* Side-by-Side Diff Inspector Trigger */}
-      <div className="mt-2.5 pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-xs">
+      <div className="mt-2.5 pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-sm">
         <button
           type="button"
           onClick={() => setShowDiffInspector(!showDiffInspector)}
@@ -96,7 +96,7 @@ export default function DualModelComparison({
           {showDiffInspector ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
 
-        <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">
+        <span className="text-sm text-stone-400 font-mono hidden sm:inline">
           {lang === 'bn' ? 'সম্ভাব্যতা বিস্তার (P10-P90)' : 'Probabilistic P10-P90 spread'}
         </span>
       </div>
@@ -111,9 +111,9 @@ export default function DualModelComparison({
             className="overflow-hidden mt-3 pt-3 border-t border-stone-200/80 dark:border-stone-800"
           >
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-sm font-mono">
                 <thead>
-                  <tr className="border-b border-stone-200 dark:border-stone-800 text-[11px] text-stone-400">
+                  <tr className="border-b border-stone-200 dark:border-stone-800 text-sm text-stone-400">
                     <th className="py-2 pr-3 font-medium">{lang === 'bn' ? 'বৈশিষ্ট্য' : 'Metric'}</th>
                     <th className="py-2 px-3 text-cyan-600 dark:text-cyan-400 font-bold bg-cyan-50/50 dark:bg-cyan-950/20 rounded-t-lg">
                       AgroCast AI
@@ -129,10 +129,10 @@ export default function DualModelComparison({
                       {lang === 'bn' ? 'গ্রিড রেজোলিউশন' : 'Spatial Grid'}
                     </td>
                     <td className="py-2 px-3 font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-50/30 dark:bg-cyan-950/10">
-                      0.05° (~5 km micro-grid)
+                      {lang === 'bn' ? '0.05° (~5 km মাইক্রো-গ্রিড)' : '0.05° (~5 km micro-grid)'}
                     </td>
                     <td className="py-2 pl-3 text-stone-500">
-                      0.1° (~9-11 km global grid)
+                      {lang === 'bn' ? '0.1° (~9-11 km বৈশ্বিক গ্রিড)' : '0.1° (~9-11 km global grid)'}
                     </td>
                   </tr>
 
@@ -141,10 +141,10 @@ export default function DualModelComparison({
                       {lang === 'bn' ? 'বৃষ্টিপাত সম্ভাবনা' : 'Rain Probability'}
                     </td>
                     <td className="py-2 px-3 font-bold bg-cyan-50/30 dark:bg-cyan-950/10">
-                      {wnRainChance}% (Probabilistic P10-P90)
+                      {wnRainChance}% {lang === 'bn' ? '(সম্ভাব্যতা P10-P90)' : '(Probabilistic P10-P90)'}
                     </td>
                     <td className="py-2 pl-3">
-                      {stdRainChance}% (Deterministic Average)
+                      {stdRainChance}% {lang === 'bn' ? '(নির্ধারণবাদী গড়)' : '(Deterministic Average)'}
                     </td>
                   </tr>
 
@@ -156,7 +156,7 @@ export default function DualModelComparison({
                       {wnWind10.toFixed(1)} km/h / {wnWind100.toFixed(1)} km/h
                     </td>
                     <td className="py-2 pl-3">
-                      {stdWind10.toFixed(1)} km/h (10m only)
+                      {stdWind10.toFixed(1)} km/h {lang === 'bn' ? '(শুধু ১০মি)' : '(10m only)'}
                     </td>
                   </tr>
 
@@ -164,11 +164,11 @@ export default function DualModelComparison({
                     <td className="py-2 pr-3 font-sans text-stone-500 dark:text-stone-400 font-medium">
                       {lang === 'bn' ? 'ছত্রাক রোগ পূর্বাভাস' : 'Fungal Blight Risk'}
                     </td>
-                    <td className="py-2 px-3 font-bold bg-cyan-50/30 dark:bg-cyan-950/10 uppercase text-[11px]">
-                      {wnBlight} (Dew Point Depression)
+                    <td className="py-2 px-3 font-bold bg-cyan-50/30 dark:bg-cyan-950/10 text-sm">
+                      {wnBlight} {lang === 'bn' ? '(শিশিরাঙ্ক ব্যবধান)' : '(Dew Point Depression)'}
                     </td>
                     <td className="py-2 pl-3 text-stone-500">
-                      Simple Relative Humidity
+                      {lang === 'bn' ? 'সাধারণ আপেক্ষিক আর্দ্রতা' : 'Simple Relative Humidity'}
                     </td>
                   </tr>
 
@@ -180,7 +180,7 @@ export default function DualModelComparison({
                       {wnSprayWindow}
                     </td>
                     <td className="py-2 pl-3 text-stone-500 font-sans">
-                      Basic Wind &lt; 15 km/h
+                      {lang === 'bn' ? 'সাধারণ বাতাস < 15 km/h' : 'Basic Wind < 15 km/h'}
                     </td>
                   </tr>
                 </tbody>
