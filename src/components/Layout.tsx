@@ -179,7 +179,9 @@ export default function Layout() {
   const [agriAnalysisType, setAgriAnalysisType] = useState<string>('disease');
   // The copilot mode (static upload vs live stream) is part of the farmer's
   // session, so it survives a tab switch like the rest of the copilot state.
-  const [agriCopilotMode, setAgriCopilotMode] = useState<'static_upload' | 'live_stream'>('live_stream');
+  // Empty until the crop doctor is first opened: it then starts on the photo
+  // screen in the simple view and on live video in the full view.
+  const [agriCopilotMode, setAgriCopilotMode] = useState<'static_upload' | 'live_stream' | undefined>(undefined);
 
   // Human Expert Layer: a diagnosis screen can hand a pre-filled request seed
   // to the Expert Hub (which opens the consent wizard).

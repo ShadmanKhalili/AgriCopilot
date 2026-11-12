@@ -38,6 +38,8 @@ const THINKING_LEVEL_HINT_BN: Record<ThinkingLevelOption, string> = {
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
+import { useUiMode } from '../context/useUiMode';
+import Disclosure from './ui/Disclosure';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import type { PrescriptionData } from './DigitalPrescriptionModal';
@@ -120,7 +122,14 @@ export default function LiveVideoCopilot({
   const { user, userRole } = useAuth();
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isExtendedThinking, setIsExtendedThinking] = useState(true);
+  const uiMode = useUiMode();
+  const isSimpleView = uiMode === 'simple';
+  // Deep mode is the default for staff (Full view). A farmer in the Simple
+  // view starts in quick mode, which answers faster and costs less; deep mode
+  // stays one tap away under "More options". `null` means "not chosen yet",
+  // so the default follows the view even when the role loads after mount.
+  const [extendedThinkingChoice, setIsExtendedThinking] = useState<boolean | null>(null);
+  const isExtendedThinking = extendedThinkingChoice ?? !isSimpleView;
   // Reasoning depth for the Extended Thinking Live model. LOW keeps the
   // shipped behaviour; MEDIUM/HIGH buy deeper background reasoning at the
   // cost of latency (thinking tokens bill at the output rate).
@@ -521,6 +530,7 @@ export default function LiveVideoCopilot({
             ? "Camera or microphone permission was denied. Please allow access in browser permissions or select a sample preset below."
             : "Camera or audio device not detected. You can select one of the sample presets below to test the copilot.");
       setCameraError(msg);
+      setIsFullscreen(false);
       toast.error(msg);
       return null;
     }
@@ -935,36 +945,37 @@ Before formulating your spoken response, quickly evaluate:
 
 SPOKEN DELIVERY CADENCE:
 - Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step. Do NOT narrate thoughts out loud.`
-        : `You are a warm, highly knowledgeable Universal Plant, Gardening & Agriculture Companion (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh observing a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from a user's smartphone in ${locationContext}.
-MODE: GEMINI 3.8 LIVE EXTENDED (FAST, BROAD & VERSATILE GREEN COMPANION).
+        : `You are a friendly, practical field advisor (কৃষি পরামর্শক) for smallholder farmers in Bangladesh, watching a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from the farmer's smartphone in ${locationContext}.
+MODE: GEMINI 3.8 LIVE EXTENDED (QUICK FIELD ADVICE).
 
-BROAD MULTI-DOMAIN SCOPE & CAPABILITIES:
-You naturally and enthusiastically help with ANY green space, gardening, or farming inquiry:
-1. Rooftop & Balcony Gardening (ছাদ বাগান ও বারান্দা বাগান): Pot/container selection, container drainage (ইটের খোয়া/খোলামকুচি), lightweight potting mix ratios (বেলে-দোআঁশ মাটি, ভার্মিকম্পোস্ট/গোবর সার, কোকোপিট, বালি), rooftop heat & wind protection, and organic liquid boosters (সরিষার খৈল পচা পানি, কলার খোসা ভেজানো পানি).
-2. Indoor Houseplants & Home Decor (ইনডোর গাছপালা): Suggesting best indoor plants for homes, bedrooms, and offices in Bangladesh (Money Plant/Pothos, Snake Plant/Sansevieria, ZZ Plant, Peace Lily, Spider Plant, Aloe Vera, Areca Palm), light suitability (low light, bright indirect sun), watering frequency (checking topsoil with finger), and air-purification qualities.
-3. Kitchen Gardens & Herbs: Chili (মরিচ), tomato, coriander (ধনেপাতা), mint (পুদিনা), lemon (কাগজি লেবু), ginger in pots or small verandas.
-4. Farming, Crops & Orchards: Agricultural fields, seasonal planting calendar, healthy leaf checks, and garden pests (mealybugs/ছাতরা পোকা, aphids/জাব পোকা, whiteflies, caterpillars).
-5. Eco-friendly & Kitchen Remedies: Neem oil + soap water spray, wood ash (ছাই), compost tea, natural insect repellents.
+WHO YOU HELP & WHAT YOU DO:
+1. Your main user is a working smallholder farmer, often new to smartphones. Field crops come first: rice (ধান), potato (আলু), vegetables (বেগুন, টমেটো, মরিচ, লাউ, শিম), jute (পাট), maize (ভুট্টা), mustard (সরিষা), pulses (মসুর, মুগ, ছোলা) and fruit (আম, কলা, পেয়ারা, লেবু).
+2. From the video, name the likely problem in the farmer's words: disease, insect or mite pest, nutrient shortage, or water/weather stress (e.g. "পাতা পোড়া রোগ", "মাজরা পোকা", "নাইট্রোজেনের অভাব").
+3. Then give 2-3 practical steps the farmer can do TODAY: no-cost field steps first (remove and destroy affected leaves or plants, fix drainage or water, hand-pick pests, keep the field clean), then inputs sold at the local dealer (সার ও বালাইনাশকের দোকান) only if needed.
+4. If asked about a rooftop, balcony, pot or household garden, help the same simple way, but that is not your main focus.
+
+HONESTY & SAFETY:
+1. If the picture is unclear or the signs fit more than one problem, ask at most ONE short question (e.g. "পাতার উল্টো পিঠে পোকা আছে কি?") or ask to move the camera. If still unsure, say so honestly ("নিশ্চিত বলতে পারছি না") and give safe general steps. Never guess a disease name just to sound sure.
+2. Chemicals come after non-chemical steps. Never recommend banned chemicals (Paraquat, Carbofuran, Monocrotophos). If you name a pesticide or fungicide, say its active ingredient and ALWAYS add: use the dose on the packet label, wear mask, gloves and full sleeves, do not spray in wind or rain. Never give a dose without this warning.
+3. Tell the farmer to stop and call the upazila agriculture office (উপজেলা কৃষি অফিস), their SAAO, or Krishi Call Centre 16123 (কৃষি কল সেন্টার ১৬১২৩) when the problem is spreading fast or over a large area, plants are dying, a treatment did not work, you are not sure what it is, or someone feels sick after spraying.
+4. You are an AI helper, not a government officer; your advice is a first guide, not an official prescription.
 
 CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
-2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the user actually speaks first or asks a question.
-3. Start speaking ONLY after the user speaks. Respond directly, warmly, and concisely in natural spoken Bangla (বাংলা).
-4. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic phrases like "আমি আপনার ভিডিও দেখছি", "উপায়গুলো দেখছি", "আমি এআই", or announce looking at camera footage. Jump straight into answering the user's question.
-5. Switch to English ONLY if the user explicitly says "Speak in English" or "ইংরেজিতে বলুন".
+2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the farmer actually speaks first or asks a question.
+3. Speak natural, simple spoken Bangla (বাংলা) with everyday village words, not bookish ones. Understand regional accents and farming terms. Switch to English ONLY if the farmer speaks English or says "Speak in English" / "ইংরেজিতে বলুন".
+4. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say "আমি আপনার ভিডিও দেখছি", "উপায়গুলো দেখছি", "আমি এআই", or announce looking at camera footage. Answer straight away.
+5. A message starting "[কৃষকের ট্যাপ-উত্তর / Tapped answer]" is the farmer's own answer tapped on screen (crop age, how long, last input). Use it like a spoken answer; do not read it back.
 
 LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
-1. Continuous Multimodal Observation: You receive a full-resolution JPEG video frame from the camera once per second. The frames are high resolution — read the leaf surface, the spots, their colour and their texture, not just the overall shape of the plant. Continuously observe whatever the user shows—whether it is an indoor decorative pot, a rooftop planter, a balcony railing pot, kitchen garden herb, seedling, leaf, or farm crop.
-2. Ultra-low latency spoken turns: Keep responses short, natural, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human mentor in the garden with them.
-3. Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু দেখতে চান?", "জল দেওয়া হয়েছে?"). Never give long speeches.
-4. IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or speaks while you are talking, immediately stop your previous sentence and address their new question without repeating earlier words.
-5. Helpful Camera Guidance:
-   * "ক্যামেরাটি পাতা বা টবের আরেকটু কাছে আনুন।"
-   * "টবের মাটি বা পাতার নিচের দিকটা একটু দেখান।"
-   * "রোদের বিপরীতে ধরুন যাতে পাতা স্পষ্ট দেখা যায়।"
-6. If you need details, ask ONE simple, friendly question at a time (e.g., "টবে কি দিনে রোদ পায়?", "মাটি কি বেশি ভেজা নাকি শুকনা?").
-7. Plant & Chemical Safety: For home gardens, indoor pots, and edible herbs, strongly prioritize safe organic remedies. Never recommend banned toxic chemicals (Paraquat, Carbofuran, Monocrotophos).
-8. SINGLE RESPONSE MANDATE: Give exactly ONE concise, complete spoken answer per inquiry. Never repeat or restart your answer.`;
+1. You receive a full-resolution JPEG video frame from the camera once per second. Read the leaf surface, the spots, their colour and texture, the stem and any insects, not just the overall shape of the plant.
+2. Keep each spoken turn short: 1-3 short sentences, under about 40 words. Say the likely problem, then the steps; if they do not fit, give the most urgent step and offer the rest (e.g. "আর কী করবেন বলব?"). Never give long speeches.
+3. IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the farmer says "দাঁড়াও", "থামো", "Wait", "Stop", or speaks while you are talking, immediately stop and address the new question without repeating earlier words.
+4. Camera guidance when needed:
+   * "ক্যামেরাটা আক্রান্ত পাতার আরেকটু কাছে এনে ২ সেকেন্ড স্থির রাখুন।"
+   * "পাতার উল্টো পিঠটা একটু দেখান।"
+   * "পুরো গাছ আর গোড়াটাও একবার দেখান।"
+5. SINGLE RESPONSE MANDATE: Give exactly ONE concise, complete spoken answer per inquiry. Never repeat or restart your answer.`;
 
       // Append the silent Farm Memory block (weather + saved history) when available
       const systemInstructionWithMemory = farmMemoryBlock
@@ -1474,6 +1485,9 @@ Return a JSON object with this exact structure:
 
   // Stop all media & connections
   const stopAllMedia = () => {
+    // Leave the full-screen camera view, so the phone is not left on a black
+    // screen after a call ends or fails.
+    setIsFullscreen(false);
     sessionIdRef.current += 1;
     isStartingSessionRef.current = false;
     releaseWakeLock();
@@ -1942,6 +1956,246 @@ Return a JSON object with this exact structure:
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Start-screen controls. The Full view shows them inline as before; the
+  // Simple view keeps them under one "More options" disclosure.
+  // Analysis depth — one quiet line (default behaviour unchanged in Full view)
+  const analysisDepthToggle = (
+    <button
+      type="button"
+      onClick={() => setIsExtendedThinking(!isExtendedThinking)}
+      className={`w-full flex items-center justify-between gap-2 px-3 min-h-[44px] py-1.5 rounded-xl border backdrop-blur-md text-left transition-colors cursor-pointer ${
+        isExtendedThinking
+          ? 'bg-purple-950/40 border-purple-500/30 hover:bg-purple-950/60'
+          : 'bg-gray-900/60 border-gray-800/80 hover:bg-gray-800/60'
+      }`}
+      role="switch"
+      aria-checked={isExtendedThinking}
+      aria-label={lang === 'bn'
+        ? (isExtendedThinking ? 'গভীর রোগ ও প্যাথলজি মোড বন্ধ করুন' : 'গভীর রোগ ও প্যাথলজি মোড চালু করুন')
+        : (isExtendedThinking ? 'Turn off Deep Clinical Pathology Mode' : 'Turn on Deep Clinical Pathology Mode')}
+    >
+      <span className="flex items-center gap-2 min-w-0">
+        {isExtendedThinking
+          ? <BrainCircuit className="w-3.5 h-3.5 text-purple-300 shrink-0" aria-hidden="true" />
+          : <Zap className="w-3.5 h-3.5 text-emerald-300 shrink-0" aria-hidden="true" />}
+        <span className={`text-[11px] font-bold truncate ${isExtendedThinking ? 'text-purple-200' : 'text-emerald-200'}`}>
+          {isExtendedThinking
+            ? (lang === 'bn' ? 'গভীর রোগ বিশ্লেষণ' : 'Deep pathology mode')
+            : (lang === 'bn' ? 'দ্রুত পরামর্শ' : 'Quick advice')}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
+          isExtendedThinking ? 'bg-purple-500' : 'bg-gray-600'
+        }`}
+      >
+        <span
+          className={`pointer-events-none mt-0.5 ml-0.5 inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-200 ${
+            isExtendedThinking ? 'translate-x-3' : ''
+          }`}
+        />
+      </span>
+    </button>
+  );
+
+  // Reasoning depth — only meaningful on the Extended Thinking model,
+  // because plain gemini-3.8-live has no reasoning at all.
+  const reasoningDepthPicker = (
+    <>
+      {isExtendedThinking && (
+        <div className="w-full px-3 py-2 rounded-xl border border-purple-500/25 bg-purple-950/25 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-[11px] font-bold text-purple-200 truncate">
+              {lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
+            </span>
+            <span className="text-[10px] text-purple-300/80 truncate">
+              {lang === 'bn'
+                ? THINKING_LEVEL_HINT_BN[thinkingLevel]
+                : THINKING_LEVEL_HINT[thinkingLevel]}
+            </span>
+          </div>
+          <div
+            className="grid grid-cols-3 gap-1.5"
+            role="radiogroup"
+            aria-label={lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
+          >
+            {(['LOW', 'MEDIUM', 'HIGH'] as ThinkingLevelOption[]).map((level) => {
+              const active = thinkingLevel === level;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setThinkingLevel(level)}
+                  className={`min-h-[36px] rounded-lg border text-[11px] font-bold tracking-wide transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-purple-500/70 border-purple-300/70 text-white'
+                      : 'bg-gray-900/60 border-purple-500/20 text-purple-200/70 hover:bg-purple-900/60'
+                  }`}
+                >
+                  {level}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // Investor demo — collapsed behind a tiny ghost control (boardroom tool, no public use)
+  const investorDemoPanel = (
+    <>
+      {userRole === 'admin' && (showInvestorPanel ? (
+      <div className="pt-2 text-left">
+        <div className="bg-gradient-to-br from-amber-500/10 via-emerald-950/40 to-teal-950/40 p-3.5 rounded-2xl border border-amber-500/30 backdrop-blur-md">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="flex items-center space-x-2 min-w-0">
+              <div className="p-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                <Briefcase className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-black text-amber-200 uppercase tracking-wider block truncate">
+                  {lang === 'bn' ? 'ইনভেস্টর ডেমো প্রিসেট (বোর্ডরুম ব্যাকআপ)' : 'Investor Demo Presets (Pitch Backup)'}
+                </span>
+                <p className="text-[11px] text-stone-300 truncate">
+                  {lang === 'bn' ? 'মিটিং রুমে বাস্তব ফসল না থাকলেও ১০০% নির্ভরযোগ্য লাইভ এআই ডেমো' : 'Foolproof live AI demo without real crops in meeting room'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
+                className="text-[11px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all cursor-pointer"
+              >
+                {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInvestorPanel(false)}
+                aria-label={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
+                title={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
+                className="p-1 text-amber-300/70 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg border border-amber-400/20 transition-all cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {/* Pitch Cheat Sheet Accordion */}
+          <AnimatePresence>
+            {showPitchCheatSheet && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-3 p-2.5 rounded-xl bg-black/70 border border-amber-500/30 text-[11px] space-y-1.5 font-mono text-amber-100"
+              >
+                <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                  <span className="text-stone-400">Multimodal Latency:</span>
+                  <span className="font-bold text-emerald-400">~120ms (Real-time Video)</span>
+                </div>
+                <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                  <span className="text-stone-400">Audio Synthesis:</span>
+                  <span className="font-bold text-teal-300">24kHz PCM Bi-directional</span>
+                </div>
+                <div className="flex justify-between border-b border-amber-500/20 pb-1">
+                  <span className="text-stone-400">Unit Cost per Consult:</span>
+                  <span className="font-bold text-amber-300">&lt;$0.002 vs $15 Field Officer</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-stone-400">Total Addressable Market:</span>
+                  <span className="font-bold text-purple-300">16.5M Farmers + 3.5M Urban</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 4 Demo Preset Cards */}
+          <div className="grid grid-cols-2 gap-2">
+            {INVESTOR_DEMO_PRESETS.map((preset) => {
+              const isSelected = activeDemoPreset?.id === preset.id;
+              return (
+                <div
+                  key={preset.id}
+                  className={`p-2.5 rounded-xl border transition-all text-left relative flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-emerald-950/90 border-emerald-400 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-black/50 hover:bg-black/70 border-stone-700/60 text-stone-200'
+                  }`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
+                        {preset.category === 'staple' ? '🌾 Staple' : 
+                         preset.category === 'cash_crop' ? '🍅 Cash Crop' : 
+                         preset.category === 'rooftop' ? '🍋 Rooftop' : '🪴 Indoor'}
+                      </span>
+                      {isSelected && (
+                        <span className="text-[11px] bg-emerald-500 text-gray-950 px-1 py-0.2 rounded font-black">
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-bold leading-tight line-clamp-1">
+                      {lang === 'bn' ? preset.cropBn : preset.cropEn}
+                    </p>
+                    <p className="text-[11px] text-stone-400 line-clamp-1">
+                      {lang === 'bn' ? preset.diseaseBn : preset.diseaseEn}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 mt-2 pt-1.5 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPreset(isSelected ? null : preset)}
+                      className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-emerald-500 text-gray-950 hover:bg-emerald-400'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
+                    >
+                      {isSelected 
+                        ? (lang === 'bn' ? '✓ অ্যাক্টিভ' : '✓ Active') 
+                        : (lang === 'bn' ? 'ফিড নির্বাচন' : 'Set Feed')}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPrescriptionForPreset(preset)}
+                      className="p-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 transition-all cursor-pointer"
+                      title={lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন' : 'View Digital Rx'}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      ) : (
+        <div className="pt-1 flex justify-end pr-0.5">
+          <button
+            type="button"
+            onClick={() => setShowInvestorPanel(true)}
+            aria-label={lang === 'bn' ? 'ইনভেস্টর ডেমো প্যানেল খুলুন' : 'Open investor demo panel'}
+            title={lang === 'bn' ? 'ইনভেস্টর ডেমো' : 'Investor demo'}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-stone-500/60 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer select-none"
+          >
+            <Briefcase className="w-3 h-3" aria-hidden="true" />
+            <span>{lang === 'bn' ? 'ডেমো' : 'Demo'}</span>
+          </button>
+        </div>
+      ))}
+    </>
+  );
+
   return (
     <div className="space-y-4 w-full">
       {/* Hidden processing canvas */}
@@ -2013,8 +2267,62 @@ Return a JSON object with this exact structure:
           )}
         </AnimatePresence>
 
-        {/* Inactive Camera State / Start CTA */}
-        {!isCameraActive && !isConnecting && (
+        {/* Inactive Camera State / Start CTA — Simple view: one line, one big
+            button, any camera error, and everything else under "More options". */}
+        {!isCameraActive && !isConnecting && isSimpleView && (
+          <div className="p-4 sm:p-6 text-center text-white space-y-5 w-full max-w-md mx-auto z-10 my-auto">
+            <div className="mx-auto w-16 h-16 rounded-3xl bg-emerald-700 flex items-center justify-center" aria-hidden="true">
+              <Video className="w-9 h-9 text-white" />
+            </div>
+
+            {/* H2 keeps the document outline sequential after the page H1 */}
+            <h2 className="text-lg font-bold leading-snug text-white">
+              {lang === 'bn'
+                ? 'ক্যামেরা ফসলের দিকে ধরুন আর কথা বলুন। এআই দেখে উত্তর দেবে।'
+                : 'Point your camera at the crop and talk. The AI will look and answer.'}
+            </h2>
+
+            {cameraError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 text-left rounded-2xl border border-rose-400/50 bg-rose-950/70 px-4 py-3 text-base text-rose-100 leading-snug"
+              >
+                <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0 text-rose-300" aria-hidden="true" />
+                <span>{cameraError}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={startLiveSession}
+              disabled={isConnecting}
+              className="w-full min-h-[64px] px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-lg font-bold shadow-xl shadow-emerald-900/40 flex items-center justify-center gap-3 active:scale-[0.98] transition-transform cursor-pointer disabled:opacity-60"
+            >
+              <Video className="w-7 h-7 shrink-0" aria-hidden="true" />
+              <span>
+                {activeDemoPreset
+                  ? (lang === 'bn' ? `ডেমো ফিড দিয়ে শুরু করুন (${activeDemoPreset.cropBn})` : `Start with Demo Feed (${activeDemoPreset.cropEn})`)
+                  : (lang === 'bn' ? 'লাইভ ক্যামেরা চালু করুন' : 'Start live camera')}
+              </span>
+            </button>
+
+            {/* The shared Disclosure is styled for light pages; on this dark
+                viewfinder its row text and border are lightened. */}
+            <Disclosure
+              label={lang === 'bn' ? 'আরও অপশন' : 'More options'}
+              className="text-left [&>button]:text-white [&>button]:border-white/30"
+            >
+              <div className="space-y-3">
+                {analysisDepthToggle}
+                {reasoningDepthPicker}
+                {investorDemoPanel}
+              </div>
+            </Disclosure>
+          </div>
+        )}
+
+        {/* Inactive Camera State / Start CTA — Full view (unchanged) */}
+        {!isCameraActive && !isConnecting && !isSimpleView && (
           <div className="p-4 sm:p-6 text-center text-white space-y-4 max-w-md mx-auto z-10 my-auto">
             <div className="relative mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-0.5 shadow-xl shadow-emerald-500/20">
               <div className="w-full h-full rounded-[18px] sm:rounded-[22px] bg-gray-900/90 flex items-center justify-center">
@@ -2042,86 +2350,9 @@ Return a JSON object with this exact structure:
               </p>
             </div>
 
-            {/* Analysis depth — one quiet line (default behavior unchanged) */}
-            <button
-              type="button"
-              onClick={() => setIsExtendedThinking(!isExtendedThinking)}
-              className={`w-full flex items-center justify-between gap-2 px-3 min-h-[44px] py-1.5 rounded-xl border backdrop-blur-md text-left transition-colors cursor-pointer ${
-                isExtendedThinking
-                  ? 'bg-purple-950/40 border-purple-500/30 hover:bg-purple-950/60'
-                  : 'bg-gray-900/60 border-gray-800/80 hover:bg-gray-800/60'
-              }`}
-              role="switch"
-              aria-checked={isExtendedThinking}
-              aria-label={lang === 'bn'
-                ? (isExtendedThinking ? 'গভীর রোগ ও প্যাথলজি মোড বন্ধ করুন' : 'গভীর রোগ ও প্যাথলজি মোড চালু করুন')
-                : (isExtendedThinking ? 'Turn off Deep Clinical Pathology Mode' : 'Turn on Deep Clinical Pathology Mode')}
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                {isExtendedThinking
-                  ? <BrainCircuit className="w-3.5 h-3.5 text-purple-300 shrink-0" aria-hidden="true" />
-                  : <Zap className="w-3.5 h-3.5 text-emerald-300 shrink-0" aria-hidden="true" />}
-                <span className={`text-[11px] font-bold truncate ${isExtendedThinking ? 'text-purple-200' : 'text-emerald-200'}`}>
-                  {isExtendedThinking
-                    ? (lang === 'bn' ? 'গভীর রোগ বিশ্লেষণ' : 'Deep pathology mode')
-                    : (lang === 'bn' ? 'দ্রুত পরামর্শ' : 'Quick advice')}
-                </span>
-              </span>
-              <span
-                aria-hidden="true"
-                className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors duration-200 ${
-                  isExtendedThinking ? 'bg-purple-500' : 'bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none mt-0.5 ml-0.5 inline-block h-3 w-3 rounded-full bg-white shadow transition-transform duration-200 ${
-                    isExtendedThinking ? 'translate-x-3' : ''
-                  }`}
-                />
-              </span>
-            </button>
+            {analysisDepthToggle}
 
-            {/* Reasoning depth — only meaningful on the Extended Thinking model,
-                because plain gemini-3.8-live has no reasoning at all. */}
-            {isExtendedThinking && (
-              <div className="w-full px-3 py-2 rounded-xl border border-purple-500/25 bg-purple-950/25 backdrop-blur-md">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="text-[11px] font-bold text-purple-200 truncate">
-                    {lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
-                  </span>
-                  <span className="text-[10px] text-purple-300/80 truncate">
-                    {lang === 'bn'
-                      ? THINKING_LEVEL_HINT_BN[thinkingLevel]
-                      : THINKING_LEVEL_HINT[thinkingLevel]}
-                  </span>
-                </div>
-                <div
-                  className="grid grid-cols-3 gap-1.5"
-                  role="radiogroup"
-                  aria-label={lang === 'bn' ? 'রিজনিং গভীরতা' : 'Reasoning depth'}
-                >
-                  {(['LOW', 'MEDIUM', 'HIGH'] as ThinkingLevelOption[]).map((level) => {
-                    const active = thinkingLevel === level;
-                    return (
-                      <button
-                        key={level}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        onClick={() => setThinkingLevel(level)}
-                        className={`min-h-[36px] rounded-lg border text-[11px] font-bold tracking-wide transition-colors cursor-pointer ${
-                          active
-                            ? 'bg-purple-500/70 border-purple-300/70 text-white'
-                            : 'bg-gray-900/60 border-purple-500/20 text-purple-200/70 hover:bg-purple-900/60'
-                        }`}
-                      >
-                        {level}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {reasoningDepthPicker}
 
             <motion.button
               whileHover={{ scale: 1.03 }}
@@ -2142,152 +2373,7 @@ Return a JSON object with this exact structure:
               </span>
             </motion.button>
 
-            {/* Investor demo — collapsed behind a tiny ghost control (boardroom tool, no public use) */}
-            {userRole === 'admin' && (showInvestorPanel ? (
-            <div className="pt-2 text-left">
-              <div className="bg-gradient-to-br from-amber-500/10 via-emerald-950/40 to-teal-950/40 p-3.5 rounded-2xl border border-amber-500/30 backdrop-blur-md">
-                <div className="flex items-center justify-between gap-2 mb-2.5">
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <div className="p-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                      <Briefcase className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-xs font-black text-amber-200 uppercase tracking-wider block truncate">
-                        {lang === 'bn' ? 'ইনভেস্টর ডেমো প্রিসেট (বোর্ডরুম ব্যাকআপ)' : 'Investor Demo Presets (Pitch Backup)'}
-                      </span>
-                      <p className="text-[11px] text-stone-300 truncate">
-                        {lang === 'bn' ? 'মিটিং রুমে বাস্তব ফসল না থাকলেও ১০০% নির্ভরযোগ্য লাইভ এআই ডেমো' : 'Foolproof live AI demo without real crops in meeting room'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowPitchCheatSheet(!showPitchCheatSheet)}
-                      className="text-[11px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 px-2 py-1 rounded-lg border border-amber-400/30 transition-all cursor-pointer"
-                    >
-                      {showPitchCheatSheet ? (lang === 'bn' ? 'চিটশিট লুকান' : 'Hide Stats') : (lang === 'bn' ? 'ইনভেস্টর চিটশিট 📊' : 'Pitch Stats 📊')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowInvestorPanel(false)}
-                      aria-label={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
-                      title={lang === 'bn' ? 'ডেমো প্যানেল লুকান' : 'Hide demo panel'}
-                      className="p-1 text-amber-300/70 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg border border-amber-400/20 transition-all cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Pitch Cheat Sheet Accordion */}
-                <AnimatePresence>
-                  {showPitchCheatSheet && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mb-3 p-2.5 rounded-xl bg-black/70 border border-amber-500/30 text-[11px] space-y-1.5 font-mono text-amber-100"
-                    >
-                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
-                        <span className="text-stone-400">Multimodal Latency:</span>
-                        <span className="font-bold text-emerald-400">~120ms (Real-time Video)</span>
-                      </div>
-                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
-                        <span className="text-stone-400">Audio Synthesis:</span>
-                        <span className="font-bold text-teal-300">24kHz PCM Bi-directional</span>
-                      </div>
-                      <div className="flex justify-between border-b border-amber-500/20 pb-1">
-                        <span className="text-stone-400">Unit Cost per Consult:</span>
-                        <span className="font-bold text-amber-300">&lt;$0.002 vs $15 Field Officer</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-stone-400">Total Addressable Market:</span>
-                        <span className="font-bold text-purple-300">16.5M Farmers + 3.5M Urban</span>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* 4 Demo Preset Cards */}
-                <div className="grid grid-cols-2 gap-2">
-                  {INVESTOR_DEMO_PRESETS.map((preset) => {
-                    const isSelected = activeDemoPreset?.id === preset.id;
-                    return (
-                      <div
-                        key={preset.id}
-                        className={`p-2.5 rounded-xl border transition-all text-left relative flex flex-col justify-between ${
-                          isSelected
-                            ? 'bg-emerald-950/90 border-emerald-400 text-white shadow-md shadow-emerald-500/20'
-                            : 'bg-black/50 hover:bg-black/70 border-stone-700/60 text-stone-200'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-400">
-                              {preset.category === 'staple' ? '🌾 Staple' : 
-                               preset.category === 'cash_crop' ? '🍅 Cash Crop' : 
-                               preset.category === 'rooftop' ? '🍋 Rooftop' : '🪴 Indoor'}
-                            </span>
-                            {isSelected && (
-                              <span className="text-[11px] bg-emerald-500 text-gray-950 px-1 py-0.2 rounded font-black">
-                                ACTIVE
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs font-bold leading-tight line-clamp-1">
-                            {lang === 'bn' ? preset.cropBn : preset.cropEn}
-                          </p>
-                          <p className="text-[11px] text-stone-400 line-clamp-1">
-                            {lang === 'bn' ? preset.diseaseBn : preset.diseaseEn}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 mt-2 pt-1.5 border-t border-white/10">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectPreset(isSelected ? null : preset)}
-                            className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold text-center transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-emerald-500 text-gray-950 hover:bg-emerald-400'
-                                : 'bg-white/10 hover:bg-white/20 text-white'
-                            }`}
-                          >
-                            {isSelected 
-                              ? (lang === 'bn' ? '✓ অ্যাক্টিভ' : '✓ Active') 
-                              : (lang === 'bn' ? 'ফিড নির্বাচন' : 'Set Feed')}
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPrescriptionForPreset(preset)}
-                            className="p-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 transition-all cursor-pointer"
-                            title={lang === 'bn' ? 'ডিজিটাল প্রেসক্রিপশন দেখুন' : 'View Digital Rx'}
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            ) : (
-              <div className="pt-1 flex justify-end pr-0.5">
-                <button
-                  type="button"
-                  onClick={() => setShowInvestorPanel(true)}
-                  aria-label={lang === 'bn' ? 'ইনভেস্টর ডেমো প্যানেল খুলুন' : 'Open investor demo panel'}
-                  title={lang === 'bn' ? 'ইনভেস্টর ডেমো' : 'Investor demo'}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-stone-500/60 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer select-none"
-                >
-                  <Briefcase className="w-3 h-3" aria-hidden="true" />
-                  <span>{lang === 'bn' ? 'ডেমো' : 'Demo'}</span>
-                </button>
-              </div>
-            ))}
+            {investorDemoPanel}
           </div>
         )}
 
@@ -2464,7 +2550,7 @@ Return a JSON object with this exact structure:
 
                         toast(lang === 'bn' ? 'এআই উত্তর বাতিল করা হয়েছে' : 'AI speech response cancelled', { duration: 1200, icon: '✋' });
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[11px] uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse"
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold ${isSimpleView ? 'text-sm' : 'text-[11px]'} uppercase tracking-wider shadow-lg shadow-red-900/60 backdrop-blur-md border border-red-400 active:scale-90 transition-all cursor-pointer animate-pulse`}
                       title={lang === 'bn' ? 'এআই উত্তর বাতিল করুন' : 'Cancel AI Response'}
                     >
                       <Square className="w-3 h-3 fill-current" />
@@ -2638,7 +2724,7 @@ Return a JSON object with this exact structure:
                     <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-gray-950" />
                   </div>
                   {isFullscreen && (
-                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[11px] font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md">
+                    <span className={`absolute left-1/2 -translate-x-1/2 font-black uppercase text-emerald-300 whitespace-nowrap drop-shadow-md ${isSimpleView ? '-bottom-6 text-sm' : '-bottom-5 text-[11px]'}`}>
                       {lang === 'bn' ? 'ক্যাপচার' : 'Capture'}
                     </span>
                   )}

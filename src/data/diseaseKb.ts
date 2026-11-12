@@ -116,7 +116,7 @@ export const CROP_KNOWLEDGE: Record<string, CropKnowledge> = {
       },
       {
         disease: 'Brown spot',
-        diseaseBn: 'বাদামি গাছফড়িং',
+        diseaseBn: 'বাদামি দাগ রোগ',
         pathogen: 'Bipolaris oryzae',
         symptomsEn:
           'Round to oval dark brown spots, sesame-seed sized, scattered over the leaf; can also darken the panicle (false smut) and weaken the grain.',
