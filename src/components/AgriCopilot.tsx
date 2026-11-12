@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer, HeartHandshake } from 'lucide-react';
+import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer, HeartHandshake, BellRing } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
 import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation, isAbortError } from '../services/ai';
@@ -27,7 +27,12 @@ import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import toBn from '../utils/banglaNum';
 import { aiErrorMessage } from '../utils/aiErrorMessage';
-import { buildLocationContext } from '../utils/farmerContext';
+import { buildLocationContext, describePlace } from '../utils/farmerContext';
+import { useUiMode } from '../context/useUiMode';
+import { useAppSettings } from '../context/AppSettingsContext';
+import { diseaseKeyFor } from '../utils/diseaseKey';
+import { addFollowUpTask } from '../services/farmTasks';
+import Disclosure from './ui/Disclosure';
 import { speakWithBrowser } from '../utils/speech';
 import {
   buildPrescriptionData,
@@ -559,6 +564,24 @@ const SAMPLE_DIAGNOSIS_CASES = [
 type SampleDiagnosis = typeof SAMPLE_DIAGNOSIS_CASES[number]['sampleDiagnosis'];
 
 /**
+ * In the simple view the content sits one tap away behind a labelled row;
+ * in the full view it is shown as before. Nothing is removed in either.
+ */
+function Layered({ simple, label, innerClassName, children }: {
+  simple: boolean;
+  label: string;
+  innerClassName?: string;
+  children: React.ReactNode;
+}) {
+  if (!simple) return <>{children}</>;
+  return (
+    <Disclosure label={label} keepMounted className="w-full">
+      <div className={innerClassName}>{children}</div>
+    </Disclosure>
+  );
+}
+
+/**
  * The result card renders `diagnosis` as its main text, but the sample cases
  * only carry structured fields, so every sample opened onto an empty card with
  * no disease name and no treatment. Compose that text from the sample itself.
@@ -680,10 +703,13 @@ export default function AgriCopilot({
   const speechRecognitionRef = useRef<any>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [chatSummary, setChatSummary] = useState<string | null>(null);
+  const simple = useUiMode() === 'simple';
+  const { place } = useAppSettings();
   const [lastDiagnosisId, setLastDiagnosisId] = useState<string | null>(null);
+  const [reminderState, setReminderState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
-  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>(persistedCopilotMode || 'live_stream');
+  const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>(persistedCopilotMode || (simple ? 'static_upload' : 'live_stream'));
   // Which sample scenario card is currently loaded (visual selection ring)
   const [activeSampleIdx, setActiveSampleIdx] = useState<number | null>(null);
   const [customContextText, setCustomContextText] = useState('');
@@ -944,6 +970,31 @@ export default function AgriCopilot({
       window.open(mapsUrl, '_blank');
       setIsFindingExpert(false);
     }, 1500);
+  };
+
+  const handleRemindFollowUp = async () => {
+    const uid = (user ?? auth.currentUser)?.uid;
+    if (!uid) {
+      toast.error(lang === 'bn' ? 'মনে করিয়ে দিতে আগে সাইন ইন করুন।' : 'Please sign in to set a reminder.');
+      return;
+    }
+    setReminderState('saving');
+    try {
+      const cropLabel = crop ? String((t.crops as Record<string, string>)[crop] || crop) : '';
+      await addFollowUpTask(uid, {
+        title: lang === 'bn'
+          ? `${cropLabel || 'ফসল'} আবার দেখুন: সমস্যা কমেছে কি না`
+          : `Check your ${cropLabel || 'crop'} again: is the problem getting better?`,
+        inDays: 3,
+        ...(lastDiagnosisId ? { diagnosisId: lastDiagnosisId } : {}),
+        ...(crop ? { crop } : {}),
+      });
+      setReminderState('saved');
+    } catch (error) {
+      console.warn('The reminder could not be saved:', error);
+      setReminderState('idle');
+      toast.error(lang === 'bn' ? 'মনে করিয়ে দেওয়া ঠিক করা যায়নি। আবার চেষ্টা করুন।' : 'Could not set the reminder. Please try again.');
+    }
   };
 
   const activeDistrict = geoData.find(d => d.id === selectedDistrict);
@@ -1391,6 +1442,21 @@ export default function AgriCopilot({
       // The AI request may have just created this visitor's guest account, and `user`
       // still holds the value from before it. Saving under that would lose the record.
       const sessionUser = user ?? auth.currentUser;
+      setReminderState('idle');
+
+      // Where the problem was seen and which known disease it matches. These let
+      // the app later warn an area when several farmers report the same problem.
+      // The picked area wins; a GPS position gives the district only.
+      const savedPlace = place ?? describePlace(globalLocation);
+      let diseaseKey: string | null = null;
+      try {
+        diseaseKey = diseaseKeyFor({
+          crop,
+          text: `${topCandidate(result)?.disease || result.disease || ''}\n${result.diagnosis || ''}`,
+        });
+      } catch (keyError) {
+        console.warn('Could not match the diagnosis to a known disease:', keyError);
+      }
 
       // Save to Firestore if user is logged in
       if (sessionUser) {
@@ -1404,7 +1470,10 @@ export default function AgriCopilot({
             qualitativeSeverity: recordFields.qualitativeSeverity,
             symptomsBreakdown: recordFields.symptomsBreakdown,
             verificationAdvice: String(result.verificationAdvice || 'Consult an expert.'),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            ...(savedPlace?.district ? { district: savedPlace.district.slice(0, 64) } : {}),
+            ...(savedPlace?.upazila ? { upazila: savedPlace.upazila.slice(0, 64) } : {}),
+            ...(diseaseKey ? { diseaseKey } : {}),
           });
           setLastDiagnosisId(diagDoc.id);
         } catch (error) {
@@ -1651,7 +1720,14 @@ export default function AgriCopilot({
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 md:space-y-6 w-full"
     >
+      {simple && (
+        <h1 className="text-2xl font-bold text-stone-900 dark:text-white">
+          {lang === 'bn' ? 'ফসল দেখান' : 'Check my crop'}
+        </h1>
+      )}
+
       {/* Ultra-Compact Main Header with Predictive Glow */}
+      {!simple && (
       <div className="bg-white rounded-[24px] p-3 md:p-5 shadow-sm border border-gray-100 mb-4 relative overflow-hidden group w-full">
         {/* Predictive UI Glow Layer */}
         <motion.div 
@@ -1679,8 +1755,40 @@ export default function AgriCopilot({
           </div>
         </div>
       </div>
+      )}
+
+      {/* Simple view: photo first, live video one tap away */}
+      {simple && (
+        <div className="grid grid-cols-2 gap-2 w-full" role="tablist" aria-label={lang === 'bn' ? 'ফসল দেখানোর উপায়' : 'How to show your crop'}>
+          {([
+            { id: 'static_upload' as const, icon: Camera, bn: 'ছবি তুলুন', en: 'Take a photo' },
+            { id: 'live_stream' as const, icon: Video, bn: 'লাইভ ভিডিও', en: 'Live video' },
+          ]).map((option) => {
+            const active = copilotMode === option.id;
+            const OptionIcon = option.icon;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setCopilotMode(option.id)}
+                className={`flex items-center justify-center gap-2 min-h-[56px] px-3 rounded-2xl border-2 text-base font-bold active:scale-[0.98] transition-transform ${
+                  active
+                    ? 'bg-emerald-700 border-emerald-700 text-white'
+                    : 'bg-white dark:bg-[#0c1c13] border-stone-300 dark:border-emerald-900/60 text-stone-800 dark:text-stone-100'
+                }`}
+              >
+                <OptionIcon className="w-6 h-6 shrink-0" aria-hidden="true" />
+                <span>{lang === 'bn' ? option.bn : option.en}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Dual Mode Switcher: Live Video Multimodal Stream (Primary) vs Photo Prescription */}
+      {!simple && (
       <div className="bg-emerald-950/5 dark:bg-emerald-950/20 p-1 rounded-2xl border border-emerald-500/20 w-full flex gap-1.5 shadow-xs">
         <button
           type="button"
@@ -1712,6 +1820,7 @@ export default function AgriCopilot({
           <span className="truncate">{lang === 'bn' ? 'ফটো প্রেসক্রিপশন' : 'Photo Prescription'}</span>
         </button>
       </div>
+      )}
 
       {copilotMode === 'live_stream' ? (
         <div className="w-full">
@@ -1774,7 +1883,7 @@ export default function AgriCopilot({
                   <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                     {images.length}/5 {lang === 'bn' ? 'টি ছবি' : 'Photos'}
                   </span>
-                  {(images.length > 0 || crop || cropStage || analysisType || description || diagnosis) && (
+                  {(simple ? (images.length > 0 || Boolean(diagnosis)) : (images.length > 0 || crop || cropStage || analysisType || description || diagnosis)) && (
                     <button
                       onClick={handleClearAll}
                       type="button"
@@ -1967,6 +2076,14 @@ export default function AgriCopilot({
               </motion.button>
             )}
 
+            {simple && (
+              <p className="text-sm text-stone-700 dark:text-stone-300 text-center leading-snug">
+                {lang === 'bn'
+                  ? 'এটি এআই-এর পরামর্শ। বড় সিদ্ধান্তের আগে কৃষি অফিসারের সাথে কথা বলুন।'
+                  : 'This is AI advice. Talk to an agriculture officer before a big decision.'}
+              </p>
+            )}
+
           </div>
         </motion.div>
 
@@ -2111,6 +2228,7 @@ export default function AgriCopilot({
                     </div>
 
                     {/* Quick Guidance Ribbon: Start Over or Add Context */}
+                    {!simple && (
                     <div className="bg-emerald-50/60 dark:bg-emerald-950/40 p-3 sm:p-3.5 rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs mb-2">
                       <div className="flex items-center space-x-2 text-xs text-stone-700 dark:text-stone-300">
                         <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -2142,8 +2260,9 @@ export default function AgriCopilot({
                         </button>
                       </div>
                     </div>
-                    
-                    <div 
+                    )}
+
+                    <div
                       className="flex-1 space-y-10"
                       role="status"
                       aria-live="polite"
@@ -2400,6 +2519,31 @@ export default function AgriCopilot({
                             </motion.div>
                           </div>
 
+                          {/* Follow-up: a reminder to look at the crop again */}
+                          <div className="rounded-[28px] border-2 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 relative z-10">
+                            <p className="text-base font-bold text-stone-900 dark:text-white leading-snug">
+                              {lang === 'bn' ? 'পরামর্শ মেনে ৩ দিন পর ফসল আবার দেখুন।' : 'Follow the advice, then check the crop again in 3 days.'}
+                            </p>
+                            {reminderState === 'saved' ? (
+                              <p className="mt-3 flex items-center gap-2 text-base font-bold text-emerald-800 dark:text-emerald-300" role="status">
+                                <CheckCircle2 className="w-6 h-6 shrink-0" aria-hidden="true" />
+                                <span>{lang === 'bn' ? 'ঠিক আছে। ৩ দিন পর হোম পাতায় মনে করিয়ে দেব।' : 'Done. We will remind you on the Home screen in 3 days.'}</span>
+                              </p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={handleRemindFollowUp}
+                                disabled={reminderState === 'saving'}
+                                className="mt-3 w-full min-h-[56px] px-5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-lg font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+                              >
+                                {reminderState === 'saving'
+                                  ? <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />
+                                  : <BellRing className="w-6 h-6" aria-hidden="true" />}
+                                <span>{lang === 'bn' ? '৩ দিন পর মনে করিয়ে দিন' : 'Remind me in 3 days'}</span>
+                              </button>
+                            )}
+                          </div>
+
                           {/* Human Expert Layer — the step after AI advice.
                               Consent-first: opens the expert request wizard with
                               everything the farmer already diagnosed prefilled. */}
@@ -2481,6 +2625,7 @@ export default function AgriCopilot({
                             </motion.div>
                           )}
 
+                          <Layered simple={simple} label={lang === 'bn' ? 'আরও বিস্তারিত দেখুন' : 'More details'} innerClassName="space-y-10">
                           {/* Differential Diagnosis (Chain of Thought Output) */}
                           {(diagnosis.possibleDiseases?.length > 0 || diagnosis.differentialDiagnosis) && (
                             <motion.div 
@@ -2539,6 +2684,8 @@ export default function AgriCopilot({
                               harvestIntervalDays={extractPhiDays(deepDiagnosis?.advancedTreatment)}
                               initialPathway="organic"
                               onRequestExpert={onRequestExpert}
+                              diagnosisId={lastDiagnosisId}
+                              userId={(user ?? auth.currentUser)?.uid ?? null}
                             />
                             </Suspense>
                           </div>
@@ -2731,6 +2878,8 @@ export default function AgriCopilot({
                               </motion.button>
                             </div>
                           )}
+
+                          </Layered>
 
                           {/* Chatbot Section (Moved after Deep Analysis) */}
                           <div className="mt-8">
@@ -3248,6 +3397,7 @@ export default function AgriCopilot({
         </div>
 
         {/* Settings and Info Section */}
+        <Layered simple={simple} label={lang === 'bn' ? 'আরও অপশন (ফসল, এলাকা, বিবরণ)' : 'More options (crop, area, notes)'}>
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -3505,11 +3655,13 @@ export default function AgriCopilot({
             </div>
             
         </motion.div>
+        </Layered>
 
       </div>
       )}
 
       {/* Sample Crop Disease Diagnosis & Symptoms Dropdown (Last item of tab) */}
+      <Layered simple={simple} label={lang === 'bn' ? 'নমুনা রোগ দেখুন' : 'See example diseases'}>
       <div className="mt-4 pt-3 border-t border-stone-200/60 dark:border-stone-800 w-full">
         <div className="bg-stone-50/90 dark:bg-stone-900/90 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-3 sm:p-3.5 flex flex-col gap-3 shadow-2xs">
           <div className="flex items-center space-x-2.5 min-w-0">
@@ -3559,6 +3711,7 @@ export default function AgriCopilot({
           </div>
         </div>
       </div>
+      </Layered>
 
       {/* 1-Click Certified Digital Krishi Prescription Modal */}
       {rxModalData && (

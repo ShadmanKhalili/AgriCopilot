@@ -81,7 +81,13 @@ service cloud.firestore {
              data.symptomsBreakdown is list &&
              data.symptomsBreakdown.size() <= 25 &&
              isStr(data.verificationAdvice, 1, 10000) &&
-             isTimestamp(data.createdAt);
+             isTimestamp(data.createdAt) &&
+             // Where the problem was seen and which standard disease it was
+             // matched to. All three are optional: a farmer may not have set
+             // an area, and many answers match no known disease.
+             (!data.keys().hasAny(['district']) || isStr(data.district, 1, 64)) &&
+             (!data.keys().hasAny(['upazila']) || isStr(data.upazila, 1, 64)) &&
+             (!data.keys().hasAny(['diseaseKey']) || (isStr(data.diseaseKey, 3, 80) && data.diseaseKey.matches('^[a-z0-9_-]+:[a-z0-9_-]+$')));
     }
 
     function isValidCertificate(data) {
@@ -702,6 +708,70 @@ service cloud.firestore {
       // review them. Nobody else can.
       allow read: if isOwner(userId) || isAdmin();
       allow update, delete: if false;
+    }
+
+    // ===============================================================
+    // A farmer's own reminders
+    //   users/{uid}/tasks/{taskId}
+    //
+    // "Check your crop again in 3 days" and similar. Only the farmer reads
+    // and writes them. Once made, a task can only be marked done.
+    // ===============================================================
+
+    function isDateStr(val) {
+      return val is string && val.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    match /users/{userId}/tasks/{taskId} {
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(taskId) &&
+                    incoming().keys().hasAll(['uid', 'kind', 'title', 'dueDate', 'status', 'createdAt']) &&
+                    incoming().keys().hasOnly(['uid', 'kind', 'title', 'dueDate', 'status', 'createdAt', 'diagnosisId', 'crop']) &&
+                    incoming().uid == request.auth.uid &&
+                    incoming().kind in ['follow_up'] &&
+                    isStr(incoming().title, 1, 200) &&
+                    isDateStr(incoming().dueDate) &&
+                    incoming().status == 'open' &&
+                    isTimestamp(incoming().createdAt) &&
+                    (!incoming().keys().hasAny(['diagnosisId']) || isStr(incoming().diagnosisId, 1, 128)) &&
+                    (!incoming().keys().hasAny(['crop']) || isStr(incoming().crop, 1, 128));
+      // The owner is read from the document, so a list query filtered on
+      // nothing but `status` can still be proven to return only own tasks.
+      allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    existing().uid == request.auth.uid &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'doneAt']) &&
+                    incoming().status in ['open', 'done'] &&
+                    (!incoming().keys().hasAny(['doneAt']) || isTimestamp(incoming().doneAt));
+      allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // A farmer's own notes on how a treated crop is recovering
+    //   users/{uid}/recoveryLogs/{logId}
+    //
+    // Text only: no photo is stored here. Notes are written once and can be
+    // deleted, never edited.
+    // ===============================================================
+
+    match /users/{userId}/recoveryLogs/{logId} {
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(logId) &&
+                    incoming().keys().hasAll(['uid', 'diagnosisId', 'date', 'action', 'change', 'createdAt']) &&
+                    incoming().keys().hasOnly(['uid', 'diagnosisId', 'date', 'action', 'change', 'createdAt']) &&
+                    incoming().uid == request.auth.uid &&
+                    isStr(incoming().diagnosisId, 1, 128) &&
+                    isDateStr(incoming().date) &&
+                    isStr(incoming().action, 0, 500) &&
+                    isStr(incoming().change, 0, 500) &&
+                    (incoming().action.size() > 0 || incoming().change.size() > 0) &&
+                    isTimestamp(incoming().createdAt);
+      allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+      allow update: if false;
     }
   }
 }

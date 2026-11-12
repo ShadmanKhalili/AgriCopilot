@@ -705,7 +705,7 @@ ${outputRules(lang)}
       
       STEP 2: SEASONAL CONTEXT
       - You have no internet access for this answer. Do not claim to have searched, and do not mention current outbreaks, advisories, bulletins or weather reports. Do not list any sources or URLs.
-      - Use GOOGLE SEARCH to cross-reference these symptoms with active disease outbreaks, monsoon/climate advisories, and agricultural research bulletins in Bangladesh for ${crop || 'crop'} (targeting reports from DAE, BARI, BRRI, or AIS Bangladesh for ${currentYear}).
+      - Rely on your own knowledge of the crop diseases and pests that are common in Bangladesh for ${crop || 'this crop'} at this time of year. Do not cite bulletins, reports or any other sources.
       - Say from general knowledge whether the usual weather for this season in this area tends to favour the suspected problem.
       
       STEP 3: FINAL ASSESSMENT

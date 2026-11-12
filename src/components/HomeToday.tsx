@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Camera, CheckCircle2, Clock, CloudSun, Droplets, FlaskConical, Grid, HeartHandshake,
+  BellRing, Camera, CheckCircle2, Clock, CloudSun, Droplets, FlaskConical, Grid, HeartHandshake,
   Loader2, MapPin, SprayCan, TrendingUp, XCircle, ChevronRight,
 } from 'lucide-react';
 import type { Language } from '../utils/translations';
@@ -12,6 +12,8 @@ import toBn from '../utils/banglaNum';
 import BigActionButton from './ui/BigActionButton';
 import Card from './ui/Card';
 import ListenButton from './ui/ListenButton';
+import { useAuth } from './AuthProvider';
+import { dhakaDateString, isTaskDue, listOpenTasks, markTaskDone, type FarmTask } from '../services/farmTasks';
 
 interface Props {
   lang: Language;
@@ -54,6 +56,35 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
   const num = (value: number) => (bn ? toBn(Math.round(value)) : String(Math.round(value)));
 
   const signals = state.status === 'ready' ? todaySignals(state.weather) : [];
+
+  // The farmer's own reminders, such as "check the crop again" after a diagnosis.
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+  const [tasks, setTasks] = useState<FarmTask[]>([]);
+  useEffect(() => {
+    if (!uid) {
+      setTasks([]);
+      return;
+    }
+    let cancelled = false;
+    listOpenTasks(uid)
+      .then((list) => { if (!cancelled) setTasks(list); })
+      .catch((error) => console.warn('Could not load reminders:', error));
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  const finishTask = useCallback((taskId: string) => {
+    if (!uid) return;
+    setTasks((list) => list.filter((task) => task.id !== taskId));
+    markTaskDone(uid, taskId).catch((error) => console.warn('Could not mark the reminder done:', error));
+  }, [uid]);
+
+  const today = dhakaDateString();
+  const dayLabel = (task: FarmTask): string => {
+    if (isTaskDue(task, today)) return bn ? 'আজ করুন' : 'Do today';
+    const days = Math.round((Date.parse(task.dueDate) - Date.parse(today)) / 86400000);
+    return bn ? `${num(days)} দিন পর` : `In ${days} day${days === 1 ? '' : 's'}`;
+  };
 
   return (
     <div className="max-w-xl mx-auto w-full space-y-4">
@@ -150,6 +181,45 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
           </div>
         )}
       </Card>
+
+      {tasks.length > 0 && (
+        <Card>
+          <h2 className="flex items-center gap-2 text-lg font-bold text-stone-900 dark:text-white">
+            <BellRing className="w-6 h-6 text-amber-600" aria-hidden="true" />
+            <span>{bn ? 'আমার কাজ' : 'My tasks'}</span>
+          </h2>
+          <ul className="mt-3 space-y-2">
+            {tasks.slice(0, 3).map((task) => {
+              const due = isTaskDue(task, today);
+              return (
+                <li
+                  key={task.id}
+                  className={`rounded-2xl border p-3 ${due ? 'border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800' : 'border-stone-200 dark:border-emerald-900/60'}`}
+                >
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-300">{dayLabel(task)}</p>
+                  <p className="text-base font-bold text-stone-900 dark:text-white leading-snug">{task.title}</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('agri-copilot')}
+                      className="min-h-[48px] rounded-xl bg-emerald-700 text-white text-base font-bold active:scale-[0.98] transition-transform"
+                    >
+                      {bn ? 'ফসল দেখান' : 'Check crop'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => finishTask(task.id)}
+                      className="min-h-[48px] rounded-xl border-2 border-stone-300 dark:border-emerald-900/60 text-stone-800 dark:text-stone-100 text-base font-bold active:scale-[0.98] transition-transform"
+                    >
+                      {bn ? 'হয়ে গেছে' : 'Done'}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <BigActionButton

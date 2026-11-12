@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  X, Download, Printer, Share2, Check, ShieldCheck, QrCode, 
+  X, Download, Printer, Share2, Check, ShieldCheck,
   MapPin, Calendar, Clock, AlertTriangle, Leaf, Award, 
   FileText, ArrowDownToLine, Copy, ExternalLink, Sparkles, Droplets, Thermometer, Wind,
   Volume2, Square, Loader2
@@ -110,9 +110,6 @@ export default function DigitalPrescriptionModal({
     year: 'numeric'
   });
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  // Generate QR code SVG representation for authenticated offline scanning
-  const qrVerificationUrl = `https://smart-krishi-ai.bd/verify?rx=${rxId}&crop=${encodeURIComponent(data.crop)}&status=VALID`;
 
   // Download high-resolution PNG
   const handleDownloadImage = async () => {
@@ -744,12 +741,12 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             {/* Institutional Verification Footer & QR Seal */}
             <div className="relative z-10 pt-4 border-t-2 border-dashed border-stone-300 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center space-x-3.5">
-                {/* Visual QR Code Box */}
-                <div className="w-16 h-16 bg-white border-2 border-stone-800 p-1 rounded-xl flex items-center justify-center shadow-xs flex-shrink-0">
-                  <div className="relative w-full h-full flex flex-col items-center justify-center bg-stone-50 rounded-lg p-0.5">
-                    <QrCode className="w-11 h-11 text-stone-900" />
-                    <span className="text-[6px] font-mono font-bold text-stone-600 uppercase">SCAN VERIFY</span>
-                  </div>
+                {/* Reference number box (plain text, not a scannable code) */}
+                <div className="min-w-[7rem] bg-white border-2 border-stone-800 px-2.5 py-1.5 rounded-xl flex flex-col items-center justify-center shadow-xs flex-shrink-0 text-center">
+                  <span className="text-[9px] font-bold text-stone-600 uppercase tracking-wide">
+                    {lang === 'bn' ? 'রেফারেন্স নম্বর' : 'Reference no.'}
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-stone-900 break-all leading-tight mt-0.5">{rxId}</span>
                 </div>
 
                 <div className="text-xs">
@@ -758,8 +755,8 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   </p>
                   <p className="text-[11px] text-stone-500 mt-0.5">
                     {lang === 'bn' 
-                      ? 'কৃষি জ্ঞানভিত্তিক সিদ্ধান্ত সহায়তা মডেল • রাসায়নিক চিকিৎসার পূর্বে মাঠের বিশেষজ্ঞ যাচাই আবশ্যক।' 
-                      : 'Agronomic decision-support model • Recorded expert review required before chemical application.'}
+                      ? 'এটি এআই-তৈরি পরামর্শ। রাসায়নিক প্রয়োগের আগে স্থানীয় কৃষি কর্মকর্তার সঙ্গে নিশ্চিত হয়ে নিন।' 
+                      : 'This is an AI-generated advisory. Confirm with your local agriculture officer before applying any chemical.'}
                   </p>
                   <p className="text-[11px] text-emerald-800 font-semibold mt-1">
                     📞 Helpline: 16123 (Krishi Call Centre) • Free Farmer Support
@@ -778,9 +775,6 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   {data.expertVerified 
                     ? (lang === 'bn' ? 'বিশেষজ্ঞ কর্তৃক যাচাইকৃত' : 'Expert Verified') 
                     : (lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা • রিভিউ পেন্ডিং' : 'AI Decision Support • Review Pending')}
-                </p>
-                <p className="text-[11px] text-stone-400 font-mono">
-                  {lang === 'bn' ? 'রেকর্ড নম্বর' : 'Record no.'}: {rxId}
                 </p>
               </div>
             </div>
