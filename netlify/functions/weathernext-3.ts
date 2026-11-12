@@ -1,6 +1,8 @@
 import { Handler } from '@netlify/functions';
 import axios from 'axios';
 import { checkIpRateLimit, extractClientIpFromHeaders, weatherCallsPerIpPerMinute } from './_shared/ip-limit.ts';
+import { farmActionsFromFeed, isSafeSprayHour } from './_shared/farm-actions.ts';
+import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from './_shared/daily-merge.ts';
 
 /**
  * AgroCast AI / Google Weather API agro-forecast endpoint (Netlify function).
@@ -26,6 +28,8 @@ type WeatherAlertItem = {
   effective: string;
   expires: string;
   agroImpact: string;
+  kind?: 'heavy_rain' | 'storm' | 'blight' | 'heat' | 'wind' | 'official';
+  facts?: { rainChance?: number; humidity?: number; dewPointDepression?: number; heatIndex?: number; wind?: number; gust?: number };
   dataSource?: { name: string; authorityUri: string };
 };
 
@@ -45,6 +49,29 @@ const weatherResponse = (body: string) => ({
   },
   body
 });
+
+/**
+ * Open-Meteo's 7-day daily block, used to complete the Google-derived `daily`.
+ * Never throws and never waits long: null on any failure or after 4 seconds.
+ */
+const fetchOpenMeteoDaily = async (lat: number, lon: number, timezone: string): Promise<any | null> => {
+  try {
+    const res = await axios.get('https://api.open-meteo.com/v1/forecast', {
+      params: {
+        latitude: lat,
+        longitude: lon,
+        daily: OPEN_METEO_DAILY_PARAM,
+        timezone,
+        forecast_days: 7
+      },
+      timeout: 4000
+    });
+    return res.data?.daily ?? null;
+  } catch (err: any) {
+    console.warn('[AgroCast AI][netlify] Open-Meteo daily completion failed, serving Google-only daily:', err?.message);
+    return null;
+  }
+};
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {
@@ -116,6 +143,10 @@ export const handler: Handler = async (event) => {
         const gmpHeaders = {
           'X-Goog-Maps-Solution-ID': 'gmp_mcp_codeassist_v1_aistudio'
         };
+
+        // Start the Open-Meteo 7-day request now so it runs while Google answers.
+        // It never rejects (null on failure), so it cannot break this lookup.
+        const openMeteoDailyPromise = fetchOpenMeteoDaily(lat, lon, timezone);
 
         // Fetch Current Conditions, Hourly Forecast (48h), and Public Alerts concurrently
         const [currentRes, hourlyRes, alertsRes] = await Promise.all([
@@ -251,7 +282,9 @@ export const handler: Handler = async (event) => {
             const p50 = parseFloat(hRainQpf.toFixed(2));
             const p90 = parseFloat((hRainQpf * 1.5 + (hRainProb > 40 ? 1.5 : 0.1)).toFixed(2));
 
-            const isSafe = hRainProb <= 18 && hWind <= 14 && hWind100 <= 24 && hTemp >= 12 && hTemp <= 31;
+            // Same rule as the spray advice (shared engine), so the window can never contradict it.
+            const isSafe = isSafeSprayHour({ temp: hTemp, windSpeed: hWind, rainChance: hRainProb });
+
 
             const displayDate = new Date(intervalTime);
             // Google Weather API returns UTC (Z) timestamps — label them in Bangladesh time
@@ -273,10 +306,64 @@ export const handler: Handler = async (event) => {
             });
           }
 
-          // Heuristic ensemble spread & convergence estimate
-          const ensembleSeed = Math.abs(Math.sin(lat * 12.9898 + lon * 78.233) * 1000);
-          const varianceFactor = 0.82 + ((ensembleSeed % 100) / 280);
-          const convergenceScore = Math.min(99, Math.max(93, Math.round(97 - (varianceFactor - 1) * 10)));
+          // Daily summary per local calendar day, built only from values Google
+          // returned, under the same field names as Open-Meteo's `daily`. The
+          // hourly lookup covers 48 h, so this is the rest of today plus about
+          // one full day; a later day is listed only when the forecast covers
+          // at least 20 of its hours.
+          const dayFormatter = (() => {
+            const opts: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+            try {
+              return new Intl.DateTimeFormat('en-CA', { ...opts, timeZone: timezone && timezone !== 'auto' ? String(timezone) : 'Asia/Dhaka' });
+            } catch {
+              return new Intl.DateTimeFormat('en-CA', { ...opts, timeZone: 'Asia/Dhaka' });
+            }
+          })();
+          const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+          type DayBucket = { hours: number; temps: number[]; probs: number[]; qpf: number[]; winds: number[]; uvs: number[] };
+          const dayBuckets = new Map<string, DayBucket>();
+          const bucketFor = (key: string): DayBucket => {
+            let b = dayBuckets.get(key);
+            if (!b) {
+              b = { hours: 0, temps: [], probs: [], qpf: [], winds: [], uvs: [] };
+              dayBuckets.set(key, b);
+            }
+            return b;
+          };
+          const todayKey = dayFormatter.format(new Date(currentCond.currentTime || Date.now()));
+          const todayBucket = bucketFor(todayKey);
+          if (isNum(currentCond.temperature?.degrees)) todayBucket.temps.push(currentCond.temperature.degrees);
+          if (isNum(currentCond.precipitation?.probability?.percent)) todayBucket.probs.push(currentCond.precipitation.probability.percent);
+          if (isNum(currentCond.wind?.speed?.value)) todayBucket.winds.push(currentCond.wind.speed.value);
+          if (isNum(currentCond.uvIndex)) todayBucket.uvs.push(currentCond.uvIndex);
+          for (const item of forecastHours) {
+            const start = item?.interval?.startTime;
+            if (!start) continue;
+            const key = dayFormatter.format(new Date(start));
+            if (key < todayKey) continue;
+            const b = bucketFor(key);
+            b.hours++;
+            if (isNum(item.temperature?.degrees)) b.temps.push(item.temperature.degrees);
+            if (isNum(item.precipitation?.probability?.percent)) b.probs.push(item.precipitation.probability.percent);
+            if (isNum(item.precipitation?.qpf?.quantity)) b.qpf.push(item.precipitation.qpf.quantity);
+            if (isNum(item.wind?.speed?.value)) b.winds.push(item.wind.speed.value);
+            if (isNum(item.uvIndex)) b.uvs.push(item.uvIndex);
+          }
+          const dayKeys = [...dayBuckets.keys()]
+            .filter((k) => k === todayKey || (dayBuckets.get(k)?.hours ?? 0) >= 20)
+            .sort();
+          const maxOrNull = (xs: number[]) => (xs.length > 0 ? Math.max(...xs) : null);
+          const minOrNull = (xs: number[]) => (xs.length > 0 ? Math.min(...xs) : null);
+          const dayField = (pick: (b: DayBucket) => number | null) => dayKeys.map((k) => pick(dayBuckets.get(k)!));
+          const googleDaily = {
+            time: dayKeys,
+            temperature_2m_max: dayField((b) => maxOrNull(b.temps)),
+            temperature_2m_min: dayField((b) => minOrNull(b.temps)),
+            precipitation_sum: dayField((b) => (b.qpf.length > 0 ? parseFloat(b.qpf.reduce((s, v) => s + v, 0).toFixed(1)) : null)),
+            precipitation_probability_max: dayField((b) => maxOrNull(b.probs)),
+            wind_speed_10m_max: dayField((b) => maxOrNull(b.winds)),
+            uv_index_max: dayField((b) => maxOrNull(b.uvs))
+          };
 
           const totalP10 = Math.max(0, parseFloat((totalExpectedRain * 0.6).toFixed(1)));
           const totalP50 = parseFloat(totalExpectedRain.toFixed(1));
@@ -318,6 +405,7 @@ export const handler: Handler = async (event) => {
               alerts.push({
                 id: pAlert.alertId || `gmp-${Date.now()}`,
                 event: pAlert.eventType || pAlert.alertTitle || "Severe Weather Alert",
+                kind: 'official',
                 severity: (pAlert.severity?.toLowerCase() as any) || "severe",
                 headline: pAlert.alertTitle || "Official Meteorological Alert",
                 description: pAlert.instruction || pAlert.safetyRecommendations || "Follow official meteorological precautions.",
@@ -341,11 +429,13 @@ export const handler: Handler = async (event) => {
               id: `blight-risk-${gridLat}-${gridLon}`,
               event: "Fungal Blight Critical Risk (Late Blight / Rice Blast)",
               severity: "moderate",
-              headline: "High Atmospheric Saturation & Low Dew Point Depression",
-              description: `Current humidity is ${currentHumidity}% with a dew point depression of only ${dewPointDepression.toFixed(1)}°C, providing prime incubation conditions for fungal spore germination.`,
+              kind: 'blight',
+              facts: { humidity: Math.round(Number(currentHumidity)), dewPointDepression: Number(Number(dewPointDepression).toFixed(1)) },
+              headline: "Fungal disease risk is high",
+              description: `Humidity is ${Math.round(Number(currentHumidity))}% and the air is very damp, so fungal diseases like blight can spread fast.`,
               effective: new Date().toISOString(),
               expires: new Date(Date.now() + 86400000).toISOString(),
-              agroImpact: "Apply preventive systemic fungicide on potato crops and scout boro rice seedbeds immediately before spore proliferation.",
+              agroImpact: "Check potato and boro rice seedbeds today. Spray a fungicide before the disease shows.",
               dataSource: {
                 name: "Google Maps Weather API & Agronomic Pathology Engine",
                 authorityUri: "https://developers.google.com/maps/documentation/weather"
@@ -358,11 +448,13 @@ export const handler: Handler = async (event) => {
               id: `heat-stress-${gridLat}-${gridLon}`,
               event: "Severe Agricultural Heat Stress Warning",
               severity: "severe",
-              headline: `Extreme Heat Index: ${currentCond.heatIndex.degrees.toFixed(1)}°C`,
-              description: "Severe heat index accelerates evapotranspiration, triggers pollen sterility in flowering crops, and causes heat stress in livestock.",
+              kind: 'heat',
+              facts: { heatIndex: Number(currentCond.heatIndex.degrees.toFixed(1)) },
+              headline: `Very hot: feels like ${currentCond.heatIndex.degrees.toFixed(1)}°C`,
+              description: "Strong heat dries the soil fast and can hurt flowering crops and farm animals.",
               effective: new Date().toISOString(),
               expires: new Date(Date.now() + 43200000).toISOString(),
-              agroImpact: "Ensure 5-7cm standing irrigation water in paddy fields; avoid midday agrochemical spraying and provide shade for farm animals.",
+              agroImpact: "Keep 5-7 cm of water in paddy fields. Do not spray in the midday heat. Give animals shade and water.",
               dataSource: {
                 name: "Google Maps Weather API Telemetry",
                 authorityUri: "https://developers.google.com/maps/documentation/weather"
@@ -375,11 +467,13 @@ export const handler: Handler = async (event) => {
               id: `spray-drift-${gridLat}-${gridLon}`,
               event: "High Canopy Wind Spray Drift Hazard",
               severity: "moderate",
-              headline: `Sustained Wind: ${currentWind} km/h (Gusts: ${currentWindGust} km/h)`,
-              description: "Surface and boundary-layer winds exceed safe agrochemical application thresholds.",
+              kind: 'wind',
+              facts: { wind: Math.round(currentWind), gust: Math.round(currentWindGust) },
+              headline: `Strong wind: ${Math.round(currentWind)} km/h, gusts up to ${Math.round(currentWindGust)} km/h`,
+              description: "The wind is too strong for spraying. The spray will blow away.",
               effective: new Date().toISOString(),
               expires: new Date(Date.now() + 28800000).toISOString(),
-              agroImpact: "Suspend backpack and drone pesticide/fertilizer spraying to avoid chemical drift wastage and non-target crop toxicity.",
+              agroImpact: "Do not spray pesticide or fertilizer now. Wait for calmer wind.",
               dataSource: {
                 name: "Google Maps Weather API Telemetry",
                 authorityUri: "https://developers.google.com/maps/documentation/weather"
@@ -392,11 +486,13 @@ export const handler: Handler = async (event) => {
               id: `cloudburst-risk-${gridLat}-${gridLon}`,
               event: "Thunderstorm & Cloudburst Heavy Rain Advisory",
               severity: "severe",
-              headline: `Storm Risk: ${maxRainProb}% Rain Probability (P90 Storm Spread: ${totalP90} mm)`,
-              description: "Localized heavy precipitation and monsoonal squalls predicted within the 48-hour forecast window.",
+              kind: 'storm',
+              facts: { rainChance: maxRainProb },
+              headline: `Heavy rain and storm likely: ${maxRainProb}% chance of rain`,
+              description: "Heavy rain and strong storms are likely in the next 2 days.",
               effective: new Date().toISOString(),
               expires: new Date(Date.now() + 86400000).toISOString(),
-              agroImpact: "Clear field drainage furrows to prevent root inundation; secure harvested produce and postpone fertilizer broadcasting.",
+              agroImpact: "Clear the drains in your fields. Keep harvested crops under cover. Do not put fertilizer before the rain.",
               dataSource: {
                 name: "Google Maps Weather API Forecast Analytics",
                 authorityUri: "https://developers.google.com/maps/documentation/weather"
@@ -404,11 +500,16 @@ export const handler: Handler = async (event) => {
             });
           }
 
+          // Complete `daily` to 7 days with Open-Meteo for the dates Google does not cover
+          // (Google keeps its own days). Falls back to the Google-only daily on failure.
+          const mergedDaily = mergeDailyForecast(googleDaily, await openMeteoDailyPromise, 'google', 'open-meteo');
+
           weatherPayload = {
             model: "Google Weather API",
             provider: "Google Maps Platform",
             version: "1.0-live-gmp",
             source: "google_weather_api",
+            daily_sources: mergedDaily.sources,
             resolution: "0.05° (~5 km spatial grid)",
             grid_coordinates: { latitude: gridLat, longitude: gridLon },
             data_sources: {
@@ -418,12 +519,6 @@ export const handler: Handler = async (event) => {
             alerts: alerts,
             ensemble: {
               estimate_basis: "Heuristic spread envelope derived from hourly Google Weather API forecast data",
-              convergence_score_pct: convergenceScore,
-              temperature_spread: {
-                p10: parseFloat((currentTemp - 0.7 * varianceFactor).toFixed(1)),
-                median: currentTemp,
-                p90: parseFloat((currentTemp + 0.8 * varianceFactor).toFixed(1))
-              },
               precipitation_spread_mm: {
                 p10: totalP10,
                 median: totalP50,
@@ -476,13 +571,7 @@ export const handler: Handler = async (event) => {
               direct_normal_irradiance: hourlyDNIs
             },
             hourly_spread: hourlySpread,
-            daily: {
-              precipitation_sum: [totalP50],
-              precipitation_probability_max: [maxRainProb],
-              uv_index_max: [currentCond.uvIndex || 3],
-              temperature_2m_max: [Math.max(...hourlyTemps.slice(0, 24), currentTemp + 2)],
-              temperature_2m_min: [Math.min(...hourlyTemps.slice(0, 24), currentTemp - 4)]
-            },
+            daily: mergedDaily.daily,
             dataSource: {
               name: "Google Maps Platform Weather API",
               authorityUri: "https://developers.google.com/maps/documentation/weather"
@@ -510,7 +599,7 @@ export const handler: Handler = async (event) => {
           longitude: lon,
           current: 'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure',
           hourly: 'temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_speed_100m,wind_direction_10m,shortwave_radiation,direct_normal_irradiance,soil_moisture_0_to_7cm',
-          daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,uv_index_max,et0_fao_evapotranspiration',
+          daily: 'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,uv_index_max,et0_fao_evapotranspiration',
           timezone: timezone,
           forecast_days: parseInt(forecast_days) || 7
         },
@@ -545,17 +634,11 @@ export const handler: Handler = async (event) => {
         fungalBlightRisk = 'moderate';
       }
 
-      const ensembleSeed = Math.abs(Math.sin(lat * 12.9898 + lon * 78.233) * 1000);
-      const varianceFactor = 0.8 + ((ensembleSeed % 100) / 250);
-      const convergenceScore = Math.min(99, Math.max(91, Math.round(96 - (varianceFactor - 1) * 12)));
-
       const rainProbMax = daily.precipitation_probability_max?.[0] ?? 10;
       const expectedRainSum = daily.precipitation_sum?.[0] ?? 0;
 
       const rainP10 = Math.max(0, parseFloat((expectedRainSum * 0.6).toFixed(1)));
       const rainP90 = parseFloat((expectedRainSum * 1.45 + (rainProbMax > 40 ? 1.8 : 0.2)).toFixed(1));
-      const tempP10 = parseFloat((currentTemp - 0.7 * varianceFactor).toFixed(1));
-      const tempP90 = parseFloat((currentTemp + 0.8 * varianceFactor).toFixed(1));
 
       // Build hourly spread for charting
       const hourlySpread: Array<{
@@ -582,7 +665,7 @@ export const handler: Handler = async (event) => {
           const hPrecip = hourly.precipitation?.[i] ?? 0;
           const hWind = hourly.wind_speed_10m?.[i] ?? current10mWind;
           const hWind100 = hourly.wind_speed_100m?.[i] ?? (hWind * 1.35);
-          const isSafe = hProb <= 18 && hWind <= 14 && hWind100 <= 24 && hTemp >= 12 && hTemp <= 31;
+          const isSafe = isSafeSprayHour({ temp: hTemp, windSpeed: hWind, rainChance: hProb });
           const d = new Date(hTime);
 
           hourlySpread.push({
@@ -622,14 +705,13 @@ export const handler: Handler = async (event) => {
             const idx = i + j;
             const rProb = rainProbs[idx] ?? 0;
             const w10 = winds10m[idx] ?? 0;
-            const w100 = winds100m[idx] ?? w10;
             const tVal = temps[idx] ?? 25;
 
             sumWind += w10;
             sumTemp += tVal;
             if (rProb > maxRainProbLocal) maxRainProbLocal = rProb;
 
-            if (rProb > 18 || w10 > 14 || w100 > 24 || tVal > 31 || tVal < 12) {
+            if (!isSafeSprayHour({ temp: tVal, windSpeed: w10, rainChance: rProb })) {
               isSafe = false;
               break;
             }
@@ -639,9 +721,15 @@ export const handler: Handler = async (event) => {
             const startDate = new Date(times[i]);
             const endDate = new Date(times[i + 2]);
             const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-            const startDay = startDate.getDate();
-            const todayDay = new Date().getDate();
-            const dayLabel = startDay === todayDay ? "Today" : "Tomorrow";
+            // Compare calendar dates in the request's timezone (Asia/Dhaka for 'auto'),
+            // not the server's own day of the month. Open-Meteo times are local to that zone.
+            const startKey = String(times[i]).slice(0, 10);
+            const todayKey = dateKeyInZone(new Date(), timezone);
+            const dayLabel = startKey === todayKey
+              ? "Today"
+              : (startKey === dateKeyInZone(new Date(Date.now() + 86400000), timezone)
+                ? "Tomorrow"
+                : new Date(`${startKey}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }));
             safeSprayingWindow = `${dayLabel}, ${formatTime(startDate)} - ${formatTime(endDate)}`;
             safeWindowDetailed = {
               start: times[i],
@@ -663,11 +751,13 @@ export const handler: Handler = async (event) => {
           id: `blight-${gridLat}-${gridLon}`,
           event: "Fungal Blight Incubation Risk (Late Blight / Rice Blast)",
           severity: "moderate",
-          headline: `Relative Humidity: ${currentHumidity.toFixed(1)}% | Dew Point Depression: ${dewPointDepression.toFixed(1)}°C`,
-          description: "High relative humidity combined with prolonged dew retention creates optimal conditions for fungal blight spore germination.",
+          kind: 'blight',
+          facts: { humidity: Math.round(Number(currentHumidity)), dewPointDepression: Number(Number(dewPointDepression).toFixed(1)) },
+          headline: "Fungal disease risk is high",
+          description: `Humidity is ${Math.round(Number(currentHumidity))}% and the air is very damp, so fungal diseases like blight can spread fast.`,
           effective: new Date().toISOString(),
           expires: new Date(Date.now() + 86400000).toISOString(),
-          agroImpact: "Spray preventive copper hydroxide or mancozeb before fungal hyphae establish on leaves.",
+          agroImpact: "Check potato and boro rice seedbeds today. Spray a fungicide before the disease shows.",
           dataSource: {
             name: "Agro-Meteorological Pathology Model",
             authorityUri: "https://open-meteo.com"
@@ -680,11 +770,13 @@ export const handler: Handler = async (event) => {
           id: `heavy-rain-${gridLat}-${gridLon}`,
           event: "Impending Heavy Precipitation & Waterlogging Alert",
           severity: "severe",
-          headline: `Precipitation Probability: ${rainProbMax}% (P90 Storm Spike: ${rainP90} mm)`,
-          description: "Substantial monsoonal rainfall expected. Potential flash waterlogging in low-lying crop plots.",
+          kind: 'heavy_rain',
+          facts: { rainChance: rainProbMax },
+          headline: `Heavy rain likely: ${rainProbMax}% chance of rain`,
+          description: "Heavy rain is likely. Low fields may get waterlogged.",
           effective: new Date().toISOString(),
           expires: new Date(Date.now() + 86400000).toISOString(),
-          agroImpact: "Ensure unblocked outlet drains in vegetable raised beds and paddy plots to avoid seed rot.",
+          agroImpact: "Keep drains open in vegetable beds and paddy plots so water can flow out.",
           dataSource: {
             name: "High-Resolution Meteorological Ensemble",
             authorityUri: "https://open-meteo.com"
@@ -697,6 +789,7 @@ export const handler: Handler = async (event) => {
         provider: "Open-Meteo (5 km grid)",
         version: "1.0-ensemble",
         source: "ensemble_synthesis",
+        daily_sources: (Array.isArray(daily.time) ? daily.time : []).map(() => "open-meteo"),
         resolution: "0.05° (~5 km spatial grid)",
         grid_coordinates: { latitude: gridLat, longitude: gridLon },
         data_sources: {
@@ -706,8 +799,6 @@ export const handler: Handler = async (event) => {
         alerts: ensembleAlerts,
         ensemble: {
           estimate_basis: "Heuristic spread estimate derived from Open-Meteo daily probabilities",
-          convergence_score_pct: convergenceScore,
-          temperature_spread: { p10: tempP10, median: currentTemp, p90: tempP90 },
           precipitation_spread_mm: { p10: rainP10, median: expectedRainSum, p90: rainP90 },
           heavy_rain_risk_prob: Math.min(100, Math.round(rainProbMax * 0.45))
         },
@@ -739,6 +830,10 @@ export const handler: Handler = async (event) => {
         daily: daily
       };
     }
+
+    // Spray / irrigate / fertilise advice, decided by the shared rules from the
+    // very object returned (and cached), so the two can never disagree.
+    weatherPayload.farm_actions = farmActionsFromFeed(weatherPayload);
 
     const body = JSON.stringify(weatherPayload);
     if (googleWeatherSucceeded) {

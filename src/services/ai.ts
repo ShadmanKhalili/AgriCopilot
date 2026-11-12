@@ -842,7 +842,6 @@ export const generateWeatherAdvisory = async (
         const wnSourceLabel = wn.source === 'google_weather_api' ? 'live Google Maps Platform Weather API' : 'Open-Meteo 5 km grid (automatic fallback)';
         weatherNext3Context = `AgroCast AI agro-forecast (source: ${wnSourceLabel}):
         - Data Source: ${wn.source === 'google_weather_api' ? 'Google Maps Platform Weather API (weather.googleapis.com) with server-side agro-metric computation' : 'Open-Meteo high-resolution model data with server-side agro-metric computation'}
-        - Model Confidence Estimate: ${wn.ensemble?.convergence_score_pct || 96}% (heuristic)
         - 100m Upper Canopy Wind: ${wn.agro_metrics?.boundary_layer_wind_100m_kmh || 'N/A'} km/h
         - Direct Solar Irradiance (DNI): ${wn.agro_metrics?.direct_normal_irradiance_wm2 || 0} W/m²
         - Dew Point Depression & Spore Risk: ${wn.agro_metrics?.dew_point_depression_celsius || 'N/A'}°C (${wn.agro_metrics?.fungal_blight_risk?.toUpperCase()} risk of fungal blight)
