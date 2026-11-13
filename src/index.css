@@ -210,6 +210,22 @@
   animation-play-state: paused;
 }
 
+/* The same request applies to the pulsing, spinning and bouncing utility
+   animations. Spinners keep turning, slowly, so loading is still visible. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .animate-bounce,
+  .animate-ping {
+    animation: none !important;
+  }
+  .animate-spin {
+    animation-duration: 3s !important;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
+}
+
 /* OLED True Dark Styling */
 .dark body,
 .dark html {

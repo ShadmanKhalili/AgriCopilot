@@ -10,6 +10,7 @@ import { seedGovSchemes } from '../data/seedSchemes';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
+import LegalModal from './LegalModal';
 import FarmerDossier from './FarmerDossier';
 import { DataStatusCard } from './DataStatusCard';
 import { auth, needsEmailVerification, resendVerificationEmail } from '../firebase';
@@ -61,6 +62,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [isSyncSettingsOpen, setIsSyncSettingsOpen] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
   const t = translations[lang];
 
   const getTierName = () => {
@@ -205,6 +207,19 @@ export default function Profile({ lang, onUpgrade }: Props) {
           </button>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsLegalOpen(true)}
+        className="w-full min-h-[48px] px-4 py-3 flex items-center justify-between text-left bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+      >
+        <span className="flex items-center gap-3 text-sm font-bold text-slate-800 dark:text-slate-200">
+          <FileText className="w-5 h-5 text-emerald-600" />
+          {lang === 'bn' ? 'শর্ত ও গোপনীয়তা' : 'Terms and privacy'}
+        </span>
+        <ChevronRight className="w-4 h-4 text-slate-400" />
+      </button>
+      <LegalModal isOpen={isLegalOpen} onClose={() => setIsLegalOpen(false)} lang={lang} />
 
       {viewMode === 'dossier' ? (
         <FarmerDossier lang={lang} />

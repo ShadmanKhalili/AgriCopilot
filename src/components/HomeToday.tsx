@@ -15,7 +15,8 @@ import ListenButton from './ui/ListenButton';
 import HomeCalendarTasks from './HomeCalendarTasks';
 import SignalList from './weather/SignalList';
 import { useAuth } from './AuthProvider';
-import { dhakaDateString, isTaskDue, listOpenTasks, markTaskDone, type FarmTask } from '../services/farmTasks';
+import { dhakaDateString, isTaskDue } from '../utils/farmTaskDates';
+import type { FarmTask } from '../services/farmTasks';
 
 interface Props {
   lang: Language;
@@ -50,7 +51,9 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
       return;
     }
     let cancelled = false;
-    listOpenTasks(uid)
+    // The task service brings the database library, so it is loaded on demand.
+    import('../services/farmTasks')
+      .then(({ listOpenTasks }) => listOpenTasks(uid))
       .then((list) => { if (!cancelled) setTasks(list); })
       .catch((error) => console.warn('Could not load reminders:', error));
     return () => { cancelled = true; };
@@ -59,7 +62,9 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
   const finishTask = useCallback((taskId: string) => {
     if (!uid) return;
     setTasks((list) => list.filter((task) => task.id !== taskId));
-    markTaskDone(uid, taskId).catch((error) => console.warn('Could not mark the reminder done:', error));
+    import('../services/farmTasks')
+      .then(({ markTaskDone }) => markTaskDone(uid, taskId))
+      .catch((error) => console.warn('Could not mark the reminder done:', error));
   }, [uid]);
 
   const today = dhakaDateString();

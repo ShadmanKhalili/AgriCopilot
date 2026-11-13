@@ -15,7 +15,6 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../components/AuthProvider';
-import { fetchActiveExpertCount } from '../services/expertService';
 
 export function useExpertAvailability() {
   const { user } = useAuth();
@@ -33,7 +32,9 @@ export function useExpertAvailability() {
     setIsLoading(true);
 
     const load = () => {
-      fetchActiveExpertCount()
+      // Loaded on demand so the database library is not part of the first load.
+      import('../services/expertService')
+        .then(({ fetchActiveExpertCount }) => fetchActiveExpertCount())
         .then((count) => {
           if (!cancelled) setOnlineCount(count);
         })

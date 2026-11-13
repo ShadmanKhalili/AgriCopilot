@@ -1,9 +1,20 @@
 import { db } from '../firestore';
 import { collection, doc, writeBatch, serverTimestamp, getDocs } from 'firebase/firestore';
+import type { EligibilityTags } from '../utils/schemeMatch';
+
+/**
+ * Eligibility tags for the "For you" list. A tag is set only where the scheme's
+ * own text below says so; every scheme here names a government body as its
+ * provider. No scheme states a district or a land size limit.
+ * - farmers-card: "own even a little land" -> land owners.
+ * - gov-paddy-procurement: "has paddy to sell" -> paddy growers.
+ */
+const tags = (t: EligibilityTags): EligibilityTags => t;
 
 export const CURRENT_PDF_SCHEMES = [
   {
     id: "farmers-card",
+    eligibilityTags: tags({ tenure: ['owner'], provider: 'government' }),
     title: { en: "Farmers' Card", bn: "কৃষক কার্ড" },
     description: {
       en: "A multi-service digital identity and payments card providing fair-price inputs, easy-term credit, lower machinery costs, and direct subsidies.",
@@ -38,6 +49,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "agri-machinery-subsidy",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Agricultural Machinery Subsidy", bn: "কৃষি যন্ত্রপাতি ভর্তুকি" },
     description: {
       en: "50%–70% subsidy for purchasing modern machinery like combine harvesters and transplanters.",
@@ -72,6 +84,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "irrigation-scheme",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Irrigation Scheme Service", bn: "সেচ স্কিম পরিষেবা" },
     description: {
       en: "Group access to irrigation equipment under designated government projects.",
@@ -106,6 +119,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "gov-paddy-procurement",
+    eligibilityTags: tags({ crops: ['paddy'], provider: 'government' }),
     title: { en: "Government Paddy/Rice Procurement", bn: "সরকারি ধান/চাল সংগ্রহ" },
     description: {
       en: "Sell seasonal produce directly to the government at official procurement rates.",
@@ -140,6 +154,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "krishi-call-centre",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Krishi Call Centre (16123)", bn: "কৃষি কল সেন্টার (১৬১২৩)" },
     description: { en: "Immediate expert advice via phone on crops, pests, and farming techniques available 8 AM to 8 PM.", bn: "ফসল, পোকা এবং চাষাবাদ কৌশলের উপর ফোনের মাধ্যমে তাৎক্ষণিক বিশেষজ্ঞ পরামর্শ (সকাল ৮টা - রাত ৮টা)।" },
     provider: "Agricultural Information Service (AIS)",
@@ -159,6 +174,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "loan-waiver-10k",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Small Agri-Loan Waiver", bn: "স্বল্প কৃষি ঋণ মওকুফ" },
     description: { en: "Waiver of principal and interest on overdue agricultural loans up to Tk 10,000.", bn: "১০,০০০ টাকা পর্যন্ত বকেয়া কৃষি ঋণের আসল ও সুদ মওকুফ।" },
     provider: "Government / Banking System",
@@ -173,6 +189,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "fertilizer-subsidy",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Fertilizer Price Subsidy", bn: "সার মূল্য ভর্তুকি" },
     description: { en: "Government provides Urea, TSP, DAP, and MOP fertilizers at highly subsidized prices through licensed dealers.", bn: "সরকার লাইসেন্সপ্রাপ্ত ডিলারদের মাধ্যমে ইউরিয়া, টিএসপি, ডিএপি এবং এমওপি সার অত্যন্ত ভর্তুকি মূল্যে প্রদান করে।" },
     provider: "Ministry of Agriculture / BADC",
@@ -190,6 +207,7 @@ export const CURRENT_PDF_SCHEMES = [
   },
   {
     id: "disaster-relief-seeds",
+    eligibilityTags: tags({ provider: 'government' }),
     title: { en: "Disaster Recovery Seed Support", bn: "দুর্যোগ পরবর্তী বীজ সহায়তা" },
     description: { en: "Free distribution of seeds and fertilizers to victims of floods, cyclones, or prolonged droughts.", bn: "বন্যা, ঘূর্ণিঝড় বা দীর্ঘস্থায়ী খরায় ক্ষতিগ্রস্তদের মাঝে বিনামূল্যে বীজ ও সার বিতরণ।" },
     provider: "Department of Agricultural Extension (DAE)",
@@ -206,6 +224,11 @@ export const CURRENT_PDF_SCHEMES = [
     sourceLinks: ["https://dae.gov.bd/"]
   }
 ];
+
+/** The seeded tags by scheme id, for Firestore records saved before tags existed. */
+export const SEED_ELIGIBILITY_TAGS: Record<string, EligibilityTags> = Object.fromEntries(
+  CURRENT_PDF_SCHEMES.map((s) => [s.id, s.eligibilityTags])
+);
 
 export async function seedGovSchemes() {
   const colRef = collection(db, 'gov_schemes');

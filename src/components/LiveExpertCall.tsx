@@ -270,7 +270,7 @@ MODE: GEMINI 3.8 LIVE EXTENDED THINKING (SUPER SPECIALIZED CLINICAL PATHOLOGY & 
 CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 1. DO NOT GREET OR SPEAK FIRST ON CALL CONNECT. Stay completely silent when the call connects.
 2. Start speaking ONLY after the caller speaks first. Listen attentively and reply directly in natural, authoritative spoken Bangla (বাংলা).
-3. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic or filler phrases like "আমি গভীর বৈজ্ঞানিক পর্যবেক্ষণের জন্য শুনছি", "উপায়গুলো দেখছি", "লক্ষণগুলো দেখছি", "আমি পরামর্শ দিচ্ছি", "আসুন বিস্তারিত জেনে নিই", "ভাবছি", "অপেক্ষা করুন", or "আমি এআই সহকারী". 
+3. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic or filler phrases like "আমি গভীর বৈজ্ঞানিক পর্যবেক্ষণের জন্য শুনছি", "উপায়গুলো দেখছি", "লক্ষণগুলো দেখছি", "আমি পরামর্শ দিচ্ছি", "আসুন বিস্তারিত জেনে নিই", "ভাবছি", "অপেক্ষা করুন", or "আমি এআই সহকারী". If asked whether you are human, honestly say you are an AI assistant. 
 4. IMMEDIATE VALUE MANDATE:
    - If the caller gives symptoms, state the exact pathology and specific remedy with dilution ratio immediately in 1-2 clear spoken Bangla sentences.
    - If the inquiry is broad or vague (e.g., 'আমার গাছে পোকা লেগেছে'), immediately ask ONE targeted diagnostic question with 2 options (e.g., 'ধানের গোড়ায় বাদামি ফড়িং লেগেছে, নাকি মাঝের ডগা শুকিয়ে সাদা শীষ বের হচ্ছে?').
@@ -295,7 +295,7 @@ Before formulating your spoken response, leverage your thinking budget to execut
 
 SPOKEN DELIVERY CADENCE:
 - Distill your clinical reasoning into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and immediate recovery action. Do NOT narrate your thought process out loud.`
-        : `You are a warm, highly knowledgeable Universal Green Companion & Agricultural Advisor (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ বিশেষজ্ঞ) in Bangladesh conducting a real-time live phone call.
+        : `You are a warm, knowledgeable AI voice assistant: a Universal Green Companion & Agricultural Advisor (সবুজ পরামর্শক ও সার্বিক উদ্ভিদ সহকারী, এআই ভয়েস সহকারী) in Bangladesh conducting a real-time voice call. You are an AI, not a human expert; never claim to be a person, doctor or officer.
 CONTEXT: General plant, gardening, or farming consultation: "${diagnosisContext}".
 LOCATION: ${locationContext}, Bangladesh.
 MODE: GEMINI 3.8 LIVE (FAST, BROAD & VERSATILE PLANT & GARDENING COMPANION).
@@ -311,11 +311,11 @@ You naturally and warmly assist with ANY green-living, plant care, gardening, or
 CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
 1. DO NOT GREET OR SPEAK FIRST ON CALL CONNECT. Stay completely silent when the call connects.
 2. Start speaking ONLY after the caller speaks first. Respond directly, warmly, and concisely in natural spoken Bangla (বাংলা).
-3. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic phrases like "আমি সরাসরি শুনছি", "উপায়গুলো দেখছি", "আমি এআই", "আসুন বিস্তারিত জানি", or announce call systems. Speak directly like an expert mentor on the line.
+3. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say robotic phrases like "আমি সরাসরি শুনছি", "উপায়গুলো দেখছি", "আমি এআই", "আসুন বিস্তারিত জানি", or announce call systems. Speak directly and helpfully on the line. If asked whether you are human, honestly say you are an AI voice assistant.
 4. Switch to English only if the caller explicitly says "Speak in English" or "ইংরেজিতে বলুন".
 
 LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
-- Ultra-low latency spoken turns: Keep responses short, punchy, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive human expert on the phone.
+- Ultra-low latency spoken turns: Keep responses short, punchy, and conversational (1-2 sentences at a time, strictly under 25 words). Act like a friendly, attentive AI voice assistant on the phone.
 - Rapid Interactivity & Natural Dialogue: Answer directly, then invite them to speak (e.g., "আর কিছু জানতে চান?", "গাছের বয়স কত?"). Never deliver long lectures.
 - IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the user says "দাঁড়াও", "থামো", "Wait", "Stop", or interrupts by speaking, immediately cease previous points and answer their new topic directly.
 - Active Listening: Acknowledge caller statements with brief conversational confirmations ("হ্যাঁ, বুঝতে পারছি", "অবশ্যই").
@@ -730,7 +730,12 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
   };
 
   return (
-    <div className="w-full mt-6 mb-4 space-y-3" role="region" aria-label={lang === 'bn' ? 'এআই সহায়ক কল সার্ভিস' : 'AI Assistant Call Service'}>
+    <div className="w-full mt-6 mb-4 space-y-3" role="region" aria-label={lang === 'bn' ? 'এআই ভয়েস কল' : 'AI voice call'}>
+      <p className="text-sm text-gray-300 text-center font-medium">
+        {lang === 'bn'
+          ? 'এটি এআই, মানুষ নয়। মানুষের পরামর্শের জন্য \'বিশেষজ্ঞ\' সেবায় যান।'
+          : 'This is an AI, not a person. For a human, use the Expert service.'}
+      </p>
       {!isConnected && !isCalling ? (
         <div className="space-y-3">
           {/* Simplified Consultation Mode Switch */}
@@ -795,7 +800,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={startCall}
-            aria-label={lang === 'bn' ? 'এআই সহায়কের সাথে ভয়েস কল শুরু করুন' : 'Start voice chat with AI Assistant'}
+            aria-label={lang === 'bn' ? 'এআই ভয়েস কল শুরু করুন' : 'Start AI voice call'}
             className={`w-full flex flex-col items-center justify-center space-y-2 p-6 rounded-3xl shadow-xl transition-all cursor-pointer relative overflow-hidden group focus:ring-4 outline-none ${
               isExtendedThinking
                 ? 'bg-gradient-to-br from-purple-700 via-indigo-800 to-emerald-900 text-white shadow-purple-950/30 border border-purple-500/40 focus:ring-purple-400'
@@ -816,8 +821,8 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             </span>
             <span className="text-green-100 text-xs font-medium">
               {lang === 'bn' 
-                ? (isExtendedThinking ? 'ক্লিনিক্যাল প্যাথলজিস্টের সাথে গভীর বৈজ্ঞানিক আলোচনা' : 'ছাদ বাগান, ইনডোর গাছ বা ফসল নিয়ে সরাসরি কথা বলুন') 
-                : (isExtendedThinking ? 'Deep scientific consultation with Clinical Pathologist' : 'Ask about rooftop gardens, indoor plants, or crops')}
+                ? (isExtendedThinking ? 'এআই ভয়েস সহকারীর সাথে গভীর রোগ-বিশ্লেষণ' : 'ছাদ বাগান, ইনডোর গাছ বা ফসল নিয়ে সরাসরি কথা বলুন') 
+                : (isExtendedThinking ? 'Deep plant disease analysis with AI voice assistant' : 'Ask about rooftop gardens, indoor plants, or crops')}
             </span>
           </motion.button>
         </div>
@@ -874,7 +879,7 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
             
             <div className="text-center">
               <h4 id="expert-call-title" className="text-white font-black text-3xl tracking-tight mb-1">
-                {lang === 'bn' ? 'এআই কৃষি সহায়ক' : 'AI Agri Assistant'}
+                {lang === 'bn' ? 'এআই ভয়েস সহকারী' : 'AI voice assistant'}
               </h4>
               <p className="text-green-500/80 text-sm font-medium tracking-widest uppercase flex items-center justify-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -888,8 +893,8 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
               </p>
               <p className="text-gray-400 text-[11px] mt-1.5 max-w-xs mx-auto">
                 {lang === 'bn' 
-                  ? 'লাইভ এআই ভয়েস পরামর্শক • সরকারি কৃষি সহায়তার জন্য ১৬১২৩ ডায়াল করুন' 
-                  : 'Live AI Voice Assistant • For Gov Krishi Hotline dial 16123'}
+                  ? 'এআই ভয়েস সহকারী • মানুষের পরামর্শের জন্য সরকারি কৃষি হটলাইন ১৬১২৩' 
+                  : 'AI Voice Assistant • For a human advisor, call the government Krishi Hotline 16123'}
               </p>
 
               {/* Active Model Indicator Badge */}
@@ -1014,13 +1019,13 @@ LIVE CONVERSATIONAL CADENCE (GEMINI 3.8 LIVE EXTENDED):
 
               <p className={`text-xs uppercase tracking-[0.2em] font-black transition-colors duration-500 ${isCalling || callStatus === 'thinking' ? 'text-green-400 animate-pulse' : 'text-gray-400'}`}>
                 {isRinging
-                  ? (lang === 'bn' ? 'এআই সহায়ককে কল করা হচ্ছে...' : 'Ringing AI Assistant...')
+                  ? (lang === 'bn' ? 'এআই ভয়েস সহকারীকে কল করা হচ্ছে...' : 'Ringing AI voice assistant...')
                   : isCalling 
                     ? (lang === 'bn' ? 'রাউটিং কল...' : 'Routing Call...') 
                     : callStatus === 'thinking' 
                       ? (lang === 'bn' ? 'সারাংশ খোঁজা হচ্ছে...' : 'Consulting Database...') 
                       : callStatus === 'speaking' 
-                        ? (lang === 'bn' ? 'এআই সহায়ক কথা বলছেন' : 'AI Assistant Speaking')
+                        ? (lang === 'bn' ? 'এআই ভয়েস সহকারী কথা বলছে' : 'AI voice assistant speaking')
                         : callStatus === 'listening' 
                           ? (lang === 'bn' ? 'আপনার কথা শোনা হচ্ছে' : 'Listening to you') 
                           : (lang === 'bn' ? 'সংযুক্ত' : 'Connected')}

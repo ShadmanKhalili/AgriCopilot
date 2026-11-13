@@ -362,9 +362,10 @@ export const buildConsentSnapshot = (
     if (seed?.severity) snapshot.severity = sanitizeString(seed.severity, 32);
     if (typeof seed?.confidence === 'number') snapshot.confidence = seed.confidence;
   }
-  if (has('photos') && typeof seed?.photosCount === 'number') {
-    snapshot.photosCount = Math.max(0, Math.min(20, seed.photosCount));
-  }
+  // `seed.photosCount` is how many photos the AI diagnosis used. Those photos
+  // are never sent to the expert, so that number must not be stored here.
+  // The real count is written after the photos are saved (see
+  // `refreshPhotosCount` in expertPhotos.ts).
   if (has('farm_profile')) {
     snapshot.crop = sanitizeString(seed?.crop || profile?.primaryCrop || fallback.crop || '', 64);
     snapshot.cropStage = sanitizeString(seed?.cropStage || '', 64);

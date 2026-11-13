@@ -461,6 +461,30 @@ service cloud.firestore {
              (!data.keys().hasAny(['advisory']) || data.advisory is map);
     }
 
+    // A crop photo shared with the expert: compressed JPEG as base64 text,
+    // capped well under the 1 MiB document limit (client caps at 215 KB).
+    function isValidConsultationPhoto(data) {
+      return data.keys().hasAll(['base64', 'mimeType', 'width', 'height', 'bytes', 'createdAt', 'uploadedBy']) &&
+             data.keys().hasOnly(['base64', 'mimeType', 'width', 'height', 'bytes', 'createdAt', 'uploadedBy']) &&
+             isStr(data.base64, 1, 290000) &&
+             data.mimeType == 'image/jpeg' &&
+             data.width is int && data.width >= 1 && data.width <= 1024 &&
+             data.height is int && data.height >= 1 && data.height <= 1024 &&
+             data.bytes is int && data.bytes >= 1 && data.bytes <= 215000 &&
+             isTimestamp(data.createdAt) &&
+             data.uploadedBy == request.auth.uid;
+    }
+
+    // Only the owning farmer, only while consent stands, and only if they
+    // ticked "Crop photos" in the consent step.
+    function canSharePhoto(consultationId) {
+      let c = get(/databases/$(database)/documents/consultations/$(consultationId)).data;
+      return isSignedIn() &&
+        c.farmerId == request.auth.uid &&
+        c.consentRevoked == false &&
+        'photos' in c.consentScope;
+    }
+
     function isValidEvent(data) {
       return data.keys().hasAll(['type', 'actorId', 'actorRole', 'createdAt']) &&
              isStr(data.type, 1, 64) &&
@@ -597,6 +621,18 @@ service cloud.firestore {
                       existing().senderId != request.auth.uid &&
                       incoming().diff(existing()).affectedKeys().hasOnly(['readAt']);
         allow delete: if false;
+      }
+
+      // Crop photos. Same read gate as messages and voice notes: the expert
+      // loses access the moment consent is revoked or expires. Fixed ids
+      // p0..p2 cap the count at 3, because a second write to an id is an update.
+      match /photos/{photoId} {
+        allow read: if isConsultationParticipant(consultationId);
+        allow create: if canSharePhoto(consultationId) &&
+                      photoId in ['p0', 'p1', 'p2'] &&
+                      isValidConsultationPhoto(incoming());
+        allow update: if false;
+        allow delete: if isConsultationFarmer(consultationId);
       }
 
       match /events/{eventId} {

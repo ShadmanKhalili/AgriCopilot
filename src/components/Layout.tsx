@@ -514,8 +514,13 @@ export default function Layout() {
       {!hasOnboarded && <Onboarding onDone={() => undefined} />}
       <OfflineBanner lang={lang} />
       
-      <div className="h-[100dvh] w-full bg-[#F4F6F4] dark:bg-[#09110c] text-slate-900 dark:text-emerald-50 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200">
-        
+      {/* While the welcome screens cover the app, the app behind them is taken
+          out of keyboard and screen-reader reach. */}
+      <div
+        inert={!hasOnboarded}
+        className="h-[100dvh] w-full bg-[#F4F6F4] dark:bg-[#09110c] text-slate-900 dark:text-emerald-50 flex flex-col md:flex-row font-sans overflow-hidden transition-colors duration-200"
+      >
+
         {/* ======================= SIDEBAR (DESKTOP & MOBILE DRAWER) ======================= */}
         <AnimatePresence>
           {isMobileMenuOpen && (
