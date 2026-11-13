@@ -216,11 +216,20 @@ export const matchCommodities = (items: BulletinItem[]) => {
     item: BulletinItem | null;
   }> = [];
 
+  // Bangla letters such as য় can be written as one code point or as a base
+  // letter plus a dot. The bulletin and this file do not always agree, so
+  // both sides are put in the same form before comparing. Without this,
+  // onion (পেঁয়াজ) and soybean oil (সয়াবিন) were reported as missing.
+  const sameForm = (text: string) => text.normalize('NFC');
+  const named = items.map((candidate) => ({ candidate, name: sameForm(candidate.name) }));
+
   for (const commodity of COMMODITY_MATCHERS) {
-    const item =
-      items.find((candidate) =>
-        commodity.match.some((needle) => candidate.name.includes(needle))
-      ) || null;
+    // Earlier names in `match` are preferred over later, looser ones.
+    let item: BulletinItem | null = null;
+    for (const needle of commodity.match.map(sameForm)) {
+      item = named.find((entry) => entry.name.includes(needle))?.candidate ?? null;
+      if (item) break;
+    }
     matched.push({
       id: commodity.id,
       label: commodity.label,
