@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Shield, X, FileText } from 'lucide-react';
 import { translations, Language } from '../utils/translations';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,6 +11,15 @@ interface Props {
 
 export default function LegalModal({ isOpen, onClose, lang }: Props) {
   const t = translations[lang];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -29,6 +38,8 @@ export default function LegalModal({ isOpen, onClose, lang }: Props) {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          role="dialog"
+          aria-modal="true"
           className="bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden relative z-10 flex flex-col max-h-[90vh]"
         >
           {/* Header */}
@@ -37,13 +48,15 @@ export default function LegalModal({ isOpen, onClose, lang }: Props) {
               <div className="p-3 bg-white/10 rounded-2xl">
                 <Shield className="w-8 h-8 text-green-300" />
               </div>
-              <h2 className="text-2xl font-black tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight">
                 {lang === 'bn' ? 'গোপনীয়তা নীতি ও শর্তাবলী' : 'Privacy Policy & Terms'}
               </h2>
             </div>
             <button 
+              type="button"
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              aria-label={lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+              className="p-3 min-w-[48px] min-h-[48px] flex items-center justify-center hover:bg-white/10 rounded-full transition-colors shrink-0"
             >
               <X className="w-6 h-6" />
             </button>
@@ -130,7 +143,7 @@ export default function LegalModal({ isOpen, onClose, lang }: Props) {
           <div className="p-6 md:p-8 bg-gray-50 border-t border-gray-100 flex justify-end shrink-0">
             <button
               onClick={onClose}
-              className="bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-900/20"
+              className="min-h-[48px] bg-green-700 hover:bg-green-800 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-green-900/20"
             >
               {lang === 'bn' ? 'আমি সম্মত' : 'I Understand & Agree'}
             </button>

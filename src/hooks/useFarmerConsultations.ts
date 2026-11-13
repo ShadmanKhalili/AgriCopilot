@@ -12,7 +12,6 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../components/AuthProvider';
-import { watchFarmerConsultations } from '../services/expertService';
 import type { Consultation } from '../utils/expertTypes';
 
 type Listener = (items: Consultation[]) => void;
@@ -21,8 +20,11 @@ let cachedItems: Consultation[] = [];
 let activeFarmerId: string | null = null;
 let unsubscribe: (() => void) | null = null;
 const listeners = new Set<Listener>();
+/** Bumped on every start and stop, so a late-loading start can tell it is stale. */
+let listenToken = 0;
 
 const stopListening = () => {
+  listenToken += 1;
   unsubscribe?.();
   unsubscribe = null;
   activeFarmerId = null;
@@ -30,15 +32,26 @@ const stopListening = () => {
 };
 
 const startListening = (farmerId: string) => {
-  if (activeFarmerId === farmerId && unsubscribe) return;
+  // Already listening, or about to, for this farmer.
+  if (activeFarmerId === farmerId) return;
   unsubscribe?.();
   unsubscribe = null;
   activeFarmerId = farmerId;
   cachedItems = [];
-  unsubscribe = watchFarmerConsultations(farmerId, (items) => {
-    cachedItems = items;
-    listeners.forEach((listener) => listener(items));
-  });
+  const token = ++listenToken;
+  // Loaded on demand so the database library is not part of the first load.
+  import('../services/expertService')
+    .then(({ watchFarmerConsultations }) => {
+      if (token !== listenToken) return;
+      unsubscribe = watchFarmerConsultations(farmerId, (items) => {
+        cachedItems = items;
+        listeners.forEach((listener) => listener(items));
+      });
+    })
+    .catch((error) => {
+      console.warn('Could not start the consultations listener:', error);
+      if (token === listenToken) activeFarmerId = null;
+    });
 };
 
 /**

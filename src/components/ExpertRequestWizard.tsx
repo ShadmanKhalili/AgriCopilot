@@ -8,6 +8,8 @@ import {
   Carrot,
   Check,
   ChevronLeft,
+  ImageIcon,
+  RotateCw,
   ChevronRight,
   CloudRain,
   Layers,
@@ -43,6 +45,9 @@ import {
 import { geoData } from '../utils/geoData';
 import toBn from '../utils/banglaNum';
 import { audioFeedback } from '../utils/audioFeedback';
+import PhotoPicker, { type PickedPhoto } from './expert/PhotoPicker';
+import { uploadConsultationPhotos } from '../services/expertPhotos';
+import { photoSrc } from '../utils/imageCompress';
 
 const CATEGORY_ICONS: Record<string, any> = {
   crop_disease: Bug,
@@ -100,6 +105,11 @@ export default function ExpertRequestWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
+  // Set once the request exists but some photos were not saved.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [failedSlots, setFailedSlots] = useState<number[]>([]);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,6 +119,9 @@ export default function ExpertRequestWizard({
     setSymptoms(seed?.diagnosisSummary || '');
     setSelectedExpertUid(preselectedExpertUid || null);
     setGpsCoords(null);
+    setPhotos([]);
+    setCreatedId(null);
+    setFailedSlots([]);
     const base = {} as Record<ConsentKey, boolean>;
     CONSENT_ITEMS.forEach((item) => (base[item.id] = item.defaultOn));
     setConsent(base);
@@ -270,6 +283,28 @@ export default function ExpertRequestWizard({
         seed: seed || undefined,
       });
       audioFeedback.playTactileClick();
+
+      // Photos go only with consent. A photo that fails must not undo the
+      // request: it is already sent; the farmer is told which photos are
+      // missing and can retry.
+      if (consent.photos && photos.length > 0) {
+        const result = await uploadConsultationPhotos(
+          id,
+          photos.map((photo, slot) => ({ slot, photo })),
+          user.uid
+        );
+        if (result.failed.length > 0) {
+          setCreatedId(id);
+          setFailedSlots(result.failed.map((f) => f.index).sort((a, b) => a - b));
+          toast.error(
+            bn
+              ? 'অনুরোধ পাঠানো হয়েছে, কিন্তু কিছু ছবি যায়নি।'
+              : 'Request sent, but some photos were not sent.'
+          );
+          return;
+        }
+      }
+
       toast.success(
         bn ? 'অনুরোধ পাঠানো হয়েছে — বিশেষজ্ঞ শীঘ্রই দেখবেন।' : 'Request sent — the expert will review it soon.'
       );
@@ -278,6 +313,32 @@ export default function ExpertRequestWizard({
       toast.error(describeError(error, lang));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRetryPhotos = async () => {
+    if (!createdId || !user?.uid || failedSlots.length === 0) return;
+    setIsRetrying(true);
+    try {
+      const result = await uploadConsultationPhotos(
+        createdId,
+        failedSlots.filter((slot) => photos[slot]).map((slot) => ({ slot, photo: photos[slot] })),
+        user.uid
+      );
+      const stillFailed = result.failed.map((f) => f.index).sort((a, b) => a - b);
+      setFailedSlots(stillFailed);
+      if (stillFailed.length === 0) {
+        toast.success(bn ? 'সব ছবি পাঠানো হয়েছে।' : 'All photos sent.');
+        onCreated(createdId);
+      } else {
+        toast.error(
+          bn
+            ? 'এখনও কিছু ছবি যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।'
+            : 'Some photos still did not send. Check your connection and retry.'
+        );
+      }
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -310,9 +371,9 @@ export default function ExpertRequestWizard({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => (createdId ? onCreated(createdId) : onClose())}
               aria-label={bn ? 'বন্ধ করুন' : 'Close'}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-2xl bg-white/15 hover:bg-white/25 active:scale-90 transition-all shrink-0"
+              className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-2xl bg-white/15 hover:bg-white/25 active:scale-90 transition-all shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -337,6 +398,73 @@ export default function ExpertRequestWizard({
           </div>
         </div>
 
+        {createdId ? (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900">
+              <p className="text-sm font-black text-emerald-900 dark:text-emerald-100 flex items-center gap-2">
+                <Check className="w-4 h-4 shrink-0" />
+                {bn ? 'আপনার অনুরোধ পাঠানো হয়েছে।' : 'Your request was sent.'}
+              </p>
+            </div>
+            {failedSlots.length > 0 && (
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-800 space-y-3">
+                <p className="text-sm font-black text-amber-900 dark:text-amber-100">
+                  {bn
+                    ? `এই ${toBn(failedSlots.length)}টি ছবি বিশেষজ্ঞের কাছে যায়নি:`
+                    : `${failedSlots.length === 1 ? 'This photo was' : `These ${failedSlots.length} photos were`} not sent to the expert:`}
+                </p>
+                <ul className="flex flex-wrap gap-3">
+                  {failedSlots.map((slot) => {
+                    const photo = photos[slot];
+                    const src = photo ? photoSrc(photo.mimeType, photo.base64) : null;
+                    const label = bn ? `ছবি ${toBn(slot + 1)}` : `Photo ${slot + 1}`;
+                    return (
+                      <li key={slot} className="flex flex-col items-center gap-1">
+                        <span className="w-20 h-20 rounded-xl overflow-hidden border-2 border-amber-300 dark:border-amber-700 bg-stone-100 dark:bg-stone-800 block">
+                          {src && <img src={src} alt={bn ? `পাঠানো যায়নি: ${label}` : `Not sent: ${label}`} className="w-full h-full object-cover" />}
+                        </span>
+                        <span className="text-sm font-bold text-amber-900 dark:text-amber-100">{label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                  {bn
+                    ? 'ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন। ছবি ছাড়াও বিশেষজ্ঞ আপনার অনুরোধ দেখতে পাবেন।'
+                    : 'Check your internet and try again. The expert can still see your request without them.'}
+                </p>
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {failedSlots.length > 0 && (
+                <button
+                  type="button"
+                  disabled={isRetrying}
+                  onClick={handleRetryPhotos}
+                  className="flex-1 min-h-[52px] rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+                >
+                  {isRetrying ? <Loader2 className="w-5 h-5 animate-spin" /> : <RotateCw className="w-5 h-5" />}
+                  {bn ? 'ছবিগুলো আবার পাঠান' : 'Send photos again'}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={isRetrying}
+                onClick={() => onCreated(createdId)}
+                className="flex-1 min-h-[52px] rounded-2xl border-2 border-stone-200 dark:border-stone-700 text-slate-700 dark:text-slate-200 font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                {failedSlots.length > 0
+                  ? bn
+                    ? 'ছবি ছাড়াই এগিয়ে যান'
+                    : 'Continue without them'
+                  : bn
+                  ? 'অনুরোধ খুলুন'
+                  : 'Open my request'}
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="p-4 sm:p-5 space-y-5">
           <AnimatePresence mode="wait">
             {step === 0 && (
@@ -450,6 +578,15 @@ export default function ExpertRequestWizard({
                     placeholder={bn ? 'যেমন: ধানের পাতায় বাদামি দাগ, ১০ দিন ধরে...' : 'e.g. brown spots on rice leaves for 10 days...'}
                   />
                 </div>
+
+                <PhotoPicker lang={lang} photos={photos} onChange={setPhotos} disabled={isSubmitting} />
+                {photos.length === 0 && (seed?.photosCount || 0) > 0 && (
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                    {bn
+                      ? 'এআই পরীক্ষার ছবিগুলো নিজে থেকে বিশেষজ্ঞের কাছে যায় না। দেখাতে চাইলে এখানে আবার যোগ করুন।'
+                      : 'Photos from the AI check are not sent to the expert on their own. Add them here if you want the expert to see them.'}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -532,6 +669,14 @@ export default function ExpertRequestWizard({
                             ? bn
                               ? 'অবস্থান খোঁজা হচ্ছে...'
                               : 'Finding your location...'
+                            : item.id === 'photos'
+                            ? photos.length > 0
+                              ? bn
+                                ? `আপনার বেছে নেওয়া ${toBn(photos.length)}টি ছবি`
+                                : `The ${photos.length} photo${photos.length === 1 ? '' : 's'} you chose`
+                              : bn
+                              ? 'ধাপ ১-এ ছবি যোগ করুন'
+                              : 'Add photos in step 1'
                             : bn
                             ? item.detailBn
                             : item.detailEn}
@@ -551,6 +696,27 @@ export default function ExpertRequestWizard({
                     </button>
                   );
                 })}
+
+                {photos.length > 0 && (
+                  <div
+                    className={`p-3 rounded-2xl border text-sm font-medium flex items-start gap-2 ${
+                      consent.photos
+                        ? 'bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-950/40 dark:border-sky-900 dark:text-sky-100'
+                        : 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/40 dark:border-amber-900 dark:text-amber-100'
+                    }`}
+                  >
+                    <ImageIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>
+                      {consent.photos
+                        ? bn
+                          ? `আপনার ${toBn(photos.length)}টি ছবি সেই বিশেষজ্ঞকে দেখানো হবে, যিনি আপনার অনুরোধটি নেবেন। অন্য কেউ দেখবেন না। সম্মতি প্রত্যাহার করলে বিশেষজ্ঞ আর ছবিগুলো দেখতে পারবেন না।`
+                          : `Your ${photos.length} photo${photos.length === 1 ? '' : 's'} will be shown to the expert who takes your case, and to no one else. If you revoke consent, the expert can no longer see them.`
+                        : bn
+                        ? 'ছবি শেয়ার বন্ধ — আপনার ছবিগুলো পাঠানো হবে না।'
+                        : 'Photo sharing is off — your photos will not be sent.'}
+                    </span>
+                  </div>
+                )}
 
                 {consent.phone && (
                   <label className="block">
@@ -668,7 +834,13 @@ export default function ExpertRequestWizard({
                         ? 'কিছুই শেয়ার করা হবে না — বিশেষজ্ঞের পক্ষে সাহায্য করা কঠিন হবে।'
                         : 'Nothing shared — it will be hard for the expert to help.'
                       : CONSENT_ITEMS.filter((i) => consent[i.id])
-                          .map((i) => (bn ? i.bn : i.en))
+                          .map((i) =>
+                            i.id === 'photos'
+                              ? `${bn ? i.bn : i.en} (${bn ? toBn(photos.length) : photos.length})`
+                              : bn
+                              ? i.bn
+                              : i.en
+                          )
                           .join(' • ')}
                   </div>
                 )}
@@ -717,6 +889,7 @@ export default function ExpertRequestWizard({
             )}
           </div>
         </div>
+        )}
       </motion.div>
     </div>
   );

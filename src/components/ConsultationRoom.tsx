@@ -50,6 +50,7 @@ import toBn from '../utils/banglaNum';
 import { markConsultationRead } from '../utils/expertReadState';
 import { audioFeedback } from '../utils/audioFeedback';
 import { speakWithBrowser } from '../utils/speech';
+import ConsultationPhotos from './expert/ConsultationPhotos';
 
 interface ConsultationRoomProps {
   lang: 'bn' | 'en';
@@ -347,7 +348,7 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
 
   const handleRevoke = async () => {
     if (!consultation || !user) return;
-    if (!window.confirm(bn ? 'সম্মতি প্রত্যাহার করলে বিশেষজ্ঞ আর আপনার তথ্য দেখতে পারবেন না। নিশ্চিত?' : 'Revoking consent blocks the expert from seeing your data. Continue?')) {
+    if (!window.confirm(bn ? 'সম্মতি প্রত্যাহার করলে বিশেষজ্ঞ আর আপনার তথ্য ও ছবি দেখতে পারবেন না। নিশ্চিত?' : 'Revoking consent blocks the expert from seeing your data and photos. Continue?')) {
       return;
     }
     try {
@@ -550,6 +551,15 @@ export default function ConsultationRoom({ lang, consultationId, onClose, viewer
               <span className="font-black">{bn ? 'কৃষকের সমস্যা' : 'Farmer’s description'}: </span>
               {caseData.symptoms}
             </div>
+          )}
+          {(isExpertView || isFarmerView) && (
+            <ConsultationPhotos
+              lang={lang}
+              consultationId={consultation.id}
+              viewer={isExpertView ? 'expert' : 'farmer'}
+              photosConsented={!!consultation.consentScope?.includes('photos')}
+              canDelete={isFarmerView && !isExpertView}
+            />
           )}
           {caseData?.consentSnapshot.previousConsultations?.length ? (
             <div className="p-3 rounded-2xl bg-stone-50 dark:bg-stone-900/70 border border-stone-200 dark:border-stone-800 text-[11px] font-medium text-slate-700 dark:text-slate-200">

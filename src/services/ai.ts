@@ -993,7 +993,13 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
       - Respond in JSON format.
       - Justification must be in ${lang === 'bn' ? 'Bangla' : 'English'}.
       - Use markdown in the justification for better readability.
-      - CRITICAL: Keep the justification very short, sweet, and to the point.`;
+      - CRITICAL: Keep the justification very short, sweet, and to the point.
+
+      PRICE RULES:
+      - You have no market data. Any price you give is only a rough guess from the photo and the product name.
+      - Give a low and a high price per kg in BDT (estimatedPriceLowBdt, estimatedPriceHighBdt) as a wide, cautious range. Set estimatedPriceBdt to the middle of that range.
+      - Do not name a source for the price. Do not say it is the market rate, today's rate, official or certain.
+      - shelfLife and bestMarket are also only suggestions. Keep them short and general.`;
       
       const response = await generateContent({
         contents: [
@@ -1007,9 +1013,11 @@ export const gradeProduce = async (imageBase64: string, mimeType: string, produc
             properties: {
               grade: { type: Type.STRING, description: 'Grade A, Grade B, Reject, or Invalid' },
               justification: { type: Type.STRING, description: `Short justification for the grade in ${lang === 'bn' ? 'Bangla' : 'English'}` },
-              estimatedPriceBdt: { type: Type.NUMBER, description: 'Estimated price per kg in BDT' },
-              shelfLife: { type: Type.STRING, description: 'Estimated shelf life (e.g., 3-5 days)' },
-              bestMarket: { type: Type.STRING, description: 'Recommended market type (e.g., Local Bazaar, Supermarket, Export)' }
+              estimatedPriceBdt: { type: Type.NUMBER, description: 'Rough guess of the price per kg in BDT, the middle of the low-high range. Not a market rate.' },
+              estimatedPriceLowBdt: { type: Type.NUMBER, description: 'Rough guess, low end of the price per kg in BDT' },
+              estimatedPriceHighBdt: { type: Type.NUMBER, description: 'Rough guess, high end of the price per kg in BDT' },
+              shelfLife: { type: Type.STRING, description: 'Rough guess of shelf life (e.g., 3-5 days)' },
+              bestMarket: { type: Type.STRING, description: 'Suggested kind of market (e.g., Local Bazaar, Supermarket, Export). A suggestion only.' }
             },
             required: ['grade', 'justification', 'estimatedPriceBdt', 'shelfLife', 'bestMarket']
           }
