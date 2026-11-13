@@ -192,7 +192,9 @@ export default function Layout() {
 
   // MarketConnect State Persistence
   const [marketInsights, setMarketInsights] = useState<any | null>(null);
-  const [marketProduce, setMarketProduce] = useState<string>('tomato');
+  // Empty until a crop is chosen, so the market screen can open on the
+  // farmer's own main crop.
+  const [marketProduce, setMarketProduce] = useState<string>('');
 
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
     if (payload?.crop) {

@@ -17,7 +17,8 @@ const Type = {
   STRING: 'STRING',
   NUMBER: 'NUMBER',
   OBJECT: 'OBJECT',
-  ARRAY: 'ARRAY'
+  ARRAY: 'ARRAY',
+  BOOLEAN: 'BOOLEAN'
 } as const;
 const Modality = { AUDIO: 'AUDIO' } as const;
 
@@ -1041,7 +1042,7 @@ export const getMarketInsights = async (
       const currentYear = now.getFullYear();
       const locationContext = coords
         ? buildLocationContext(coords)
-        : `Location: Bangladesh wholesale markets (Kawran Bazar, Shyambazar, Khatunganj, Mohasthan, Cox's Bazar).`;
+        : `Location: Bangladesh (no exact location given).`;
 
       // The official prices are fetched, not searched for.
       //
@@ -1055,102 +1056,55 @@ export const getMarketInsights = async (
       const bulletin = await fetchOfficialBulletin();
       const officialPrices = bulletinPromptContext(bulletin, produce);
 
-      const prompt = `You are an elite agricultural commodities economist and market intelligence expert for Bangladesh.${outputRules(lang)}
-Analyse the market for "${produce}" in Bangladesh as of TODAY (${today}, Year: ${currentYear}).
+      // What this asks for, and what it no longer asks for.
+      //
+      // The model has no live market feed: the only real numbers it gets are
+      // the government bulletin above. It used to be asked for supermarket
+      // shelf prices, per-mandi rows, arrival volumes, a retail margin and
+      // distances to markets. With nothing to look them up in, it made them
+      // up, and the screen showed them as live bids. It is now asked only
+      // for what it can do honestly: explain the official figure, give a
+      // clearly labelled estimate, and give selling advice.
+      const prompt = `You are an agricultural market adviser for smallholder farmers in Bangladesh.${outputRules(lang)}
+The farmer grows "${produce}". Today is ${today} (${currentYear}).
 
 ${officialPrices}
 
 YOUR TASKS:
-1. WHOLESALE MANDI PRICES & TRENDS:
-   - Use the official bulletin price above as the base price for "${produce}".
-   - Describe the wholesale mandis where it trades (Kawran Bazar, Shyambazar, Khatunganj) and, for regional commodities, the local mandi.
-   - Give minimum, maximum and average price per KG in BDT, anchored on the official figure rather than contradicting it.
-   - Note arrival supply volume (পর্যাপ্ত / মাঝারি / ঘাটতি) and price momentum (উর্ধ্বমুখী / স্থিতিশীল / নিম্নমুখী).
-
-2. SUPERMARKET & E-COMMERCE RETAIL PRICES:
-   - Give the typical retail shelf price per KG for "${produce}" in Bangladesh supermarkets (Shwapno, Meena Bazar, Agora) and apps (Chaldal), based on the official price plus the usual retail markup over wholesale.
-   - Note packaging condition (যেমন: গ্রেডেড প্যাকেট, খোলা, নেট ব্যাগ) and stock availability.
-
-3. VALUE-CHAIN MARGIN SPREAD & FARMER GUIDANCE:
-   - Calculate the percentage markup between the wholesale rate and the supermarket retail shelf rate.
-   - Provide concrete, actionable bargaining advice for farmers (e.g., selling directly, sorting Grade-A for supermarket supply contracts, timing delivery to Karwan Bazar vs local cold storage).
+1. If the official bulletin above lists "${produce}", explain in plain words what that price range means for a farmer (it is a Dhaka market range; farm-gate prices are usually lower). If it does not list it, say so in one sentence.
+2. Give ONE estimated wholesale price range per kg that a farmer might expect at a local wholesale market (aarot) for "${produce}" now. This is an ESTIMATE: say so, and anchor it on the official figure when there is one. Set "isEstimate": true.
+3. List up to 4 things that are moving the price now (season, supply, weather, festivals), as short plain sentences. Do not invent statistics, percentages, tonnages or named sources.
+4. Give up to 4 practical selling tips (when to sell, sorting and grading, storage, selling together with neighbours, checking prices with the upazila agriculture office or the DAM bulletin).
 
 CRITICAL REQUIREMENTS:
-- Base every price on the official bulletin figure given above. If the commodity is not in that bulletin, say so plainly and label any figure as an estimate — never present an invented number as official.
-- All prices must be strictly in BDT (Taka) and per KG (Kilogram). Convert Maunds (40kg) accurately to per KG.
-- Deliver results in structured JSON format matching the schema.
-- Language for summaries, notes, and tips: ${lang === 'bn' ? 'Bangla (সহজ ও বাস্তবমুখী বাংলা)' : 'English'}.
+- Never present an estimate as an official or live price. Never name a specific market's "today" price unless it comes from the bulletin above.
+- Do not give supermarket or online shop prices, per-market price tables, arrival volumes, margins, or distances to markets.
+- Prices in BDT per kg. Convert maunds (40 kg) to per kg.
+- Keep "insights" short: at most 5 short bullet points in markdown, simple words.
+- Language: ${lang === 'bn' ? 'Bangla (সহজ ও বাস্তবমুখী বাংলা)' : 'English'}.
 ${locationContext}`;
-      
+
       const config: any = {
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            insights: { 
-              type: Type.STRING, 
-              description: 'Executive market analysis markdown with headings, bullets, and clear trend highlights.' 
+            insights: {
+              type: Type.STRING,
+              description: 'Short plain-language market note in markdown bullets.'
             },
             wholesaleRates: {
               type: Type.OBJECT,
+              description: 'An ESTIMATED local wholesale range, not an official or live price.',
               properties: {
                 minPriceBdt: { type: Type.NUMBER },
                 maxPriceBdt: { type: Type.NUMBER },
                 avgPriceBdt: { type: Type.NUMBER },
                 unit: { type: Type.STRING },
-                primaryMarket: { type: Type.STRING },
-                trend: { type: Type.STRING }
+                trend: { type: Type.STRING },
+                isEstimate: { type: Type.BOOLEAN }
               },
-              required: ['minPriceBdt', 'maxPriceBdt', 'avgPriceBdt', 'unit', 'primaryMarket', 'trend']
-            },
-            supermarketRates: {
-              type: Type.OBJECT,
-              properties: {
-                minPriceBdt: { type: Type.NUMBER },
-                maxPriceBdt: { type: Type.NUMBER },
-                avgPriceBdt: { type: Type.NUMBER },
-                unit: { type: Type.STRING },
-                trend: { type: Type.STRING }
-              },
-              required: ['minPriceBdt', 'maxPriceBdt', 'avgPriceBdt', 'unit']
-            },
-            supermarkets: {
-              type: Type.ARRAY,
-              description: 'Prices gathered from Shwapno, Meena Bazar, Agora, Chaldal',
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  pricePerKgBdt: { type: Type.NUMBER },
-                  packagingType: { type: Type.STRING },
-                  stockStatus: { type: Type.STRING },
-                  websiteUrl: { type: Type.STRING }
-                },
-                required: ['name', 'pricePerKgBdt', 'packagingType', 'stockStatus']
-              }
-            },
-            mandiHubs: {
-              type: Type.ARRAY,
-              description: 'Mainstream wholesale mandis like Kawran Bazar, Shyambazar, Khatunganj',
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  mandiName: { type: Type.STRING },
-                  wholesalePriceBdt: { type: Type.NUMBER },
-                  arrivalVolume: { type: Type.STRING },
-                  trend: { type: Type.STRING }
-                },
-                required: ['mandiName', 'wholesalePriceBdt', 'arrivalVolume', 'trend']
-              }
-            },
-            marginSpread: {
-              type: Type.OBJECT,
-              properties: {
-                spreadPercentage: { type: Type.NUMBER },
-                middlemanMarkupEstimate: { type: Type.STRING },
-                farmerDirectOpportunity: { type: Type.STRING }
-              },
-              required: ['spreadPercentage', 'middlemanMarkupEstimate', 'farmerDirectOpportunity']
+              required: ['minPriceBdt', 'maxPriceBdt', 'avgPriceBdt', 'unit', 'trend', 'isEstimate']
             },
             priceDrivers: {
               type: Type.ARRAY,
@@ -1159,19 +1113,9 @@ ${locationContext}`;
             farmerActionTips: {
               type: Type.ARRAY,
               items: { type: Type.STRING }
-            },
-            nearestMarkets: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  distance: { type: Type.STRING }
-                }
-              }
             }
           },
-          required: ['insights', 'wholesaleRates', 'supermarketRates', 'supermarkets', 'mandiHubs', 'marginSpread', 'priceDrivers', 'farmerActionTips']
+          required: ['insights', 'wholesaleRates', 'priceDrivers', 'farmerActionTips']
         }
       };
 
@@ -1187,8 +1131,7 @@ ${locationContext}`;
         console.warn("Market analysis model failed, retrying with the standard model:", searchError);
         const fallbackPrompt = `${officialPrices}
 
-Provide realistic in-depth market intelligence for ${produce} in Bangladesh around ${today}.
-Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets (Shwapno, Meena Bazar, Agora, Chaldal). Base every price on the official bulletin figure above. Return JSON matching schema in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
+Give a short, plain market note for a smallholder farmer growing ${produce} in Bangladesh around ${today}: what the official figure above means (if listed), ONE clearly labelled estimated local wholesale range per kg (isEstimate true), up to 4 price drivers and up to 4 selling tips. No supermarket prices, per-market tables, volumes, margins or distances. Return JSON matching the schema in ${lang === 'bn' ? 'Bangla' : 'English'}.`;
 
         const fallbackResponse = await generateContent({
           contents: [{ parts: [{ text: fallbackPrompt }] }],
@@ -1205,76 +1148,6 @@ Include wholesale mandis (Kawran Bazar, Shyambazar, Khatunganj) and supermarkets
       throw error;
     }
   });
-};
-
-export interface LiveMandiItemUpdate {
-  id: string;
-  wholesalePrice: number;
-  retailPrice: number;
-  change: number;
-  trend: 'up' | 'down' | 'flat';
-  low24h: number;
-  high24h: number;
-  notes?: string;
-}
-
-/**
- * The live mandi prices, straight from the official bulletin.
- *
- * This used to ask Gemini to run a Google Search for the day's DAM bulletin.
- * The `googleSearch` tool is refused by this project's key, so the search
- * never returned anything: the ticker silently kept its prices frozen at
- * 30 September 2026, and the model — asked for prices it could not look up —
- * was free to invent them.
- *
- * The bulletin is public, so the server reads it and parses it
- * (`/api/market-prices`). No model call, no search engine, no invented
- * numbers: the low and high of the published range are the wholesale and
- * retail prices, and the bulletin's own change figure is the change.
- */
-export const fetchLiveWebMandiPrices = async (lang: string = 'bn'): Promise<{
-  items: LiveMandiItemUpdate[];
-  timestamp: string;
-  source: string;
-  sourceUrl: string;
-  stale: boolean;
-  missing: Array<{ id: string; label: string }>;
-}> => {
-  const bulletin = await fetchOfficialBulletin();
-
-  if (!bulletin) {
-    console.warn('Official bulletin unavailable; keeping the last known prices.');
-    return {
-      items: [],
-      timestamp: new Date().toISOString(),
-      source: 'dam.gov.bd Official Bulletin (unavailable)',
-      sourceUrl: 'https://market.dam.gov.bd/market_daily_price_report',
-      stale: true,
-      missing: [],
-    };
-  }
-
-  const items: LiveMandiItemUpdate[] = bulletin.prices.map((price) => ({
-    id: price.id,
-    wholesalePrice: price.low,
-    retailPrice: price.high,
-    change: price.changePct ?? 0,
-    trend: price.direction,
-    low24h: price.low,
-    high24h: price.high,
-    notes: `${price.name}: ${price.low}-${price.high} BDT/kg`,
-  }));
-
-  return {
-    items,
-    timestamp: bulletin.fetchedAt,
-    source: bulletin.stale
-      ? `${bulletin.source} (cached — the source was unreachable)`
-      : bulletin.source,
-    sourceUrl: bulletin.sourceUrl,
-    stale: bulletin.stale,
-    missing: bulletin.missing,
-  };
 };
 
 export const findGovernmentSchemes = async (

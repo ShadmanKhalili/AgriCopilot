@@ -773,5 +773,66 @@ service cloud.firestore {
       allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
       allow update: if false;
     }
+
+    // ===============================================================
+    // A farmer's saved crop plans and the costs noted against them
+    //   users/{uid}/seasons/{seasonId}
+    //   users/{uid}/seasons/{seasonId}/expenses/{expenseId}
+    //
+    // Only the farmer reads and writes them. A plan can be edited; a cost
+    // is written once and can be deleted, never edited. Numbers are
+    // bounded so a typo cannot become a crore-taka record.
+    // ===============================================================
+
+    function isNumIn(val, min, max) {
+      return val is number && val >= min && val <= max;
+    }
+
+    function isValidSeason(data) {
+      return data.keys().hasAll(['uid', 'crop', 'landSize', 'landUnit', 'expectedYieldMon', 'expectedPricePerMon', 'plannedCost', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['uid', 'crop', 'landSize', 'landUnit', 'expectedYieldMon', 'expectedPricePerMon', 'plannedCost', 'createdAt', 'updatedAt']) &&
+             data.uid == request.auth.uid &&
+             data.crop is string && data.crop.matches('^[a-z0-9_-]{1,64}$') &&
+             isNumIn(data.landSize, 0, 10000) && data.landSize > 0 &&
+             data.landUnit in ['decimal', 'bigha', 'acre', 'katha'] &&
+             isNumIn(data.expectedYieldMon, 0, 100000) &&
+             isNumIn(data.expectedPricePerMon, 0, 100000) &&
+             isNumIn(data.plannedCost, 0, 10000000) &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    match /users/{userId}/seasons/{seasonId} {
+      allow create: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(seasonId) &&
+                    isValidSeason(incoming());
+      allow update: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    existing().uid == request.auth.uid &&
+                    isValidSeason(incoming()) &&
+                    incoming().createdAt == existing().createdAt;
+      allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+
+      match /expenses/{expenseId} {
+        allow create: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      isValidId(expenseId) &&
+                      incoming().keys().hasAll(['uid', 'seasonId', 'category', 'amount', 'note', 'date', 'createdAt']) &&
+                      incoming().keys().hasOnly(['uid', 'seasonId', 'category', 'amount', 'note', 'date', 'createdAt']) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().seasonId == seasonId &&
+                      incoming().category in ['seeds', 'fertilizer', 'pesticide', 'irrigation', 'labor', 'tillage', 'transport', 'lease', 'other'] &&
+                      incoming().amount is int && incoming().amount > 0 && incoming().amount <= 10000000 &&
+                      isStr(incoming().note, 0, 200) &&
+                      isDateStr(incoming().date) &&
+                      isTimestamp(incoming().createdAt) &&
+                      exists(/databases/$(database)/documents/users/$(userId)/seasons/$(seasonId));
+        allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+        allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+        allow update: if false;
+      }
+    }
   }
 }

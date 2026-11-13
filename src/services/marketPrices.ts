@@ -171,7 +171,9 @@ export const bulletinPromptContext = (
   const lines = bulletin.prices.map(
     (price) =>
       `- ${price.name} (${price.label}): ${price.low} - ${price.high} BDT/kg${
-        price.changePct !== null ? ` (change ${price.changePct}%)` : ''
+        price.changePct !== null
+          ? ` (${price.direction === 'down' ? 'down' : price.direction === 'up' ? 'up' : 'change'} ${Math.abs(price.changePct)}% on the previous day)`
+          : ''
       }`
   );
 
@@ -188,7 +190,8 @@ export const bulletinPromptContext = (
   return [
     `OFFICIAL REFERENCE PRICES — Department of Agricultural Marketing (DAM) daily bulletin, fetched ${date}.`,
     `Source: ${bulletin.sourceUrl}`,
-    'These are the prices the government published, in BDT per kg. Use them as the base price.',
+    'These are the price ranges (lowest to highest) the government published for Dhaka markets, in BDT per kg.',
+    'They are not farm-gate prices and not a wholesale/retail split. Use them as the reference figure.',
     ...lines,
     ...(produceNote ? [produceNote] : []),
   ].join('\n');

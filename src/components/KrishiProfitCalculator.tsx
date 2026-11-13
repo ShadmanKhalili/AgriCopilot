@@ -1,259 +1,29 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Calculator, DollarSign, TrendingUp, TrendingDown, Scale, 
-  Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Copy, 
-  RotateCcw, Download, Info, ShieldCheck, PieChart, Coins,
-  Waves, Bot, Cloud, Satellite, Mic
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import {
+  DollarSign, TrendingUp, TrendingDown, Scale,
+  Sparkles, ArrowRight, Copy,
+  RotateCcw, ShieldCheck, PieChart, Coins,
+  Waves, Bot, Mic, BookmarkPlus
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { AgriCurrency } from '../utils/currency';
 import { TactileStepper } from './TactileStepper';
-import { toBn } from '../utils/banglaNum';
+import { CROP_BENCHMARKS } from '../data/cropBenchmarks';
+import { LAND_UNIT_DECIMALS, type LandUnit, type SeasonPlan } from '../utils/seasonMath';
+import { costItemsForTotal, initialBenchmarkKey, linkedBenchmarkKey, mainCropForBenchmark } from '../utils/profitPlan';
+import { fetchOfficialBulletin, type OfficialBulletin } from '../services/marketPrices';
+import { useAuth } from './AuthProvider';
+import { useAppSettings } from '../context/AppSettingsContext';
+import { useUiMode } from '../context/useUiMode';
+import Disclosure from './ui/Disclosure';
+import SimpleProfitCard from './profit/SimpleProfitCard';
+import SavedPlans from './profit/SavedPlans';
+import BulletinPriceLine from './profit/BulletinPriceLine';
+import VoiceAmountButton from './profit/VoiceAmountButton';
+import { useSeasonPlans } from './profit/useSeasonPlans';
 
-interface CropBenchmark {
-  nameBn: string;
-  nameEn: string;
-  defaultYieldPerDecimalMon: number; // Mon (40kg) per decimal (e.g. 0.6 mon/decimal = ~20 mon/bigha for boro)
-  defaultPricePerMon: number; // BDT per Mon (40kg)
-  // Standard baseline costs in BDT per 33 Decimals (1 Bigha)
-  perBighaCosts: {
-    tillage: number;
-    seeds: number;
-    fertilizer: number;
-    irrigation: number;
-    pesticide: number;
-    labor: number;
-    transport: number;
-  };
-}
-
-/**
- * Parse a spoken amount into a number. Accepts plain digits / Bangla digits and
- * common spoken Bangla forms (word-digits 0-99 combined with hajar/likkho/koti
- * multipliers). Returns null when nothing amount-like was heard.
- */
-const parseSpokenAmount = (raw: string): number | null => {
-  const t = String(raw || '').replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
-  const WORDS: Record<string, number> = {
-    'শূন্য': 0, 'ইক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4,
-    'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9,
-    'দশ': 10, 'ইগারো': 11, 'বারো': 12, 'তেরো': 13, 'চৌদ্দ': 14,
-    'পনেরো': 15, 'ষোলো': 16, 'সতেরো': 17, 'আঠারো': 18, 'ঊনিশ': 19,
-    'বিশ': 20, 'ত্রিশ': 30, 'চল্লিশ': 40, 'পঞ্চাশ': 50,
-    'ষাট': 60, 'সত্তর': 70, 'আশি': 80, 'নব্বই': 90,
-    'ইকশ': 100, 'শ': 100, 'শত': 100,
-  };
-  const MULT: Record<string, number> = {
-    'কোটি': 10000000, 'লক্ষ': 100000, 'হাজার': 1000,
-  };
-  const tokens = t.split(/[\s,]+/).filter(Boolean);
-  let total = 0;
-  let current = 0;
-  let found = false;
-  for (const tok of tokens) {
-    const w = tok.replace(/[\u0964.,]/g, '');
-    if (/^\d+(?:\.\d+)?$/.test(w)) { current += parseFloat(w); found = true; continue; }
-    // hundreds compounds like "panch sho" (500)
-    if (w.endsWith('শ') || w.endsWith('শো')) {
-      const base = w.replace(/(?:\u200b|শ|শো)$/, '');
-      if (base && base in WORDS) { current += WORDS[base] * 100; found = true; continue; }
-    }
-    if (w in WORDS) { current += WORDS[w]; found = true; continue; }
-    if (w in MULT) { total += (current === 0 ? 1 : current) * MULT[w]; current = 0; found = true; continue; }
-  }
-  return found ? Math.round(total + current) : null;
-};
-
-// Voice-first money input: tap the mic, say the amount, the row updates.
-const VoiceAmountButton: React.FC<{
-  lang: Language;
-  label: string;
-  onAmount: (amount: number) => void;
-}> = ({ lang, label, onAmount }) => {
-  const [listening, setListening] = useState(false);
-  const recRef = React.useRef<any>(null);
-
-  const startListening = () => {
-    if (listening) {
-      try { recRef.current?.stop(); } catch {}
-      setListening(false);
-      return;
-    }
-    const SRClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SRClass) {
-      toast.error(lang === 'bn' ? 'আপনার ব্রাউজারে স্পিচ রিকগনিশন সমর্থিত নয়' : 'Voice input is not supported in this browser');
-      return;
-    }
-    try {
-      const rec = new SRClass();
-      recRef.current = rec;
-      rec.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.maxAlternatives = 1;
-      rec.onstart = () => setListening(true);
-      rec.onend = () => setListening(false);
-      rec.onerror = () => setListening(false);
-      rec.onresult = (event: any) => {
-        const transcript = (event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript) || '';
-        const amount = parseSpokenAmount(transcript);
-        if (amount !== null) {
-          const clean = Math.max(0, Math.round(amount));
-          onAmount(clean);
-          const shown = '৳' + toBn(clean.toLocaleString('en-IN'));
-          toast.success(lang === 'bn' ? shown + ' সেট করা হয়েছে' : shown + ' set');
-        } else {
-          toast.error(lang === 'bn' ? 'টাকার পরিমাণ বোঝা যায়নি; আবার চেষ্টা করুন' : 'Amount not understood - try saying it again');
-        }
-      };
-      rec.start();
-    } catch {
-      setListening(false);
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={startListening}
-      aria-label={lang === 'bn' ? label + ' (মাইক)' : (label + ' - speak the amount')}
-      title={lang === 'bn' ? 'মাইক - মাইক চেপে টাকার পরিমাণ বলুন' : 'Speak the amount'}
-      className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl border transition-all active:scale-95 cursor-pointer shrink-0 ${
-        listening
-          ? 'bg-red-50 dark:bg-red-950/60 border-red-300 dark:border-red-700 text-red-600 dark:text-red-300 shadow-xs animate-pulse'
-          : 'bg-stone-50 dark:bg-stone-800/80 border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-300 hover:text-emerald-700 hover:border-emerald-300'
-      }`}
-    >
-      <Mic className="w-4 h-4" aria-hidden="true" />
-    </button>
-  );
-};
-
-
-const CROP_BENCHMARKS: Record<string, CropBenchmark> = {
-  'paddy_boro': {
-    nameBn: 'বোরো ধান (উফশী/হাইব্রিড)',
-    nameEn: 'Boro Rice (HYV/Hybrid)',
-    defaultYieldPerDecimalMon: 0.65, // ~21.5 Mon per Bigha
-    defaultPricePerMon: 1150, // ৳1,150 / Mon
-    perBighaCosts: {
-      tillage: 2200,
-      seeds: 1200,
-      fertilizer: 4800,
-      irrigation: 5500,
-      pesticide: 1800,
-      labor: 9000,
-      transport: 1200,
-    }
-  },
-  'paddy_aman': {
-    nameBn: 'রোপা আমন ধান',
-    nameEn: 'T. Aman Rice',
-    defaultYieldPerDecimalMon: 0.48, // ~16 Mon per Bigha
-    defaultPricePerMon: 1250, // ৳1,250 / Mon
-    perBighaCosts: {
-      tillage: 2000,
-      seeds: 1000,
-      fertilizer: 3600,
-      irrigation: 1800, // Rainfed mostly
-      pesticide: 1500,
-      labor: 7500,
-      transport: 1000,
-    }
-  },
-  'potato': {
-    nameBn: 'আলু (ডায়মন্ড/কার্ডিনাল)',
-    nameEn: 'Potato (Diamond/Cardinal)',
-    defaultYieldPerDecimalMon: 2.2, // ~72 Mon per Bigha (~85-90 kg/decimal)
-    defaultPricePerMon: 850, // ৳850 / Mon (৳21-22/kg)
-    perBighaCosts: {
-      tillage: 2800,
-      seeds: 16000, // Seed potato is costly
-      fertilizer: 8500,
-      irrigation: 4000,
-      pesticide: 4500, // Blight fungicides
-      labor: 11000,
-      transport: 3500,
-    }
-  },
-  'tomato': {
-    nameBn: 'টমেটো (শীতকালীন / গ্রীষ্মকালীন)',
-    nameEn: 'Tomato (Hybrid)',
-    defaultYieldPerDecimalMon: 2.5, // ~80 Mon per Bigha
-    defaultPricePerMon: 1100, // ৳1,100 / Mon
-    perBighaCosts: {
-      tillage: 2500,
-      seeds: 3500,
-      fertilizer: 6500,
-      irrigation: 3500,
-      pesticide: 5000,
-      labor: 12000,
-      transport: 3000,
-    }
-  },
-  'onion': {
-    nameBn: 'পেঁয়াজ (তাহেরপুরী / বারি)',
-    nameEn: 'Onion (Taherpuri/BARI)',
-    defaultYieldPerDecimalMon: 1.3, // ~43 Mon per Bigha
-    defaultPricePerMon: 1800, // ৳1,800 / Mon (৳45/kg)
-    perBighaCosts: {
-      tillage: 2600,
-      seeds: 5500,
-      fertilizer: 5800,
-      irrigation: 3000,
-      pesticide: 3200,
-      labor: 10500,
-      transport: 2200,
-    }
-  },
-  'brinjal': {
-    nameBn: 'বেগুন (বারি / হাইব্রিড)',
-    nameEn: 'Brinjal / Eggplant',
-    defaultYieldPerDecimalMon: 2.0, // ~66 Mon per Bigha
-    defaultPricePerMon: 1200, // ৳1,200 / Mon
-    perBighaCosts: {
-      tillage: 2200,
-      seeds: 2000,
-      fertilizer: 5500,
-      irrigation: 3500,
-      pesticide: 6000, // Fruit and shoot borer
-      labor: 11000,
-      transport: 2500,
-    }
-  },
-  'chili': {
-    nameBn: 'কাঁচা মরিচ',
-    nameEn: 'Green Chili',
-    defaultYieldPerDecimalMon: 0.9, // ~30 Mon per Bigha
-    defaultPricePerMon: 3000, // ৳3,000 / Mon (৳75/kg)
-    perBighaCosts: {
-      tillage: 2200,
-      seeds: 2500,
-      fertilizer: 5200,
-      irrigation: 3200,
-      pesticide: 4500,
-      labor: 13000, // Multiple manual pickings
-      transport: 2000,
-    }
-  },
-  'maize': {
-    nameBn: 'ভুট্টা (হাইব্রিড)',
-    nameEn: 'Hybrid Maize',
-    defaultYieldPerDecimalMon: 1.1, // ~36 Mon per Bigha
-    defaultPricePerMon: 1050, // ৳1,050 / Mon
-    perBighaCosts: {
-      tillage: 2400,
-      seeds: 3000,
-      fertilizer: 6200,
-      irrigation: 4000,
-      pesticide: 1800,
-      labor: 7500,
-      transport: 1800,
-    }
-  }
-};
 
 interface Props {
   lang: Language;
@@ -263,17 +33,40 @@ interface Props {
 }
 
 export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect, onNavigateTab }: Props) {
-  const [selectedCrop, setSelectedCrop] = useState<string>(initialCrop && CROP_BENCHMARKS[initialCrop] ? initialCrop : 'paddy_boro');
-  const [landUnit, setLandUnit] = useState<'decimal' | 'bigha' | 'acre' | 'katha'>('bigha');
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+  const { mainCrop } = useAppSettings();
+  const simple = useUiMode() === 'simple';
+  const { plans, loaded, openPlan, setOpenId, save, remove } = useSeasonPlans(uid, lang);
+  /** The saved plan whose numbers are in the calculator, so saving updates it. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+
+  // The government price is shown next to the farmer's own price, for reference.
+  const [bulletin, setBulletin] = useState<OfficialBulletin | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchOfficialBulletin().then((result) => { if (alive) setBulletin(result); });
+    return () => { alive = false; };
+  }, []);
+
+  const [selectedCrop, setSelectedCrop] = useState<string>(() => initialBenchmarkKey(initialCrop, mainCrop));
+  const [landUnit, setLandUnit] = useState<LandUnit>('bigha');
   const [landSize, setLandSize] = useState<number>(1); // 1 Bigha default
 
-  // Synchronize when initialCrop changes externally
+  // Another screen (for example Market) can send the farmer here with a crop.
+  // Only a real change of that crop counts, not the first render.
+  const lastInitialCrop = useRef(initialCrop);
   useEffect(() => {
-    if (initialCrop && CROP_BENCHMARKS[initialCrop]) {
-      setSelectedCrop(initialCrop);
+    if (lastInitialCrop.current === initialCrop) return;
+    lastInitialCrop.current = initialCrop;
+    const next = linkedBenchmarkKey(initialCrop);
+    if (next && next !== selectedCrop) {
+      setSelectedCrop(next);
       setCustomCosts({});
       setCustomYieldMon(null);
       setCustomPricePerMon(null);
+      setEditingId(null);
     }
   }, [initialCrop]);
 
@@ -323,6 +116,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
     setCustomCosts({});
     setCustomYieldMon(null);
     setCustomPricePerMon(null);
+    setEditingId(null);
     onCropSelect?.(cropKey);
   };
 
@@ -377,7 +171,50 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
     setCustomCosts({});
     setCustomYieldMon(null);
     setCustomPricePerMon(null);
-    toast.success(lang === 'bn' ? 'আদর্শ খরচে পুনর্বহাল করা হয়েছে' : 'Reset to regional benchmarks');
+    toast.success(lang === 'bn' ? 'সাধারণ হিসাবে ফেরানো হয়েছে' : 'Reset to typical figures');
+  };
+
+  const savePlan = () => {
+    const existing = editingId ? plans.find((plan) => plan.id === editingId) ?? null : null;
+    const item = save(
+      {
+        crop: selectedCrop,
+        landSize,
+        landUnit,
+        expectedYieldMon: totalYieldMon,
+        expectedPricePerMon: pricePerMon,
+        plannedCost: totalCost,
+      },
+      existing
+    );
+    if (!item) return;
+    setEditingId(item.id);
+    toast.success(
+      existing
+        ? (lang === 'bn' ? 'বদল রাখা হয়েছে' : 'Changes saved')
+        : (lang === 'bn' ? 'হিসাব রাখা হয়েছে। নিচে খরচ লিখে রাখতে পারবেন।' : 'Plan saved. You can note your costs below.')
+    );
+  };
+
+  /** Put a saved plan's numbers back into the calculator. */
+  const editPlan = (plan: SeasonPlan) => {
+    const key = CROP_BENCHMARKS[plan.crop] ? plan.crop : selectedCrop;
+    const ratio = (plan.landSize * LAND_UNIT_DECIMALS[plan.landUnit]) / 33;
+    setSelectedCrop(key);
+    onCropSelect?.(key);
+    setLandSize(plan.landSize);
+    setLandUnit(plan.landUnit);
+    setCustomCosts(costItemsForTotal(CROP_BENCHMARKS[key], ratio, plan.plannedCost));
+    setCustomYieldMon(plan.expectedYieldMon);
+    setCustomPricePerMon(plan.expectedPricePerMon);
+    setEditingId(plan.id);
+    topRef.current?.scrollIntoView({ block: 'start' });
+    toast.success(lang === 'bn' ? 'হিসাবটি উপরে খোলা হয়েছে। বদলে আবার রাখুন।' : 'The plan is open above. Change it and save again.');
+  };
+
+  const deletePlan = (plan: SeasonPlan) => {
+    if (editingId === plan.id) setEditingId(null);
+    remove(plan);
   };
 
   const copySummarySlip = () => {
@@ -391,7 +228,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
 ${tenureNote}
 💰 মোট উৎপাদন খরচ: ৳${totalCost.toLocaleString()} টাকা
 ⚖️ প্রতি মণ উৎপাদন খরচ (ব্রেক-ইভেন): ৳${breakEvenCostPerMon.toLocaleString()} / মণ (৳${breakEvenCostPerKg}/কেজি)
-📦 আনুমানিক মোট ফলন: ${totalYieldMon} মণ (${Math.round(totalYieldMon * 40)} কেজি, ১৪% আর্দ্রতা মান)
+📦 আনুমানিক মোট ফলন: ${totalYieldMon} মণ (${Math.round(totalYieldMon * 40)} কেজি)
 💵 প্রত্যাশিত বিক্রয়মূল্য: ৳${pricePerMon.toLocaleString()} / মণ
 📈 নিট লাভ / ক্ষতি: ৳${netProfit.toLocaleString()} টাকা (ROI: ${roiPercentage}%)
 💡 পরামর্শ: ফরিয়াদের কাছে ৳${breakEvenCostPerMon} টাকার নিচে বিক্রি করবেন না।`
@@ -400,7 +237,7 @@ ${tenureNote}
 ${tenureNote}
 💰 Total Production Cost: ৳${totalCost.toLocaleString()} BDT
 ⚖️ Break-Even Cost per Mon: ৳${breakEvenCostPerMon.toLocaleString()} / Mon (৳${breakEvenCostPerKg}/kg)
-📦 Estimated Harvest: ${totalYieldMon} Mon (${Math.round(totalYieldMon * 40)} kg, 14% Moisture Standard)
+📦 Estimated Harvest: ${totalYieldMon} Mon (${Math.round(totalYieldMon * 40)} kg)
 💵 Selling Market Price: ৳${pricePerMon.toLocaleString()} / Mon
 📈 Net Profit / Loss: ৳${netProfit.toLocaleString()} BDT (ROI: ${roiPercentage}%)
 💡 Farmer Advisory: Do not sell to intermediaries below ৳${breakEvenCostPerMon}/Mon.`;
@@ -409,8 +246,8 @@ ${tenureNote}
     toast.success(lang === 'bn' ? 'হিসাব কপি করা হয়েছে!' : 'Profit statement copied!');
   };
 
-  return (
-    <div className="w-full max-w-6xl mx-auto space-y-6">
+  const banner = (
+    <>
       {/* Top Banner */}
       <div className="bg-emerald-950 dark:bg-stone-900 rounded-2xl p-5 md:p-7 text-white relative overflow-hidden border border-emerald-900 dark:border-stone-800 shadow-xs">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
@@ -424,8 +261,8 @@ ${tenureNote}
             </h1>
             <p className="text-emerald-200/80 text-xs md:text-sm max-w-2xl leading-relaxed">
               {lang === 'bn' 
-                ? 'চাষ শুরুর আগেই জানুন প্রতি মণ ফসলে আপনার প্রকৃত খরচ কত হবে। মধ্যস্বত্বভোগী বা ফড়িয়াদের কাছে লোকসানে বিক্রি থেকে বাঁচুন।'
-                : 'Calculate exact per-maund production cost, projected revenue, and break-even price to negotiate profitably with traders.'}
+                ? 'চাষ শুরুর আগেই হিসাব করুন প্রতি মণ ফসলে আপনার খরচ কত হতে পারে, যাতে লোকসানে বিক্রি না করতে হয়। খরচ ও ফলন সাধারণ হিসাব; নিজের সংখ্যা বসিয়ে নিন।'
+                : 'Work out your cost per mon, expected income and the lowest price you can sell at without a loss. Costs and yield start as typical figures; replace them with your own.'}
             </p>
           </div>
 
@@ -448,6 +285,12 @@ ${tenureNote}
         </div>
       </div>
 
+    </>
+  );
+
+  // The full editor: the farmer's own yield, price and each cost.
+  const editor = (
+    <div className="space-y-6">
       {/* Control Panel: Crop & Land Size */}
       <div className="bg-white dark:bg-stone-900 rounded-2xl p-5 md:p-6 border border-stone-200/80 dark:border-stone-800 shadow-xs space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -544,7 +387,7 @@ ${tenureNote}
               />
             </div>
             <div className="flex items-center justify-between text-[11px] text-stone-400">
-              <span>{lang === 'bn' ? 'আঞ্চলিক গড় অনুযায়ী প্রাক্কলিত' : 'Regional average projection'}</span>
+              <span>{lang === 'bn' ? 'সাধারণ ফলন; নিজের ফলন দিন' : 'Typical yield; enter your own'}</span>
               <span className="font-mono tabular-nums font-medium text-stone-600 dark:text-stone-300">
                 ≈ {Math.round(totalYieldMon * 40).toLocaleString()} kg
               </span>
@@ -563,7 +406,7 @@ ${tenureNote}
                 {lang === 'bn' ? 'প্রত্যাশিত বাজারদর (প্রতি মণ ৪০ কেজি)' : 'Expected Market Price (per Mon / 40kg)'}
               </h2>
               <p className="text-[11px] text-stone-500 dark:text-stone-400">
-                {lang === 'bn' ? 'আজকের বাজারদরে পরিবর্তন করতে পারেন' : 'Adjust according to current wholesale rate'}
+                {lang === 'bn' ? 'আপনি যে দাম পাবেন বলে মনে করেন তা দিন' : 'Enter the price you expect to get'}
               </p>
             </div>
           </div>
@@ -579,6 +422,7 @@ ${tenureNote}
             />
           </div>
         </div>
+        {!simple && <BulletinPriceLine lang={lang} cropKey={selectedCrop} bulletin={bulletin} />}
       </div>
 
       {/* KPI Financial Overview Cards */}
@@ -673,7 +517,7 @@ ${tenureNote}
               {lang === 'bn' ? 'উৎপাদন খরচের খতিয়ান (সম্পাদনাযোগ্য)' : 'Production Expense Ledger (Editable)'}
             </h3>
             <p className="text-xs text-stone-500 dark:text-stone-400">
-              {lang === 'bn' ? 'আঞ্চলিক গড় খরচের খসড়া; আপনার ভাউচার অনুযায়ী টাকার পরিমাণ পরিবর্তন করুন।' : 'Pre-filled with regional averages; click to update based on your vouchers.'}
+              {lang === 'bn' ? 'সাধারণ খরচ বসানো আছে; আপনার নিজের খরচ অনুযায়ী বদলে নিন।' : 'Filled with typical costs; change each one to what you actually spend.'}
             </p>
             <p className="text-[11px] text-emerald-700/90 dark:text-emerald-400/90 font-medium mt-1 flex items-center gap-1">
               <Mic className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -797,13 +641,75 @@ ${tenureNote}
         </div>
         <p className="text-sm text-amber-950 leading-relaxed font-medium">
           {lang === 'bn'
-            ? `আপনার প্রতি মণ ${currentBenchmark.nameBn} উৎপাদনে প্রকৃত খরচ হচ্ছে ৳${breakEvenCostPerMon} টাকা (৳${breakEvenCostPerKg}/কেজি)। এই খরচের হিসাবে স্থানীয় ফড়িয়া বা পাইকাররা এর চেয়ে কম দাম অফার করলে আপনার লোকসান হবে। বিক্রির আগে নিকটস্থ আড়তের দর জেনে নিন।`
-            : `Your net cost to produce 1 Mon of ${currentBenchmark.nameEn} is ৳${breakEvenCostPerMon} BDT (৳${breakEvenCostPerKg}/kg). Reject any local middleman offer lower than this threshold to protect your baseline investment.`}
+            ? `আপনার প্রতি মণ ${currentBenchmark.nameBn} উৎপাদনে এই হিসাব অনুযায়ী খরচ ৳${breakEvenCostPerMon} টাকা (৳${breakEvenCostPerKg}/কেজি)। এই খরচের হিসাবে স্থানীয় ফড়িয়া বা পাইকাররা এর চেয়ে কম দাম অফার করলে আপনার লোকসান হবে। বিক্রির আগে নিকটস্থ আড়তের দর জেনে নিন।`
+            : `By this estimate, your cost to produce 1 Mon of ${currentBenchmark.nameEn} is ৳${breakEvenCostPerMon} BDT (৳${breakEvenCostPerKg}/kg). Reject any local middleman offer lower than this threshold to protect your baseline investment.`}
         </p>
       </div>
 
+    </div>
+  );
+
+  return (
+    <div ref={topRef} className={`w-full mx-auto space-y-6 scroll-mt-24 ${simple ? 'max-w-2xl' : 'max-w-6xl'}`}>
+      {simple ? (
+        <SimpleProfitCard
+          lang={lang}
+          cropKey={selectedCrop}
+          onCropChange={handleCropChange}
+          landSize={landSize}
+          landUnit={landUnit}
+          onLandChange={changeLand}
+          pricePerMon={pricePerMon}
+          onPriceChange={setCustomPricePerMon}
+          totalCost={totalCost}
+          yieldMon={totalYieldMon}
+          bulletin={bulletin}
+          onSave={savePlan}
+          editing={editingId !== null}
+        />
+      ) : (
+        <>
+          {banner}
+          {editor}
+          <div className="bg-white dark:bg-stone-900 rounded-2xl p-4 sm:p-5 border border-stone-200/80 dark:border-stone-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm text-stone-700 dark:text-stone-300">
+              {lang === 'bn'
+                ? 'হিসাবটি রেখে দিন, তারপর মৌসুমজুড়ে আসল খরচ লিখে রাখুন।'
+                : 'Save this plan, then note your real costs through the season.'}
+            </p>
+            <button
+              type="button"
+              onClick={savePlan}
+              className="min-h-[48px] px-5 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-base font-bold cursor-pointer shrink-0"
+            >
+              <BookmarkPlus className="w-5 h-5" aria-hidden="true" />
+              {editingId !== null
+                ? (lang === 'bn' ? 'বদল রাখুন' : 'Save changes')
+                : (lang === 'bn' ? 'হিসাব রাখুন' : 'Save this plan')}
+            </button>
+          </div>
+        </>
+      )}
+
+      <SavedPlans
+        lang={lang}
+        uid={uid}
+        plans={plans}
+        loaded={loaded}
+        openPlan={openPlan}
+        onToggle={(plan) => setOpenId(openPlan?.id === plan.id ? null : plan.id)}
+        onEdit={editPlan}
+        onDelete={deletePlan}
+      />
+
+      {simple && (
+        <Disclosure label={lang === 'bn' ? 'আরও বিস্তারিত: নিজের খরচ ও ফলন দিন' : 'More details: enter your own costs and yield'}>
+          {editor}
+        </Disclosure>
+      )}
+
       {/* Cross-Module Linked Agri-Tools Navigation */}
-      {onNavigateTab && (
+      {!simple && onNavigateTab && (
         <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-teal-950 rounded-[2.2rem] p-6 text-white shadow-xl border border-emerald-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2.5">
@@ -825,7 +731,7 @@ ${tenureNote}
             {/* 1. Market Connect */}
             <button
               type="button"
-              onClick={() => onNavigateTab('market-connect', { produce: selectedCrop.replace('paddy_boro', 'paddy').replace('paddy_aman', 'paddy') })}
+              onClick={() => onNavigateTab('market-connect', { produce: mainCropForBenchmark(selectedCrop) })}
               className="flex items-center space-x-3 p-3.5 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
             >
               <div className="p-2.5 bg-amber-400 text-amber-950 rounded-xl group-hover:scale-105 transition-transform shrink-0">
@@ -833,11 +739,11 @@ ${tenureNote}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-black text-xs text-white leading-tight flex items-center justify-between">
-                  <span>{lang === 'bn' ? 'পাইকারি বাজারদর দেখুন' : 'Wholesale prices'}</span>
+                  <span>{lang === 'bn' ? 'আজকের বাজারদর' : 'Market prices'}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="text-[11px] text-amber-200 mt-0.5 truncate font-medium">
-                  {lang === 'bn' ? 'শ্যামবাজার ও আড়তের দর' : 'Check wholesale trends'}
+                  {lang === 'bn' ? 'সরকারি দামের তালিকা' : 'Government price list'}
                 </div>
               </div>
             </button>
@@ -845,7 +751,7 @@ ${tenureNote}
             {/* 2. Agri Copilot */}
             <button
               type="button"
-              onClick={() => onNavigateTab('agri-copilot', { crop: selectedCrop.replace('paddy_boro', 'paddy').replace('paddy_aman', 'paddy') })}
+              onClick={() => onNavigateTab('agri-copilot', { crop: mainCropForBenchmark(selectedCrop) })}
               className="flex items-center space-x-3 p-3.5 bg-white/10 hover:bg-white/20 active:scale-95 border border-white/15 rounded-2xl text-left transition-all group min-h-[48px] cursor-pointer"
             >
               <div className="p-2.5 bg-emerald-400 text-emerald-950 rounded-xl group-hover:scale-105 transition-transform shrink-0">
