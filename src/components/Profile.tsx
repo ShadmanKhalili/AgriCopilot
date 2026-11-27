@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import Tooltip from './Tooltip';
 import LegalModal from './LegalModal';
 import FarmerDossier from './FarmerDossier';
+import NotificationSettings from './NotificationSettings';
 import { DataStatusCard } from './DataStatusCard';
 import { auth, needsEmailVerification, resendVerificationEmail } from '../firebase';
 
@@ -220,6 +221,8 @@ export default function Profile({ lang, onUpgrade }: Props) {
         <ChevronRight className="w-4 h-4 text-slate-400" />
       </button>
       <LegalModal isOpen={isLegalOpen} onClose={() => setIsLegalOpen(false)} lang={lang} />
+
+      <NotificationSettings lang={lang} />
 
       {viewMode === 'dossier' ? (
         <FarmerDossier lang={lang} />

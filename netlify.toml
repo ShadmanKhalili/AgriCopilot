@@ -51,6 +51,17 @@
     window_size = 60
     aggregate_by = ["ip", "domain"]
 
+# Anonymous area reports. Each call writes to the database, so it is capped
+# like the live-token route.
+[[redirects]]
+  from = "/api/area-report"
+  to = "/.netlify/functions/area-report"
+  status = 200
+  [redirects.rate_limit]
+    window_limit = 30
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
 [[redirects]]
   from = "/api/weather-next"
   to = "/.netlify/functions/weathernext-3"

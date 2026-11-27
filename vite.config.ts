@@ -86,6 +86,8 @@ export default defineConfig(({mode}) => {
           // chunks.
           navigateFallback: null,
           cleanupOutdatedCaches: true,
+          // Phone notifications (push and tap handlers) live in public/push-sw.js.
+          importScripts: ['push-sw.js'],
           runtimeCaching: [
             {
               // App-shell navigations: always prefer the fresh HTML from the

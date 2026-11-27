@@ -31,6 +31,7 @@ import { buildLocationContext, describePlace } from '../utils/farmerContext';
 import { useUiMode } from '../context/useUiMode';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { diseaseKeyFor } from '../utils/diseaseKey';
+import { sendAreaReport } from '../services/areaReports';
 import { addFollowUpTask } from '../services/farmTasks';
 import Disclosure from './ui/Disclosure';
 import { speakWithBrowser } from '../utils/speech';
@@ -1476,6 +1477,16 @@ export default function AgriCopilot({
             ...(diseaseKey ? { diseaseKey } : {}),
           });
           setLastDiagnosisId(diagDoc.id);
+          // Tell the area, without a name, that a farmer here saw this problem. Never blocks.
+          if (diseaseKey && savedPlace?.district && savedPlace.upazila) {
+            void sendAreaReport({
+              kind: 'problem',
+              district: savedPlace.district,
+              upazila: savedPlace.upazila,
+              crop: diseaseKey.split(':')[0],
+              diseaseKey,
+            });
+          }
         } catch (error) {
           // A failed history write must never destroy the answer. The farmer
           // has already been given a diagnosis; losing it because a

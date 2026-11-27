@@ -6,9 +6,98 @@ import { db } from '../firestore';
 import { translations, Language } from '../utils/translations';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { useAuth } from './AuthProvider';
+import { useAreaWarnings } from '../hooks/useAreaWarnings';
+import { notConfirmedNote, shortDay, warningSentence, warningSpeech } from '../utils/areaWarningText';
+import { AREA_MIN_FARMERS, AREA_WINDOW_DAYS } from '../../netlify/functions/_shared/area-model';
+import toBn from '../utils/banglaNum';
+import ListenButton from './ui/ListenButton';
 
 interface Props {
   lang: Language;
+  /** Opens the area picker. Without it the "Set your area" prompt is text only. */
+  onSetArea?: () => void;
+}
+
+/** Crop problems that 3 or more different farmers in the farmer's own upazila reported lately. */
+function MyAreaSection({ lang, onSetArea }: Props) {
+  const bn = lang === 'bn';
+  const { state, wordsFor, signedIn, upazila } = useAreaWarnings(lang, { broadcasts: false });
+  const min = bn ? toBn(AREA_MIN_FARMERS) : String(AREA_MIN_FARMERS);
+  const days = bn ? toBn(AREA_WINDOW_DAYS) : String(AREA_WINDOW_DAYS);
+
+  return (
+    <section
+      aria-label={bn ? 'আমার এলাকা' : 'My area'}
+      className="bg-amber-50 border border-amber-300 rounded-2xl md:rounded-3xl p-4 sm:p-5 space-y-3"
+    >
+      <h3 className="flex items-center gap-2 text-lg font-bold text-stone-900">
+        <MapPin className="w-6 h-6 text-amber-700 shrink-0" aria-hidden="true" />
+        <span>{bn ? 'আমার এলাকা' : 'My area'}</span>
+      </h3>
+
+      {!signedIn ? (
+        <p className="text-base text-stone-800">
+          {bn
+            ? 'অ্যাকাউন্টে ঢুকলে কাছের কৃষকদের জানানো ফসলের সমস্যা এখানে দেখতে পাবেন।'
+            : 'Sign in to see crop problems that farmers near you reported.'}
+        </p>
+      ) : !upazila ? (
+        <div className="space-y-3">
+          <p className="text-base text-stone-800">
+            {bn ? 'আপনার উপজেলা ঠিক করুন, তাহলে কাছের কৃষকদের জানানো সমস্যা দেখাতে পারব।' : 'Set your area so we can show problems that farmers near you reported.'}
+          </p>
+          {onSetArea && (
+            <button
+              type="button"
+              onClick={onSetArea}
+              className="w-full min-h-[56px] rounded-2xl bg-emerald-700 text-white text-lg font-bold active:scale-[0.98] transition-transform"
+            >
+              {bn ? 'এলাকা বেছে নিন' : 'Set your area'}
+            </button>
+          )}
+        </div>
+      ) : state.status !== 'ready' ? (
+        <p className="flex items-center gap-2 text-base text-stone-700" role="status">
+          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+          <span>{bn ? 'আপনার এলাকার তথ্য আনা হচ্ছে...' : 'Loading your area...'}</span>
+        </p>
+      ) : state.warnings.length === 0 ? (
+        <p className="text-base font-bold text-stone-800">
+          {bn ? `কাছের ${min} জন বা বেশি কৃষক কোনো সমস্যা জানাননি` : 'No problems reported by 3+ farmers near you'}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {state.warnings.map((warning) => {
+            const words = wordsFor(warning);
+            return (
+              <li key={`${warning.crop}__${warning.diseaseKey}`} className="rounded-2xl border border-amber-200 bg-white p-3 space-y-1">
+                <p className="text-base font-bold text-stone-900 leading-snug">{warningSentence(words, lang)}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm text-stone-700">
+                    {bn
+                      ? `${toBn(warning.farmers)} জন কৃষক, শেষ খবর ${shortDay(warning.lastDay, 'bn')}`
+                      : `${warning.farmers} farmers, last report ${shortDay(warning.lastDay, 'en')}`}
+                  </p>
+                  <ListenButton text={warningSpeech(words, lang)} lang={lang} variant="icon" />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {upazila && (
+        <div className="space-y-1">
+          <p className="text-sm text-stone-700">{notConfirmedNote(lang)}</p>
+          <p className="text-sm text-stone-700">
+            {bn
+              ? `${min} জন বা বেশি আলাদা কৃষক ${days} দিনের মধ্যে একই সমস্যা জানালে তবেই এখানে দেখানো হয়। কারও নাম কখনো জানানো হয় না।`
+              : `Shown only when ${min} or more different farmers report the same problem within ${days} days. Names are never shared.`}
+          </p>
+        </div>
+      )}
+    </section>
+  );
 }
 
 interface Alert {
@@ -20,7 +109,7 @@ interface Alert {
   diagnosisText: string;
 }
 
-export default function CommunityRadar({ lang }: Props) {
+export default function CommunityRadar({ lang, onSetArea }: Props) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const t = translations[lang];
@@ -100,6 +189,8 @@ export default function CommunityRadar({ lang }: Props) {
         </div>
       </div>
 
+      <MyAreaSection lang={lang} onSetArea={onSetArea} />
+
       <div className="bg-red-50/70 border border-red-200/70 rounded-2xl md:rounded-3xl p-3.5 sm:p-5 flex items-start space-x-3 sm:space-x-4 mb-4 sm:mb-6">
         <div className="p-2 bg-red-100 rounded-xl text-red-600 shrink-0">
           <ShieldAlert className="w-5 h-5 text-red-600" />
@@ -110,8 +201,8 @@ export default function CommunityRadar({ lang }: Props) {
           </h3>
           <p className="text-xs sm:text-sm text-red-800/80 font-medium leading-relaxed">
             {lang === 'bn' 
-              ? 'এখানে আপনার নিজের ছবি পরীক্ষায় পাওয়া মাঝারি ও গুরুতর রোগ-বালাই দেখানো হচ্ছে। এলাকার অন্য কৃষকদের তথ্য এখনো এখানে যুক্ত হয়নি।' 
-              : 'This shows the moderate and severe problems found in your own photo checks. Reports from other farmers in your area are not included yet.'}
+              ? 'এখানে আপনার নিজের ছবি পরীক্ষায় পাওয়া মাঝারি ও গুরুতর রোগ-বালাই দেখানো হচ্ছে।' 
+              : 'This shows the moderate and severe problems found in your own photo checks.'}
           </p>
         </div>
       </div>
