@@ -23,6 +23,9 @@ export const handler: Handler = async (event) => {
     process.env.MAPS_API_KEY
   );
 
+  const areaReportsConfigured = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const pushConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+
   return {
     statusCode: 200,
     headers: {
@@ -32,6 +35,8 @@ export const handler: Handler = async (event) => {
     body: JSON.stringify({
       googleMapsConfigured,
       weatherNextConfigured,
+      areaReportsConfigured,
+      pushConfigured,
       activeProviders: {
         weatherNext: weatherNextConfigured ? 'Google Maps Platform Weather API (live)' : 'Open-Meteo agro-forecast ensemble',
         googleMaps: googleMapsConfigured ? 'Google Maps Platform (Authenticated)' : 'Standard Web Maps'

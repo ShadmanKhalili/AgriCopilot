@@ -16,6 +16,7 @@ import { maxOutputTokensFromEnv, sanitizeGenerationConfig, findUnsupportedConten
 import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
 import { farmActionsFromFeed, isSafeSprayHour } from "./netlify/functions/_shared/farm-actions.ts";
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./netlify/functions/_shared/daily-merge.ts";
+import areaReportHandler from "./netlify/functions/area-report.ts";
 import {
   getFreshMarketBulletin,
   getStaleMarketBulletin,
@@ -229,9 +230,13 @@ async function startServer() {
       process.env.VITE_GOOGLE_MAPS_API_KEY ||
       process.env.MAPS_API_KEY
     );
+    const areaReportsConfigured = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT);
+    const pushConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
     res.json({
       googleMapsConfigured,
       weatherNextConfigured,
+      areaReportsConfigured,
+      pushConfigured,
       activeProviders: {
         weatherNext: weatherNextConfigured ? "Google Maps Platform Weather API (live)" : "Open-Meteo agro-forecast ensemble",
         googleMaps: googleMapsConfigured ? "Google Maps Platform (Authenticated)" : "Standard Web Maps"
@@ -393,6 +398,26 @@ async function startServer() {
         isSuspended,
         isKeyError
       });
+    }
+  });
+
+  // Anonymous area reports (warnings and local prices). Same handler as the
+  // Netlify function: build a Request from the Express one and call it.
+  app.post("/api/area-report", async (req, res) => {
+    try {
+      const response = await areaReportHandler(
+        new Request("http://localhost/api/area-report", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(req.headers.authorization ? { Authorization: String(req.headers.authorization) } : {}),
+          },
+          body: JSON.stringify(req.body ?? null),
+        })
+      );
+      res.status(response.status).type("application/json").send(await response.text());
+    } catch {
+      res.status(500).json({ error: "area_report_failed" });
     }
   });
 

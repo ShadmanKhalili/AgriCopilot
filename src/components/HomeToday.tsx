@@ -13,6 +13,7 @@ import BigActionButton from './ui/BigActionButton';
 import Card from './ui/Card';
 import ListenButton from './ui/ListenButton';
 import HomeCalendarTasks from './HomeCalendarTasks';
+import AreaWarningStrip from './home/AreaWarningStrip';
 import SignalList from './weather/SignalList';
 import { useAuth } from './AuthProvider';
 import { dhakaDateString, isTaskDue } from '../utils/farmTaskDates';
@@ -150,6 +151,8 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
           </div>
         )}
       </Card>
+
+      <AreaWarningStrip lang={lang} onNavigate={onNavigate} />
 
       {tasks.length > 0 && (
         <Card>

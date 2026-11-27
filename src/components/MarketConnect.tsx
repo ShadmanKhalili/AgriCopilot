@@ -25,6 +25,9 @@ import toBn from '../utils/banglaNum';
 import Disclosure from './ui/Disclosure';
 import BigActionButton from './ui/BigActionButton';
 import OfficialPriceCard from './market/OfficialPriceCard';
+import LocalPriceCard from './market/LocalPriceCard';
+import ReportPriceForm from './market/ReportPriceForm';
+import { localPriceCrop } from '../utils/localPriceCrops';
 
 const PRODUCE_TYPES = ['tomato', 'brinjal', 'paddy', 'betelLeaf', 'chili', 'watermelon', 'potato', 'onion'];
 
@@ -115,6 +118,11 @@ export default function MarketConnect({
   }, [loadBulletin]);
 
   const cropName = (key: string) => t.crops[key as keyof typeof t.crops] || key;
+
+  // Prices farmers near here say they got: read, and reported, per crop.
+  const reportCrop = localPriceCrop(produce);
+  const [localPriceRefresh, setLocalPriceRefresh] = useState(0);
+  const bumpLocalPrice = useCallback(() => setLocalPriceRefresh((n) => n + 1), []);
 
   // Sync with globalLocation if changed from outside
   useEffect(() => {
@@ -343,6 +351,13 @@ export default function MarketConnect({
     />
   );
 
+  const localPriceCards = reportCrop && (
+    <>
+      <LocalPriceCard lang={lang} crop={reportCrop} cropName={cropName(produce)} refreshKey={localPriceRefresh} />
+      <ReportPriceForm key={reportCrop} lang={lang} crop={reportCrop} cropName={cropName(produce)} onSent={bumpLocalPrice} />
+    </>
+  );
+
   const actionButtons = onNavigateTab && (
     <div className="grid grid-cols-2 gap-3">
       <BigActionButton
@@ -496,6 +511,7 @@ export default function MarketConnect({
         </h1>
         {cropPicker}
         {priceCard}
+        {localPriceCards}
         {actionButtons}
         <Disclosure label={bn ? 'এআই-এর বাজার মন্তব্য (অনুমান)' : 'AI market note (estimate)'} keepMounted>
           <div className="space-y-3">

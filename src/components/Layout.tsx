@@ -1324,7 +1324,7 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="community-radar" active={activeTab === 'community-radar'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} />}
+                      {visitedTabs.has('community-radar') && <CommunityRadar lang={lang} onSetArea={() => setIsRegionModalOpen(true)} />}
                       </ErrorBoundary>
                     </TabPanel>
                     <TabPanel id="gov-schemes" active={activeTab === 'gov-schemes'}>

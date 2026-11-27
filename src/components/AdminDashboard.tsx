@@ -81,12 +81,25 @@ import {
 import { toPng } from 'html-to-image';
 import toast from 'react-hot-toast';
 import { geoData } from '../utils/geoData';
+import { slug } from '../../netlify/functions/_shared/area-model';
 import { Language } from '../utils/translations';
 import { confidenceLabel, confidenceValue } from '../utils/diagnosisTypes';
 import DigitalPrescriptionModal from './DigitalPrescriptionModal';
 import { buildPrescriptionFromRecord, type PrescriptionData } from '../utils/prescriptionData';
 import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
 import { useAuth } from './AuthProvider';
+import {
+  BROADCAST_MAX_DAYS,
+  BROADCAST_MAX_LENGTH,
+  buildBroadcast,
+  createBroadcast,
+  deleteBroadcast,
+  expiryForDays,
+  isExpired,
+  listRecentBroadcasts,
+  type BroadcastError,
+  type StoredBroadcastRow,
+} from '../services/broadcasts';
 
 interface Stats {
   totalUsers: number;
@@ -224,10 +237,18 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   const [rxStatusFilter, setRxStatusFilter] = useState<'all' | 'verified' | 'pending'>('all');
 
   // Emergency Advisory Broadcast Simulator & Geo Radar
-  const [broadcastDistrict, setBroadcastDistrict] = useState('Bogura');
-  const [broadcastDisease, setBroadcastDisease] = useState('Bacterial Leaf Blight');
-  const [broadcastMessage, setBroadcastMessage] = useState('');
+  // Emergency broadcast form (Phase 6): 'all' or a district name from geoData.
+  const [broadcastDistrict, setBroadcastDistrict] = useState('all');
+  const [broadcastMessage, setBroadcastMessage] = useState(''); // English
+  const [broadcastMessageBn, setBroadcastMessageBn] = useState('');
+  const [broadcastSeverity, setBroadcastSeverity] = useState<'info' | 'warning'>('warning');
+  const [broadcastDays, setBroadcastDays] = useState(3);
+  const [broadcastConfirming, setBroadcastConfirming] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastNotice, setBroadcastNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [recentBroadcasts, setRecentBroadcasts] = useState<StoredBroadcastRow[] | null>(null);
+  const [broadcastListFailed, setBroadcastListFailed] = useState(false);
+  const [deletingBroadcastId, setDeletingBroadcastId] = useState<string | null>(null);
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
 
   // Real-time Telemetry & Edge Status
@@ -447,15 +468,87 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
     }
   };
 
-  // Dispatch Emergency Advisory Broadcast
+  // Emergency broadcast: shown in the app to signed-in farmers (no phone notification).
+  const broadcastErrorText = (error: BroadcastError | 'failed' | 'permission_denied'): string => {
+    const bn = lang === 'bn';
+    switch (error) {
+      case 'message_bn_empty': return bn ? 'বাংলা বার্তা লিখুন' : 'Write the message in Bangla';
+      case 'message_en_empty': return bn ? 'ইংরেজি বার্তা লিখুন' : 'Write the message in English';
+      case 'message_bn_too_long':
+      case 'message_en_too_long': return bn ? `বার্তা সর্বোচ্চ ${BROADCAST_MAX_LENGTH} অক্ষরের হতে পারে` : `A message can be at most ${BROADCAST_MAX_LENGTH} characters`;
+      case 'district_invalid': return bn ? 'জেলা বেছে নিন' : 'Choose a district';
+      case 'expiry_invalid':
+      case 'expiry_out_of_range': return bn ? `দিন ১ থেকে ${BROADCAST_MAX_DAYS}-এর মধ্যে হতে হবে` : `Days must be from 1 to ${BROADCAST_MAX_DAYS}`;
+      case 'signed_out': return bn ? 'আবার সাইন ইন করুন' : 'Please sign in again';
+      case 'permission_denied': return bn ? 'অনুমতি নেই: শুধু অ্যাডমিন বার্তা পাঠাতে পারেন' : 'Permission denied: only an admin can send broadcasts';
+      default: return bn ? 'পাঠানো যায়নি। সংযোগ দেখে আবার চেষ্টা করুন' : 'Could not send. Check the connection and try again';
+    }
+  };
+
+  const broadcastFormInput = () => ({
+    messageBn: broadcastMessageBn,
+    messageEn: broadcastMessage,
+    district: broadcastDistrict,
+    severity: broadcastSeverity,
+    expiresDay: expiryForDays(broadcastDays),
+  });
+
+  const loadRecentBroadcasts = async () => {
+    const result = await listRecentBroadcasts();
+    if (result.ok) {
+      setRecentBroadcasts(result.items);
+      setBroadcastListFailed(false);
+    } else {
+      setBroadcastListFailed(true);
+    }
+  };
+
+  // Step 1: check the form, then ask for confirmation.
   const handleDispatchAdvisory = () => {
-    if (!broadcastMessage.trim()) {
-      toast.error(lang === 'bn' ? 'জরুরি সতর্কবার্তা লিখুন' : 'Please type emergency advisory message');
+    setBroadcastNotice(null);
+    const checked = buildBroadcast(broadcastFormInput(), 'check', new Date());
+    if (checked.ok === false) {
+      setBroadcastNotice({ kind: 'error', text: broadcastErrorText(checked.error) });
       return;
     }
-    // Real sending is not built yet: never report success.
-    toast.error(lang === 'bn' ? 'এখনো কাজ করছে না: কৃষকদের কাছে কিছু পাঠানো হয়নি' : 'Not working yet: nothing is sent to farmers');
+    setBroadcastConfirming(true);
   };
+
+  // Step 2: really send.
+  const handleConfirmBroadcast = async () => {
+    setIsBroadcasting(true);
+    const result = await createBroadcast(broadcastFormInput());
+    setIsBroadcasting(false);
+    setBroadcastConfirming(false);
+    if (result.ok === true) {
+      setBroadcastNotice({
+        kind: 'ok',
+        text: lang === 'bn' ? 'বার্তা পাঠানো হয়েছে। কৃষকরা অ্যাপে দেখতে পাবেন।' : 'Broadcast sent. Farmers will see it in the app.',
+      });
+      setBroadcastMessage('');
+      setBroadcastMessageBn('');
+      void loadRecentBroadcasts();
+    } else {
+      setBroadcastNotice({ kind: 'error', text: broadcastErrorText(result.error) });
+    }
+  };
+
+  const handleDeleteBroadcast = async (id: string) => {
+    setDeletingBroadcastId(id);
+    const result = await deleteBroadcast(id);
+    setDeletingBroadcastId(null);
+    if (result.ok === true) {
+      setRecentBroadcasts((list) => (list ? list.filter((item) => item.id !== id) : list));
+      toast.success(lang === 'bn' ? 'বার্তা মুছে ফেলা হয়েছে' : 'Broadcast deleted');
+    } else {
+      toast.error(broadcastErrorText(result.error));
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'intelligence' && recentBroadcasts === null && !broadcastListFailed) void loadRecentBroadcasts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Export Executive Report (PNG)
   const handleExportDashboard = async () => {
@@ -1242,16 +1335,16 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setBroadcastDistrict(hotspot.district);
-                          setBroadcastDisease(hotspot.disease);
-                          setBroadcastMessage(lang === 'bn' 
-                            ? `জরুরি কৃষি সতর্কতা: ${hotspot.districtBn} জেলায় ${hotspot.cropBn} ফসলে ${hotspot.diseaseBn} ছড়িয়ে পড়ছে। অবিলম্বে দাঁড়ানো পানি নিষ্কাশন করুন এবং অনুমোদিত স্প্রে করুন। বিস্তারিত কৃষি কল সেন্টারে ১৬১২৩ নম্বরে কল করুন।` 
-                            : `URGENT CROP ALERT: ${hotspot.disease} detected in ${hotspot.district} ${hotspot.crop} fields. Immediate intervention required. Dial 16123.`);
+                          setBroadcastDistrict(geoData.some((d) => d.name === hotspot.district) ? hotspot.district : 'all');
+                          setBroadcastNotice(null);
+                          setBroadcastConfirming(false);
+                          setBroadcastMessageBn(`জরুরি কৃষি সতর্কতা: ${hotspot.districtBn} জেলায় ${hotspot.cropBn} ফসলে ${hotspot.diseaseBn} ছড়িয়ে পড়ছে। অবিলম্বে দাঁড়ানো পানি নিষ্কাশন করুন এবং অনুমোদিত স্প্রে করুন। বিস্তারিত কৃষি কল সেন্টারে ১৬১২৩ নম্বরে কল করুন।`);
+                          setBroadcastMessage(`URGENT CROP ALERT: ${hotspot.disease} detected in ${hotspot.district} ${hotspot.crop} fields. Immediate intervention required. Dial 16123.`);
                         }}
                         className="font-bold text-rose-700 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <Bell className="w-3 h-3" />
-                        <span>{lang === 'bn' ? 'বার্তা খসড়া করুন (পাঠানো যায় না)' : 'Draft message (cannot send yet)'}</span>
+                        <span>{lang === 'bn' ? 'বার্তা খসড়া করুন' : 'Draft message'}</span>
                       </button>
                     </div>
                   </div>
@@ -1259,7 +1352,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
               </div>
             </div>
 
-            {/* Emergency Advisory Broadcaster Panel */}
+            {/* Emergency Broadcast Panel (real: saved to Firestore, shown in the farmer app) */}
             <div className="bg-gradient-to-br from-stone-900 to-stone-950 text-white p-6 sm:p-8 rounded-3xl border border-rose-500/30 shadow-xl space-y-4">
               <div className="flex items-center space-x-3">
                 <div className="p-2 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30">
@@ -1267,73 +1360,219 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 </div>
                 <div>
                   <h4 className="font-display font-black text-sm uppercase tracking-wider text-rose-300">
-                    {lang === 'bn' ? 'আঞ্চলিক জরুরি কৃষি সতর্কবার্তা সম্প্রচার পোর্টাল' : 'Regional Emergency SMS & App Advisory Dispatcher'}
+                    {lang === 'bn' ? 'জরুরি সতর্কবার্তা সম্প্রচার' : 'Emergency Broadcast'}
                   </h4>
                   <p className="text-xs text-stone-400 mt-0.5">
-                    {lang === 'bn' ? 'নির্বাচিত জেলার সকল নিবন্ধিত কৃষকের মোবাইল অ্যাপ ও এসএমএসে তাৎক্ষণিক পরামর্শ পাঠান' : 'Direct emergency push and broadcast to all smallholders in targeted cluster'}
+                    {lang === 'bn' ? 'নির্বাচিত জেলার সাইন-ইন করা কৃষকদের অ্যাপে বার্তা দেখানো হবে' : 'Shown in the app to signed-in farmers in the chosen district'}
                   </p>
                 </div>
               </div>
 
-              <div role="alert" className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-bold">
+              <div className="p-3 rounded-xl bg-stone-800/70 border border-stone-700 text-stone-300 text-xs font-semibold">
                 {lang === 'bn'
-                  ? 'এখনো কাজ করছে না: কৃষকদের কাছে কিছু পাঠানো হয় না (ডেমো ফর্ম)'
-                  : 'Not working yet: nothing is sent to farmers (demo form)'}
+                  ? 'বার্তা শুধু অ্যাপের ভেতরে দেখানো হয়। ফোনে নোটিফিকেশন বা এসএমএস পাঠানো হয় না।'
+                  : 'Messages are shown inside the app only. No phone notification or SMS is sent.'}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
+                  <label htmlFor="broadcast-district" className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
                     {lang === 'bn' ? 'লক্ষ্য এলাকা / জেলা' : 'Target District'}
                   </label>
                   <select
+                    id="broadcast-district"
                     value={broadcastDistrict}
-                    onChange={(e) => setBroadcastDistrict(e.target.value)}
+                    onChange={(e) => { setBroadcastDistrict(e.target.value); setBroadcastConfirming(false); }}
                     className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-xs font-semibold text-white outline-none focus:border-rose-500"
                   >
-                    {['Bogura', 'Rajshahi', 'Mymensingh', 'Jessore', 'Rangpur', 'Dhaka', 'Barishal', 'Sylhet'].map(d => (
-                      <option key={d} value={d}>{d} District</option>
+                    <option value="all">{lang === 'bn' ? 'সব জেলা' : 'All districts'}</option>
+                    {geoData.map((d) => (
+                      <option key={d.id} value={d.name}>{lang === 'bn' ? d.bn_name : d.name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
-                    {lang === 'bn' ? 'শনাক্তকৃত রোগ / সংকট' : 'Causal Hazard'}
+                  <label htmlFor="broadcast-severity" className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
+                    {lang === 'bn' ? 'গুরুত্ব' : 'Severity'}
+                  </label>
+                  <select
+                    id="broadcast-severity"
+                    value={broadcastSeverity}
+                    onChange={(e) => { setBroadcastSeverity(e.target.value as 'info' | 'warning'); setBroadcastConfirming(false); }}
+                    className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-xs font-semibold text-white outline-none focus:border-rose-500"
+                  >
+                    <option value="info">{lang === 'bn' ? 'তথ্য' : 'Info'}</option>
+                    <option value="warning">{lang === 'bn' ? 'সতর্কতা' : 'Warning'}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="broadcast-days" className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
+                    {lang === 'bn' ? `কত দিন দেখানো হবে (১-${BROADCAST_MAX_DAYS})` : `Days to show (1-${BROADCAST_MAX_DAYS})`}
                   </label>
                   <input
-                    type="text"
-                    value={broadcastDisease}
-                    onChange={(e) => setBroadcastDisease(e.target.value)}
+                    id="broadcast-days"
+                    type="number"
+                    min={1}
+                    max={BROADCAST_MAX_DAYS}
+                    value={broadcastDays}
+                    onChange={(e) => {
+                      const n = Math.trunc(Number(e.target.value));
+                      setBroadcastDays(Number.isFinite(n) ? Math.min(BROADCAST_MAX_DAYS, Math.max(1, n)) : 1);
+                      setBroadcastConfirming(false);
+                    }}
                     className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-xs font-semibold text-white outline-none focus:border-rose-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
-                  {lang === 'bn' ? 'সতর্কবার্তা ড্রাফট' : 'Advisory Message Body'}
+                <label htmlFor="broadcast-message-bn" className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
+                  {lang === 'bn' ? 'বার্তা (বাংলা)' : 'Message (Bangla)'}
+                  <span className="ml-2 font-mono normal-case text-stone-500">{broadcastMessageBn.length}/{BROADCAST_MAX_LENGTH}</span>
                 </label>
                 <textarea
+                  id="broadcast-message-bn"
                   rows={3}
-                  value={broadcastMessage}
-                  onChange={(e) => setBroadcastMessage(e.target.value)}
-                  placeholder={lang === 'bn' ? 'এখানে বার্তা লিখুন...' : 'Type advisory message text to push...'}
+                  maxLength={BROADCAST_MAX_LENGTH}
+                  value={broadcastMessageBn}
+                  onChange={(e) => { setBroadcastMessageBn(e.target.value); setBroadcastConfirming(false); }}
+                  placeholder={lang === 'bn' ? 'এখানে বাংলায় বার্তা লিখুন...' : 'Write the message in Bangla...'}
                   className="w-full bg-stone-800/80 border border-stone-700 rounded-2xl p-3 text-xs text-white placeholder-stone-500 outline-none focus:border-rose-500 leading-relaxed font-sans"
                 />
               </div>
 
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleDispatchAdvisory}
-                  disabled
-                  aria-disabled="true"
-                  className="px-6 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-950/40 flex items-center gap-2 cursor-not-allowed opacity-50"
+              <div>
+                <label htmlFor="broadcast-message-en" className="block text-[11px] font-bold uppercase text-stone-400 mb-1">
+                  {lang === 'bn' ? 'বার্তা (ইংরেজি)' : 'Message (English)'}
+                  <span className="ml-2 font-mono normal-case text-stone-500">{broadcastMessage.length}/{BROADCAST_MAX_LENGTH}</span>
+                </label>
+                <textarea
+                  id="broadcast-message-en"
+                  rows={3}
+                  maxLength={BROADCAST_MAX_LENGTH}
+                  value={broadcastMessage}
+                  onChange={(e) => { setBroadcastMessage(e.target.value); setBroadcastConfirming(false); }}
+                  placeholder={lang === 'bn' ? 'এখানে ইংরেজিতে বার্তা লিখুন...' : 'Write the message in English...'}
+                  className="w-full bg-stone-800/80 border border-stone-700 rounded-2xl p-3 text-xs text-white placeholder-stone-500 outline-none focus:border-rose-500 leading-relaxed font-sans"
+                />
+              </div>
+
+              {broadcastNotice && (
+                <div
+                  role={broadcastNotice.kind === 'error' ? 'alert' : 'status'}
+                  className={`p-3 rounded-xl border text-xs font-bold ${
+                    broadcastNotice.kind === 'error'
+                      ? 'bg-rose-500/15 border-rose-500/40 text-rose-200'
+                      : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
+                  }`}
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{lang === 'bn' ? 'এখনো কাজ করছে না: কিছু পাঠানো হবে না' : 'Not working yet: nothing will be sent'}</span>
-                </button>
+                  {broadcastNotice.text}
+                </div>
+              )}
+
+              {broadcastConfirming ? (
+                <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 space-y-3">
+                  <p className="text-xs font-bold text-amber-100">
+                    {lang === 'bn'
+                      ? `এটি ${broadcastDistrict === 'all' ? 'সব জেলার' : (geoData.find((d) => d.name === broadcastDistrict)?.bn_name ?? broadcastDistrict) + ' জেলার'} প্রতিটি সাইন-ইন করা কৃষককে দেখানো হবে, ${broadcastDays} দিন ধরে। পাঠাবেন?`
+                      : `This will show to every signed-in farmer in ${broadcastDistrict === 'all' ? 'all districts' : broadcastDistrict} for ${broadcastDays} ${broadcastDays === 1 ? 'day' : 'days'}. Send it?`}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBroadcastConfirming(false)}
+                      disabled={isBroadcasting}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-stone-800 border border-stone-700 text-stone-200 cursor-pointer disabled:opacity-50"
+                    >
+                      {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmBroadcast}
+                      disabled={isBroadcasting}
+                      className="px-5 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-950/40 flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isBroadcasting ? (lang === 'bn' ? 'পাঠানো হচ্ছে...' : 'Sending...') : (lang === 'bn' ? 'হ্যাঁ, পাঠান' : 'Yes, send')}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDispatchAdvisory}
+                    className="px-6 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-950/40 flex items-center gap-2 cursor-pointer hover:bg-rose-500"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>{lang === 'bn' ? 'বার্তা পাঠান' : 'Send broadcast'}</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-stone-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[11px] font-black uppercase tracking-wider text-stone-400">
+                    {lang === 'bn' ? 'সাম্প্রতিক বার্তা' : 'Recent broadcasts'}
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => void loadRecentBroadcasts()}
+                    className="text-[11px] font-bold text-stone-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>{lang === 'bn' ? 'রিফ্রেশ' : 'Refresh'}</span>
+                  </button>
+                </div>
+                {broadcastListFailed && (
+                  <p role="alert" className="text-xs text-rose-300">
+                    {lang === 'bn' ? 'তালিকা লোড করা যায়নি' : 'Could not load the list'}
+                  </p>
+                )}
+                {!broadcastListFailed && recentBroadcasts === null && (
+                  <p className="text-xs text-stone-500">{lang === 'bn' ? 'লোড হচ্ছে...' : 'Loading...'}</p>
+                )}
+                {recentBroadcasts && recentBroadcasts.length === 0 && (
+                  <p className="text-xs text-stone-500">{lang === 'bn' ? 'এখনো কোনো বার্তা নেই' : 'No broadcasts yet'}</p>
+                )}
+                {recentBroadcasts?.map((item) => {
+                  const expired = isExpired(item);
+                  const districtLabel = item.district === 'all'
+                    ? (lang === 'bn' ? 'সব জেলা' : 'All districts')
+                    : (() => {
+                        const found = geoData.find((d) => slug(d.name) === item.district);
+                        return found ? (lang === 'bn' ? found.bn_name : found.name) : item.district;
+                      })();
+                  return (
+                    <div key={item.id} className={`p-3 rounded-xl bg-stone-800/60 border border-stone-700 flex items-start gap-3 ${expired ? 'opacity-60' : ''}`}>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                          <span className={`px-2 py-0.5 rounded-full ${item.severity === 'warning' ? 'bg-amber-500 text-gray-950' : 'bg-sky-600 text-white'}`}>
+                            {item.severity === 'warning' ? (lang === 'bn' ? 'সতর্কতা' : 'Warning') : (lang === 'bn' ? 'তথ্য' : 'Info')}
+                          </span>
+                          <span className="text-stone-300">{districtLabel}</span>
+                          <span className="text-stone-500">
+                            {expired
+                              ? (lang === 'bn' ? `মেয়াদ শেষ (${item.expiresDay})` : `Expired (${item.expiresDay})`)
+                              : (lang === 'bn' ? `${item.expiresDay} পর্যন্ত` : `Until ${item.expiresDay}`)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-stone-100 break-words">{lang === 'bn' ? item.messageBn : item.messageEn}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteBroadcast(item.id)}
+                        disabled={deletingBroadcastId === item.id}
+                        aria-label={lang === 'bn' ? 'বার্তা মুছুন' : 'Delete broadcast'}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-stone-900 border border-stone-700 text-rose-300 hover:bg-rose-950 cursor-pointer disabled:opacity-50"
+                      >
+                        {deletingBroadcastId === item.id ? '...' : (lang === 'bn' ? 'মুছুন' : 'Delete')}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </motion.div>
