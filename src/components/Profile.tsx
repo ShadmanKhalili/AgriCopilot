@@ -19,6 +19,10 @@ import { auth, needsEmailVerification, resendVerificationEmail } from '../fireba
 interface Props {
   lang: Language;
   onUpgrade: () => void;
+  /** Go to another tool by its tab id (used by the farm record). */
+  onNavigateToTab?: (tab: string) => void;
+  /** True while the Profile tab is open. */
+  active?: boolean;
 }
 
 interface DiagnosisRecord {
@@ -51,7 +55,7 @@ interface PlantingIntentRecord {
   createdAt: string;
 }
 
-export default function Profile({ lang, onUpgrade }: Props) {
+export default function Profile({ lang, onUpgrade, onNavigateToTab, active = true }: Props) {
   const { user, userProfile, signIn, isGuest, saveGuestAccount } = useAuth();
   const { currentUsage, limit: usageLimit, tier } = useUsageTracking();
   const [savingGuest, setSavingGuest] = useState(false);
@@ -225,7 +229,7 @@ export default function Profile({ lang, onUpgrade }: Props) {
       <NotificationSettings lang={lang} />
 
       {viewMode === 'dossier' ? (
-        <FarmerDossier lang={lang} />
+        <FarmerDossier lang={lang} onNavigateToTab={onNavigateToTab} active={active} />
       ) : !user ? (
         <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
           <UserCircle className="w-16 h-16 text-slate-300" />

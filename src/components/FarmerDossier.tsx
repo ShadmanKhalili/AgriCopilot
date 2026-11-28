@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, UserCheck, Edit3, Trash2, X, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { flushSync } from 'react-dom';
 import { useAuth } from './AuthProvider';
 import { 
   FarmerProfileData, 
@@ -15,24 +16,30 @@ import {
   seedDemoFarmerProfile,
   updateFarmerProfileManual,
   resetFarmerProfile,
-  calculateCreditScore,
   FARMER_RECORD_UPDATED_EVENT
 } from '../utils/farmerProfiler';
 import { Language } from '../utils/translations';
 import toast from 'react-hot-toast';
+import FarmRecordSection from './farmRecord/FarmRecordSection';
+import FarmRecordPrint from './farmRecord/FarmRecordPrint';
+import RecordScoreCard from './farmRecord/RecordScoreCard';
+import { loadFarmRecord, fetchRecordScore, type FarmRecord, type StoredRecordScore } from '../services/farmRecord';
 
 interface Props {
   lang: Language;
   onNavigateToTab?: (tab: string) => void;
+  /** True while the tab showing this dossier is open. */
+  active?: boolean;
 }
 
-export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
+export default function FarmerDossier({ lang, onNavigateToTab, active = true }: Props) {
   const { user, userRole } = useAuth();
   const [profile, setProfile] = useState<FarmerProfileData | null>(null);
   const [timeline, setTimeline] = useState<FarmerTimelineEventData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [showPrintView, setShowPrintView] = useState(false);
+  const [printRecord, setPrintRecord] = useState<FarmRecord>({ plots: [], seasons: [] });
+  const [printScore, setPrintScore] = useState<StoredRecordScore | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [assistedRouteMode, setAssistedRouteMode] = useState<'self' | 'saao'>('self');
   const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
@@ -140,14 +147,22 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
     }
   };
 
-  const handlePrint = () => {
+  // The printed page is the farm record (plots, seasons, sales) plus the server
+  // score. Both are loaded just before printing so the page is never stale.
+  const handlePrint = async () => {
+    try {
+      const [record, score] = await Promise.all([
+        loadFarmRecord(user?.uid || null),
+        user?.uid ? fetchRecordScore().catch(() => null) : Promise.resolve(null),
+      ]);
+      flushSync(() => {
+        setPrintRecord(record);
+        setPrintScore(score);
+      });
+    } catch (e) {
+      console.error(e);
+    }
     window.print();
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 75) return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800';
-    if (score >= 55) return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800';
-    return 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800';
   };
 
   const getEventIcon = (type: FarmerTimelineEventData['eventType']) => {
@@ -184,25 +199,12 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
     }
   };
 
-  const [showAuditFramework, setShowAuditFramework] = useState(false);
-
-  const creditAnalysis = calculateCreditScore({
-    totalSessionsCompleted: profile?.totalSessionsCompleted || 0,
-    totalDiagnoses: profile?.totalDiagnoses || 0,
-    cropsCount: profile?.cropsGrown?.length || (profile?.primaryCrop ? 1 : 0),
-    hasLandData: Boolean(profile?.totalLandDecimals && profile.totalLandDecimals > 0),
-    hasLocationData: Boolean(profile?.locationDistrict || profile?.locationUpazila),
-    hasSoilOrIrrigation: Boolean(profile?.soilType || profile?.irrigationType),
-    hasCertificates: timeline.some(t => t.eventType === 'smart_grading'),
-    hasWeatherAction: timeline.some(t => t.eventType === 'weather_alert'),
-    totalEventsCount: timeline.length
-  });
-
-  // The headline and the five bars must come from the same calculation.
-  const currentScore = creditAnalysis.score;
-
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-16">
+    <div className="max-w-6xl mx-auto pb-16">
+      <div className="space-y-8 print:hidden">
+      {/* Farm record: the main purpose of this screen (plots, seasons, sales) */}
+      <FarmRecordSection lang={lang} onPrint={handlePrint} onNavigate={onNavigateToTab} active={active} />
+
       {/* Top Banner / Explanation */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-emerald-700/40">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -436,9 +438,6 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <p className="text-2xl font-black text-slate-900 dark:text-white">
                 {profile?.totalSessionsCompleted ?? 0} {lang === 'bn' ? 'টি' : ''}
               </p>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5">
-                {lang === 'bn' ? '+৩ পয়েন্ট প্রতি সেশনে (সর্বোচ্চ ১২)' : '+3 pts/session (Max 12)'}
-              </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -449,157 +448,24 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
               <p className="text-2xl font-black text-slate-900 dark:text-white">
                 {profile?.totalDiagnoses ?? 0} {lang === 'bn' ? 'টি' : ''}
               </p>
-              <p className="text-[11px] text-lime-600 dark:text-lime-400 mt-0.5">
-                {lang === 'bn' ? '+৩ পয়েন্ট প্রতি স্ক্যানে (সর্বোচ্চ ১৩)' : '+3 pts/scan (Max 13)'}
-              </p>
             </div>
           </div>
         </div>
 
         {/* Right: Farm record score */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Personal score: never shown as evidence to a lender until it is calculated on the server */}
+          {/* Farm record score: calculated by the server (Phase 7) */}
+          <RecordScoreCard lang={lang} />
+
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  {lang === 'bn' ? 'শুধু আপনার জন্য — ব্যাংক বা ঋণদাতার জন্য নয়' : 'For you only — not for banks or lenders'}
-                </div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1.5">
-                  {lang === 'bn' ? 'খামার রেকর্ড স্কোর' : 'Farm Record Score'}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  {lang === 'bn' ? 'অ্যাপে আপনি কতটা নিয়মিত রেকর্ড রাখছেন তার হিসাব। এটি আপনার ফোনে হিসাব হয়, তাই ঋণ বা বীমার প্রমাণ নয়।' : 'Shows how regularly you keep records in the app. It is worked out on your phone, so it is not proof for a loan or insurance.'}
-                </p>
-              </div>
-
-              {/* Numerical Score Box */}
-              <div className={`px-5 py-3 rounded-2xl border flex items-baseline gap-2 ${getScoreColor(currentScore)}`}>
-                <span className="text-3xl sm:text-4xl font-black tracking-tight">
-                  {currentScore}
-                </span>
-                <span className="text-sm font-semibold opacity-70">/ ১০০</span>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="space-y-1.5">
-              <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-slate-700">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-500 via-emerald-500 to-teal-500 rounded-full transition-all duration-700"
-                  style={{ width: `${Math.min(100, Math.max(currentScore > 0 ? 5 : 0, currentScore))}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[11px] font-semibold text-slate-400">
-                <span>{lang === 'bn' ? 'শুরু (০-৩৪)' : 'Starting (0-34)'}</span>
-                <span>{lang === 'bn' ? 'চলছে (৩৫-৫৪)' : 'Building (35-54)'}</span>
-                <span>{lang === 'bn' ? 'ভালো (৫৫-৭৪)' : 'Good (55-74)'}</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lang === 'bn' ? 'নিয়মিত (৭৫+)' : 'Regular (75+)'}</span>
-              </div>
-            </div>
-
-            {/* 5-Pillar Breakdown Meter */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                  {lang === 'bn' ? 'স্কোরের পাঁচটি অংশ' : 'The five parts of the score'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAuditFramework(!showAuditFramework)}
-                  className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 min-h-[44px] cursor-pointer"
-                >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  {showAuditFramework 
-                    ? (lang === 'bn' ? 'সংক্ষেপ করুন' : 'Hide Audit Details') 
-                    : (lang === 'bn' ? 'যাচাই পদ্ধতি দেখুন' : 'View Audit Framework')}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                <div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🏛️ {lang === 'bn' ? 'জমির মালিকানা ও অবস্থান' : 'Land & Farm Provenance'}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.farmProvenance}/২০</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.farmProvenance / 20) * 100}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🛡️ {lang === 'bn' ? 'পরামর্শ ও বালাই নজরদারি' : 'Advisory & Pest Diligence'}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.surveillanceDiligence}/২৫</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-teal-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.surveillanceDiligence / 25) * 100}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🌾 {lang === 'bn' ? 'ফসল বৈচিত্র্য ও সম্ভাব্যতা' : 'Crop Viability & Rotation'}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.cropViability}/২০</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-lime-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.cropViability / 20) * 100}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🏅 {lang === 'bn' ? 'মান যাচাই ও বাজার সংযোগ' : 'Quality Grading & Mandi'}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.qualityAndMarket}/১৫</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.qualityAndMarket / 15) * 100}%` }} />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <div className="flex justify-between text-slate-600 dark:text-slate-300 font-medium mb-1">
-                    <span>🌦️ {lang === 'bn' ? 'জলবায়ু সতর্কতা ও দীর্ঘমেয়াদি রেকর্ড' : 'Climate Action & Longitudinal History'}</span>
-                    <span className="font-bold text-slate-900 dark:text-white">{creditAnalysis.pillars.longitudinalTrackRecord}/২০</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${(creditAnalysis.pillars.longitudinalTrackRecord / 20) * 100}%` }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Expandable Stakeholder Audit Details */}
-              <AnimatePresence>
-                {showAuditFramework && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 space-y-2 text-xs leading-relaxed overflow-hidden"
-                  >
-                    <p className="font-bold text-slate-800 dark:text-slate-200">
-                      {lang === 'bn' ? 'এই স্কোর কীভাবে হিসাব হয়' : 'How this score is worked out'}
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li>{lang === 'bn' ? 'আপনার পরামর্শ, ছবি পরীক্ষা ও খামারের তথ্য থেকে পয়েন্ট আসে। প্রতিটি অংশের সর্বোচ্চ সীমা আছে।' : 'Points come from your consultations, photo checks and farm details. Each part has a maximum.'}</li>
-                      <li>{lang === 'bn' ? 'হিসাবটি আপনার ফোনেই হয় এবং কেউ তা যাচাই করে না।' : 'It is worked out on your phone and nobody checks it.'}</li>
-                      <li>{lang === 'bn' ? 'এটি কোনো ব্যাংক, এনজিও বা নিয়ন্ত্রক সংস্থার অনুমোদিত পদ্ধতি নয়। ঋণ বা বীমার সিদ্ধান্তে ব্যবহার করবেন না।' : 'No bank, NGO or regulator has approved this method. Do not use it for loan or insurance decisions.'}</li>
-                    </ul>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-
             {/* Separated 4 Pillars of Proprietary Intelligence (Need, Eligibility, Intervention, Data Confidence) */}
             <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/70 border border-stone-200 dark:border-stone-700/80 space-y-3">
               <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-700 pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
-                  {lang === 'bn' ? '৪টি পৃথক বুদ্ধিমত্তা স্তর (Trustworthy Evidence System)' : '4 Separated Evidence Pillars'}
+                  {lang === 'bn' ? '৪টি আলাদা তথ্যের অংশ' : '4 separate parts of your record'}
                 </span>
                 <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                  {lang === 'bn' ? 'স্বচ্ছ ও যাচাইযোগ্য' : 'Transparent & Verifiable'}
+                  {lang === 'bn' ? 'আপনার নিজের দেওয়া তথ্য' : 'From what you entered'}
                 </span>
               </div>
 
@@ -797,54 +663,18 @@ export default function FarmerDossier({ lang, onNavigateToTab }: Props) {
         )}
       </div>
 
-      {/* Printable farm record. Not a credit document: the score is left out until it is calculated on the server. */}
-      <div className="hidden print:block print:p-8 bg-white text-slate-900 font-sans">
-        <div className="border-b-2 border-emerald-800 pb-4 mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-emerald-900">
-              খামারের কার্যক্রমের রেকর্ড
-            </h1>
-            <p className="text-xs text-slate-600">
-              Self-reported farm activity record. Not verified by any government office, bank or insurer.
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="font-mono text-xs">ID: BD-KRISHI-{effectiveUid.substring(0, 8).toUpperCase()}</p>
-            <p className="text-xs text-slate-500">তারিখ: {new Date().toLocaleDateString('bn-BD')}</p>
-          </div>
-        </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-4 text-sm mb-6 border p-4 rounded-lg">
-          <div>
-            <p><strong>কৃষকের নাম:</strong> {profile?.fullName || effectiveName || 'তথ্য দেওয়া হয়নি'}</p>
-            <p><strong>ঠিকানা:</strong> {[profile?.locationUpazila, profile?.locationDistrict].filter(Boolean).join(', ') || 'তথ্য নেই'}</p>
-            <p><strong>প্রধান ফসল:</strong> {profile?.primaryCrop || 'তথ্য নেই'}</p>
-          </div>
-          <div>
-            <p><strong>চাষযোগ্য জমি:</strong> {profile?.totalLandDecimals ? `${profile.totalLandDecimals} শতক` : 'তথ্য নেই'}</p>
-          </div>
-        </div>
-
-        <h3 className="font-bold text-base mb-2 border-b pb-1">কার্যক্রম ও ইন্টারঅ্যাকশন ইতিহাস</h3>
-        <div className="space-y-3 mb-8">
-          {timeline.length > 0 ? (
-            timeline.slice(0, 4).map((e, i) => (
-              <div key={i} className="text-xs border-b pb-2">
-                <p className="font-bold">{e.title} ({new Date(e.createdAt).toLocaleDateString('bn-BD')})</p>
-                <p className="text-slate-600">{e.summary}</p>
-                {e.keyFacts && e.keyFacts.length > 0 && (
-                  <p className="text-emerald-700">{e.keyFacts.join(' • ')}</p>
-                )}
-              </div>
-            ))
-          ) : (
-            <p className="text-xs text-slate-500 italic">কোনো কার্যক্রমের রেকর্ড নেই।</p>
-          )}
-        </div>
-
-        <div className="pt-6 border-t text-xs text-slate-600">
-          <p>এটি কৃষকের নিজের দেওয়া তথ্য ও অ্যাপ ব্যবহারের রেকর্ড। ঋণ, বীমা বা সরকারি সহায়তার প্রমাণ হিসেবে ব্যবহারের জন্য নয়।</p>
-        </div>
+      {/* Printed page: the farm record and the server score. Not a credit document. */}
+      <div className="hidden print:block">
+        <FarmRecordPrint
+          lang={lang}
+          record={printRecord}
+          score={printScore}
+          farmerName={profile?.fullName || effectiveName || ''}
+          district={profile?.locationDistrict || ''}
+          upazila={profile?.locationUpazila || ''}
+        />
       </div>
 
       {/* Manual Farm Profile Editor Modal */}

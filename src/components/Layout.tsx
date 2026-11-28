@@ -1339,12 +1339,21 @@ export default function Layout() {
                     </TabPanel>
                     <TabPanel id="farmer-dossier" active={activeTab === 'farmer-dossier'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('farmer-dossier') && <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} />}
+                      {visitedTabs.has('farmer-dossier') && (
+                        <FarmerDossier lang={lang} onNavigateToTab={handleNavigateTab} active={activeTab === 'farmer-dossier'} />
+                      )}
                       </ErrorBoundary>
                     </TabPanel>
                     <TabPanel id="profile" active={activeTab === 'profile'}>
                       <ErrorBoundary {...tabErrorBoundaryProps}>
-                      {visitedTabs.has('profile') && <Profile lang={lang} onUpgrade={() => setIsPricingOpen(true)} />}
+                      {visitedTabs.has('profile') && (
+                        <Profile
+                          lang={lang}
+                          onUpgrade={() => setIsPricingOpen(true)}
+                          onNavigateToTab={handleNavigateTab}
+                          active={activeTab === 'profile'}
+                        />
+                      )}
                       </ErrorBoundary>
                     </TabPanel>
                     <TabPanel id="admin-dashboard" active={activeTab === 'admin-dashboard'}>

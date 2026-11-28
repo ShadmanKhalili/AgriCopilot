@@ -293,9 +293,14 @@ service cloud.firestore {
 
     match /farmer_profiles/{userId} {
       allow read: if isOwner(userId) || isAdmin();
+      // The old phone-made score is frozen (Phase 7): a new profile starts at 0
+      // and only the admin may change it. The real record score is calculated
+      // by the server in farm_record_scores/{uid}.
       allow create: if isSignedIn() && isValidFarmerProfile(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     userId == request.auth.uid &&
+                    incoming().creditReadinessScore == 0 &&
+                    (!incoming().keys().hasAny(['insuranceRiskTier']) || incoming().insuranceRiskTier == 'High') &&
                     isValidId(userId);
       allow update: if isSignedIn() && isValidFarmerProfile(incoming()) &&
                     isOwner(userId) &&
@@ -305,7 +310,7 @@ service cloud.firestore {
                     (
                       isAdmin() ||
                       incoming().diff(existing()).affectedKeys().hasOnly([
-                        'fullName', 'creditReadinessScore', 'insuranceRiskTier', 
+                        'fullName',
                         'primaryCrop', 'cropsGrown', 'totalLandDecimals', 
                         'locationDistrict', 'locationUpazila', 'soilType', 
                         'irrigationType', 'totalSessionsCompleted', 'totalDiagnoses', 
@@ -883,9 +888,20 @@ service cloud.firestore {
       return val is number && val >= min && val <= max;
     }
 
+    // Phase 7 progress fields on a season. All optional; each checked when present.
+    function isValidSeasonProgress(data) {
+      return (!data.keys().hasAny(['plotId']) || (data.plotId is string && data.plotId.matches('^[A-Za-z0-9_-]{1,128}$'))) &&
+             (!data.keys().hasAny(['stage']) || data.stage in ['planned', 'growing', 'harvested']) &&
+             (!data.keys().hasAny(['sowingDate']) || isDateStr(data.sowingDate)) &&
+             (!data.keys().hasAny(['harvestDate']) || isDateStr(data.harvestDate)) &&
+             (!data.keys().hasAny(['harvestMon']) || isNumIn(data.harvestMon, 0, 100000));
+    }
+
     function isValidSeason(data) {
       return data.keys().hasAll(['uid', 'crop', 'landSize', 'landUnit', 'expectedYieldMon', 'expectedPricePerMon', 'plannedCost', 'createdAt', 'updatedAt']) &&
-             data.keys().hasOnly(['uid', 'crop', 'landSize', 'landUnit', 'expectedYieldMon', 'expectedPricePerMon', 'plannedCost', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['uid', 'crop', 'landSize', 'landUnit', 'expectedYieldMon', 'expectedPricePerMon', 'plannedCost', 'createdAt', 'updatedAt',
+                                  'plotId', 'stage', 'sowingDate', 'harvestDate', 'harvestMon']) &&
+             isValidSeasonProgress(data) &&
              data.uid == request.auth.uid &&
              data.crop is string && data.crop.matches('^[a-z0-9_-]{1,64}$') &&
              isNumIn(data.landSize, 0, 10000) && data.landSize > 0 &&
@@ -928,6 +944,58 @@ service cloud.firestore {
         allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
         allow update: if false;
       }
+
+      // What the farmer sold from this season (Phase 7). Fixed once written;
+      // a mistake is deleted and entered again.
+      match /sales/{saleId} {
+        allow create: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      isValidId(saleId) &&
+                      incoming().keys().hasAll(['uid', 'seasonId', 'quantityMon', 'pricePerMon', 'buyerType', 'date', 'createdAt']) &&
+                      incoming().keys().hasOnly(['uid', 'seasonId', 'quantityMon', 'pricePerMon', 'buyerType', 'date', 'createdAt']) &&
+                      incoming().uid == request.auth.uid &&
+                      incoming().seasonId == seasonId &&
+                      isNumIn(incoming().quantityMon, 0, 100000) && incoming().quantityMon > 0 &&
+                      incoming().pricePerMon is int && incoming().pricePerMon >= 1 && incoming().pricePerMon <= 100000 &&
+                      incoming().buyerType in ['trader', 'market', 'cooperative', 'company', 'other'] &&
+                      isDateStr(incoming().date) &&
+                      isTimestamp(incoming().createdAt) &&
+                      exists(/databases/$(database)/documents/users/$(userId)/seasons/$(seasonId));
+        allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+        allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+        allow update: if false;
+      }
+    }
+
+    // A piece of the farmer's land (Phase 7).
+    function isValidPlot(data) {
+      return data.keys().hasAll(['uid', 'name', 'landSize', 'landUnit', 'tenure', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['uid', 'name', 'landSize', 'landUnit', 'tenure', 'createdAt', 'updatedAt']) &&
+             data.uid == request.auth.uid &&
+             isStr(data.name, 1, 60) &&
+             isNumIn(data.landSize, 0, 10000) && data.landSize > 0 &&
+             data.landUnit in ['decimal', 'bigha', 'acre', 'katha'] &&
+             data.tenure in ['own', 'lease', 'sharecrop'] &&
+             isTimestamp(data.createdAt) &&
+             isTimestamp(data.updatedAt);
+    }
+
+    match /users/{userId}/plots/{plotId} {
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(plotId) && isValidPlot(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+                    existing().uid == request.auth.uid &&
+                    isValidPlot(incoming()) &&
+                    incoming().createdAt == existing().createdAt;
+      allow read: if isSignedIn() && request.auth.uid == userId && resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && request.auth.uid == userId && existing().uid == request.auth.uid;
+    }
+
+    // The farm record score. Calculated and written only by the server (service
+    // account), so the farmer cannot type the number. The owner and the admin can read it.
+    match /farm_record_scores/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
     }
   }
 }

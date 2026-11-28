@@ -5,7 +5,10 @@ import { sanitizeString, safeStorage } from './security';
 export interface FarmerProfileData {
   userId: string;
   fullName: string;
-  creditReadinessScore: number; // 0 - 100
+  // Frozen legacy fields (Phase 7). The app no longer calculates or shows them;
+  // new profiles hold 0 / 'High' and only an admin can change them. The record
+  // score is in farm_record_scores/{uid}, written by the server.
+  creditReadinessScore: number;
   insuranceRiskTier: 'Low' | 'Moderate' | 'High';
   primaryCrop: string;
   cropsGrown: string[];
@@ -65,135 +68,6 @@ export interface RecordEventParams {
   insight?: string;
 }
 
-export interface CreditScorePillars {
-  farmProvenance: number; // Max 20: Land ownership, geo-location, soil profile
-  surveillanceDiligence: number; // Max 25: Advisory consultations & pest surveillance
-  cropViability: number; // Max 20: Primary crop & diversification/rotation
-  qualityAndMarket: number; // Max 15: Post-harvest grading & market linkage
-  longitudinalTrackRecord: number; // Max 20: Weather risk response & interaction history
-}
-
-export interface CreditScoreResult {
-  score: number;
-  riskTier: 'Low' | 'Moderate' | 'High';
-  grade: string;
-  recommendedLoanLimit: number;
-  pillars: CreditScorePillars;
-}
-
-// Farm record score: how regularly the farmer keeps records in the app.
-// It runs on the device and the farmer can edit its inputs, so it must never be
-// offered as evidence to a lender. That needs a server-side calculation first.
-export function calculateCreditScore(profile: {
-  totalSessionsCompleted: number;
-  totalDiagnoses: number;
-  cropsCount: number;
-  hasLandData: boolean;
-  hasLocationData?: boolean;
-  hasSoilOrIrrigation?: boolean;
-  hasCertificates: boolean;
-  hasWeatherAction?: boolean;
-  totalEventsCount?: number;
-}): CreditScoreResult {
-  const totalActivity = (profile.totalSessionsCompleted || 0) + 
-                        (profile.totalDiagnoses || 0) + 
-                        (profile.totalEventsCount || 0);
-  
-  // Strict zero-data policy: If no data provided and zero activity, score is strictly 0
-  if (totalActivity === 0 && !profile.hasLandData && (!profile.cropsCount || profile.cropsCount === 0) && !profile.hasCertificates) {
-    return {
-      score: 0,
-      riskTier: 'High',
-      grade: 'Starting',
-      recommendedLoanLimit: 0,
-      pillars: {
-        farmProvenance: 0,
-        surveillanceDiligence: 0,
-        cropViability: 0,
-        qualityAndMarket: 0,
-        longitudinalTrackRecord: 0
-      }
-    };
-  }
-
-  // Pillar 1: Farm Ownership & Provenance (Max 20 pts)
-  let farmProvenance = 0;
-  if (profile.hasLandData) farmProvenance += 10; // Land cultivated & recorded
-  if (profile.hasLocationData !== false && (profile.hasLandData || profile.cropsCount > 0)) farmProvenance += 5; // Geo-district / Upazila
-  if (profile.hasSoilOrIrrigation) farmProvenance += 5; // Documented soil & irrigation infrastructure
-  farmProvenance = Math.min(20, farmProvenance);
-
-  // Pillar 2: Advisory Diligence & Surveillance Discipline (Max 25 pts)
-  // Non-gaming capped: +3 pts per distinct consultation (max 12 pts)
-  const sessionsPoints = Math.min(12, (profile.totalSessionsCompleted || 0) * 3);
-  // Pest & Disease Diagnostic surveillance: +3 pts per verified scan (max 13 pts)
-  const diagnosisPoints = Math.min(13, (profile.totalDiagnoses || 0) * 3);
-  const surveillanceDiligence = Math.min(25, sessionsPoints + diagnosisPoints);
-
-  // Pillar 3: Crop Diversification & Economic Viability (Max 20 pts)
-  let cropViability = 0;
-  if (profile.cropsCount > 0) cropViability += 10; // Registered primary crop
-  if (profile.cropsCount > 1) cropViability += 10; // Crop diversification / multi-cropping
-  cropViability = Math.min(20, cropViability);
-
-  // Pillar 4: Post-Harvest Quality & Market Readiness (Max 15 pts)
-  let qualityAndMarket = 0;
-  if (profile.hasCertificates) qualityAndMarket += 8; // Verified quality grading / inspection
-  if (profile.totalEventsCount && profile.totalEventsCount >= 3) qualityAndMarket += 7; // Market connection / active trading
-  qualityAndMarket = Math.min(15, qualityAndMarket);
-
-  // Pillar 5: Climate Resilience & Longitudinal Track Record (Max 20 pts)
-  let longitudinalTrackRecord = 0;
-  if (profile.hasWeatherAction) longitudinalTrackRecord += 8; // Climate risk alert action verified
-  // Multi-event compounding timeline (+3 pts per recorded timeline event, max 12 pts)
-  const timelinePoints = Math.min(12, ((profile.totalEventsCount || 0) > 0 ? (profile.totalEventsCount || 0) : totalActivity) * 3);
-  longitudinalTrackRecord = Math.min(20, longitudinalTrackRecord + timelinePoints);
-
-  const totalScore = Math.min(100, Math.max(0, 
-    farmProvenance + 
-    surveillanceDiligence + 
-    cropViability + 
-    qualityAndMarket + 
-    longitudinalTrackRecord
-  ));
-
-  let riskTier: 'Low' | 'Moderate' | 'High' = 'High';
-  let grade = 'Starting';
-  let recommendedLoanLimit = 0;
-
-  if (totalScore >= 75) {
-    riskTier = 'Low';
-    grade = 'Regular';
-    recommendedLoanLimit = 150000;
-  } else if (totalScore >= 55) {
-    riskTier = 'Moderate';
-    grade = 'Good';
-    recommendedLoanLimit = 50000;
-  } else if (totalScore >= 35) {
-    riskTier = 'Moderate';
-    grade = 'Building';
-    recommendedLoanLimit = 20000;
-  } else {
-    riskTier = 'High';
-    grade = 'Starting';
-    recommendedLoanLimit = 0;
-  }
-
-  return {
-    score: totalScore,
-    riskTier,
-    grade,
-    recommendedLoanLimit,
-    pillars: {
-      farmProvenance,
-      surveillanceDiligence,
-      cropViability,
-      qualityAndMarket,
-      longitudinalTrackRecord
-    }
-  };
-}
-
 // Local Storage helpers for guest / fast offline demo mode
 const LOCAL_PROFILE_KEY = (uid: string) => `krishi_farmer_profile_${uid}`;
 const LOCAL_EVENTS_KEY = (uid: string) => `krishi_farmer_events_${uid}`;
@@ -212,6 +86,27 @@ const cleanFullName = (fullName?: string): string => {
 // Reading them would always be denied by the zero-trust rules and only add console noise.
 const isGuestProfileId = (userId: string): boolean =>
   userId === 'guest_farmer_demo' || userId.startsWith('guest_');
+
+/**
+ * The one place a profile is written to Firestore.
+ *
+ * firestore.rules (Phase 7): a new profile must carry creditReadinessScore 0 and
+ * insuranceRiskTier 'High'; an update by the farmer may not change either field,
+ * createdAt or userId, and one refused field refuses the whole write. So a new
+ * document gets 0 / 'High', and an existing one gets a merge that leaves those
+ * fields (and createdAt) out entirely. The real score lives in
+ * farm_record_scores/{uid} and is written by the server only.
+ */
+async function saveProfileToFirestore(userId: string, profile: FarmerProfileData): Promise<void> {
+  const profileRef = doc(db, 'farmer_profiles', userId);
+  const { creditReadinessScore, insuranceRiskTier, createdAt, ...rest } = profile;
+  const snap = await getDoc(profileRef);
+  if (snap.exists()) {
+    await setDoc(profileRef, rest, { merge: true });
+  } else {
+    await setDoc(profileRef, { ...rest, createdAt, creditReadinessScore: 0, insuranceRiskTier: 'High' });
+  }
+}
 
 export async function fetchFarmerProfile(userId: string): Promise<FarmerProfileData | null> {
   if (!userId) return null;
@@ -406,25 +301,9 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     profile.keyInsights = [cleanInsight, ...profile.keyInsights.slice(0, 5)];
   }
 
-  const existingEvents = await fetchFarmerTimeline(cleanUserId);
-  const totalEventsCount = existingEvents.length + 1;
-  const hasWeatherAction = params.eventType === 'weather_alert' || existingEvents.some(e => e.eventType === 'weather_alert');
-  const hasSmartGrading = params.eventType === 'smart_grading' || existingEvents.some(e => e.eventType === 'smart_grading');
-  // Recalculate credit and insurance metrics based strictly on actual usage
-  const creditResult = calculateCreditScore({
-    totalSessionsCompleted: profile.totalSessionsCompleted,
-    totalDiagnoses: profile.totalDiagnoses,
-    cropsCount: profile.cropsGrown.length,
-    hasLandData: profile.totalLandDecimals > 0,
-    hasLocationData: Boolean(profile.locationDistrict || profile.locationUpazila),
-    hasSoilOrIrrigation: Boolean(profile.soilType || profile.irrigationType),
-    hasCertificates: hasSmartGrading,
-    hasWeatherAction,
-    totalEventsCount
-  });
-
-  profile.creditReadinessScore = creditResult.score;
-  profile.insuranceRiskTier = creditResult.riskTier;
+  // The phone no longer calculates a score. creditReadinessScore and
+  // insuranceRiskTier keep whatever the profile already holds (0 / 'High' on a
+  // new one); the real record score is calculated by the server.
   profile.lastInteractionSummary = cleanSummary;
   profile.lastInteractionDate = now;
   profile.updatedAt = now;
@@ -439,8 +318,7 @@ export async function recordFarmerInteractionEvent(params: RecordEventParams): P
     }
 
     try {
-      const profileRef = doc(db, 'farmer_profiles', cleanUserId);
-      await setDoc(profileRef, profile, { merge: true });
+      await saveProfileToFirestore(cleanUserId, profile);
     } catch (error) {
       console.warn("Firestore error saving farmer profile, continuing locally:", error);
     }
@@ -513,31 +391,12 @@ export async function updateFarmerProfileManual(
   // Guard against legacy profiles or blank submissions: firestore.rules requires 1..128 chars
   profile.fullName = cleanFullName(profile.fullName);
 
-  const existingEvents = await fetchFarmerTimeline(cleanUserId);
-  const totalEventsCount = existingEvents.length;
-  const hasWeatherAction = existingEvents.some(e => e.eventType === 'weather_alert');
-  const hasSmartGrading = existingEvents.some(e => e.eventType === 'smart_grading');
-
-  // Recalculate credit score with updated farm data
-  const creditResult = calculateCreditScore({
-    totalSessionsCompleted: profile.totalSessionsCompleted || 0,
-    totalDiagnoses: profile.totalDiagnoses || 0,
-    cropsCount: profile.cropsGrown.length,
-    hasLandData: profile.totalLandDecimals > 0,
-    hasLocationData: Boolean(profile.locationDistrict || profile.locationUpazila),
-    hasSoilOrIrrigation: Boolean(profile.soilType || profile.irrigationType),
-    hasCertificates: hasSmartGrading,
-    hasWeatherAction,
-    totalEventsCount
-  });
-
-  profile.creditReadinessScore = creditResult.score;
-  profile.insuranceRiskTier = creditResult.riskTier;
   profile.updatedAt = now;
 
   try {
-    const profileRef = doc(db, 'farmer_profiles', cleanUserId);
-    await setDoc(profileRef, profile, { merge: true });
+    if (!isGuestProfileId(cleanUserId)) {
+      await saveProfileToFirestore(cleanUserId, profile);
+    }
   } catch (error) {
     console.warn("Firestore save profile manual error:", error);
   }
@@ -579,8 +438,9 @@ export async function resetFarmerProfile(userId: string): Promise<FarmerProfileD
   };
 
   try {
-    const profileRef = doc(db, 'farmer_profiles', cleanUserId);
-    await setDoc(profileRef, emptyProfile);
+    if (!isGuestProfileId(cleanUserId)) {
+      await saveProfileToFirestore(cleanUserId, emptyProfile);
+    }
   } catch (error) {
     console.warn("Firestore reset profile error:", error);
   }
