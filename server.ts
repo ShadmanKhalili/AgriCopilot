@@ -9,17 +9,24 @@ import helmet from "helmet";
 import { rateLimit } from 'express-rate-limit';
 import compression from "compression";
 import { GoogleGenAI } from "@google/genai";
-import { validateOutboundUrl, safeFetch, readTextWithLimit } from "./netlify/functions/_shared/safe-url.ts";
+import { handleLinkPreview } from "./netlify/functions/_shared/link-preview-core.ts";
+import { extractClientIpFromHeaders } from "./netlify/functions/_shared/ip-limit.ts";
 import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions/_shared/auth.ts";
 import { countAiUsageToday, dailyAiLimit, dailyLimitMessage, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
 import { maxOutputTokensFromEnv, sanitizeGenerationConfig, findUnsupportedContent, configTextChars, MAX_CONFIG_TEXT_CHARS } from "./netlify/functions/_shared/ai-config.ts";
-import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
+import { issueLiveToken, liveTokenMessage } from "./netlify/functions/_shared/live-token.ts";
 import { farmActionsFromFeed } from "./netlify/functions/_shared/farm-actions.ts";
 import { isSafeSprayWindowHour } from "./netlify/functions/_shared/spray-window.ts";
 import { parseIpLiteral, isNonPublicIp } from "./netlify/functions/_shared/client-ip.ts";
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./netlify/functions/_shared/daily-merge.ts";
 import areaReportHandler from "./netlify/functions/area-report.ts";
 import farmRecordScoreHandler from "./netlify/functions/farm-record-score.ts";
+import configStatusHandler from "./netlify/functions/config-status.ts";
+import dailyForecastHandler from "./netlify/functions/daily-forecast.ts";
+import historicalDataHandler from "./netlify/functions/historical-data.ts";
+import wbIndicatorsHandler from "./netlify/functions/wb-indicators.ts";
+import sentinelHandler from "./netlify/functions/sentinel.ts";
+import { normalizeWeatherQuery, serverWeatherKey } from "./netlify/functions/_shared/weather-request.ts";
 import {
   getFreshMarketBulletin,
   getStaleMarketBulletin,
@@ -221,31 +228,35 @@ async function startServer() {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  // Check if Google Maps / Google Weather API keys are configured in environment secrets
-  app.get("/api/config-status", (req, res) => {
-    const googleMapsConfigured = Boolean(
-      process.env.GOOGLE_MAPS_API_KEY || 
-      process.env.VITE_GOOGLE_MAPS_API_KEY || 
-      process.env.MAPS_API_KEY
-    );
-    const weatherNextConfigured = Boolean(
-      process.env.GOOGLE_MAPS_API_KEY ||
-      process.env.VITE_GOOGLE_MAPS_API_KEY ||
-      process.env.MAPS_API_KEY
-    );
-    const areaReportsConfigured = Boolean(process.env.FIREBASE_SERVICE_ACCOUNT);
-    const pushConfigured = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
-    res.json({
-      googleMapsConfigured,
-      weatherNextConfigured,
-      areaReportsConfigured,
-      pushConfigured,
-      activeProviders: {
-        weatherNext: weatherNextConfigured ? "Google Maps Platform Weather API (live)" : "Open-Meteo agro-forecast ensemble",
-        googleMaps: googleMapsConfigured ? "Google Maps Platform (Authenticated)" : "Standard Web Maps"
-      }
-    });
-  });
+  // The simple data proxies below run the SAME handlers as the Netlify
+  // functions (strict input checks, per-IP limit, generic errors): build a
+  // Request from the Express one, call the handler, and copy the answer back.
+  const callFetchHandler = async (
+    handler: (request: Request) => Promise<Response>,
+    req: express.Request,
+    res: express.Response
+  ) => {
+    try {
+      const hasBody = req.method !== "GET" && req.method !== "HEAD";
+      const response = await handler(
+        new Request(`http://localhost${req.originalUrl}`, {
+          method: req.method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(req.ip ? { "x-real-ip": req.ip } : {}),
+          },
+          body: hasBody ? JSON.stringify(req.body ?? null) : undefined,
+        })
+      );
+      response.headers.forEach((value, key) => res.setHeader(key, value));
+      res.status(response.status).send(await response.text());
+    } catch {
+      res.status(500).json({ error: "request_failed" });
+    }
+  };
+
+  // Which provider keys are configured (booleans only, no secrets).
+  app.get("/api/config-status", (req, res) => callFetchHandler(configStatusHandler, req, res));
 
   // Live market prices from the Department of Agricultural Marketing.
   //
@@ -359,23 +370,24 @@ async function startServer() {
     }
 
     try {
+      const lang = req.body?.lang === "en" ? "en" : "bn";
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(503).json({
-          error: "GEMINI_API_KEY is not configured in server environment."
-        });
+        console.error("[live-token] GEMINI_API_KEY is not configured");
+        return res.status(503).json({ code: "LIVE_FAILED", error: liveTokenMessage("LIVE_FAILED", lang) });
       }
 
       const client = getServerAi();
       if (!client || !client.authTokens?.create) {
-        return res.status(500).json({
-          error: "Gemini AuthTokens service is unavailable on the server."
-        });
+        console.error("[live-token] Gemini AuthTokens service is unavailable");
+        return res.status(500).json({ code: "LIVE_FAILED", error: liveTokenMessage("LIVE_FAILED", lang) });
       }
 
-      const result = await issueLiveToken(client as any, user.uid, idToken, req.body?.model, user.isGuest);
+      // The body carries only small validated inputs; the system instruction
+      // is built and locked into the token by the shared builder.
+      const result = await issueLiveToken(client as any, user.uid, idToken, req.body, user.isGuest);
       if (result.ok === false) {
-        return res.status(result.status).json({ error: result.error });
+        return res.status(result.status).json({ code: result.code, error: result.error });
       }
 
       return res.json({
@@ -384,23 +396,10 @@ async function startServer() {
         model: result.model
       });
     } catch (err: any) {
-      const rawMsg = String(err?.message || err || '');
-      const isSuspended = rawMsg.includes("CONSUMER_SUSPENDED") || rawMsg.includes("has been suspended");
-      const isKeyError = isSuspended || rawMsg.includes("PERMISSION_DENIED") || rawMsg.includes("API_KEY_INVALID") || err?.status === 403;
-
-      let safeErrorMessage = "Failed to generate ephemeral session token.";
-      if (isSuspended) {
-        safeErrorMessage = "Gemini API key has been suspended or rotated. Please configure an active GEMINI_API_KEY.";
-      } else if (isKeyError) {
-        safeErrorMessage = "Gemini API key is invalid or lacks Live API permissions.";
-      }
-
-      console.warn(`[Live Token] Ephemeral token generation unavailable: ${safeErrorMessage}`);
-      return res.status(isKeyError ? 403 : 500).json({
-        error: safeErrorMessage,
-        isSuspended,
-        isKeyError
-      });
+      // Details stay in the server log; the caller gets a generic message.
+      const lang = req.body?.lang === "en" ? "en" : "bn";
+      console.warn("[Live Token] Ephemeral token generation failed:", String(err?.message || err || ""));
+      return res.status(500).json({ code: "LIVE_FAILED", error: liveTokenMessage("LIVE_FAILED", lang) });
     }
   });
 
@@ -665,191 +664,8 @@ async function startServer() {
     res.send("User-agent: *\nAllow: /");
   });
 
-  // Agro-Climatic Vegetation & Moisture Index Model (High-precision regional baseline)
-  function getAgroClimaticVegetationIndex(lat: number, lng: number) {
-    const month = new Date().getMonth(); // 0 to 11
-    
-    // Seasonal baseline for Bangladesh Agro-Ecological Zones (AEZ)
-    // Monsoon / Aman Season (Jun - Oct): High vegetative density & water index
-    // Winter / Boro / Rabi Season (Nov - Feb): Irrigated crop greens
-    // Pre-Monsoon / Summer (Mar - May): Transitional preparation
-    let baseNdvi = 0.68;
-    let baseNdmi = 0.22;
-
-    if (month >= 5 && month <= 9) {
-      baseNdvi = 0.74;
-      baseNdmi = 0.32;
-    } else if (month >= 10 || month <= 1) {
-      baseNdvi = 0.65;
-      baseNdmi = 0.18;
-    } else {
-      baseNdvi = 0.54;
-      baseNdmi = 0.08;
-    }
-
-    // Micro-spatial variation derived deterministically from geographic coordinates
-    const seed = Math.sin(lat * 12.9898 + lng * 78.233) * 43758.5453;
-    const variance = (seed - Math.floor(seed)) * 0.12 - 0.06;
-    const moistureVariance = ((seed * 1.5) - Math.floor(seed * 1.5)) * 0.10 - 0.05;
-
-    const finalNdvi = Math.min(0.92, Math.max(0.20, Number((baseNdvi + variance).toFixed(2))));
-    const finalNdmi = Math.min(0.60, Math.max(-0.20, Number((baseNdmi + moistureVariance).toFixed(2))));
-
-    return {
-      ndvi: finalNdvi,
-      ndmi: finalNdmi,
-      source: 'agro_climatic_model',
-      isEstimated: true
-    };
-  }
-
-  // Sentinel Hub / Copernicus Vegetation Proxy
-  app.post("/.netlify/functions/sentinel", async (req, res) => {
-    const { lat, lng } = req.body;
-    const latNum = Number(lat) || 23.685;
-    const lngNum = Number(lng) || 90.3563;
-
-    const rawClientId = process.env.SENTINEL_HUB_CLIENT_ID || "";
-    const rawClientSecret = process.env.SENTINEL_HUB_CLIENT_SECRET || "";
-    
-    // Clean up credentials
-    const clientId = rawClientId.trim().replace(/^["']|["']$/g, '');
-    const clientSecret = rawClientSecret.trim().replace(/^["']|["']$/g, '');
-
-    // If credentials are not configured or are placeholder values, provide model calculation
-    if (!clientId || !clientSecret || clientId.includes("placeholder") || clientId.length < 5) {
-      return res.json(getAgroClimaticVegetationIndex(latNum, lngNum));
-    }
-
-    try {
-      // 1. Get OAuth Token (Try CDSE first, fallback to Classic Sentinel Hub)
-      let accessToken = "";
-      let processEndpoint = "";
-
-      try {
-        const authResponse = await axios.post(
-          "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
-          new URLSearchParams({
-            grant_type: "client_credentials",
-            client_id: clientId,
-            client_secret: clientSecret,
-          }).toString(),
-          { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 8000 }
-        );
-        accessToken = authResponse.data.access_token;
-        processEndpoint = "https://sh.dataspace.copernicus.eu/api/v1/process";
-      } catch {
-        // Fallback to Classic Sentinel Hub OAuth
-        const authResponse = await axios.post(
-          "https://services.sentinel-hub.com/auth/realms/main/protocol/openid-connect/token",
-          new URLSearchParams({
-            grant_type: "client_credentials",
-            client_id: clientId,
-            client_secret: clientSecret,
-          }).toString(),
-          { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 8000 }
-        );
-        accessToken = authResponse.data.access_token;
-        processEndpoint = "https://services.sentinel-hub.com/api/v1/process";
-      }
-
-      // 2. Fetch NDVI & NDMI via Statistical API
-      const offset = 0.001; // ~100m
-      const bbox = [lngNum - offset, latNum - offset, lngNum + offset, latNum + offset];
-
-      const toDate = new Date();
-      const fromDate = new Date();
-      fromDate.setDate(toDate.getDate() - 30); // Look back 30 days
-      
-      const toDateStr = toDate.toISOString().split('.')[0] + 'Z';
-      const fromDateStr = fromDate.toISOString().split('.')[0] + 'Z';
-
-      const statsEndpoint = processEndpoint.replace('/process', '/statistics');
-
-      const processResponse = await axios.post(
-        statsEndpoint,
-        {
-          input: {
-            bounds: { bbox },
-            data: [{ 
-              type: "sentinel-2-l2a",
-              dataFilter: {
-                timeRange: { from: fromDateStr, to: toDateStr },
-                maxCloudCoverage: 30
-              }
-            }]
-          },
-          aggregation: {
-            timeRange: { from: fromDateStr, to: toDateStr },
-            aggregationInterval: { of: "P30D" },
-            evalscript: `
-              //VERSION=3
-              function setup() {
-                return {
-                  input: ["B04", "B08", "B11", "SCL", "dataMask"],
-                  output: [
-                    { id: "ndvi", bands: 1, sampleType: "FLOAT32" },
-                    { id: "ndmi", bands: 1, sampleType: "FLOAT32" },
-                    { id: "dataMask", bands: 1 }
-                  ]
-                };
-              }
-              function evaluatePixel(sample) {
-                let isCloud = [3, 8, 9, 10].includes(sample.SCL);
-                let valid = sample.dataMask === 1 && !isCloud;
-
-                let ndvi = 0;
-                let ndmi = 0;
-
-                if (valid) {
-                  let ndviDenom = sample.B08 + sample.B04;
-                  ndvi = ndviDenom === 0 ? 0 : (sample.B08 - sample.B04) / ndviDenom;
-                  
-                  let ndmiDenom = sample.B08 + sample.B11;
-                  ndmi = ndmiDenom === 0 ? 0 : (sample.B08 - sample.B11) / ndmiDenom;
-                }
-
-                return {
-                  ndvi: [ndvi],
-                  ndmi: [ndmi],
-                  dataMask: [valid ? 1 : 0]
-                };
-              }
-            `,
-            resx: 10,
-            resy: 10
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-            Accept: "application/json"
-          },
-          timeout: 10000
-        }
-      );
-
-      let ndviValue = 0;
-      let ndmiValue = 0;
-      try {
-        const statsNdvi = processResponse.data.data[0].outputs.ndvi.bands.B0.stats;
-        ndviValue = statsNdvi.mean;
-        
-        const statsNdmi = processResponse.data.data[0].outputs.ndmi.bands.B0.stats;
-        ndmiValue = statsNdmi.mean;
-      } catch {
-        // Fallback to model if stats parsing empty
-        return res.json(getAgroClimaticVegetationIndex(latNum, lngNum));
-      }
-      
-      return res.json({ ndvi: ndviValue, ndmi: ndmiValue, source: 'sentinel_2', isEstimated: false });
-
-    } catch {
-      // Seamlessly fallback to Agro-Climatic Model without breaking user experience
-      return res.json(getAgroClimaticVegetationIndex(latNum, lngNum));
-    }
-  });
+  // Sentinel Hub / Copernicus vegetation proxy: same handler as the Netlify function.
+  app.post("/api/sentinel", (req, res) => callFetchHandler(sentinelHandler, req, res));
 
   // Proxy for IP Geolocation fallback (strictly aligned with Bangladesh regional focus)
   app.get("/api/ip-location", async (req, res) => {
@@ -1078,84 +894,9 @@ async function startServer() {
     return res.json(result);
   });
 
-  // Proxy for Weather API
-  app.get("/api/daily-forecast", async (req, res) => {
-    try {
-      const { latitude, longitude, ...rest } = req.query;
-      
-      if (!latitude || !longitude) {
-        return res.status(400).json({ error: "Latitude and longitude are required" });
-      }
-
-      const lat = parseFloat(latitude as string);
-      const lon = parseFloat(longitude as string);
-
-      if (isNaN(lat) || isNaN(lon)) {
-        return res.status(400).json({ error: "Invalid latitude or longitude" });
-      }
-
-      const url = `https://api.open-meteo.com/v1/forecast`;
-      console.log(`Proxying Weather request to Open-Meteo: ${url} with params:`, { latitude: lat, longitude: lon, ...rest });
-      const response = await axios.get(url, {
-        params: {
-          latitude: lat,
-          longitude: lon,
-          ...rest
-        },
-        timeout: 10000 // 10s timeout
-      });
-      // Enforce strict no-cache for live weather data so browsers & proxies never serve stale forecasts
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.setHeader("Surrogate-Control", "no-store");
-      res.json(response.data);
-    } catch (error: any) {
-      const fullUrl = error.config?.url + '?' + new URLSearchParams(error.config?.params).toString();
-      console.error("Weather Proxy Error:", error.message, "URL:", fullUrl);
-      if (error.response?.data) {
-        console.error("Open-Meteo API Error Response:", JSON.stringify(error.response.data));
-      }
-      res.status(500).json({ 
-        error: "Failed to fetch weather data from Open-Meteo",
-        details: error.message,
-        apiError: error.response?.data,
-        requestedUrl: fullUrl
-      });
-    }
-  });
-
-  // Proxy for Climate API
-  app.get("/api/historical-data", async (req, res) => {
-    try {
-      const { latitude, longitude, ...rest } = req.query;
-      
-      if (!latitude || !longitude) {
-        return res.status(400).json({ error: "Latitude and longitude are required" });
-      }
-
-      const url = `https://archive-api.open-meteo.com/v1/archive`;
-      console.log(`Proxying Climate request to Open-Meteo: ${url} with params:`, { latitude, longitude, ...rest });
-      
-      const response = await axios.get(url, {
-        params: req.query,
-        timeout: 15000 // 15s timeout
-      });
-      res.json(response.data);
-    } catch (error: any) {
-      const fullUrl = error.config?.url + '?' + new URLSearchParams(error.config?.params).toString();
-      console.error("Climate Proxy Error:", error.message, "URL:", fullUrl);
-      if (error.response?.data) {
-        console.error("Open-Meteo Archive API Error Response:", JSON.stringify(error.response.data));
-      }
-      res.status(500).json({ 
-        error: "Failed to fetch historical climate data from Open-Meteo",
-        details: error.message,
-        apiError: error.response?.data,
-        requestedUrl: fullUrl
-      });
-    }
-  });
+  // Open-Meteo forecast and archive proxies: same handlers as the Netlify functions.
+  app.get("/api/daily-forecast", (req, res) => callFetchHandler(dailyForecastHandler, req, res));
+  app.get("/api/historical-data", (req, res) => callFetchHandler(historicalDataHandler, req, res));
 
   // Open-Meteo's 7-day daily block, used to complete the Google-derived `daily`.
   // Never throws and never waits long: null on any failure or after 4 seconds.
@@ -1182,32 +923,26 @@ async function startServer() {
   // AgroCast AI / Google Weather API - High-Resolution Agrometeorological Endpoint
   const handleWeatherNext3 = async (req: express.Request, res: express.Response) => {
     try {
-      const { latitude, longitude, timezone = 'auto', forecast_days = '7' } = req.query;
-
-      if (!latitude || !longitude) {
-        return res.status(400).json({ error: "Latitude and longitude are required" });
+      // Same normalisation as the Netlify function: coordinates snap to the
+      // 0.05 degree grid, timezone and forecast days are allowlisted.
+      const query = normalizeWeatherQuery({
+        latitude: req.query.latitude,
+        longitude: req.query.longitude,
+        timezone: req.query.timezone,
+        forecast_days: req.query.forecast_days
+      });
+      if (!query) {
+        return res.status(400).json({ error: "Valid latitude and longitude are required" });
       }
+      const { lat, lon, timezone } = query;
+      const forecast_days = String(query.forecastDays);
 
-      const lat = parseFloat(latitude as string);
-      const lon = parseFloat(longitude as string);
+      // Server-side environment keys only. The caller cannot choose the key
+      // (no header or query override), and the browser's VITE_ key is never used.
+      const googleKey = serverWeatherKey();
 
-      if (isNaN(lat) || isNaN(lon)) {
-        return res.status(400).json({ error: "Invalid latitude or longitude" });
-      }
-
-      // Resolve Google API key. Server-side secrets take priority so the browser's
-      // (possibly HTTP-referrer-restricted) key can never break the server-to-server
-      // Google Weather lookup. The client header/query remain a development fallback.
-      const googleKey =
-        process.env.GOOGLE_MAPS_API_KEY ||
-        process.env.GOOGLE_API_KEY ||
-        process.env.MAPS_API_KEY ||
-        process.env.VITE_GOOGLE_MAPS_API_KEY ||
-        (req.headers['x-google-maps-key'] as string) ||
-        (req.query.apiKey as string);
-
-      const gridLat = Math.round(lat / 0.05) * 0.05;
-      const gridLon = Math.round(lon / 0.05) * 0.05;
+      const gridLat = lat;
+      const gridLon = lon;
 
       let googleWeatherSucceeded = false;
       let weatherPayload: any = null;
@@ -1963,11 +1698,8 @@ async function startServer() {
       weatherPayload.farm_actions = farmActionsFromFeed(weatherPayload);
       return res.json(weatherPayload);
     } catch (error: any) {
-      console.error("[AgroCast AI] Error generating weather forecast:", error.message);
-      return res.status(500).json({
-        error: "Failed to generate weather forecast",
-        details: error.message
-      });
+      console.error("[AgroCast AI] Error generating weather forecast:", error?.message);
+      return res.status(500).json({ error: "Failed to generate weather forecast" });
     }
   };
 
@@ -2036,14 +1768,19 @@ async function startServer() {
     }
 
     try {
+      // Only the validated point and allowlisted SoilGrids parameters go upstream.
       const params = new URLSearchParams();
-      for (const key in req.query) {
-        const value = req.query[key];
-        if (Array.isArray(value)) {
-          value.forEach(v => params.append(key, v as string));
-        } else {
-          params.append(key, value as string);
-        }
+      params.append("lat", String(lat));
+      params.append("lon", String(lon));
+      const soilAllowed: Record<string, RegExp> = {
+        property: /^(bdod|cec|cfvo|clay|nitrogen|ocd|ocs|phh2o|sand|silt|soc)$/,
+        depth: /^(0-5|5-15|15-30|30-60|60-100|100-200)cm$/,
+        value: /^(Q0\.05|Q0\.5|Q0\.95|mean|uncertainty)$/,
+      };
+      for (const [key, pattern] of Object.entries(soilAllowed)) {
+        const raw = req.query[key];
+        const items = (Array.isArray(raw) ? raw : [raw]).flatMap((v) => (typeof v === "string" ? v.split(",") : []));
+        items.slice(0, 8).map((v) => v.trim()).filter((v) => pattern.test(v)).forEach((v) => params.append(key, v));
       }
 
       const response = await axios.get(`https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`, {
@@ -2066,140 +1803,26 @@ async function startServer() {
     }
   });
 
-  // Proxy for World Bank API
-  app.get("/api/wb-indicators", async (req, res) => {
-    try {
-      const { country, ind, ...rest } = req.query;
-      
-      if (!country || !ind) {
-        return res.status(400).json({ error: "Missing country or indicator parameter" });
-      }
-
-      const url = `https://api.worldbank.org/v2/country/${country}/indicator/${ind}`;
-      console.log(`Proxying World Bank request to: ${url}`);
-
-      const response = await axios.get(url, {
-        params: {
-          ...rest,
-          format: 'json'
-        },
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json'
-        },
-        timeout: 20000 // Increased to 20s
-      });
-      
-      res.json(response.data);
-    } catch (error: any) {
-      const errorStatus = error.response?.status || 500;
-      let errorDetails = error.response?.data;
-      
-      console.error(`World Bank Proxy Error at /api/wb-indicators for ${req.query.ind}:`, error.message);
-      
-      if (errorDetails) {
-        // If it's an HTML error page, don't flood logs or send huge HTML to frontend
-        if (typeof errorDetails === 'string' && errorDetails.trim().startsWith('<')) {
-          console.error(`World Bank API Response Error: ${errorStatus} (HTML error page omitted)`);
-          errorDetails = "Upstream server returned an HTML error page";
-        } else {
-          console.error("World Bank API Response Error:", errorStatus, errorDetails);
-        }
-      }
-      
-      res.status(errorStatus).json({ 
-        error: error.message || "Failed to fetch from World Bank API",
-        details: errorDetails
-      });
-    }
-  });
+  // World Bank indicators: same handler as the Netlify function.
+  app.get("/api/wb-indicators", (req, res) => callFetchHandler(wbIndicatorsHandler, req, res));
 
   // AI PROXY ROUTES REMOVED (AI moved to frontend)
 
 
   // SSRF protection for outbound fetches lives in
-  // `netlify/functions/_shared/safe-url.ts` and is shared with the Netlify
-  // function that actually serves `/api/link-preview` in production. The two
-  // implementations used to drift — this file had a hardened validator while
-  // the shipped Netlify copy kept a four-entry host blocklist.
-
-  // Link Preview Helper (Hardened against SSRF & Resource Exhaustion)
-  app.get("/api/link-preview", async (req, res) => {
-    const { url } = req.query;
-    if (!url || typeof url !== 'string') {
-      return res.status(400).json({ error: "URL query parameter is required" });
-    }
-
-    const validation = await validateOutboundUrl(url);
-    if (!validation.safe || !validation.url) {
-      return res.status(403).json({ error: validation.error || "Forbidden URL destination" });
-    }
-    const urlObj = validation.url;
-
-    try {
-      console.log(`Fetching sanitized link preview for: ${url}`);
-      
-      // Every redirect hop is re-validated, with a timeout and a size limit.
-      const response = await safeFetch(urlObj.toString(), {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9,bn;q=0.8'
-        }
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      
-      if (response.status === 403 || response.status === 404 || !contentType.includes('text/html')) {
-        return res.json({
-          title: response.status === 404 ? "Portal Not Found" : "Portal Access Restricted",
-          description: !contentType.includes('text/html') && response.status === 200 
-            ? "This link leads to a document or secure portal. Click below to view it directly."
-            : "This portal requires a direct visit for security verification. Please use the link below to access the official website.",
-          siteName: urlObj.hostname,
-          url: url,
-          isRestricted: true
-        });
-      }
-
-      const html = await readTextWithLimit(response);
-      
-      // Basic meta tag extraction via regex (simple and effective for most OG sites)
-      const getMeta = (property: string) => {
-        const regex = new RegExp(`<meta [^>]*property=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
-        const match = html.match(regex);
-        if (match) return match[1];
-        
-        // Try fallback for name attribute
-        const regexName = new RegExp(`<meta [^>]*name=["']${property}["'] [^>]*content=["']([^"']*)["']`, 'i');
-        const matchName = html.match(regexName);
-        return matchName ? matchName[1] : null;
-      };
-
-      const title = getMeta('og:title') || getMeta('title') || html.match(/<title>([^<]*)<\/title>/i)?.[1];
-      const description = getMeta('og:description') || getMeta('description');
-      const image = getMeta('og:image') || getMeta('twitter:image');
-      const siteName = getMeta('og:site_name');
-
-      res.json({
-        title: title?.trim(),
-        description: description?.trim(),
-        image: image,
-        siteName: siteName,
-        url: url
-      });
-
-    } catch {
-      // Safe fallback for unreachable hosts, offline portals, DNS resolution failures, or timeout
-      const cleanHost = urlObj.hostname.replace(/^www\./, '');
-      return res.json({
-        title: `${cleanHost.toUpperCase()} Portal`,
-        description: "Official government or agricultural resource portal. Click below to view the official site directly.",
-        siteName: cleanHost,
-        url: url,
-        isRestricted: true
-      });
-    }
+  // `netlify/functions/_shared/safe-url.ts`, and the whole request handling
+  // (GET only, per-IP limit, sign-in or allow-listed host, pinned-IP fetch)
+  // in `_shared/link-preview-core.ts`. This route calls the same handler as
+  // the Netlify function that serves `/api/link-preview` in production.
+  app.all("/api/link-preview", async (req, res) => {
+    const rawUrl = req.query.url;
+    const result = await handleLinkPreview({
+      method: req.method,
+      url: typeof rawUrl === "string" ? rawUrl : undefined,
+      authorization: req.headers.authorization,
+      ip: extractClientIpFromHeaders(req.headers as Record<string, string | undefined>),
+    });
+    res.status(result.status).set(result.headers).json(result.body);
   });
 
   // Vite middleware for development

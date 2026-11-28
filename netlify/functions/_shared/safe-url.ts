@@ -18,10 +18,22 @@
  *
  * Redirects are followed manually so every hop is re-validated — otherwise a
  * public URL can 302 straight to `169.254.169.254`.
+ *
+ * DNS rebinding: validating a hostname and then letting `fetch()` resolve it
+ * again leaves a gap in which a hostile DNS server can answer with a public
+ * address for the check and `127.0.0.1` for the connection. `safeFetch` closes
+ * the gap by resolving the hostname once per hop, validating every address,
+ * and connecting to that validated address through a custom `lookup` (node:http
+ * / node:https), keeping the original hostname for the Host header, SNI and
+ * certificate check.
  */
 
 import dns from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
 import net from 'node:net';
+import { PassThrough, Readable, Transform, pipeline } from 'node:stream';
+import zlib from 'node:zlib';
 import type { LookupAddress } from 'node:dns';
 
 /** Whole-request budget for a single outbound request (ms). */
@@ -35,6 +47,8 @@ export interface UrlValidation {
   safe: boolean;
   error?: string;
   url?: URL;
+  /** The addresses the host resolved to, every one of them checked. */
+  addresses?: LookupAddress[];
 }
 
 const BLOCKED_EXACT_HOSTS = new Set([
@@ -97,14 +111,23 @@ export function isPrivateAddress(host: string): boolean {
   return false;
 }
 
+/** Resolves a hostname to every address it currently points at. */
+export type HostResolver = (hostname: string) => Promise<LookupAddress[]>;
+
+const defaultResolver: HostResolver = (hostname) => dns.lookup(hostname, { all: true });
+
 /**
  * Validate a URL that the server is about to fetch.
  *
  * The hostname is resolved and every returned address is checked, so a name
  * such as `127.0.0.1.nip.io` (or an attacker-controlled DNS record) is
- * rejected even though the literal string looks harmless.
+ * rejected even though the literal string looks harmless. The validated
+ * addresses are returned so a caller can connect to exactly those.
  */
-export async function validateOutboundUrl(rawUrl: string): Promise<UrlValidation> {
+export async function validateOutboundUrl(
+  rawUrl: string,
+  resolver: HostResolver = defaultResolver
+): Promise<UrlValidation> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -134,45 +157,284 @@ export async function validateOutboundUrl(rawUrl: string): Promise<UrlValidation
   }
 
   // Literal addresses are already covered above; only resolve real hostnames.
-  if (!net.isIP(hostname.replace(/^\[/, '').replace(/\]$/, ''))) {
-    let addresses: LookupAddress[];
-    try {
-      addresses = await dns.lookup(hostname, { all: true });
-    } catch {
-      return { safe: false, error: 'Host could not be resolved' };
-    }
-    if (addresses.length === 0) {
-      return { safe: false, error: 'Host could not be resolved' };
-    }
-    for (const { address } of addresses) {
-      if (isPrivateAddress(address)) {
-        return { safe: false, error: 'Access to private address space is prohibited' };
-      }
+  const bareHost = hostname.replace(/^\[/, '').replace(/\]$/, '');
+  if (net.isIP(bareHost)) {
+    return { safe: true, url, addresses: [{ address: bareHost, family: net.isIPv6(bareHost) ? 6 : 4 }] };
+  }
+
+  let addresses: LookupAddress[];
+  try {
+    addresses = await resolver(hostname);
+  } catch {
+    return { safe: false, error: 'Host could not be resolved' };
+  }
+  if (!Array.isArray(addresses) || addresses.length === 0) {
+    return { safe: false, error: 'Host could not be resolved' };
+  }
+  for (const { address } of addresses) {
+    if (isPrivateAddress(address)) {
+      return { safe: false, error: 'Access to private address space is prohibited' };
     }
   }
 
-  return { safe: true, url };
+  return { safe: true, url, addresses };
+}
+
+/**
+ * A `lookup` function for node:http(s) that only ever answers with the address
+ * that was already validated for `hostname`. It is asked again by the socket
+ * layer (and again for each address family attempt), so it re-checks both the
+ * name and the address every time: a different hostname, or an address in a
+ * private range, is an error and no connection is made.
+ */
+export function createPinnedLookup(hostname: string, pinned: LookupAddress) {
+  const expected = hostname.toLowerCase().replace(/\.$/, '');
+  return (
+    requested: string,
+    options: any,
+    callback?: (err: Error | null, address?: any, family?: number) => void
+  ): void => {
+    const cb = typeof options === 'function' ? options : callback;
+    const opts = typeof options === 'function' ? {} : options || {};
+    if (!cb) return;
+    if (String(requested || '').toLowerCase().replace(/\.$/, '') !== expected) {
+      cb(new Error('Pinned lookup was asked for a different host'));
+      return;
+    }
+    if (isPrivateAddress(pinned.address)) {
+      cb(new Error('Access to private address space is prohibited'));
+      return;
+    }
+    if (opts.all) {
+      cb(null, [{ address: pinned.address, family: pinned.family }]);
+    } else {
+      cb(null, pinned.address, pinned.family);
+    }
+  };
+}
+
+/** The minimal slice of a node:http client request the fetcher uses. */
+export interface PinnedRequestLike {
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  end(): unknown;
+  destroy(error?: Error): unknown;
+}
+
+/** Makes the actual request. Swappable so tests need no network. */
+export type PinnedTransport = (
+  protocol: 'http:' | 'https:',
+  options: http.RequestOptions & https.RequestOptions,
+  onResponse: (res: http.IncomingMessage) => void
+) => PinnedRequestLike;
+
+const defaultTransport: PinnedTransport = (protocol, options, onResponse) =>
+  (protocol === 'https:' ? https : http).request(options, onResponse);
+
+export interface SafeFetchOptions {
+  /** Largest body that will be delivered (after any decompression). */
+  maxBytes?: number;
+  /** Whole-request budget in ms. */
+  timeoutMs?: number;
+  /** Hostname resolution. Called once per hop. */
+  resolver?: HostResolver;
+  /** The request implementation. */
+  transport?: PinnedTransport;
+}
+
+const headersToRecord = (headers: RequestInit['headers']): Record<string, string> => {
+  const out: Record<string, string> = {};
+  if (!headers) return out;
+  const add = (key: string, value: string) => {
+    out[key.toLowerCase()] = value;
+  };
+  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+    headers.forEach((value, key) => add(key, value));
+  } else if (Array.isArray(headers)) {
+    for (const [key, value] of headers) add(key, value);
+  } else {
+    for (const [key, value] of Object.entries(headers as Record<string, string>)) add(key, String(value));
+  }
+  return out;
+};
+
+/** Ends the body with an error once it grows past `limit` bytes. */
+const byteLimit = (limit: number): Transform => {
+  let seen = 0;
+  return new Transform({
+    transform(chunk, _encoding, callback) {
+      seen += chunk.length;
+      if (seen > limit) {
+        callback(new Error('Response too large'));
+        return;
+      }
+      callback(null, chunk);
+    },
+  });
+};
+
+/**
+ * One request to an already-validated address. Resolves with a web `Response`
+ * whose body is capped at `maxBytes`.
+ */
+function requestPinned(
+  target: URL,
+  address: LookupAddress,
+  init: RequestInit,
+  options: Required<Pick<SafeFetchOptions, 'maxBytes' | 'timeoutMs'>> & { transport: PinnedTransport }
+): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    const protocol = target.protocol === 'https:' ? 'https:' : 'http:';
+    const method = (init.method || 'GET').toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      reject(new Error('Only GET requests are permitted'));
+      return;
+    }
+    const hostname = target.hostname.replace(/^\[/, '').replace(/\]$/, '');
+    const isLiteral = net.isIP(hostname) !== 0;
+    const headers = headersToRecord(init.headers);
+    // Node does not decompress, and an unexpected encoding would defeat the
+    // size cap, so ask for none; any encoding that comes back is handled below.
+    if (!headers['accept-encoding']) headers['accept-encoding'] = 'identity';
+
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    const requestOptions: http.RequestOptions & https.RequestOptions = {
+      method,
+      hostname,
+      port: target.port || (protocol === 'https:' ? 443 : 80),
+      path: `${target.pathname}${target.search}`,
+      headers,
+      // A fresh connection per request: no pooled socket from an earlier,
+      // differently-resolved lookup is ever reused.
+      agent: false,
+      // Connect to the address that was validated, whatever DNS says now.
+      lookup: createPinnedLookup(hostname, address) as any,
+      ...(protocol === 'https:' && !isLiteral ? { servername: hostname } : {}),
+    };
+
+    const req = options.transport(protocol, requestOptions, (res) => {
+      const status = res.statusCode || 0;
+      const responseHeaders = new Headers();
+      for (const [key, value] of Object.entries(res.headers)) {
+        if (value === undefined) continue;
+        if (Array.isArray(value)) value.forEach((v) => responseHeaders.append(key, v));
+        else responseHeaders.set(key, String(value));
+      }
+
+      const declared = Number(responseHeaders.get('content-length'));
+      const noBody = method === 'HEAD' || status === 204 || status === 205 || status === 304;
+      if (!noBody && Number.isFinite(declared) && declared > options.maxBytes) {
+        res.destroy();
+        req.destroy();
+        finish(() => reject(new Error('Response too large')));
+        return;
+      }
+
+      const encoding = String(res.headers['content-encoding'] || '').toLowerCase().trim();
+      let source: Readable = res;
+      const stages: Array<NodeJS.ReadWriteStream> = [];
+      if (encoding === 'gzip' || encoding === 'x-gzip') stages.push(zlib.createGunzip());
+      else if (encoding === 'deflate') stages.push(zlib.createInflate());
+      else if (encoding === 'br') stages.push(zlib.createBrotliDecompress());
+      else if (encoding && encoding !== 'identity') {
+        res.destroy();
+        req.destroy();
+        finish(() => reject(new Error('Unsupported content encoding')));
+        return;
+      }
+      if (stages.length) {
+        responseHeaders.delete('content-encoding');
+        responseHeaders.delete('content-length');
+      }
+
+      const limited = byteLimit(options.maxBytes);
+      const body = new PassThrough();
+      pipeline([source, ...stages, limited, body] as any, () => {
+        // Errors surface on the web stream; nothing else to do here.
+      });
+      body.on('close', () => {
+        if (timer) clearTimeout(timer);
+        try {
+          req.destroy();
+        } catch {
+          // Already finished.
+        }
+      });
+
+      finish(() =>
+        resolve(
+          new Response(noBody ? null : (Readable.toWeb(body) as unknown as ReadableStream), {
+            status,
+            headers: responseHeaders,
+          })
+        )
+      );
+      if (noBody) body.destroy();
+    });
+
+    timer = setTimeout(() => {
+      const error = new Error('Request timed out');
+      try {
+        req.destroy(error);
+      } catch {
+        // Ignore.
+      }
+      finish(() => reject(error));
+    }, options.timeoutMs);
+
+    req.on('error', (error: Error) => {
+      if (timer) clearTimeout(timer);
+      finish(() => reject(error));
+    });
+
+    const signal = init.signal;
+    if (signal) {
+      const onAbort = () => {
+        try {
+          req.destroy(new Error('Aborted'));
+        } catch {
+          // Ignore.
+        }
+        finish(() => reject(new Error('Aborted')));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    req.end();
+  });
 }
 
 /**
  * Fetch a URL that the user supplied, with every redirect hop re-validated,
- * a hard timeout and no unbounded response buffering.
+ * the validated address pinned for the connection, a hard timeout and a cap on
+ * the body.
  */
-export async function safeFetch(rawUrl: string, init: RequestInit = {}): Promise<Response> {
+export async function safeFetch(
+  rawUrl: string,
+  init: RequestInit = {},
+  options: SafeFetchOptions = {}
+): Promise<Response> {
+  const maxBytes = options.maxBytes ?? SAFE_FETCH_MAX_BYTES;
+  const timeoutMs = options.timeoutMs ?? SAFE_FETCH_TIMEOUT_MS;
+  const transport = options.transport ?? defaultTransport;
   let target = rawUrl;
 
   for (let hop = 0; hop <= SAFE_FETCH_MAX_REDIRECTS; hop++) {
-    const validation = await validateOutboundUrl(target);
-    if (!validation.safe || !validation.url) {
+    const validation = await validateOutboundUrl(target, options.resolver);
+    if (!validation.safe || !validation.url || !validation.addresses?.length) {
       throw new Error(validation.error || 'Forbidden URL destination');
     }
 
-    const response = await fetch(validation.url, {
-      ...init,
-      // Follow redirects by hand so each hop is validated above.
-      redirect: 'manual',
-      signal: init.signal ?? AbortSignal.timeout(SAFE_FETCH_TIMEOUT_MS),
-    });
+    // Prefer an IPv4 address when the host has both; the first one otherwise.
+    const address = validation.addresses.find((a) => a.family === 4) ?? validation.addresses[0];
+    const response = await requestPinned(validation.url, address, init, { maxBytes, timeoutMs, transport });
 
     const location = response.headers.get('location');
     if (response.status >= 300 && response.status < 400 && location) {

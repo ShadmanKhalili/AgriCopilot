@@ -124,7 +124,7 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
       // Fetch Satellite Data
       let satelliteData = null;
       try {
-        const satRes = await fetchWithTimeout('/.netlify/functions/sentinel', {
+        const satRes = await fetchWithTimeout('/api/sentinel', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ lat: activeLocation.latitude, lng: activeLocation.longitude }),

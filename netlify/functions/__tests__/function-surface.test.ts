@@ -71,6 +71,51 @@ describe('netlify/functions surface', () => {
     expect(missing).toEqual([]);
   });
 
+  it('gives no v2 function with a custom path a matching netlify.toml redirect', () => {
+    // A redirect and a function `path` for the same route conflict; a v2
+    // function with a custom path is also not reachable at /.netlify/functions/<name>,
+    // so a redirect to it would point nowhere.
+    const toml = readFileSync(path.join(REPO_ROOT, 'netlify.toml'), 'utf8');
+    const redirectFroms = new Set<string>();
+    for (const match of toml.matchAll(/from\s*=\s*"([^"]+)"/g)) redirectFroms.add(match[1]);
+    const redirectTargets = new Set<string>();
+    for (const match of toml.matchAll(/to\s*=\s*"\/\.netlify\/functions\/([^"]+)"/g)) {
+      redirectTargets.add(match[1]);
+    }
+
+    const customPaths: Array<{ file: string; route: string }> = [];
+    for (const file of functionFiles.filter((f) => /\.m?ts$/.test(f))) {
+      const source = readFileSync(path.join(FUNCTIONS_DIR, file), 'utf8');
+      const route = /export\s+const\s+config\b[^=]*=\s*\{[^}]*?\bpath:\s*'([^']+)'/s.exec(source)?.[1];
+      if (route) customPaths.push({ file, route });
+    }
+    expect(customPaths.length).toBeGreaterThan(0);
+    for (const { file, route } of customPaths) {
+      expect(route.startsWith('/api/'), `${file} path ${route} must be under /api/`).toBe(true);
+      expect(redirectFroms.has(route), `${file}: remove the netlify.toml redirect for ${route}`).toBe(false);
+      const name = file.replace(/\.[^.]+$/, '');
+      expect(redirectTargets.has(name), `${file}: a redirect targets /.netlify/functions/${name}`).toBe(false);
+    }
+  });
+
+  it('keeps the unauthenticated data proxies on a rate-limited custom path', () => {
+    const proxies = [
+      'daily-forecast',
+      'historical-data',
+      'loc-lookup',
+      'wb-indicators',
+      'soil-properties',
+      'sentinel',
+      'config-status',
+    ];
+    for (const name of proxies) {
+      const source = readFileSync(path.join(FUNCTIONS_DIR, `${name}.ts`), 'utf8');
+      expect(source, `${name} must declare path /api/${name}`).toContain(`path: '/api/${name}'`);
+      expect(source, `${name} must declare a rateLimit`).toMatch(/rateLimit:\s*\{/);
+      expect(source, `${name} must not send a CORS header`).not.toMatch(/Access-Control-Allow-Origin/i);
+    }
+  });
+
   it.each(subDirs)('subdirectory %s is not treated as a function', (dir) => {
     const inner = readdirSync(path.join(FUNCTIONS_DIR, dir));
     const offending = inner.filter((f) => {

@@ -1,107 +1,85 @@
-import { Handler } from "@netlify/functions";
+import type { Config } from '@netlify/functions';
+import {
+  enforceIpLimit,
+  jsonResponse,
+  methodNotAllowed,
+  parseLatLon,
+  proxyJson,
+} from './_shared/proxy-guard.ts';
 
 /**
- * Netlify SoilGrids proxy (ISRIC).
+ * GET /api/soil-properties: SoilGrids (ISRIC) point query, proxied.
  *
- * Two hardening points:
- *  - every upstream call has a timeout, so a stalled ISRIC response cannot
- *    hold a Netlify function open until the platform kills it (which shows up
- *    as a 504 with no explanation);
- *  - the coordinates are validated and the property list is bounded, so the
- *    endpoint cannot be used to ask the upstream for an unbounded response.
+ * Coordinates are validated and rounded; `property`, `depth` and `value` are
+ * checked against the lists SoilGrids defines, and nothing else is forwarded.
+ * Every upstream call has a timeout, so a stalled ISRIC response cannot hold
+ * the function open. Same-origin only, per-IP limited, and a v2 function with
+ * its own `path` so the platform rate limit always applies.
  */
 
 const UPSTREAM_TIMEOUT_MS = 12_000;
 const MAX_PROPERTIES = 8;
+const CALLS_PER_IP_PER_MINUTE = 30;
 
-const isInRange = (value: unknown, limit: number): value is string => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && Math.abs(parsed) <= limit;
+const PROPERTIES = new Set(['bdod', 'cec', 'cfvo', 'clay', 'nitrogen', 'ocd', 'ocs', 'phh2o', 'sand', 'silt', 'soc']);
+const DEPTHS = new Set(['0-5cm', '5-15cm', '15-30cm', '30-60cm', '60-100cm', '100-200cm']);
+const VALUES = new Set(['Q0.05', 'Q0.5', 'Q0.95', 'mean', 'uncertainty']);
+
+/**
+ * Every value of a repeated (and/or comma-separated) query parameter, kept in
+ * order without duplicates. Null when any one is outside the allowlist or
+ * there are more than `max`.
+ */
+const allowedList = (
+  query: URLSearchParams,
+  name: string,
+  allowed: Set<string>,
+  max: number
+): string[] | null => {
+  const out: string[] = [];
+  for (const raw of query.getAll(name)) {
+    for (const part of raw.split(',')) {
+      const item = part.trim();
+      if (!item) continue;
+      if (!allowed.has(item)) return null;
+      if (!out.includes(item)) out.push(item);
+    }
+  }
+  return out.length <= max ? out : null;
 };
 
-export const handler: Handler = async (event) => {
-  const { lat, lon, property, depth, value } = event.queryStringParameters || {};
+export default async (request: Request, _context?: unknown): Promise<Response> => {
+  if (request.method !== 'GET') return methodNotAllowed('GET');
 
-  if (!lat || !lon) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Latitude and longitude are required" }),
-    };
+  const limited = enforceIpLimit(request, 'soil-properties', CALLS_PER_IP_PER_MINUTE);
+  if (limited) return limited;
+
+  const query = new URL(request.url).searchParams;
+  const coords = parseLatLon(query.get('lat'), query.get('lon'));
+  if (!coords) {
+    return jsonResponse(400, { error: 'Valid latitude and longitude are required' });
   }
 
-  if (!isInRange(lat, 90) || !isInRange(lon, 180)) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ error: "Latitude and longitude must be valid coordinates" }),
-    };
+  const properties = allowedList(query, 'property', PROPERTIES, MAX_PROPERTIES);
+  const depths = allowedList(query, 'depth', DEPTHS, DEPTHS.size);
+  const values = allowedList(query, 'value', VALUES, VALUES.size);
+  if (!properties || properties.length === 0 || !depths || !values) {
+    return jsonResponse(400, { error: 'Invalid soil property, depth or value' });
   }
 
-  // Handle multiple properties if provided
   const params = new URLSearchParams();
-  params.append("lat", lat as string);
-  params.append("lon", lon as string);
-  
-  if (Array.isArray(property)) {
-    property.forEach(p => params.append("property", p));
-  } else if (property) {
-    // If it's a comma separated string or single value
-    const props = (property as string).split(',');
-    props.forEach(p => params.append("property", p.trim()));
-  }
+  params.append('lat', String(coords.lat));
+  params.append('lon', String(coords.lon));
+  properties.forEach((p) => params.append('property', p));
+  depths.forEach((d) => params.append('depth', d));
+  values.forEach((v) => params.append('value', v));
 
-  if (depth) params.append("depth", depth as string);
-  if (value) params.append("value", value as string);
+  return proxyJson(`https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`, {
+    timeoutMs: UPSTREAM_TIMEOUT_MS,
+  });
+};
 
-  // The ISRIC API uses query parameters for properties like ?property=phh2o&property=nitrogen
-  // but queryStringParameters in Netlify might not handle multiple same-key params well if they aren't parsed correctly.
-  // Actually, event.queryStringParameters is an object where keys are strings. 
-  // If the frontend sends ?property=A&property=B, we might need event.multiValueQueryStringParameters.
-  
-  const multiParams = event.multiValueQueryStringParameters || {};
-  const finalParams = new URLSearchParams();
-  finalParams.append("lat", lat as string);
-  finalParams.append("lon", lon as string);
-  
-  const properties = multiParams.property || (property ? [(property as string)] : []);
-  properties.slice(0, MAX_PROPERTIES).forEach(p => finalParams.append("property", p));
-
-  const depths = multiParams.depth || (depth ? [(depth as string)] : []);
-  depths.slice(0, MAX_PROPERTIES).forEach(d => finalParams.append("depth", d));
-
-  const values = multiParams.value || (value ? [(value as string)] : []);
-  values.slice(0, MAX_PROPERTIES).forEach(v => finalParams.append("value", v));
-
-  const url = `https://rest.isric.org/soilgrids/v2.0/properties/query?${finalParams.toString()}`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      return {
-        statusCode: 502,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "Soil data service did not respond" }),
-      };
-    }
-    const data = await response.json();
-
-    return {
-      statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-      body: JSON.stringify(data),
-    };
-  } catch (error) {
-    console.error("Soil API Error:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Failed to fetch soil data" }),
-    };
-  }
+export const config: Config = {
+  path: '/api/soil-properties',
+  rateLimit: { windowLimit: 30, windowSize: 60, aggregateBy: ['ip', 'domain'] },
 };

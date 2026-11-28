@@ -70,14 +70,12 @@ async function fetchWeatherBlock(
 
   let block: string | null = null;
   try {
-    const gMapKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || '';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2800);
     const res = await fetch(
       `/api/weathernext-3?latitude=${lat}&longitude=${lon}&timezone=auto`,
       {
         signal: controller.signal,
-        headers: gMapKey ? { 'x-google-maps-key': gMapKey } : undefined,
       }
     );
     clearTimeout(timer);

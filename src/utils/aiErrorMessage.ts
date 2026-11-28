@@ -21,6 +21,19 @@ export const aiErrorMessage = (error: unknown, lang: Language): string => {
       ? 'অতিথি অ্যাকাউন্টে আজকের এআই পরামর্শ শেষ। প্রোফাইলে Google যুক্ত করলে বা ইমেইল যাচাই করলে প্রতিদিন আরও বেশি পাবেন। নইলে কাল আবার চেষ্টা করুন।'
       : "You've used today's guest AI advice. Link Google or verify your email in your profile for more each day, or try again tomorrow.";
   }
+  // The whole app's AI budget for today is spent (server `daily_capacity`), which is
+  // not the farmer's own allowance.
+  if (/daily_capacity/i.test(raw)) {
+    return lang === 'bn'
+      ? 'আজকের এআই সীমা শেষ, কাল আবার চেষ্টা করুন। জরুরি হলে কৃষি কল সেন্টারে ১৬১২৩ নম্বরে ফোন করুন।'
+      : "The app's AI limit for today is used up, please try again tomorrow. If urgent, call the Krishi Call Centre on 16123.";
+  }
+  // The server could not verify this copy of the app (App Check enforcement).
+  if (/^app_check$/i.test(raw.trim())) {
+    return lang === 'bn'
+      ? 'অ্যাপটি যাচাই করা যায়নি। পেজটি রিলোড করে আবার চেষ্টা করুন।'
+      : 'The app could not be verified. Please reload the page and try again.';
+  }
   if (/today's|daily AI limit|resets tomorrow/i.test(raw)) {
     return lang === 'bn'
       ? 'আজকের এআই পরামর্শের সীমা শেষ। কাল আবার চেষ্টা করুন। জরুরি হলে কৃষি কল সেন্টারে ১৬১২৩ নম্বরে ফোন করুন।'

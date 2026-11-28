@@ -22,6 +22,8 @@
  * collection that lives under a document, so `runQuery` is used instead.
  */
 
+import { adminFetch, firestoreDocumentName, serviceAccountConfigured } from './service-account.ts';
+
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'studio-1309545077-89018';
 const DATABASE_ID =
   process.env.FIRESTORE_DATABASE_ID || 'ai-studio-48b5516c-2b1e-4742-b49f-c9c3397058d0';
@@ -218,6 +220,125 @@ export const recordAiUsage = async (
   } catch {
     // See the doc comment: report, never throw.
     return false;
+  }
+};
+
+// ── Global daily spend cut-off ──────────────────────────────────────────────
+//
+// The per-account allowance cannot stop a crowd of free accounts from draining
+// the paid Gemini key. This is the last wall: one counter for the whole app,
+//
+//   aiUsageGlobal/{YYYY-MM-DD}      (day in Asia/Dhaka, UTC+6)
+//     calls: total charged calls     textCalls / audioCalls / liveCalls
+//
+// written with the service account (clients cannot touch it; Firestore's
+// default-deny covers the collection) and incremented atomically with a
+// `documents:commit` field transform, so parallel instances never lose a count.
+//
+// Off unless AI_GLOBAL_DAILY_CALL_CAP is set to a positive number.
+
+/** The error code the AI endpoints answer (HTTP 503) when the cap is reached. */
+export const DAILY_CAPACITY_ERROR = 'daily_capacity';
+
+const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000;
+
+/** The cap on charged AI calls per Dhaka day, or null when none is set. */
+export const globalDailyCallCap = (): number | null => {
+  const raw = (process.env.AI_GLOBAL_DAILY_CALL_CAP || '').trim();
+  if (!raw) return null;
+  const value = Math.trunc(Number(raw));
+  return Number.isFinite(value) && value > 0 ? value : null;
+};
+
+/** The current Asia/Dhaka calendar day as `YYYY-MM-DD` (Bangladesh has no DST). */
+export const dhakaDayKey = (when: Date = new Date()): string =>
+  new Date(when.getTime() + DHAKA_OFFSET_MS).toISOString().slice(0, 10);
+
+export type GlobalChargeResult =
+  | { ok: true; enabled: boolean; count?: number; cap?: number }
+  | { ok: false; reason: typeof DAILY_CAPACITY_ERROR; count: number; cap: number };
+
+/** Dhaka day for which this instance already saw the cap reached. */
+let exhaustedDay: string | null = null;
+
+/** Test hook: forget the "cap reached" memory. */
+export const __resetGlobalCapMemoryForTests = (): void => {
+  exhaustedDay = null;
+};
+
+/**
+ * Charge `weight` calls (default 1) of `kind` against the app-wide daily cap.
+ *
+ * - No cap set: returns `{ ok: true, enabled: false }` and makes no request.
+ * - Under the cap: `{ ok: true, enabled: true, count, cap }`.
+ * - Over the cap: `{ ok: false, reason: 'daily_capacity' }`. The caller answers
+ *   503 `{ error: 'daily_capacity' }` and does not spend anything.
+ *
+ * Fails OPEN when the counter cannot be reached (no service account, Firestore
+ * down): this wall is a spend backstop, the per-account allowance still
+ * applies, and an outage here must not take the whole app down. The failure
+ * is logged. Never throws.
+ *
+ * The AI proxy calls this for every text / audio call, and the Live token
+ * function can call it with `'live'` for every minted session.
+ */
+export const chargeGlobalAiCall = async (
+  kind: AiUsageKind,
+  weight = 1,
+  when: Date = new Date()
+): Promise<GlobalChargeResult> => {
+  const cap = globalDailyCallCap();
+  if (cap === null) return { ok: true, enabled: false };
+
+  const day = dhakaDayKey(when);
+  if (exhaustedDay === day) {
+    // Already known to be over the cap today on this instance: skip the write.
+    return { ok: false, reason: DAILY_CAPACITY_ERROR, count: cap, cap };
+  }
+
+  const step = String(Math.max(1, Math.trunc(weight) || 1));
+  try {
+    if (!serviceAccountConfigured()) {
+      console.warn('[usage-quota] AI_GLOBAL_DAILY_CALL_CAP is set but no service account is configured; cap not enforced.');
+      return { ok: true, enabled: false };
+    }
+    const increment = { integerValue: step };
+    const response = await adminFetch('/documents:commit', {
+      method: 'POST',
+      body: JSON.stringify({
+        writes: [
+          {
+            // Empty update + empty mask: create the day's document if it is
+            // missing and leave existing fields alone; only the transforms act.
+            update: { name: firestoreDocumentName(`aiUsageGlobal/${day}`), fields: {} },
+            updateMask: { fieldPaths: [] },
+            updateTransforms: [
+              { fieldPath: 'calls', increment },
+              { fieldPath: `${kind}Calls`, increment },
+              { fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      console.warn(`[usage-quota] global counter commit failed (${response.status}); cap not enforced for this call.`);
+      return { ok: true, enabled: false };
+    }
+    const data: any = await response.json();
+    const count = Number(data?.writeResults?.[0]?.transformResults?.[0]?.integerValue);
+    if (!Number.isFinite(count)) {
+      console.warn('[usage-quota] global counter commit returned no count; cap not enforced for this call.');
+      return { ok: true, enabled: false };
+    }
+    if (count > cap) {
+      exhaustedDay = day;
+      return { ok: false, reason: DAILY_CAPACITY_ERROR, count, cap };
+    }
+    return { ok: true, enabled: true, count, cap };
+  } catch (error) {
+    console.warn('[usage-quota] global counter unavailable; cap not enforced for this call.', (error as Error)?.message);
+    return { ok: true, enabled: false };
   }
 };
 

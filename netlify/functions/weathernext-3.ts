@@ -3,6 +3,7 @@ import axios from 'axios';
 import { checkIpRateLimit, extractClientIpFromHeaders, weatherCallsPerIpPerMinute } from './_shared/ip-limit.ts';
 import { farmActionsFromFeed } from './_shared/farm-actions.ts';
 import { isSafeSprayWindowHour } from './_shared/spray-window.ts';
+import { normalizeWeatherQuery, serverWeatherKey } from './_shared/weather-request.ts';
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from './_shared/daily-merge.ts';
 
 /**
@@ -12,8 +13,9 @@ import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from './_sh
  * It serves /api/weathernext-3 and /api/weather-next (see netlify.toml redirects).
  *
  * PATHWAY 1: Live Google Maps Platform Weather API (weather.googleapis.com) -
- *            activated when a Google Maps key is available (client header
- *            a server env secret).
+ *            activated when a server-side Google key is set (see
+ *            `serverWeatherKey` in _shared/weather-request.ts). The browser's
+ *            VITE_ key is never used.
  * PATHWAY 2: Automatic high-resolution Open-Meteo agro-meteorological ensemble
  *            fallback when no key is configured or the live lookup fails.
  *
@@ -81,42 +83,38 @@ export const handler: Handler = async (event) => {
 
   try {
     const qs = event.queryStringParameters || {};
-    const latitude = qs.latitude;
-    const longitude = qs.longitude;
-    const timezone = qs.timezone || 'auto';
-    const forecast_days = qs.forecast_days || '7';
 
-    if (!latitude || !longitude) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Latitude and longitude are required' }) };
+    // Coordinates snap to the 0.05 degree grid, timezone and forecast days are
+    // allowlisted, so the cache key below has a small, fixed set of values.
+    const query = normalizeWeatherQuery({
+      latitude: qs.latitude,
+      longitude: qs.longitude,
+      timezone: qs.timezone,
+      forecast_days: qs.forecast_days
+    });
+    if (!query) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Valid latitude and longitude are required' }) };
     }
+    const { lat, lon, timezone, cacheKey } = query;
+    // `lat` and `lon` are already the grid centre; the payload reports them as the grid.
+    const gridLat = lat;
+    const gridLon = lon;
+    const forecast_days = String(query.forecastDays);
 
-    const lat = parseFloat(latitude);
-    const lon = parseFloat(longitude);
-
-    if (isNaN(lat) || isNaN(lon)) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid latitude or longitude' }) };
-    }
-
-    // Resolve Google API key. Server-side secrets only: a caller must not be able
-    // to choose the key this function spends.
-    const googleKey =
-      process.env.GOOGLE_MAPS_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      process.env.MAPS_API_KEY ||
-      process.env.VITE_GOOGLE_MAPS_API_KEY;
-
-    const gridLat = Math.round(lat / 0.05) * 0.05;
-    const gridLon = Math.round(lon / 0.05) * 0.05;
+    // Server-side secrets only: a caller must not be able to choose the key
+    // this function spends, and the browser-exposed VITE_ key is never used.
+    const googleKey = serverWeatherKey();
 
     // Each live lookup makes 3 paid Google calls, and this endpoint is open to
     // signed-out visitors. Nearby requests share an answer for a few minutes,
     // and one address cannot loop past the limit.
-    const cacheKey = `${gridLat.toFixed(2)}_${gridLon.toFixed(2)}_${timezone}_${forecast_days}`;
     const cached = paidWeatherCache.get(cacheKey);
     if (cached && Date.now() - cached.at < PAID_WEATHER_CACHE_MS) {
       return weatherResponse(cached.body);
     }
-    if (googleKey) {
+    // Counted with or without a Google key: without one the call still goes to
+    // Open-Meteo on this server's address.
+    {
       const limit = checkIpRateLimit(
         extractClientIpFromHeaders(event.headers as Record<string, string | undefined>),
         weatherCallsPerIpPerMinute(),
@@ -863,13 +861,10 @@ export const handler: Handler = async (event) => {
     }
     return weatherResponse(body);
   } catch (error: any) {
-    console.error('[AgroCast AI][netlify] Error generating weather forecast:', error.message);
+    console.error('[AgroCast AI][netlify] Error generating weather forecast:', error?.message);
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: 'Failed to generate weather forecast',
-        details: error.message
-      })
+      body: JSON.stringify({ error: 'Failed to generate weather forecast' })
     };
   }
 };
