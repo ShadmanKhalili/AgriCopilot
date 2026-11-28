@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Sparkles, AlertTriangle, Thermometer, HelpCircle, Layers, TestTube, History, RefreshCcw, Satellite, Zap, ShieldAlert, ShieldCheck, ArrowUpRight, ChevronDown, ChevronUp, Sliders, Database, WifiOff, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
+import toBn from '../utils/banglaNum';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
-import { detectUserLocation } from '../utils/geolocation';
+import { detectGpsLocation, gpsFailureMessage } from '../utils/geolocation';
 import MicroclimateRadarSimulator, { type HourlyPoint } from './MicroclimateRadarSimulator';
 import { saveCachedWeather, getCachedWeather, formatCacheAge, formatExactSyncTime } from '../utils/offlineCache';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
@@ -19,6 +20,7 @@ import { useUiMode } from '../context/useUiMode';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { useLocationName } from '../hooks/useLocationName';
 import { todaySignals, todayWeatherFromFeed, weekSignalsFromFeed, type TodayWeather } from '../utils/todaySignals';
+import { isSafeSprayWindowHour } from '../../netlify/functions/_shared/spray-window';
 import Disclosure from './ui/Disclosure';
 import Card from './ui/Card';
 import TodayCard from './weather/TodayCard';
@@ -31,6 +33,28 @@ const numOrUndef = (value: unknown): number | undefined =>
 /** A number for display, or a dash when it is missing. */
 const fmtNum = (value: number | undefined, digits = 0): string =>
   value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits);
+
+/** What the window holds when no safe time was found. The server sends a similar English sentence. */
+const NO_SAFE_WINDOW = 'No safe window in the next 24 hours';
+
+/** The safe-window text in the farmer's language (the server's day names and "no window" sentence are English). */
+const localizeSprayWindow = (raw: string | undefined, bn: boolean): string | undefined => {
+  if (!raw) return raw;
+  if (/^no safe window/i.test(raw)) {
+    return bn ? 'আগামী ২৪ ঘণ্টায় নিরাপদ স্প্রের সময় নেই' : NO_SAFE_WINDOW;
+  }
+  if (!bn) return raw;
+  // "Today, 11:00 AM - 1:00 PM" -> "আজ, সকাল ১১:০০ - দুপুর ১:০০" (the window is daytime only).
+  const part = (h: number) => (h < 12 ? 'সকাল' : h < 15 ? 'দুপুর' : h < 18 ? 'বিকাল' : 'সন্ধ্যা');
+  return raw
+    .replace(/^Today,/, 'আজ,')
+    .replace(/^Tomorrow,/, 'আগামীকাল,')
+    .replace(/(\d{1,2}):(\d{2})\s*(AM|PM)/gi, (_m, h, mm, ap) => {
+      const hour12 = Number(h);
+      const hour24 = (hour12 % 12) + (ap.toUpperCase() === 'PM' ? 12 : 0);
+      return `${part(hour24)} ${toBn(`${hour12}:${mm}`)}`;
+    });
+};
 
 /**
  * In the simple view the dashboard sits behind one "More details" row; in
@@ -64,13 +88,14 @@ interface HourlyForecastItem {
 }
 
 interface WeatherData {
-  temp: number;
+  // Undefined when the feed does not have the reading; shown as a dash, never as 0.
+  temp?: number;
   condition: string;
-  humidity: number;
-  windSpeed: number;
-  rainfall: number;
-  rainChance: number;
-  uvIndex: number;
+  humidity?: number;
+  windSpeed?: number;
+  rainfall?: number;
+  rainChance?: number;
+  uvIndex?: number;
   locationName: string;
   /** Average daily high for this month over the last 5 years. */
   historicalAvgMax?: number;
@@ -157,14 +182,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     setIsManualLocation(false);
 
     try {
-      const coords = await detectUserLocation();
+      // Real GPS only: no IP or Dhaka guess is ever saved as the farmer's area.
+      const coords = await detectGpsLocation();
       setGlobalLocation(coords);
       setIsDetecting(false);
     } catch (error: any) {
       console.warn("Location detection notice in WeatherAdvisory:", error?.message || error);
-      let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (error?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      const msg = gpsFailureMessage(error, bn ? 'bn' : 'en');
       setLocationError(msg);
       setIsDetecting(false);
       setIsManualLocation(true);
@@ -194,7 +218,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     
     try {
       let newWeather: WeatherData;
-      let safeSprayingWindow = "No safe window in the next 24 hours";
+      let safeSprayingWindow = NO_SAFE_WINDOW;
       let currentIndex = 0;
 
       // Real-time request headers with strict cache-busting to guarantee live data
@@ -282,13 +306,14 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
         safeSprayingWindow = wnData.agro_metrics?.safe_spraying_window || safeSprayingWindow;
 
         newWeather = {
-          temp: wnData.current?.temperature_2m ?? 0,
+          // A missing reading stays undefined (shown as a dash). A made-up 0 would read as calm, dry air.
+          temp: numOrUndef(wnData.current?.temperature_2m),
           condition: condition,
-          humidity: wnData.current?.relative_humidity_2m ?? 0,
-          windSpeed: wnData.current?.wind_speed_10m ?? 0,
-          rainfall: wnData.current?.precipitation ?? 0,
-          rainChance: wnData.daily?.precipitation_probability_max?.[0] ?? 0,
-          uvIndex: wnData.daily?.uv_index_max?.[0] ?? 0,
+          humidity: numOrUndef(wnData.current?.relative_humidity_2m),
+          windSpeed: numOrUndef(wnData.current?.wind_speed_10m),
+          rainfall: numOrUndef(wnData.current?.precipitation),
+          rainChance: numOrUndef(wnData.daily?.precipitation_probability_max?.[0]),
+          uvIndex: numOrUndef(wnData.daily?.uv_index_max?.[0]),
           locationName: "Local Area",
           soilMoisture: wnData.agro_metrics?.soil_moisture_0_7cm,
           evapotranspiration: wnData.agro_metrics?.evapotranspiration_et0_mm,
@@ -377,16 +402,17 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             let isSafe = true;
             for (let j = 0; j < 3; j++) {
               const idx = i + j;
-              const r = numOrUndef(rainProbs?.[idx]);
-              const w = numOrUndef(windSpeeds?.[idx]);
               const tt = numOrUndef(temps?.[idx]);
+              // The same rule as the server and the spray advice (shared engine), daytime only.
               // A missing reading cannot show the hour is safe.
               if (
-                r === undefined || w === undefined || tt === undefined ||
-                r > 20 ||
-                w > 15 ||
-                tt > 30 ||
-                tt < 10
+                tt === undefined ||
+                !isSafeSprayWindowHour({
+                  time: times[idx],
+                  temp: tt,
+                  windSpeed: numOrUndef(windSpeeds?.[idx]),
+                  rainChance: numOrUndef(rainProbs?.[idx]),
+                })
               ) {
                 isSafe = false;
                 break;
@@ -440,18 +466,19 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             windSpeed: h.wind,
             wind100m: w100,
             condition: h.condition,
-            isSafeSpray: h.rainProb <= 18 && h.wind <= 14 && h.temp >= 12 && h.temp <= 31
+            isSafeSpray: isSafeSprayWindowHour({ time: h.rawTime, temp: h.temp, windSpeed: h.wind, rainChance: h.rainProb })
           });
         });
 
         newWeather = {
-          temp: weatherData.current?.temperature_2m || 0,
+          // A missing reading stays undefined (shown as a dash), never a made-up 0.
+          temp: numOrUndef(weatherData.current?.temperature_2m),
           condition: condition,
-          humidity: weatherData.current?.relative_humidity_2m || 0,
-          windSpeed: weatherData.current?.wind_speed_10m || 0,
-          rainfall: weatherData.current?.precipitation || 0,
-          rainChance: weatherData.daily?.precipitation_probability_max?.[0] || 0,
-          uvIndex: weatherData.daily?.uv_index_max?.[0] || 0,
+          humidity: numOrUndef(weatherData.current?.relative_humidity_2m),
+          windSpeed: numOrUndef(weatherData.current?.wind_speed_10m),
+          rainfall: numOrUndef(weatherData.current?.precipitation),
+          rainChance: numOrUndef(weatherData.daily?.precipitation_probability_max?.[0]),
+          uvIndex: numOrUndef(weatherData.daily?.uv_index_max?.[0]),
           locationName: "Local Area",
           soilMoisture: currentSoilMoisture,
           evapotranspiration: weatherData.daily?.et0_fao_evapotranspiration?.[0],
@@ -633,10 +660,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       
       // Always immediately query live API in the background
       fetchWeatherAndAdvisory();
-    } else {
-      // Seamlessly fall back to default location rather than blocking the tab
-      setGlobalLocation({ latitude: 23.8103, longitude: 90.4125 });
     }
+    // With no saved location nothing is guessed: the "Set your area" panel below asks
+    // the farmer to find their area or choose a district.
 
     const handleForceRefresh = () => {
       fetchWeatherAndAdvisory(undefined, true);
@@ -647,26 +673,30 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     };
   }, [globalLocation?.latitude, globalLocation?.longitude]);
 
-  const getHumidityTooltip = (val: number) => {
+  const getHumidityTooltip = (val: number | undefined) => {
+    if (val === undefined) return undefined;
     if (val < 30) return t.weatherTooltips?.humidityLow;
     if (val <= 60) return t.weatherTooltips?.humidityComfortable;
     return t.weatherTooltips?.humidityHigh;
   };
 
-  const getWindTooltip = (val: number) => {
+  const getWindTooltip = (val: number | undefined) => {
+    if (val === undefined) return undefined;
     if (val < 10) return t.weatherTooltips?.windCalm;
     if (val <= 25) return t.weatherTooltips?.windModerate;
     return t.weatherTooltips?.windStrong;
   };
 
-  const getRainTooltip = (val: number) => {
+  const getRainTooltip = (val: number | undefined) => {
+    if (val === undefined) return undefined;
     if (val === 0) return t.weatherTooltips?.rainNone;
     if (val <= 30) return t.weatherTooltips?.rainSlight;
     if (val <= 70) return t.weatherTooltips?.rainModerate;
     return t.weatherTooltips?.rainHigh;
   };
 
-  const getUvTooltip = (val: number) => {
+  const getUvTooltip = (val: number | undefined) => {
+    if (val === undefined) return undefined;
     if (val < 3) return t.weatherTooltips?.uvLow;
     if (val <= 5) return t.weatherTooltips?.uvModerate;
     if (val <= 7) return t.weatherTooltips?.uvHigh;
@@ -681,7 +711,10 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
     if (!weather) return null;
     const fromFeed = feed ? todayWeatherFromFeed(feed) : null;
     if (fromFeed) return fromFeed;
-    // Standard model: the same numbers from the reshaped data.
+    // Standard model: the same numbers from the reshaped data. A missing reading
+    // stays missing (the rules then say "check the sky"), and without a
+    // temperature there is no reading to show at all.
+    if (weather.temp === undefined) return null;
     const next12 = (weather.hourlyForecast || [])
       .slice(0, 12)
       .map((h) => h.rainProb)
@@ -1074,7 +1107,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     <div>
                       <div className="flex items-baseline">
                         <span className="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {weather.temp.toFixed(1)}
+                          {fmtNum(weather.temp, 1)}
                         </span>
                         <span className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 ml-1">°C</span>
                       </div>
@@ -1084,13 +1117,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     </div>
                   </div>
 
-                  {weather.rainfall > 0 && (
+                  {(weather.rainfall ?? 0) > 0 && (
                     <div className="text-right hidden sm:block">
                       <span className="text-[11px] text-stone-500 dark:text-stone-400 block font-medium">
                         {lang === 'bn' ? 'বৃষ্টিপাত' : 'Precipitation'}
                       </span>
                       <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
-                        {weather.rainfall.toFixed(1)} mm
+                        {fmtNum(weather.rainfall, 1)} mm
                       </span>
                     </div>
                   )}
@@ -1110,7 +1143,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.humidity}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.humidity.toFixed(1)}%
+                        {weather.humidity === undefined ? '—' : `${weather.humidity.toFixed(1)}%`}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1128,7 +1161,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       </div>
                       <div className="flex items-baseline">
                         <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                          {weather.windSpeed.toFixed(1)}
+                          {fmtNum(weather.windSpeed, 1)}
                         </span>
                         <span className="text-[11px] font-medium text-stone-400 ml-1">km/h</span>
                       </div>
@@ -1147,7 +1180,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.rainChance}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.rainChance}%
+                        {weather.rainChance === undefined ? '—' : `${weather.rainChance}%`}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1164,7 +1197,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.uvIndex}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.uvIndex}
+                        {weather.uvIndex === undefined ? '—' : weather.uvIndex}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1273,7 +1306,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 <PrecipitationRiskCurve
                   data={weather.hourlySpread || []}
                   lang={lang}
-                  safeSprayingWindow={weather.safeSprayingWindow}
+                  safeSprayingWindow={localizeSprayWindow(weather.safeSprayingWindow, bn)}
                   safeWindowDetail={weather.safeWindowDetail}
                 />
 
@@ -1368,7 +1401,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               {lang === 'bn' ? 'নিরাপদ স্প্রে উইন্ডো' : 'Safe Spraying Window'}
                             </p>
                             <p className="text-stone-600 dark:text-stone-300 mt-0.5 font-medium">
-                              {weather.safeSprayingWindow}
+                              {localizeSprayWindow(weather.safeSprayingWindow, bn)}
                             </p>
                           </div>
                         </div>
@@ -1408,7 +1441,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       // high, not the current reading against a day-and-night mean.
                       const avgMax = weather.historicalAvgMax;
                       const forecastHigh = Math.max(
-                        weather.temp,
+                        ...(weather.temp === undefined ? [] : [weather.temp]),
                         ...(weather.hourlyForecast || []).slice(0, 24).map(h => h.temp).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
                       );
                       const diff = forecastHigh - avgMax;

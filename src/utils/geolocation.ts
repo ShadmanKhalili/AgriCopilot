@@ -177,3 +177,40 @@ export function detectUserLocation(options: DetectLocationOptions = { allowFallb
   });
 }
 
+/**
+ * The device's real GPS position, never a guess. There is no IP-address or
+ * Dhaka fallback, and a GPS fix outside Bangladesh (which detectUserLocation
+ * snaps to Dhaka) is refused. On failure it throws, with `code` 1 (permission
+ * denied), 2 (unavailable or outside Bangladesh) or 3 (timed out), so the
+ * screen can ask the farmer to choose a district instead.
+ */
+export async function detectGpsLocation(timeout: number = 10000): Promise<{ latitude: number; longitude: number }> {
+  const found = await detectUserLocation({ allowFallback: false, timeout });
+  if (found.isFallback || found.isWithinBangladesh === false) {
+    const err = new Error('GPS position is outside Bangladesh');
+    (err as any).code = 2;
+    throw err;
+  }
+  return { latitude: found.latitude, longitude: found.longitude };
+}
+
+/**
+ * A short message for the farmer when GPS fails. It always points to choosing
+ * the district by hand, and never tells them to use browser controls.
+ */
+export function gpsFailureMessage(error: unknown, lang: 'bn' | 'en'): string {
+  const code = (error as any)?.code;
+  if (code === 1) {
+    return lang === 'bn'
+      ? 'ফোনের সেটিংসে এই অ্যাপকে লোকেশনের অনুমতি দিন, অথবা তালিকা থেকে আপনার জেলা বেছে নিন।'
+      : 'Allow location for this app in your phone settings, or choose your district from the list.';
+  }
+  if (code === 3) {
+    return lang === 'bn'
+      ? 'অবস্থান পেতে দেরি হচ্ছে। আবার চেষ্টা করুন, অথবা তালিকা থেকে আপনার জেলা বেছে নিন।'
+      : 'Finding your location is taking too long. Try again, or choose your district from the list.';
+  }
+  return lang === 'bn'
+    ? 'আপনার অবস্থান পাওয়া যায়নি। তালিকা থেকে আপনার জেলা বেছে নিন।'
+    : 'We could not find your location. Choose your district from the list.';
+}

@@ -27,36 +27,6 @@ export interface CacheEntry<T> {
   isFallback?: boolean;
 }
 
-/**
- * Pre-seeded emergency fallback weather data for rural Cox's Bazar
- * when both network and user cache are unavailable.
- */
-export const COX_BAZAR_OFFLINE_WEATHER: Record<string, any> = {
-  temp: 28,
-  condition: 'Partly Cloudy',
-  humidity: 78,
-  windSpeed: 14,
-  rainfall: 0,
-  rainChance: 25,
-  uvIndex: 7,
-  locationName: "কক্সবাজার উপকূলীয় কৃষি অঞ্চল (Cox's Bazar Coastal Zone)",
-  soilMoisture: 0.28,
-  evapotranspiration: 4.2,
-  safeSprayingWindow: "সকাল ৬:৩০ - ৯:১৫ (বাতাস শান্ত ও পাতার আর্দ্রতা বালাইনাশক প্রয়োগের উপযুক্ত)",
-  dewPoint: 22,
-  fungalBlightRisk: 'Moderate',
-  ensembleConfidence: 85,
-  heavyRainRisk: 15,
-  hourlyForecast: [
-    { time: '6 AM', temp: 24, humidity: 86, rainProb: 10, wind: 8, condition: 'Sunny' },
-    { time: '9 AM', temp: 27, humidity: 76, rainProb: 15, wind: 11, condition: 'Sunny' },
-    { time: '12 PM', temp: 30, humidity: 68, rainProb: 20, wind: 15, condition: 'Partly Cloudy' },
-    { time: '3 PM', temp: 29, humidity: 72, rainProb: 25, wind: 16, condition: 'Partly Cloudy' },
-    { time: '6 PM', temp: 27, humidity: 80, rainProb: 20, wind: 12, condition: 'Partly Cloudy' },
-    { time: '9 PM', temp: 25, humidity: 85, rainProb: 10, wind: 9, condition: 'Clear' }
-  ]
-};
-
 export function recordGlobalSync(timestamp: number = Date.now()): void {
   try {
     localStorage.setItem(GLOBAL_SYNC_KEY, timestamp.toString());
@@ -129,16 +99,8 @@ export function getCachedWeather(
     console.warn('Failed to read cached weather:', err);
   }
 
-  // Emergency offline fallback ONLY when user has no connection and no local cache exists
-  if (isEmergencyOffline) {
-    return {
-      data: COX_BAZAR_OFFLINE_WEATHER,
-      timestamp: Date.now() - (1000 * 60 * 35),
-      locationKey: 'cox_bazar_default',
-      isFallback: true
-    };
-  }
-
+  // No real cached entry for this location: return nothing. A made-up forecast for
+  // another place must never be shown as this farmer's weather.
   return null;
 }
 

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Label } from 'recharts';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
-import { detectUserLocation } from '../utils/geolocation';
+import { detectGpsLocation, gpsFailureMessage } from '../utils/geolocation';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import DataStatusBadge from './DataStatusBadge';
 
@@ -62,14 +62,13 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
     setIsManualLocation(false);
 
     try {
-      const coords = await detectUserLocation();
+      // Real GPS only: no IP or Dhaka guess is ever saved as the farmer's area.
+      const coords = await detectGpsLocation();
       setGlobalLocation(coords);
       setLoading(false);
     } catch (err: any) {
       console.warn("Location detection notice in SatelliteHealth:", err?.message || err);
-      let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (err?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (err?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      const msg = gpsFailureMessage(err, lang === 'bn' ? 'bn' : 'en');
       setLocationError(msg);
       setError(msg);
       setLoading(false);

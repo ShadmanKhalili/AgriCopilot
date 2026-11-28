@@ -132,7 +132,7 @@ export const parsePlot = (id: string, data: unknown): Plot | null => {
 const sortPlots = (list: Plot[]): Plot[] =>
   [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
-const readLocalPlots = (): Plot[] =>
+export const readLocalPlots = (): Plot[] =>
   readKey(LOCAL_PLOTS_KEY, 'plots')
     .map((p) => (isRecord(p) ? parsePlot(str(p.id, 128), p) : null))
     .filter((p): p is Plot => p !== null);
@@ -277,7 +277,7 @@ export const parseSale = (id: string, data: unknown): Sale | null => {
 const sortSales = (list: Sale[]): Sale[] =>
   [...list].sort((a, b) => (a.date === b.date ? b.createdAt.localeCompare(a.createdAt) : b.date.localeCompare(a.date)));
 
-const readLocalSales = (): Sale[] =>
+export const readLocalSales = (): Sale[] =>
   readKey(LOCAL_SALES_KEY, 'sales')
     .map((s) => (isRecord(s) ? parseSale(str(s.id, 128), s) : null))
     .filter((s): s is Sale => s !== null);

@@ -60,11 +60,23 @@ describe('sprayAction', () => {
     expect(sprayAction({ ...calm, windSpeed: 16, temp: 35 }).reason).toBe('wind_breezy');
   });
 
-  it('decides from rain and heat only when the wind is unknown', () => {
+  it('never says go when the wind is unknown: waits with no_data', () => {
     const noWind: ActionInput = { temp: 26, rainChance: 5 };
-    expect(sprayAction(noWind)).toEqual({ kind: 'spray', status: 'go', reason: 'rain_unlikely' });
+    expect(sprayAction(noWind)).toEqual({ kind: 'spray', status: 'wait', reason: 'no_data' });
+    // A known bad reading still wins over the missing one.
     expect(sprayAction({ ...noWind, temp: 35 }).reason).toBe('too_hot');
     expect(sprayAction({ ...noWind, rainChance: 60 }).reason).toBe('rain_likely');
+  });
+
+  it('never says go when the rain chance is unknown: waits with no_data', () => {
+    expect(sprayAction({ temp: 26, windSpeed: 5 })).toEqual({ kind: 'spray', status: 'wait', reason: 'no_data' });
+    expect(sprayAction({ temp: 26 })).toEqual({ kind: 'spray', status: 'wait', reason: 'no_data' });
+    expect(sprayAction({ temp: 26, windSpeed: 25 }).reason).toBe('wind_strong');
+  });
+
+  it('treats NaN and null readings as unknown', () => {
+    expect(sprayAction({ temp: 26, windSpeed: NaN, rainChance: 0 }).reason).toBe('no_data');
+    expect(sprayAction({ temp: 26, windSpeed: null as any, rainChance: null as any }).reason).toBe('no_data');
   });
 
   it('skips the heat check when the temperature is unknown', () => {
@@ -84,6 +96,11 @@ describe('irrigateAction', () => {
     expect(irrigateAction({ ...calm, soilMoisture: 0.22 })).toMatchObject({ status: 'wait', reason: 'check_soil' });
   });
 
+  it('does not say go on dry soil when the rain chance is unknown', () => {
+    expect(irrigateAction({ soilMoisture: 0.1 })).toMatchObject({ status: 'wait', reason: 'no_data' });
+    expect(irrigateAction({ soilMoisture: 0.4 })).toMatchObject({ status: 'stop', reason: 'soil_wet' });
+  });
+
   it('asks to check the soil without a reading', () => {
     expect(irrigateAction(calm)).toMatchObject({ status: 'wait', reason: 'check_soil' });
     expect(irrigateAction({ ...calm, rainChance: 40 })).toMatchObject({ status: 'wait', reason: 'check_soil' });
@@ -95,6 +112,11 @@ describe('fertiliseAction', () => {
     expect(fertiliseAction(calm)).toMatchObject({ status: 'go', reason: 'rain_unlikely' });
     expect(fertiliseAction({ ...calm, rainChance: 25 })).toMatchObject({ status: 'wait', reason: 'rain_possible' });
     expect(fertiliseAction({ ...calm, rainChanceSoon: 50 })).toMatchObject({ status: 'stop', reason: 'rain_likely' });
+  });
+
+  it('waits when the rain chance is unknown', () => {
+    expect(fertiliseAction({})).toEqual({ kind: 'fertilise', status: 'wait', reason: 'no_data' });
+    expect(fertiliseAction({ rainChanceSoon: 60 })).toMatchObject({ status: 'stop', reason: 'rain_likely' });
   });
 
   it('ignores wind and heat', () => {
@@ -163,15 +185,39 @@ describe('todayConditionsFromFeed', () => {
     expect(todayConditionsFromFeed({ current: { temperature_2m: 'hot' } })).toBeNull();
   });
 
-  it('fills missing current numbers with 0 and missing hourly with the daily chance', () => {
+  it('leaves missing current numbers unknown (not 0) and missing hourly with the daily chance', () => {
     expect(todayConditionsFromFeed({ current: { temperature_2m: 25 }, daily: { precipitation_probability_max: [35] } })).toEqual({
       temp: 25,
-      humidity: 0,
-      windSpeed: 0,
+      humidity: undefined,
+      windSpeed: undefined,
       rainChanceToday: 35,
       rainChanceNext12h: 35,
       soilMoisture: undefined,
     });
+  });
+});
+
+describe('missing weather data is never "safe to spray"', () => {
+  it('keeps rain unknown when neither hourly nor daily has a chance', () => {
+    const c = todayConditionsFromFeed({ current: { temperature_2m: 25, wind_speed_10m: 5, relative_humidity_2m: 60 } })!;
+    expect(c.rainChanceToday).toBeUndefined();
+    expect(c.rainChanceNext12h).toBeUndefined();
+    const r = farmActionsFromFeed({ current: { temperature_2m: 25, wind_speed_10m: 5 } })!;
+    expect(r.today.map((a) => `${a.status}:${a.reason}`)).toEqual(['wait:no_data', 'wait:check_soil', 'wait:no_data']);
+  });
+
+  it('waits to spray when the current wind is missing, even with a dry forecast', () => {
+    const r = farmActionsFromFeed({
+      current: { temperature_2m: 25 },
+      daily: { time: ['2026-11-12'], precipitation_probability_max: [0] },
+    })!;
+    expect(r.today[0]).toEqual({ kind: 'spray', status: 'wait', reason: 'no_data' });
+    expect(r.today[2]).toMatchObject({ status: 'go' });
+  });
+
+  it('isSafeSprayHour is false when an hour has no wind or rain value', () => {
+    expect(isSafeSprayHour({ temp: 26, windSpeed: undefined, rainChance: 5 })).toBe(false);
+    expect(isSafeSprayHour({ temp: 26, windSpeed: 5, rainChance: null })).toBe(false);
   });
 });
 
@@ -201,10 +247,10 @@ describe('weekActionsFromFeed', () => {
     expect(statuses(6)).toEqual(['go:low_risk', 'wait:check_soil', 'go:rain_unlikely']);
   });
 
-  it('never invents a wind value for a day without one', () => {
+  it('never invents a wind value for a day without one: spray waits', () => {
     const noWind = { ...feed, daily: { ...feed.daily, wind_speed_10m_max: undefined } };
     const w = weekActionsFromFeed(noWind);
-    expect(w[4].actions[0]).toEqual({ kind: 'spray', status: 'go', reason: 'rain_unlikely' });
+    expect(w[4].actions[0]).toEqual({ kind: 'spray', status: 'wait', reason: 'no_data' });
     expect(w[3].actions[0].reason).toBe('too_hot');
   });
 
@@ -213,7 +259,8 @@ describe('weekActionsFromFeed', () => {
     const w = weekActionsFromFeed(noTemps);
     expect(w).toHaveLength(2);
     expect(w[1]).toMatchObject({ tempMax: null, tempMin: null, rainChance: 0 });
-    expect(w[1].actions[0]).toMatchObject({ status: 'go', reason: 'rain_unlikely' });
+    expect(w[1].actions[0]).toMatchObject({ status: 'wait', reason: 'no_data' });
+    expect(w[1].actions[2]).toMatchObject({ status: 'go', reason: 'rain_unlikely' });
   });
 
   it('leaves out a later day that has no rain chance', () => {

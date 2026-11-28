@@ -44,20 +44,33 @@ export default function FarmRecordPrint({ lang, record, score, farmerName, distr
   const num = (v: number) => (bn ? toBn(v) : String(v));
   const { plots, seasons } = record;
   const totals = recordTotals(seasons.map((s) => ({ totals: s.totals, harvestMon: s.season.harvestMon })));
-  const total = profitView({ profit: totals.profit }, lang);
+  const total = profitView(
+    { profit: totals.profit, revenue: totals.incomeWithoutCosts, costCount: 0 },
+    lang
+  );
   const place = [upazila, district].filter(Boolean).join(', ');
 
   return (
     <div className="hidden print:block bg-white text-black text-[10.5pt] leading-snug font-sans">
       <header className="border-b-2 border-black pb-2 mb-3">
         <h1 className="text-[16pt] font-black">{t('আমার খামারের হিসাব', 'My farm record')}</h1>
-        <p>
-          <span className="font-bold">{t('কৃষক: ', 'Farmer: ')}</span>
-          {farmerName || '-'}
-          {'   '}
-          <span className="font-bold">{t('এলাকা: ', 'Area: ')}</span>
-          {place || '-'}
-        </p>
+        {(farmerName || place) && (
+          <p>
+            {farmerName && (
+              <>
+                <span className="font-bold">{t('কৃষক: ', 'Farmer: ')}</span>
+                {farmerName}
+              </>
+            )}
+            {farmerName && place && '   '}
+            {place && (
+              <>
+                <span className="font-bold">{t('এলাকা: ', 'Area: ')}</span>
+                {place}
+              </>
+            )}
+          </p>
+        )}
         <p>
           <span className="font-bold">{t('ছাপার তারিখ: ', 'Date printed: ')}</span>
           {dayText(dhakaDateString(), lang)}
@@ -139,7 +152,7 @@ export default function FarmRecordPrint({ lang, record, score, farmerName, distr
                         '-'
                       )}
                     </td>
-                    <td className={NUM}>{pv.tone ? `${pv.word} ${pv.amount}` : '-'}</td>
+                    <td className={NUM}>{pv.tone ? pv.text : '-'}</td>
                   </tr>
                 );
               })}
@@ -150,15 +163,24 @@ export default function FarmRecordPrint({ lang, record, score, farmerName, distr
                 <td className={CELL}>{totals.harvestMon > 0 ? monText(totals.harvestMon, lang) : '-'}</td>
                 <td className={NUM}>{takaText(totals.costTotal, lang)}</td>
                 <td className={NUM}>{totals.revenue > 0 ? takaText(totals.revenue, lang) : '-'}</td>
-                <td className={NUM}>{total.tone ? `${total.word} ${total.amount}` : '-'}</td>
+                <td className={NUM}>{total.tone ? total.text : '-'}</td>
               </tr>
             </tfoot>
           </table>
         )}
         <p className="mt-1 text-[9pt]">
           {t(
-            'লাভ বা ক্ষতি = বিক্রির আয় - লেখা খরচ। শুধু যে মৌসুমে বিক্রি লেখা আছে, তার হিসাব ধরা হয়েছে।',
-            'Profit or loss = money from sales minus the costs noted. Only seasons with a recorded sale are counted.'
+            'লাভ বা ক্ষতি = বিক্রির আয় - লেখা খরচ। শুধু যে মৌসুমে বিক্রি ও খরচ দুটোই লেখা আছে, তার হিসাব ধরা হয়েছে।',
+            'Profit or loss = money from sales minus the costs noted. Only seasons with both a sale and costs noted are counted.'
+          )}
+          {totals.profit !== null && totals.incomeWithoutCosts > 0 && (
+            <>
+              {' '}
+              {t(
+                `খরচ লেখা হয়নি এমন মৌসুমের আয় ${takaText(totals.incomeWithoutCosts, lang)} লাভের হিসাবে ধরা হয়নি।`,
+                `Income of ${takaText(totals.incomeWithoutCosts, lang)} from seasons with no costs noted is not in the profit.`
+              )}
+            </>
           )}
         </p>
       </section>

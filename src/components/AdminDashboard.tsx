@@ -85,7 +85,7 @@ import { slug } from '../../netlify/functions/_shared/area-model';
 import { Language } from '../utils/translations';
 import { confidenceLabel, confidenceValue } from '../utils/diagnosisTypes';
 import DigitalPrescriptionModal from './DigitalPrescriptionModal';
-import { buildPrescriptionFromRecord, type PrescriptionData } from '../utils/prescriptionData';
+import { buildPrescriptionFromRecord, isSeverityUnknown, type PrescriptionData } from '../utils/prescriptionData';
 import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
 import { useAuth } from './AuthProvider';
 import {
@@ -1678,11 +1678,13 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
-                          rx.severity === 'Critical' || rx.severity === 'মারাত্মক'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                          isSeverityUnknown(rx.severity)
+                            ? 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
+                            : rx.severity === 'Critical' || rx.severity === 'মারাত্মক'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
                         }`}>
-                          {rx.severity || 'Medium'}
+                          {isSeverityUnknown(rx.severity) ? 'Not assessed' : rx.severity}
                         </span>
                       </td>
                       <td className="px-6 py-4">

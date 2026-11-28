@@ -21,6 +21,7 @@
 
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { safeStorage } from '../utils/security';
+import { dhakaDateString } from '../utils/farmTaskDates';
 
 /** One commodity, as published in the bulletin. */
 export interface BulletinPrice {
@@ -83,6 +84,21 @@ const readCachedBulletin = (): OfficialBulletin | null => {
   if (Number.isNaN(fetchedAt)) return null;
   if (Date.now() - fetchedAt > LOCAL_CACHE_MAX_AGE_MS) return null;
   return { ...cached, stale: true } as OfficialBulletin;
+};
+
+/**
+ * True when it is honest to call this bulletin "today's": it is not a stale
+ * copy (the server's flag, or a copy kept on the device) and it was fetched on
+ * today's date in Dhaka. Anything else must be shown as "latest available".
+ */
+export const isBulletinFromToday = (
+  bulletin: { fetchedAt: string; stale: boolean },
+  now: Date = new Date()
+): boolean => {
+  if (bulletin.stale) return false;
+  const fetched = new Date(bulletin.fetchedAt);
+  if (Number.isNaN(fetched.getTime())) return false;
+  return dhakaDateString(fetched) === dhakaDateString(now);
 };
 
 /** Keep the bulletin for next time. */

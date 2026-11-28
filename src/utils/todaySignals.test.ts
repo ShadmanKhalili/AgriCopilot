@@ -115,6 +115,31 @@ describe('todayWeatherFromFeed', () => {
   });
 });
 
+describe('missing weather data', () => {
+  const noWind = { current: { time: '2026-11-12T10:00', temperature_2m: 27 }, daily: { time: ['2026-11-12'], precipitation_probability_max: [0] } };
+
+  it('does not turn missing wind or humidity into 0', () => {
+    const w = todayWeatherFromFeed(noWind)!;
+    expect(w.windSpeed).toBeUndefined();
+    expect(w.humidity).toBeUndefined();
+  });
+
+  it('shows a cautious spray signal with a Bangla and English no-data reason', () => {
+    const s = spraySignal(todayWeatherFromFeed(noWind)!);
+    expect(s.status).toBe('wait');
+    expect(s.reason.bn).toContain('তথ্য পাওয়া যায়নি');
+    expect(s.reason.en).toContain('No wind or rain data');
+  });
+
+  it('gives every kind a no-data reason, and a no-data headline for the day', () => {
+    const w = { temp: 27 } as TodayWeather;
+    for (const s of todaySignals(w)) expect(s.reason.bn && s.reason.en).toBeTruthy();
+    expect(todaySignals(w).map((x) => x.status)).toEqual(['wait', 'wait', 'wait']);
+    const week = weekSignalsFromFeed(noWind);
+    expect(week[0].headline.en).toContain('incomplete');
+  });
+});
+
 describe('signals and the shared rules agree', () => {
   it('gives exactly the engine statuses for today', () => {
     const feed = {
@@ -253,8 +278,9 @@ describe('weekSignalsFromFeed', () => {
         }
       }
     }
-    // A future day without wind gives the 'rain_unlikely' spray reason.
+    // A day without wind gives the 'no_data' spray reason, never a safe-to-spray one.
     const noWind = weekSignalsFromFeed({ daily: { time: ['2026-11-12'], precipitation_probability_max: [0] } });
-    expect(noWind[0].signals[0].reason.en).toBe('Rain is unlikely.');
+    expect(noWind[0].signals[0].status).toBe('wait');
+    expect(noWind[0].signals[0].reason.en).toContain('No wind or rain data');
   });
 });

@@ -8,12 +8,16 @@ import { hasCalendar, upcomingCalendarTasks } from '../utils/cropCalendar';
 import { toggleStageDone } from '../utils/cropPlan';
 import { dhakaDateString } from '../utils/farmTaskDates';
 import { mainCropLabel } from '../data/mainCrops';
+import { CROP_SCHEDULES } from '../data/cropCalendars';
+import type { TodaySignal } from '../utils/todaySignals';
 import toBn from '../utils/banglaNum';
 import Card from './ui/Card';
 
 interface Props {
   lang: Language;
   onNavigate: (tab: Tab) => void;
+  /** Today's spray / irrigate / fertilise signals, when the weather is loaded. */
+  signals?: TodaySignal[];
 }
 
 /**
@@ -21,7 +25,7 @@ interface Props {
  * calendar work; without one it asks for the date, once, for the farmer's
  * main crop. It shows nothing when there is no main crop with a calendar.
  */
-export default function HomeCalendarTasks({ lang, onNavigate }: Props) {
+export default function HomeCalendarTasks({ lang, onNavigate, signals = [] }: Props) {
   const { mainCrop } = useAppSettings();
   const [plan, setPlan] = useCropPlan();
   const today = dhakaDateString();
@@ -72,6 +76,16 @@ export default function HomeCalendarTasks({ lang, onNavigate }: Props) {
     return bn ? `${num(days)} দিন পর` : `In ${days} day${days === 1 ? '' : 's'}`;
   };
 
+  // Today's weather can override a calendar task that is due now: the calendar
+  // type field says whether it is fertiliser or spray work.
+  const warningFor = (task: (typeof tasks)[number]): TodaySignal | null => {
+    if (task.daysFromToday > 0) return null;
+    const type = CROP_SCHEDULES[plan.cropKey]?.stages[task.stageIndex]?.type;
+    const kind = type === 'fertilizer' ? 'fertilise' : type === 'pesticide' ? 'spray' : null;
+    const signal = kind ? signals.find((s) => s.kind === kind) : undefined;
+    return signal && signal.status !== 'go' ? signal : null;
+  };
+
   return (
     <Card>
       <h2 className="flex items-center gap-2 text-lg font-bold text-stone-900 dark:text-white">
@@ -90,6 +104,14 @@ export default function HomeCalendarTasks({ lang, onNavigate }: Props) {
             <p className="text-sm font-bold text-amber-800 dark:text-amber-300">{dayLabel(task.daysFromToday)}</p>
             <p className="text-base font-bold text-stone-900 dark:text-white leading-snug">{task.title[lang]}</p>
             <p className="text-sm text-stone-700 dark:text-stone-300 leading-snug">{task.detail[lang]}</p>
+            {(() => {
+              const warning = warningFor(task);
+              return warning ? (
+                <p role="alert" className="mt-1 text-sm font-bold text-red-800 dark:text-red-300 leading-snug">
+                  {warning.title[lang]}{bn ? '। ' : '. '}{warning.reason[lang]}
+                </p>
+              ) : null;
+            })()}
             <button
               type="button"
               onClick={() => setPlan(toggleStageDone(plan, task.stageIndex))}
@@ -100,6 +122,9 @@ export default function HomeCalendarTasks({ lang, onNavigate }: Props) {
           </li>
         ))}
       </ul>
+      <p className="mt-2 text-sm text-stone-600 dark:text-stone-400">
+        {bn ? 'সাধারণ নির্দেশনা — কৃষি অফিসারের সাথে মিলিয়ে নিন' : 'General guide — confirm with your agriculture officer'}
+      </p>
       <button
         type="button"
         onClick={() => onNavigate('smart-planting')}

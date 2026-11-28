@@ -32,8 +32,30 @@
  * with a guess — a wrong pesticide on an official-looking card is worse
  * than no pesticide at all.
  */
-import { normalizeDiseaseCandidates, confidenceSignal } from './diagnosisTypes';
+import { normalizeDiseaseCandidates, confidenceSignal, ESCALATION_THRESHOLD } from './diagnosisTypes';
 import type { Language } from './translations';
+
+/**
+ * What `severity` holds when the model did not state one. It used to default
+ * to 'Medium', which printed an invented severity on an official-looking card.
+ */
+export const SEVERITY_NOT_ASSESSED = 'Not Assessed';
+
+/** Severity text that means "no real severity was given". */
+const SEVERITY_MISSING = /^(|unknown|n\/?a|none|null|undefined|-|—|not\s*assessed|জানা\s*নেই|যাচাই\s*করা\s*হয়নি)$/i;
+
+/** A real severity string, or SEVERITY_NOT_ASSESSED. Never invents one. */
+export const normalizeSeverity = (...values: unknown[]): string => {
+  for (const value of values) {
+    const text = value === null || value === undefined ? '' : String(value).trim();
+    if (text && !SEVERITY_MISSING.test(text) && !/not\s*assessed/i.test(text)) return text;
+  }
+  return SEVERITY_NOT_ASSESSED;
+};
+
+/** True when no real severity is known (missing, 'Not Assessed' or the Bangla equivalent). */
+export const isSeverityUnknown = (severity: unknown): boolean =>
+  normalizeSeverity(severity) === SEVERITY_NOT_ASSESSED;
 
 export interface PrescriptionData {
   rxId?: string;
@@ -44,7 +66,8 @@ export interface PrescriptionData {
   cropStage?: string;
   diseaseName: string;
   pathogen?: string;
-  severity: 'Low' | 'Medium' | 'Critical' | string;
+  /** 'Not Assessed' (SEVERITY_NOT_ASSESSED) when the model gave no severity. */
+  severity: 'Low' | 'Medium' | 'High' | 'Critical' | 'Not Assessed' | string;
   /** null means "not assessed" — never a stand-in number. */
   confidence?: number | null;
   /** False when the confidence was not established (so a stored 0 is honest). */
@@ -251,14 +274,17 @@ export const buildPrescriptionData = (source: PrescriptionSource): PrescriptionD
     cropStage: stageLabel,
     diseaseName,
     pathogen: deep.biologicalCause ? String(deep.biologicalCause) : undefined,
-    severity: String(diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium'),
+    severity: normalizeSeverity(diagnosis.qualitativeSeverity, diagnosis.severity),
     confidence: assessed ? confidence.score : null,
     confidenceAssessed: assessed,
     symptoms,
     culturalSteps,
     organicSteps,
     chemicalSteps: treatment.chemical,
-    chemicalGated: !hasChemicalProtocol,
+    // A dose from a diagnosis the model itself is unsure about (or whose
+    // confidence was never established) is a guess, so it is withheld for
+    // review exactly like a missing protocol.
+    chemicalGated: !hasChemicalProtocol || !assessed || confidence.score < ESCALATION_THRESHOLD,
     expertVerified: false,
     harvestIntervalDays: extractPhiDays(deep.advancedTreatment),
     differentialDiagnosis: diagnosis.differentialDiagnosis
@@ -310,7 +336,7 @@ export const buildPrescriptionFromRecord = (
       ? record.cropStage
       : STAGE_NOT_DETECTED[langKey],
     diseaseName,
-    severity: String(record?.qualitativeSeverity || 'Medium'),
+    severity: normalizeSeverity(record?.qualitativeSeverity),
     confidence: assessed ? confidence.score : null,
     confidenceAssessed: assessed,
     symptoms,

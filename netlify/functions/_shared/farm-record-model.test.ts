@@ -112,6 +112,21 @@ describe('seasonTotals', () => {
     expect(totals).toMatchObject({ costTotal: 1200, costCount: 2, soldMon: 0, revenue: 0, profit: null, avgPricePerMon: null });
   });
 
+  it('has no profit when something is sold but no costs are noted', () => {
+    const totals = seasonTotals([], [{ quantityMon: 10, pricePerMon: 1000 }]);
+    expect(totals).toMatchObject({ costTotal: 0, costCount: 0, soldMon: 10, revenue: 10000, profit: null, avgPricePerMon: 1000 });
+  });
+
+  it('shows a profit as soon as one cost is noted, even a zero one', () => {
+    const totals = seasonTotals([{ amount: 0 }], [{ quantityMon: 10, pricePerMon: 1000 }]);
+    expect(totals.costCount).toBe(1);
+    expect(totals.profit).toBe(10000);
+  });
+
+  it('has no profit with neither costs nor sales', () => {
+    expect(seasonTotals([], []).profit).toBeNull();
+  });
+
   it('works out revenue, profit and the average price', () => {
     const totals = seasonTotals(
       [{ amount: 1000 }],

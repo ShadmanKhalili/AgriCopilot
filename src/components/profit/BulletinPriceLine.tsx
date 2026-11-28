@@ -2,6 +2,7 @@ import React from 'react';
 import { Landmark } from 'lucide-react';
 import type { Language } from '../../utils/translations';
 import type { OfficialBulletin } from '../../services/marketPrices';
+import { isBulletinFromToday } from '../../services/marketPrices';
 import { bulletinDateLabel, cropPriceFromBulletin, perKgToPerMon } from '../../utils/marketPriceView';
 import { formatNumber } from '../../utils/profitPlan';
 
@@ -38,9 +39,15 @@ export default function BulletinPriceLine({ lang, cropKey, bulletin, className =
   if (state.kind === 'official') {
     const monRange = `৳${n(perKgToPerMon(low))}–${n(perKgToPerMon(high))}`;
     const date = bulletinDateLabel(state.fetchedAt, lang);
-    text = bn
-      ? `ঢাকার বাজারে আজ: ${range}/কেজি (${monRange}/মণ), সরকারি তালিকা${date ? `, ${date}` : ''}। কৃষক সাধারণত এর চেয়ে কম দাম পান।`
-      : `Dhaka markets today: ${range}/kg (${monRange}/mon), government list${date ? `, ${date}` : ''}. Farmers usually get less than this.`;
+    // A stale or older bulletin must not be called "today".
+    const today = isBulletinFromToday(state);
+    text = today
+      ? bn
+        ? `ঢাকার বাজারে আজ: ${range}/কেজি (${monRange}/মণ), সরকারি তালিকা${date ? `, ${date}` : ''}। কৃষক সাধারণত এর চেয়ে কম দাম পান।`
+        : `Dhaka markets today: ${range}/kg (${monRange}/mon), government list${date ? `, ${date}` : ''}. Farmers usually get less than this.`
+      : bn
+        ? `ঢাকার বাজারে সর্বশেষ পাওয়া দাম${date ? `, ${date}` : ''}: ${range}/কেজি (${monRange}/মণ), সরকারি তালিকা। কৃষক সাধারণত এর চেয়ে কম দাম পান।`
+        : `Dhaka markets, latest available price${date ? `, ${date}` : ''}: ${range}/kg (${monRange}/mon), government list. Farmers usually get less than this.`;
   } else {
     text = bn
       ? `সরকারি তালিকায় ধান নেই; চালের দাম ${range}/কেজি।`

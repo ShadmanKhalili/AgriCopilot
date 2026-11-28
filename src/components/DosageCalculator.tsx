@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { Calculator, Droplets, SprayCan as Spray, CheckCircle2, DollarSign, AlertCircle, Sparkles, Download, Copy } from 'lucide-react';
+import { Calculator, Droplets, SprayCan as Spray, CheckCircle2, DollarSign, AlertCircle, Sparkles, Download, Copy, ShieldAlert, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
+import { toBn } from '../utils/banglaNum';
+import {
+  computeDose,
+  DOSE_BASES,
+  DEFAULT_DOSE_BASIS,
+  WATER_LITRES_PER_DECIMAL,
+  type DoseBasis,
+} from '../utils/doseMath';
 
 interface DosageCalculatorProps {
   lang: Language;
@@ -25,76 +33,89 @@ export default function DosageCalculator({
   // the app must never suggest one: a pre-filled 2 g/L read as advice, and a
   // farmer could overdose by trusting it.
   const [doseText, setDoseText] = useState('');
-  const dosagePerLiter = Number(doseText) > 0 ? Number(doseText) : null;
+  const labelRate = Number(doseText) > 0 ? Number(doseText) : null;
+  // Which volume of water the label's rate refers to. Most Bangladeshi labels
+  // say "per 10 litres", so that is the starting point, but it is always shown
+  // back to the farmer ("Label says: 20 ml per 10 L — is that right?").
+  const [doseBasis, setDoseBasis] = useState<DoseBasis>(DEFAULT_DOSE_BASIS);
   const [dosageUnit, setDosageUnit] = useState<'g' | 'ml'>('g');
   const [priceText, setPriceText] = useState('');
   const pricePer100 = Number(priceText) > 0 ? Number(priceText) : null;
 
-  // Land normalization to decimals
-  // 1 Bigha = 33 Decimals (Standard BD)
-  // 1 Acre = 100 Decimals
-  // 1 Katha = 1.65 Decimals (20 katha = 1 bigha)
-  const normalizedDecimals = React.useMemo(() => {
-    switch (landUnit) {
-      case 'bigha':
-        return landSize * 33;
-      case 'acre':
-        return landSize * 100;
-      case 'katha':
-        return landSize * 1.65;
-      case 'decimal':
-      default:
-        return landSize;
-    }
-  }, [landSize, landUnit]);
+  const bn = lang === 'bn';
+  // Every number shown to a Bangla reader goes through toBn.
+  const fmt = (n: number | string) => (bn ? toBn(n) : String(n));
+  const unitLabel = dosageUnit === 'g' ? (bn ? 'গ্রাম' : 'g') : (bn ? 'মিলি' : 'ml');
+  const basisLabel = (b: DoseBasis) =>
+    b === 16
+      ? (bn ? `প্রতি ${fmt(16)} লিটার ট্যাংকে` : 'per 16 L tank')
+      : (bn ? `প্রতি ${fmt(b)} লিটারে` : `per ${b} L`);
+  const basisButtonLabel = (b: DoseBasis) =>
+    b === 16
+      ? (bn ? `${fmt(16)} লিটার ট্যাংকে` : '16 L tank')
+      : (bn ? `${fmt(b)} লিটারে` : `${b} L`);
 
-  // Standard water requirement: ~10 Liters of spray solution per decimal for foliage coverage
-  const totalWaterNeeded = React.useMemo(() => {
-    return Math.max(1, Math.round(normalizedDecimals * 10));
-  }, [normalizedDecimals]);
+  // All arithmetic lives in utils/doseMath.ts (unit-tested). Land is normalised
+  // to decimals (1 bigha = 33, 1 acre = 100, 1 katha = 1.65) and the spray
+  // volume is an approximate ~10 L per decimal.
+  const dose = React.useMemo(
+    () =>
+      computeDose({
+        landSize,
+        landUnit,
+        rate: labelRate,
+        basisLitres: doseBasis,
+        tankLitres: sprayerCapacity,
+        pricePer100,
+      }),
+    [landSize, landUnit, labelRate, doseBasis, sprayerCapacity, pricePer100]
+  );
+  const normalizedDecimals = dose.decimals;
+  const totalWaterNeeded = dose.totalWaterLitres;
+  const totalTanks = dose.totalTanks;
+  const totalChemicalNeeded = dose.total;
+  const chemicalPerTank = dose.perTank;
+  const estimatedCost = dose.cost;
 
-  // Knapsack tanks needed
-  const totalTanks = React.useMemo(() => {
-    return Math.max(1, Math.ceil(totalWaterNeeded / sprayerCapacity));
-  }, [totalWaterNeeded, sprayerCapacity]);
+  const fmtTotal = (total: number) =>
+    total >= 1000
+      ? `${fmt((total / 1000).toFixed(2))} ${dosageUnit === 'g' ? (bn ? 'কেজি' : 'kg') : (bn ? 'লিটার' : 'L')}`
+      : `${fmt(total)} ${unitLabel}`;
 
-  // Total chemical needed in grams/ml
-  const totalChemicalNeeded = React.useMemo(() => {
-    return dosagePerLiter === null ? null : Math.round(totalWaterNeeded * dosagePerLiter);
-  }, [totalWaterNeeded, dosagePerLiter]);
-
-  // Chemical per knapsack tank
-  const chemicalPerTank = React.useMemo(() => {
-    return dosagePerLiter === null ? null : Math.round(sprayerCapacity * dosagePerLiter * 10) / 10;
-  }, [sprayerCapacity, dosagePerLiter]);
-
-  // Estimated Cost calculation (BDT)
-  const estimatedCost = React.useMemo(() => {
-    return totalChemicalNeeded === null || pricePer100 === null
-      ? null
-      : Math.round((totalChemicalNeeded / 100) * pricePer100);
-  }, [totalChemicalNeeded, pricePer100]);
+  const readBack = labelRate === null
+    ? null
+    : bn
+      ? `লেবেলে লেখা: ${basisLabel(doseBasis)} ${fmt(labelRate)} ${unitLabel} — ঠিক আছে তো?`
+      : `Label says: ${labelRate} ${unitLabel} ${basisLabel(doseBasis)} — is that right?`;
 
   const copyPrescription = () => {
     if (chemicalPerTank === null || totalChemicalNeeded === null) return;
-    const costLineBn = estimatedCost === null ? '' : `\n💰 আনুমানিক খরচ: ৳${estimatedCost} টাকা`;
+    const costLineBn = estimatedCost === null ? '' : `\n💰 আনুমানিক খরচ: ৳${fmt(estimatedCost)} টাকা`;
     const costLineEn = estimatedCost === null ? '' : `\n💰 Estimated Cost: ৳${estimatedCost} BDT`;
-    const text = lang === 'bn'
+    const per16Bn = sprayerCapacity !== 16 && dose.per16LTank !== null
+      ? `\n💊 প্রতি ১৬ লিটার ট্যাংকে: ${fmt(dose.per16LTank)} ${unitLabel}` : '';
+    const per16En = sprayerCapacity !== 16 && dose.per16LTank !== null
+      ? `\n💊 Per 16 L tank: ${dose.per16LTank} ${unitLabel}` : '';
+    const text = bn
       ? `📋 ফসল সুরক্ষা ও ডোজ হিসাব (${cropName})
-জমির আকার: ${landSize} ${landUnit === 'decimal' ? 'শতাংশ' : landUnit === 'bigha' ? 'বিঘা' : landUnit === 'acre' ? 'একর' : 'কাঠা'}
-💧 মোট পানির পরিমাণ: ${totalWaterNeeded} লিটার
-🎒 স্প্রেয়ার ট্যাংক (${sprayerCapacity} লিটার): ${totalTanks} বার
-💊 প্রতি ট্যাংকে ওষুধ/কীটনাশক: ${chemicalPerTank} ${dosageUnit}
-📦 মোট প্রয়োজনীয় ওষুধ: ${totalChemicalNeeded >= 1000 ? (totalChemicalNeeded / 1000).toFixed(2) + ' কেজি/লিটার' : totalChemicalNeeded + ' ' + dosageUnit}${costLineBn}`
+${readBack}
+জমির আকার: ${fmt(landSize)} ${landUnit === 'decimal' ? 'শতাংশ' : landUnit === 'bigha' ? 'বিঘা' : landUnit === 'acre' ? 'একর' : 'কাঠা'}
+💧 মোট পানির পরিমাণ (আনুমানিক): ${fmt(totalWaterNeeded)} লিটার
+🎒 স্প্রেয়ার ট্যাংক (${fmt(sprayerCapacity)} লিটার): ${fmt(totalTanks)} বার
+💊 প্রতি ${fmt(sprayerCapacity)} লিটার ট্যাংকে ওষুধ: ${fmt(chemicalPerTank)} ${unitLabel}${per16Bn}
+📦 মোট প্রয়োজনীয় ওষুধ (আনুমানিক): ${fmtTotal(totalChemicalNeeded)}${costLineBn}
+⚠️ গ্লাভস ও মাস্ক পরুন। বাতাস বা বৃষ্টিতে স্প্রে করবেন না। লেবেলের ফসল তোলার আগের অপেক্ষার দিন মানুন। সন্দেহ হলে ১৬১২৩ নম্বরে কল করুন।`
       : `📋 Crop Protection & Spray Dosage (${cropName})
+${readBack}
 Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
-💧 Total Water: ${totalWaterNeeded} Liters
+💧 Total Water (approx.): ${totalWaterNeeded} Liters
 🎒 Knapsack Tanks (${sprayerCapacity}L): ${totalTanks} tanks
-💊 Chemical per Tank: ${chemicalPerTank} ${dosageUnit}
-📦 Total Chemical: ${totalChemicalNeeded >= 1000 ? (totalChemicalNeeded / 1000).toFixed(2) + ' kg/L' : totalChemicalNeeded + ' ' + dosageUnit}${costLineEn}`;
+💊 Chemical per ${sprayerCapacity} L tank: ${chemicalPerTank} ${unitLabel}${per16En}
+📦 Total Chemical (approx.): ${fmtTotal(totalChemicalNeeded)}${costLineEn}
+⚠️ Wear gloves and a mask. Do not spray in wind or rain. Keep the label's days-before-harvest wait. If unsure, call 16123.`;
 
     navigator.clipboard.writeText(text);
-    toast.success(lang === 'bn' ? 'ডোজ হিসাব কপি করা হয়েছে!' : 'Dosage calculation copied!');
+    toast.success(bn ? 'ডোজ হিসাব কপি করা হয়েছে!' : 'Dosage calculation copied!');
   };
 
   return (
@@ -119,12 +140,42 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
 
         <button
           onClick={copyPrescription}
-          disabled={dosagePerLiter === null}
+          disabled={labelRate === null}
           className="disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5 self-start sm:self-auto bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer"
         >
           <Copy className="w-3.5 h-3.5" />
           <span>{lang === 'bn' ? 'হিসাব কপি করুন' : 'Copy Slip'}</span>
         </button>
+      </div>
+
+      {/* What water volume does the label's rate refer to? */}
+      <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm mb-3.5 relative z-10">
+        <div id="dose-basis-label" className="block text-sm font-bold text-gray-800 mb-2">
+          {bn ? 'লেবেলে মাত্রা কত পানির জন্য লেখা?' : 'The label gives the rate for how much water?'}
+        </div>
+        <div role="radiogroup" aria-labelledby="dose-basis-label" className="grid grid-cols-3 gap-2">
+          {DOSE_BASES.map((b) => (
+            <button
+              key={b}
+              type="button"
+              role="radio"
+              aria-checked={doseBasis === b}
+              onClick={() => setDoseBasis(b)}
+              className={`min-h-[48px] px-2 py-2 rounded-xl border-2 text-sm font-black transition-all cursor-pointer active:scale-95 ${
+                doseBasis === b
+                  ? 'bg-emerald-700 border-emerald-800 text-white shadow-md'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100'
+              }`}
+            >
+              {basisButtonLabel(b)}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-gray-600 font-medium mt-2">
+          {bn
+            ? 'প্যাকেট দেখে মিলিয়ে নিন: ১০ লিটারে লেখা থাকলে ১০ লিটার বেছে নিন। ভুল বাছলে ১০ গুণ বেশি ওষুধ পড়তে পারে।'
+            : 'Check the pack: if it says per 10 L, pick 10 L. Picking the wrong one can mean 10x too much chemical.'}
+        </p>
       </div>
 
       {/* Interactive Controls */}
@@ -155,14 +206,14 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             </select>
           </div>
           <div className="text-[11px] text-gray-400 font-medium">
-            ≈ {normalizedDecimals.toFixed(1)} {lang === 'bn' ? 'শতাংশ' : 'decimals'}
+            ≈ {fmt(normalizedDecimals.toFixed(1))} {lang === 'bn' ? 'শতাংশ' : 'decimals'}
           </div>
         </div>
 
-        {/* Recommended Dosage per Liter */}
+        {/* Dose as written on the label (basis chosen above) */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
           <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-            {lang === 'bn' ? 'প্রতি লিটারে ডোজ' : 'Dosage / Liter'}
+            {bn ? `লেবেলের মাত্রা (${basisLabel(doseBasis)})` : `Label rate (${basisLabel(doseBasis)})`}
           </label>
           <div className="flex space-x-2">
             <input
@@ -171,7 +222,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
               step="0.1"
               inputMode="decimal"
               placeholder={lang === 'bn' ? 'প্যাকেট দেখে' : 'From label'}
-              aria-label={lang === 'bn' ? 'প্রতি লিটারে ডোজ' : 'Dosage per liter'}
+              aria-label={bn ? `লেবেলের মাত্রা, ${basisLabel(doseBasis)}` : `Label rate, ${basisLabel(doseBasis)}`}
               value={doseText}
               onChange={(e) => setDoseText(e.target.value)}
               className="w-full bg-emerald-50/40 border border-emerald-200 rounded-xl px-3 py-1.5 text-sm font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -193,7 +244,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
         {/* Sprayer Tank Capacity */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
           <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-            {lang === 'bn' ? 'স্প্রেয়ারের ধারণক্ষমতা' : 'Sprayer Tank Size'}
+            {lang === 'bn' ? 'স্প্রেয়ারের ধারণক্ষমতা' : 'Sprayer Tank Size'}
           </label>
           <select
             value={sprayerCapacity}
@@ -201,8 +252,8 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             className="w-full bg-emerald-50/40 border border-emerald-200 rounded-xl px-3 py-2 text-xs font-black text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
           >
             <option value={16}>{lang === 'bn' ? '১৬ লিটার (স্ট্যান্ডার্ড ন্যাপস্যাক)' : '16 Liters (Standard Knapsack)'}</option>
-            <option value={10}>{lang === 'bn' ? '১০ লিটার (ছোট স্প্রেয়ার)' : '10 Liters (Small)'}</option>
-            <option value={20}>{lang === 'bn' ? '২০ লিটার (ব্যাটারি স্প্রেয়ার)' : '20 Liters (Battery Sprayer)'}</option>
+            <option value={10}>{lang === 'bn' ? '১০ লিটার (ছোট স্প্রেয়ার)' : '10 Liters (Small)'}</option>
+            <option value={20}>{lang === 'bn' ? '২০ লিটার (ব্যাটারি স্প্রেয়ার)' : '20 Liters (Battery Sprayer)'}</option>
             <option value={5}>{lang === 'bn' ? '৫ লিটার (হাতে চালিত)' : '5 Liters (Hand Pump)'}</option>
           </select>
           <div className="text-[11px] text-gray-400 font-medium">
@@ -234,14 +285,28 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
         </div>
       </div>
 
-      {dosagePerLiter === null && (
-        <div role="status" className="flex items-start gap-2 mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-300 text-xs font-bold text-amber-900 relative z-10">
+      {labelRate === null && (
+        <div role="status" className="flex items-start gap-2 mb-4 p-3 rounded-2xl bg-amber-50 border border-amber-300 text-sm font-bold text-amber-900 relative z-10">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <span>
             {lang === 'bn'
               ? 'ওষুধের মাত্রা আপনাকে লিখতে হবে। একেক ওষুধের মাত্রা একেক রকম, তাই প্যাকেটে লেখা মাত্রা দেখে নিন অথবা স্থানীয় কৃষি কর্মকর্তাকে জিজ্ঞেস করুন।'
               : 'You need to enter the dose. It differs for every product, so check the rate on the label or ask your local agriculture officer.'}
           </span>
+        </div>
+      )}
+
+      {/* Read the entered rate back, with its basis, so a wrong basis is caught */}
+      {readBack && (
+        <div role="status" className="mb-4 p-3 rounded-2xl bg-emerald-100 border-2 border-emerald-400 text-sm font-black text-emerald-950 relative z-10">
+          <div>{readBack}</div>
+          {dose.perLitre !== null && (
+            <div className="font-bold text-emerald-900 mt-1">
+              {bn
+                ? `= প্রতি ১ লিটার পানিতে ${fmt(Math.round(dose.perLitre * 100) / 100)} ${unitLabel}`
+                : `= ${Math.round(dose.perLitre * 100) / 100} ${unitLabel} in every 1 L of water`}
+            </div>
+          )}
         </div>
       )}
 
@@ -260,11 +325,19 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           </div>
           <div>
             <div className="text-2xl md:text-3xl font-black text-emerald-900 tracking-tight">
-              {chemicalPerTank === null ? '—' : <>{chemicalPerTank} <span className="text-xs font-bold text-emerald-600">{dosageUnit}</span></>}
+              {chemicalPerTank === null ? '—' : <>{fmt(chemicalPerTank)} <span className="text-sm font-bold text-emerald-600">{unitLabel}</span></>}
             </div>
-            <p className="text-[11px] text-gray-500 font-medium mt-1">
-              {lang === 'bn' ? `প্রতি ${sprayerCapacity} লিটার পানিতে মেশাবেন` : `Mix in each ${sprayerCapacity}L water`}
+            <p className="text-sm text-gray-600 font-medium mt-1">
+              {bn ? `প্রতি ${fmt(sprayerCapacity)} লিটার পানিতে মেশাবেন` : `Mix in each ${sprayerCapacity}L water`}
             </p>
+            {/* Farmers mix by the 16 L tank, so show that too when the sprayer differs */}
+            {sprayerCapacity !== 16 && dose.per16LTank !== null && (
+              <p className="text-sm text-emerald-900 font-black mt-1">
+                {bn
+                  ? `প্রতি ${fmt(16)} লিটার ট্যাংকে: ${fmt(dose.per16LTank)} ${unitLabel}`
+                  : `Per 16 L tank: ${dose.per16LTank} ${unitLabel}`}
+              </p>
+            )}
           </div>
         </motion.div>
 
@@ -281,10 +354,10 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           </div>
           <div>
             <div className="text-2xl md:text-3xl font-black text-teal-900 tracking-tight">
-              {totalTanks} <span className="text-xs font-bold text-teal-600">{lang === 'bn' ? 'ট্যাংক' : 'Tanks'}</span>
+              {fmt(totalTanks)} <span className="text-sm font-bold text-teal-600">{lang === 'bn' ? 'ট্যাংক' : 'Tanks'}</span>
             </div>
-            <p className="text-[11px] text-gray-500 font-medium mt-1">
-              {lang === 'bn' ? `আনুমানিক মোট ${totalWaterNeeded} লিটার পানি` : `About ${totalWaterNeeded}L of water in total`}
+            <p className="text-sm text-gray-600 font-medium mt-1">
+              {bn ? `আনুমানিক মোট ${fmt(totalWaterNeeded)} লিটার পানি` : `About ${totalWaterNeeded}L of water in total`}
             </p>
           </div>
         </motion.div>
@@ -304,14 +377,14 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
             <div className="text-2xl md:text-3xl font-black text-blue-900 tracking-tight">
               {totalChemicalNeeded === null ? '—' : (
                 <>
-                  {totalChemicalNeeded >= 1000 ? (totalChemicalNeeded / 1000).toFixed(2) : totalChemicalNeeded}{' '}
-                  <span className="text-xs font-bold text-blue-600">
-                    {totalChemicalNeeded >= 1000 ? (dosageUnit === 'g' ? 'kg' : 'L') : dosageUnit}
+                  {fmt(totalChemicalNeeded >= 1000 ? (totalChemicalNeeded / 1000).toFixed(2) : totalChemicalNeeded)}{' '}
+                  <span className="text-sm font-bold text-blue-600">
+                    {totalChemicalNeeded >= 1000 ? (dosageUnit === 'g' ? (bn ? 'কেজি' : 'kg') : (bn ? 'লিটার' : 'L')) : unitLabel}
                   </span>
                 </>
               )}
             </div>
-            <p className="text-[11px] text-gray-500 font-medium mt-1">
+            <p className="text-sm text-gray-600 font-medium mt-1">
               {lang === 'bn' ? 'সম্পূর্ণ জমিতে ১ বার স্প্রে' : 'For 1 full field spray cycle'}
             </p>
           </div>
@@ -330,25 +403,41 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           </div>
           <div>
             <div className="text-2xl md:text-3xl font-black text-white tracking-tight">
-              {estimatedCost === null ? '—' : `৳ ${estimatedCost.toLocaleString()}`}
+              {estimatedCost === null ? '—' : `৳ ${bn ? toBn(estimatedCost.toLocaleString()) : estimatedCost.toLocaleString()}`}
             </div>
-            <p className="text-[11px] text-amber-100 font-medium mt-1">
+            <p className="text-sm text-amber-50 font-medium mt-1">
               {lang === 'bn' ? 'আপনার দেওয়া দাম অনুযায়ী' : 'Based on the price you entered'}
             </p>
           </div>
         </motion.div>
       </div>
 
-      {/* Safety & Spray Best Practices Banner */}
-      <div className="mt-4 pt-4 border-t border-emerald-200/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-emerald-950 font-medium relative z-10">
-        <div className="flex items-center space-x-2 text-[11px] text-emerald-800">
-          <AlertCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>
-            {lang === 'bn'
-              ? 'টিপস: সকাল ১০টার আগে বা বিকাল ৪টার পর রোদের তীব্রতা কমলে স্প্রে করুন। বাতাসের বিপরীতে স্প্রে করবেন না।'
-              : 'Best Practice: Spray before 10 AM or after 4 PM when sun intensity is low. Never spray against the wind direction.'}
-          </span>
+      {/* The water volume is a rule of thumb, not a measurement */}
+      <p className="mt-3 text-sm text-gray-700 font-medium relative z-10">
+        {bn
+          ? `আনুমানিক হিসাব: প্রতি শতাংশে প্রায় ${fmt(WATER_LITRES_PER_DECIMAL)} লিটার পানি ধরা হয়েছে। ফসল, গাছের আকার ও স্প্রেয়ারভেদে কম-বেশি লাগতে পারে। ওষুধ সবসময় লেবেলের মাত্রায় মেশান।`
+          : `Approximate: about ${WATER_LITRES_PER_DECIMAL} L of water per decimal is assumed. It varies with the crop, plant size and sprayer. Always mix the chemical at the label's rate.`}
+      </p>
+
+      {/* Safety block */}
+      <div className="mt-4 p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 text-sm text-rose-950 font-medium relative z-10">
+        <div className="flex items-center gap-2 font-black text-base mb-2">
+          <ShieldAlert className="w-5 h-5 text-rose-700 shrink-0" />
+          <span>{bn ? 'নিরাপত্তা — স্প্রের আগে পড়ুন' : 'Safety — read before spraying'}</span>
         </div>
+        <ul className="space-y-1.5 list-disc pl-5">
+          <li>{bn ? 'হাতে গ্লাভস ও মুখে মাস্ক পরুন।' : 'Wear gloves and a mask.'}</li>
+          <li>{bn ? 'বাতাসের দিনে বা বৃষ্টির সময় স্প্রে করবেন না। সকাল ১০টার আগে বা বিকাল ৪টার পর স্প্রে করুন, বাতাসের বিপরীতে নয়।' : 'Do not spray in wind or rain. Spray before 10 AM or after 4 PM, never against the wind.'}</li>
+          <li>{bn ? 'লেবেলে লেখা ফসল তোলার আগের অপেক্ষার দিন (PHI) মেনে চলুন।' : "Keep the days-before-harvest (PHI) wait written on the label."}</li>
+          <li className="font-black">{bn ? 'সন্দেহ হলে উপজেলা কৃষি অফিস বা ১৬১২৩ নম্বরে কল করুন।' : 'If unsure, ask your upazila agriculture office or call 16123.'}</li>
+        </ul>
+        <a
+          href="tel:16123"
+          className="mt-3 inline-flex items-center justify-center gap-2 min-h-[48px] px-5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-sm font-black active:scale-95 transition-all"
+        >
+          <Phone className="w-4 h-4" />
+          <span>{bn ? `${fmt(16123)} নম্বরে কল করুন` : 'Call 16123'}</span>
+        </a>
       </div>
     </div>
   );

@@ -114,10 +114,14 @@ export default function SeasonCard({ lang, record, plots, onProgress, onAddSale,
           {profit.tone && (
             <span
               className={`block text-base font-black ${
-                profit.tone === 'profit' ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'
+                profit.tone === 'profit'
+                  ? 'text-emerald-800 dark:text-emerald-300'
+                  : profit.tone === 'no_costs'
+                    ? 'text-stone-700 dark:text-stone-300'
+                    : 'text-rose-800 dark:text-rose-300'
               }`}
             >
-              {profit.word} {profit.amount}
+              {profit.text}
             </span>
           )}
         </span>
@@ -230,7 +234,7 @@ export default function SeasonCard({ lang, record, plots, onProgress, onAddSale,
               {totals.avgPricePerMon !== null && (
                 <Row label={bn ? 'গড় দাম (প্রতি মণ)' : 'Average price (per mon)'} value={takaText(totals.avgPricePerMon, lang)} />
               )}
-              {profit.tone && (
+              {(profit.tone === 'profit' || profit.tone === 'loss') && (
                 <Row
                   label={profit.word}
                   value={profit.amount}
@@ -239,9 +243,11 @@ export default function SeasonCard({ lang, record, plots, onProgress, onAddSale,
                 />
               )}
             </dl>
-            {!profit.tone && (
+            {(!profit.tone || profit.tone === 'no_costs') && (
               <p className="mt-2 text-base text-stone-600 dark:text-stone-400">
-                {bn ? 'কিছু বিক্রি লিখলে লাভ বা ক্ষতি দেখা যাবে।' : 'Record a sale to see profit or loss.'}
+                {profit.tone === 'no_costs'
+                  ? bn ? 'খরচ এখনো লেখা হয়নি। খরচ লিখলে লাভ বা ক্ষতি দেখা যাবে।' : 'No costs noted yet. Note your costs to see profit or loss.'
+                  : bn ? 'কিছু বিক্রি লিখলে লাভ বা ক্ষতি দেখা যাবে।' : 'Record a sale to see profit or loss.'}
               </p>
             )}
           </div>

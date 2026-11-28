@@ -31,14 +31,14 @@ export type SignalKind = 'spray' | 'irrigate' | 'fertilise';
 export interface TodayWeather {
   /** °C */
   temp: number;
-  /** % */
-  humidity: number;
-  /** km/h */
-  windSpeed: number;
-  /** Highest chance of rain today, %. */
-  rainChanceToday: number;
-  /** Highest chance of rain in the next 12 hours, %. */
-  rainChanceNext12h: number;
+  /** %. Undefined when the feed has no reading (show "—", never 0). */
+  humidity?: number;
+  /** km/h. Undefined when the feed has no reading. */
+  windSpeed?: number;
+  /** Highest chance of rain today, %. Undefined when unknown. */
+  rainChanceToday?: number;
+  /** Highest chance of rain in the next 12 hours, %. Undefined when unknown. */
+  rainChanceNext12h?: number;
   /** Topsoil moisture, m³/m³, when the feed has it. */
   soilMoisture?: number;
 }
@@ -123,17 +123,29 @@ const REASONS: Record<SignalKind, Partial<Record<ActionReason, Text>>> = {
     too_hot: { bn: 'দুপুরে খুব গরম, ঠান্ডা সময়ে স্প্রে করুন।', en: 'Midday is too hot; spray when it is cooler.' },
     low_risk: { bn: 'বৃষ্টি ও বাতাসের ঝুঁকি কম।', en: 'Low risk of rain and wind.' },
     rain_unlikely: { bn: 'বৃষ্টির সম্ভাবনা কম।', en: 'Rain is unlikely.' },
+    no_data: {
+      bn: 'বাতাস বা বৃষ্টির তথ্য পাওয়া যায়নি। আকাশ দেখে সিদ্ধান্ত নিন।',
+      en: 'No wind or rain data. Look at the sky before you decide.',
+    },
   },
   irrigate: {
     rain_likely: { bn: 'বৃষ্টি হতে পারে। সেচের খরচ বাঁচান।', en: 'Rain is likely. Save the pumping cost.' },
     soil_wet: { bn: 'মাটিতে যথেষ্ট রস আছে।', en: 'The soil is already moist.' },
     soil_dry: { bn: 'মাটি শুকনো এবং বৃষ্টির সম্ভাবনা কম।', en: 'The soil is dry and rain is unlikely.' },
     check_soil: { bn: 'মাটি শুকনো মনে হলে হালকা সেচ দিন।', en: 'Water lightly if the soil feels dry.' },
+    no_data: {
+      bn: 'বৃষ্টির তথ্য পাওয়া যায়নি। আকাশ ও মাটি দেখে সেচ দিন।',
+      en: 'No rain data. Check the sky and the soil before irrigating.',
+    },
   },
   fertilise: {
     rain_likely: { bn: 'বৃষ্টিতে সার ধুয়ে যাবে, টাকা নষ্ট হবে।', en: 'Rain would wash it away and waste your money.' },
     rain_possible: { bn: 'বৃষ্টির কিছু সম্ভাবনা আছে।', en: 'There is some chance of rain.' },
     rain_unlikely: { bn: 'বৃষ্টির সম্ভাবনা কম।', en: 'Rain is unlikely.' },
+    no_data: {
+      bn: 'বৃষ্টির তথ্য পাওয়া যায়নি। আকাশ দেখে সার দিন।',
+      en: 'No rain data. Look at the sky before applying fertiliser.',
+    },
   },
 };
 
@@ -198,6 +210,12 @@ export const dayHeadline = (actions: FarmAction[]): Text => {
   }
   if (spray?.reason === 'wind_strong') {
     return { bn: 'জোর বাতাস। স্প্রে করবেন না।', en: 'Strong wind. Do not spray.' };
+  }
+  if (spray?.reason === 'no_data' || fertilise?.reason === 'no_data') {
+    return {
+      bn: 'আবহাওয়ার তথ্য অসম্পূর্ণ। আকাশ দেখে কাজ করুন।',
+      en: 'Weather data is incomplete. Look at the sky before you start.',
+    };
   }
   if (spray?.reason === 'rain_possible' || fertilise?.status === 'wait') {
     return {

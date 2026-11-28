@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, Navigation, Search, Check, X, Loader2, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { geoData, District, Upazila } from '../utils/geoData';
-import { detectUserLocation } from '../utils/geolocation';
+import { detectGpsLocation, gpsFailureMessage } from '../utils/geolocation';
 import { Language } from '../utils/translations';
 
 interface Props {
@@ -44,13 +44,14 @@ export default function RegionModal({
     setIsDetecting(true);
     setDetectError(null);
     try {
-      const loc = await detectUserLocation();
-      setGlobalLocation(loc);
+      // Real GPS only: no IP or Dhaka guess is ever saved as the farmer's area.
+      const loc = await detectGpsLocation();
+      setGlobalLocation({ latitude: loc.latitude, longitude: loc.longitude });
       setIsDetecting(false);
       onClose();
     } catch (err: any) {
       console.warn('GPS detect notice in modal:', err?.message || err);
-      setDetectError(lang === 'bn' ? 'জিপিএস অবস্থান পাওয়া যায়নি। তালিকা থেকে উপজেলা নির্বাচন করুন।' : 'Could not detect GPS. Please select your Upazila from the list.');
+      setDetectError(gpsFailureMessage(err, lang === 'bn' ? 'bn' : 'en'));
       setIsDetecting(false);
     }
   };

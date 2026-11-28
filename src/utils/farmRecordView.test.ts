@@ -49,18 +49,29 @@ describe('text helpers', () => {
 
 describe('profitView', () => {
   it('shows nothing until something is sold', () => {
-    expect(profitView({ profit: null }, 'bn')).toEqual({ tone: null, word: '', amount: '' });
+    expect(profitView({ profit: null }, 'bn')).toEqual({ tone: null, word: '', amount: '', text: '' });
+    expect(profitView({ profit: null, revenue: 0, costCount: 0 }, 'en').tone).toBeNull();
+    expect(profitView({ profit: null, revenue: 0, costCount: 3 }, 'en').tone).toBeNull();
   });
   it('says profit or loss in words', () => {
-    expect(profitView({ profit: 4000 }, 'en')).toEqual({ tone: 'profit', word: 'Profit', amount: '৳4,000' });
-    expect(profitView({ profit: -2500 }, 'bn')).toEqual({ tone: 'loss', word: 'ক্ষতি', amount: '৳২,৫০০' });
+    expect(profitView({ profit: 4000 }, 'en')).toEqual({ tone: 'profit', word: 'Profit', amount: '৳4,000', text: 'Profit ৳4,000' });
+    expect(profitView({ profit: -2500 }, 'bn')).toEqual({ tone: 'loss', word: 'ক্ষতি', amount: '৳২,৫০০', text: 'ক্ষতি ৳২,৫০০' });
+  });
+  it('says income with no costs noted instead of calling it a profit', () => {
+    expect(profitView({ profit: null, revenue: 16500, costCount: 0 }, 'en')).toEqual({
+      tone: 'no_costs',
+      word: 'Income',
+      amount: '৳16,500',
+      text: 'Income ৳16,500 — no costs noted yet',
+    });
+    expect(profitView({ profit: null, revenue: 16500, costCount: 0 }, 'bn').text).toBe('আয় ৳১৬,৫০০ — খরচ এখনো লেখা হয়নি');
   });
 });
 
 describe('recordTotals', () => {
-  const t = (costTotal: number, revenue: number, soldMon: number, profit: number | null) => ({
+  const t = (costTotal: number, revenue: number, soldMon: number, profit: number | null, costCount = 1) => ({
     costTotal,
-    costCount: 1,
+    costCount,
     soldMon,
     revenue,
     profit,
@@ -71,10 +82,33 @@ describe('recordTotals', () => {
       { totals: t(1000, 3000, 3, 2000), harvestMon: 4 },
       { totals: t(500, 0, 0, null) },
     ]);
-    expect(out).toEqual({ costTotal: 1500, revenue: 3000, soldMon: 3, harvestMon: 4, profit: 2000 });
+    expect(out).toEqual({
+      costTotal: 1500,
+      costCount: 2,
+      revenue: 3000,
+      soldMon: 3,
+      harvestMon: 4,
+      profit: 2000,
+      incomeWithoutCosts: 0,
+    });
   });
   it('has no profit when nothing is sold', () => {
     expect(recordTotals([{ totals: t(500, 0, 0, null) }]).profit).toBeNull();
     expect(recordTotals([]).costTotal).toBe(0);
+  });
+  it('does not turn a season without costs into profit', () => {
+    const out = recordTotals([
+      { totals: t(1000, 3000, 3, 2000) },
+      { totals: t(0, 5000, 5, null, 0) },
+    ]);
+    expect(out.profit).toBe(2000);
+    expect(out.revenue).toBe(8000);
+    expect(out.incomeWithoutCosts).toBe(5000);
+  });
+  it('has no profit at all when every sold season lacks costs', () => {
+    const out = recordTotals([{ totals: t(0, 5000, 5, null, 0) }]);
+    expect(out.profit).toBeNull();
+    expect(out.costCount).toBe(0);
+    expect(out.incomeWithoutCosts).toBe(5000);
   });
 });

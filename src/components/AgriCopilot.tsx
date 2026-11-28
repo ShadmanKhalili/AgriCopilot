@@ -1625,7 +1625,7 @@ export default function AgriCopilot({
 
     shareBody += `📸 ${lang === 'bn' ? 'ফসল' : 'Crop'}: ${diagnosis.crop || 'Plant'}\n`;
     shareBody += `📍 ${lang === 'bn' ? 'অবস্থা' : 'Status'}: ${diagnosis.status}\n`;
-    shareBody += `⚠️ ${lang === 'bn' ? 'তীব্রতা' : 'Severity'}: ${diagnosis.qualitativeSeverity}\n`;
+    shareBody += `⚠️ ${lang === 'bn' ? 'তীব্রতা' : 'Severity'}: ${['High', 'Medium', 'Low'].includes(diagnosis.qualitativeSeverity) ? diagnosis.qualitativeSeverity : (lang === 'bn' ? 'জানা নেই — কৃষি অফিসারকে দেখান' : 'unknown — show an agriculture officer')}\n`;
     shareBody += `📋 ${lang === 'bn' ? 'লক্ষণ' : 'Symptoms'}: ${diagnosis.symptomsBreakdown?.join(', ')}\n`;
     shareBody += `🔍 ${lang === 'bn' ? 'নির্ণয়' : 'Diagnosis'}: ${diagnosis.diagnosis}\n\n`;
 
@@ -2480,24 +2480,27 @@ export default function AgriCopilot({
                                 <div className="flex-1 h-2.5 rounded-full overflow-hidden bg-stone-100 dark:bg-stone-800">
                                   <motion.div 
                                     initial={{ width: 0 }}
-                                    animate={{ width: diagnosis.qualitativeSeverity === 'High' ? '100%' : diagnosis.qualitativeSeverity === 'Medium' ? '60%' : '30%' }}
+                                    animate={{ width: diagnosis.qualitativeSeverity === 'High' ? '100%' : diagnosis.qualitativeSeverity === 'Medium' ? '60%' : diagnosis.qualitativeSeverity === 'Low' ? '30%' : '100%' }}
                                     transition={{ duration: 0.8, ease: 'easeOut' }}
                                     className={`h-full ${
                                       diagnosis.qualitativeSeverity === 'High' ? 'bg-red-500' : 
                                       diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-500' : 
-                                      'bg-emerald-500'
+                                      diagnosis.qualitativeSeverity === 'Low' ? 'bg-emerald-500' : 
+                                      'bg-stone-300 dark:bg-stone-600'
                                     }`}
                                   />
                                 </div>
                                 <div className={`px-3.5 py-1.5 rounded-xl font-bold text-sm tabular-nums ${
                                   diagnosis.qualitativeSeverity === 'High' ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-300' : 
                                   diagnosis.qualitativeSeverity === 'Medium' ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300' : 
-                                  'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                  diagnosis.qualitativeSeverity === 'Low' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300' : 
+                                  'bg-stone-100 text-stone-700 border border-stone-300 dark:bg-stone-800 dark:text-stone-200 dark:border-stone-600'
                                 }`}>
                                   {diagnosis.qualitativeSeverity === 'High' && lang === 'bn' ? 'উচ্চ' : 
                                    diagnosis.qualitativeSeverity === 'Medium' && lang === 'bn' ? 'মাঝারি' : 
                                    diagnosis.qualitativeSeverity === 'Low' && lang === 'bn' ? 'নিম্ন' : 
-                                   diagnosis.qualitativeSeverity || 'Unknown'}
+                                   (diagnosis.qualitativeSeverity === 'High' || diagnosis.qualitativeSeverity === 'Medium' || diagnosis.qualitativeSeverity === 'Low') ? diagnosis.qualitativeSeverity : 
+                                   (lang === 'bn' ? 'তীব্রতা জানা নেই — কৃষি অফিসারকে দেখান' : 'Severity unknown — show an agriculture officer')}
                                 </div>
                               </div>
                             </motion.div>
@@ -2691,7 +2694,7 @@ export default function AgriCopilot({
                                 || diagnosis.diagnosis?.split('\n')[0]
                                 || (lang === 'bn' ? 'রোগ শনাক্ত করা যায়নি' : 'No condition identified')
                               }
-                              severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Medium'}
+                              severity={diagnosis.qualitativeSeverity || diagnosis.severity || 'Not Assessed'}
                               harvestIntervalDays={extractPhiDays(deepDiagnosis?.advancedTreatment)}
                               initialPathway="organic"
                               onRequestExpert={onRequestExpert}

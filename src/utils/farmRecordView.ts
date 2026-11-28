@@ -40,46 +40,84 @@ export const dayText = (value: string | undefined, lang: Lang, fallback = '-'): 
   (value && shortDateLabel(value, lang)) || fallback;
 
 export interface ProfitView {
-  /** Null until something is sold. */
-  tone: 'profit' | 'loss' | null;
-  /** "Profit" / "Loss" word; empty until something is sold. */
+  /** 'no_costs' = something was sold but no costs are noted, so there is no profit to show. Null until something is sold. */
+  tone: 'profit' | 'loss' | 'no_costs' | null;
+  /** "Profit" / "Loss" / "Income" word; empty until something is sold. */
   word: string;
   /** Amount without a sign; empty until something is sold. */
   amount: string;
+  /** The whole line, e.g. "Profit ৳4,000" or "Income ৳4,000 — no costs noted yet"; empty until something is sold. */
+  text: string;
 }
 
-/** Profit or loss in words (the sign is never shown alone). Nothing until something is sold. */
-export const profitView = (totals: Pick<SeasonTotals, 'profit'>, lang: Lang): ProfitView => {
-  if (totals.profit === null || !Number.isFinite(totals.profit)) return { tone: null, word: '', amount: '' };
+const NO_PROFIT: ProfitView = { tone: null, word: '', amount: '', text: '' };
+
+/**
+ * Profit or loss in words (the sign is never shown alone). Nothing until
+ * something is sold. When there is income but no costs are noted, it says so
+ * instead of calling the whole income a profit.
+ */
+export const profitView = (
+  totals: Pick<SeasonTotals, 'profit'> & Partial<Pick<SeasonTotals, 'revenue' | 'costCount'>>,
+  lang: Lang
+): ProfitView => {
+  if (totals.profit === null || !Number.isFinite(totals.profit)) {
+    if (totals.profit === null && totals.costCount === 0 && (totals.revenue ?? 0) > 0) {
+      const amount = takaText(totals.revenue as number, lang);
+      const word = lang === 'bn' ? 'আয়' : 'Income';
+      const note = lang === 'bn' ? 'খরচ এখনো লেখা হয়নি' : 'no costs noted yet';
+      return { tone: 'no_costs', word, amount, text: `${word} ${amount} — ${note}` };
+    }
+    return NO_PROFIT;
+  }
   const gain = totals.profit >= 0;
-  return {
-    tone: gain ? 'profit' : 'loss',
-    word: gain ? (lang === 'bn' ? 'লাভ' : 'Profit') : lang === 'bn' ? 'ক্ষতি' : 'Loss',
-    amount: takaText(totals.profit, lang),
-  };
+  const word = gain ? (lang === 'bn' ? 'লাভ' : 'Profit') : lang === 'bn' ? 'ক্ষতি' : 'Loss';
+  const amount = takaText(totals.profit, lang);
+  return { tone: gain ? 'profit' : 'loss', word, amount, text: `${word} ${amount}` };
 };
 
-/** Sum of every season's figures, for the totals row. Profit counts only seasons with a sale. */
+/**
+ * Sum of every season's figures, for the totals row.
+ *
+ * Profit adds up only seasons that have both a sale and at least one cost
+ * noted (those are the only ones with a profit). A season that sold but has no
+ * costs noted adds nothing to profit: its income is reported separately in
+ * `incomeWithoutCosts`, so the totals never turn missing costs into profit.
+ */
 export const recordTotals = (
   seasons: Array<{ totals: SeasonTotals; harvestMon?: number }>
-): { costTotal: number; revenue: number; soldMon: number; harvestMon: number; profit: number | null } => {
+): {
+  costTotal: number;
+  costCount: number;
+  revenue: number;
+  soldMon: number;
+  harvestMon: number;
+  profit: number | null;
+  incomeWithoutCosts: number;
+} => {
   let costTotal = 0;
+  let costCount = 0;
   let revenue = 0;
   let soldMon = 0;
   let harvestMon = 0;
+  let incomeWithoutCosts = 0;
   let profit: number | null = null;
   for (const s of seasons) {
     costTotal += s.totals.costTotal;
+    costCount += s.totals.costCount;
     revenue += s.totals.revenue;
     soldMon += s.totals.soldMon;
     harvestMon += s.harvestMon ?? 0;
     if (s.totals.profit !== null) profit = (profit ?? 0) + s.totals.profit;
+    else if (s.totals.costCount === 0 && s.totals.revenue > 0) incomeWithoutCosts += s.totals.revenue;
   }
   return {
     costTotal,
+    costCount,
     revenue,
     soldMon: Math.round(soldMon * 100) / 100,
     harvestMon: Math.round(harvestMon * 100) / 100,
     profit,
+    incomeWithoutCosts,
   };
 };
