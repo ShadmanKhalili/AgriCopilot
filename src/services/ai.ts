@@ -1202,38 +1202,6 @@ export const getPlantingRecommendations = async (
   });
 };
 
-export const startAgriChat = (context: string, lang: string, locationContext: string = "Bangladesh") => {
-  const history: { role: string; text: string }[] = [];
-  return {
-    sendMessage: async (req: { message: string }, signal?: AbortSignal) => {
-      const prompt = history.length === 0 
-        ? `You are a helpful agricultural expert in Bangladesh. ${outputRules(lang)}
-           CONTEXT: The user has just received a diagnosis for their crop: "${context}".
-           ${locationContext}
-           TASK: Handle the user's first follow-up question: "${req.message}".
-           Respond in ${lang === 'bn' ? 'Bangla' : 'English'}. Concise markdown.`
-        : req.message;
-
-      const contents = history.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-      contents.push({ role: 'user', parts: [{ text: prompt }] });
-
-      const response = await generateContent({
-        contents,
-        model: CHAT_MODEL
-      }, signal);
-      
-      const responseText = response.text || '';
-      history.push({ role: 'user', text: req.message });
-      history.push({ role: 'model', text: responseText });
-      
-      return { text: responseText };
-    }
-  };
-};
-
 export const startSchemeChat = (scheme: any, lang: string) => {
   const history: { role: string; text: string }[] = [];
   const schemeContext = `

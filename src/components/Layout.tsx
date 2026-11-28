@@ -3,7 +3,7 @@ import {
   Leaf, Award, Menu, X, LogOut, LogIn, BookOpen, Globe, TrendingUp, 
   UserCircle, Cloud, Satellite, BarChart3, Radar, Landmark, Sprout, 
   ShieldCheck, Loader2, Calculator, Waves, MapPin, PhoneCall, ChevronRight, ChevronDown,
-  Search, Sun, Moon, Sparkles, Grid, HeartHandshake, Home as HomeIcon
+  Search, Sun, Moon, Sparkles, Grid, HeartHandshake, Home as HomeIcon, MessageCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { audioFeedback } from '../utils/audioFeedback';
@@ -43,6 +43,8 @@ const Profile = lazyWithRetry(() => import('./Profile'));
 const FarmerDossier = lazyWithRetry(() => import('./FarmerDossier'));
 const AdminDashboard = lazyWithRetry(() => import('./AdminDashboard'));
 const ExpertHub = lazyWithRetry(() => import('./ExpertHub'));
+// The assistant carries the chat history and speech code, so it loads on first use.
+const AssistantScreen = lazyWithRetry(() => import('./assistant/AssistantScreen'));
 
 import PricingModal from './PricingModal';
 import { useAuth } from './AuthProvider';
@@ -67,6 +69,7 @@ import { useUiMode } from '../context/useUiMode';
 import HomeToday from './HomeToday';
 import Onboarding from './Onboarding';
 import FarmProfileSync from './FarmProfileSync';
+import { ASSISTANT_NAME } from '../constants/assistant';
 
 interface TabItem {
   id: Tab;
@@ -173,7 +176,6 @@ export default function Layout() {
   const [agriImages, setAgriImages] = useState<{ base64: string; mimeType: string }[]>([]);
   const [agriDiagnosis, setAgriDiagnosis] = useState<any | null>(null);
   const [agriChatMessages, setAgriChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
-  const [agriChatSession, setAgriChatSession] = useState<any | null>(null);
   const [agriAudioUrl, setAgriAudioUrl] = useState<string | null>(null);
   const [agriCropStage, setAgriCropStage] = useState<string>('');
   const [agriCrop, setAgriCrop] = useState<string>('');
@@ -196,6 +198,18 @@ export default function Layout() {
   // Empty until a crop is chosen, so the market screen can open on the
   // farmer's own main crop.
   const [marketProduce, setMarketProduce] = useState<string>('');
+
+  // A question typed or spoken on Home: the assistant screen picks it up and
+  // asks it as soon as it opens.
+  const [assistantInitialQuestion, setAssistantInitialQuestion] = useState<{ text: string; channel: 'text' | 'voice' } | null>(null);
+  const askFromHome = (text: string, channel: 'text' | 'voice' = 'text') => {
+    const question = text.trim();
+    if (!question) return;
+    // A spoken question stays a spoken one: it is sent and saved as 'voice'.
+    setAssistantInitialQuestion({ text: question, channel });
+    setActiveTab('assistant');
+    setIsMobileMenuOpen(false);
+  };
 
   const handleNavigateTab = (tab: Tab, payload?: { crop?: string; produce?: string }) => {
     if (payload?.crop) {
@@ -260,6 +274,14 @@ export default function Layout() {
       description: lang === 'bn' ? 'আজকের আবহাওয়া ও করণীয়' : "Today's weather and what to do",
       pillar: 'home',
       subcategory: lang === 'bn' ? 'হোম' : 'Home'
+    },
+    {
+      id: 'assistant',
+      name: ASSISTANT_NAME[lang],
+      icon: MessageCircle,
+      description: lang === 'bn' ? 'কথা বলে বা লিখে যা খুশি জিজ্ঞাসা করুন' : 'Ask anything by voice or text',
+      pillar: 'support',
+      subcategory: lang === 'bn' ? 'এআই সহকারী' : 'AI assistant'
     },
     // Pillar 1: Crop Health & Protection (শস্য স্বাস্থ্য ও সুরক্ষা)
     { 
@@ -1223,7 +1245,21 @@ export default function Layout() {
                           onSetArea={() => setIsRegionModalOpen(true)}
                           locationName={locationName}
                           unreadExpertCount={unreadExpertCount}
+                          onAsk={askFromHome}
                         />
+                      </ErrorBoundary>
+                    </TabPanel>
+                    <TabPanel id="assistant" active={activeTab === 'assistant'}>
+                      <ErrorBoundary {...tabErrorBoundaryProps}>
+                      {visitedTabs.has('assistant') && (
+                        <AssistantScreen
+                          lang={lang}
+                          active={activeTab === 'assistant'}
+                          initialQuestion={assistantInitialQuestion}
+                          onConsumedInitial={() => setAssistantInitialQuestion(null)}
+                          onOpenTab={(tab) => handleNavigateTab(tab)}
+                        />
+                      )}
                       </ErrorBoundary>
                     </TabPanel>
                     <TabPanel id="agri-copilot" active={activeTab === 'agri-copilot'}>
@@ -1239,8 +1275,6 @@ export default function Layout() {
                           setPersistedDiagnosis={setAgriDiagnosis}
                           persistedChatMessages={agriChatMessages}
                           setPersistedChatMessages={setAgriChatMessages}
-                          persistedChatSession={agriChatSession}
-                          setPersistedChatSession={setAgriChatSession}
                           persistedAudioUrl={agriAudioUrl}
                           setPersistedAudioUrl={setAgriAudioUrl}
                           persistedCropStage={agriCropStage}

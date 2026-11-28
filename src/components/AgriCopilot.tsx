@@ -2,7 +2,13 @@ import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { Camera, Loader2, Leaf, Volume2, Sparkles, HelpCircle, Calendar, MapPin, Navigation, Send, User, Bot, MessageSquare, AlertTriangle, CheckCircle2, Plus, X, ShieldAlert, Search, Globe, Radar, ThumbsUp, ThumbsDown, Bug, Activity, Share2, Download, Image as ImageIcon, Copy, Calculator, TrendingUp, Waves, Satellite, Cloud, ArrowRight, ArrowUpRight, Mic, MicOff, Video, Compass, RotateCcw, Briefcase, FileText, Printer, HeartHandshake, BellRing } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toPng } from 'html-to-image';
-import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, startAgriChat, translateText, summarizeConversation, isAbortError } from '../services/ai';
+import { diagnoseCrop, deepDiagnoseCrop, generateSpeech, translateText, summarizeConversation, isAbortError } from '../services/ai';
+import { askAssistant, AssistantError, assistantErrorMessage } from '../services/assistant';
+import { getOrCreateMainThread, appendMessage } from '../services/assistantThreads';
+import { SOURCE_LABELS } from '../constants/assistant';
+import { buildDiagnosisHeadline, buildDiagnosisSummary, toAssistantHistory } from './cropDoctorSummary';
+import { requestLocation, todayForRequest } from './assistant/assistantView';
+import { getTodayReading } from '../hooks/useTodayWeather';
 import { collection, addDoc, doc, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '../firestore';
 import { auth } from '../firebase';
@@ -27,7 +33,7 @@ import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import toBn from '../utils/banglaNum';
 import { aiErrorMessage } from '../utils/aiErrorMessage';
-import { buildLocationContext, describePlace } from '../utils/farmerContext';
+import { describePlace } from '../utils/farmerContext';
 import { useUiMode } from '../context/useUiMode';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { diseaseKeyFor } from '../utils/diseaseKey';
@@ -620,6 +626,13 @@ const buildSampleDiagnosisText = (sample: SampleDiagnosis, lang: Language): stri
   ].join('\n\n');
 };
 
+/** One bubble of the follow-up chat. `sources` come from the assistant's answer. */
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  sources?: string[];
+}
+
 interface Props {
   lang: Language;
   globalLocation: { latitude: number; longitude: number } | null;
@@ -632,8 +645,7 @@ interface Props {
   setPersistedDeepDiagnosis?: (diagnosis: any | null) => void;
   persistedChatMessages?: { role: 'user' | 'model'; text: string }[];
   setPersistedChatMessages?: (messages: { role: 'user' | 'model'; text: string }[]) => void;
-  persistedChatSession?: any | null;
-  setPersistedChatSession?: (session: any | null) => void;
+  /** Unused since the follow-up chat moved to the assistant (no client chat session any more). */
   persistedAudioUrl?: string | null;
   setPersistedAudioUrl?: (url: string | null) => void;
   persistedCropStage?: string;
@@ -674,8 +686,6 @@ export default function AgriCopilot({
   setPersistedDeepDiagnosis,
   persistedChatMessages,
   setPersistedChatMessages,
-  persistedChatSession,
-  setPersistedChatSession,
   persistedAudioUrl,
   setPersistedAudioUrl,
   persistedCropStage,
@@ -716,7 +726,9 @@ export default function AgriCopilot({
   const [selectedDistrict, setSelectedDistrict] = useState(geoData[0]?.id || '1');
   const [selectedUpazila, setSelectedUpazila] = useState(geoData[0]?.upazilas[0]?.id || '');
   const [locationAccuracy, setLocationAccuracy] = useState<number | undefined>(undefined);
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>(persistedChatMessages || []);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(persistedChatMessages || []);
+  // True when the question now in the box was spoken, not typed.
+  const questionWasSpokenRef = useRef(false);
   const [currentChatMessage, setCurrentChatMessage] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isVoiceListening, setIsVoiceListening] = useState(false);
@@ -731,7 +743,6 @@ export default function AgriCopilot({
   // Why the last analysis did not give an answer, shown as a card under the button.
   const [diagError, setDiagError] = useState<{ kind: 'offline' | 'failed'; message: string } | null>(null);
   const diagErrorRef = useRef<HTMLDivElement>(null);
-  const [chatSession, setChatSession] = useState<any>(persistedChatSession || null);
   const [isAudioGenerating, setIsAudioGenerating] = useState(false);
   const [copilotMode, setCopilotMode] = useState<'static_upload' | 'live_stream'>(persistedCopilotMode || (simple ? 'static_upload' : 'live_stream'));
   // Which sample scenario card is currently loaded (visual selection ring)
@@ -867,10 +878,6 @@ export default function AgriCopilot({
   }, [chatMessages, setPersistedChatMessages]);
 
   useEffect(() => {
-    if (setPersistedChatSession) setPersistedChatSession(chatSession);
-  }, [chatSession, setPersistedChatSession]);
-
-  useEffect(() => {
     if (setPersistedAudioUrl) setPersistedAudioUrl(audioUrl);
   }, [audioUrl, setPersistedAudioUrl]);
 
@@ -918,7 +925,6 @@ export default function AgriCopilot({
     setDiagnosis(null);
     setDeepDiagnosis(null);
     setChatMessages([]);
-    setChatSession(null);
     setAudioUrl(null);
     setChatSummary(null);
     setLastDiagnosisId(null);
@@ -938,11 +944,6 @@ export default function AgriCopilot({
     setDiagnosis(sampleDiag);
     if (setPersistedDiagnosis) setPersistedDiagnosis(sampleDiag);
     
-    // Initialize active chat session for this sample
-    const locationContext = buildLocationContext(globalLocation);
-    const sampleDiagText = `${sc.sampleDiagnosis.diseaseBn} (${sc.sampleDiagnosis.disease}). Symptoms: ${sc.sampleDiagnosis.symptomsBreakdown.join(', ')}. Remedies: ${sc.sampleDiagnosis.chemicalRemedy}`;
-    const session = startAgriChat(sampleDiagText, lang, locationContext);
-    setChatSession(session);
     setChatMessages([]);
     setChatSummary(null);
 
@@ -1145,36 +1146,81 @@ export default function AgriCopilot({
     }
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentChatMessage.trim() || isChatLoading) return;
-
-    let activeSession = chatSession;
-    if (!activeSession && diagnosis) {
-      const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
-      const locationContext = buildLocationContext(globalLocation);
-      activeSession = startAgriChat(diagText, lang, locationContext);
-      setChatSession(activeSession);
+  // Save one follow-up exchange into the farmer's shared assistant thread, so
+  // the Ask tab sees it. Best effort: the chat on screen never depends on it.
+  const saveFollowUpTurn = async (
+    userText: string,
+    answer: { text: string; toolCalls?: { name: string; status: string }[] },
+    userChannel: 'photo' | 'text' | 'voice',
+    // Set on the first turn: a short line saying what the follow-ups are about,
+    // saved before them so the Ask tab's history has the context.
+    diagnosisLine?: string,
+  ) => {
+    const uid = (user ?? auth.currentUser)?.uid;
+    if (!uid) return;
+    try {
+      const threadId = await getOrCreateMainThread(uid, lang);
+      if (diagnosisLine && diagnosisLine.trim()) {
+        await appendMessage(uid, threadId, { role: 'assistant', text: diagnosisLine.trim().slice(0, 4000), channel: 'photo' });
+      }
+      await appendMessage(uid, threadId, { role: 'user', text: userText.slice(0, 4000), channel: userChannel });
+      await appendMessage(uid, threadId, {
+        role: 'assistant',
+        text: answer.text.slice(0, 4000),
+        channel: 'text',
+        ...(answer.toolCalls && answer.toolCalls.length > 0 ? { toolCalls: answer.toolCalls } : {}),
+      });
+    } catch (error) {
+      console.warn('Follow-up chat could not be saved to the assistant thread:', error);
     }
-    if (!activeSession) return;
+  };
 
-    const userMessage = currentChatMessage.trim();
-    setCurrentChatMessage('');
-    setChatMessages(prev => [...prev, { role: 'user', text: userMessage }]);
+  /**
+   * One follow-up question, answered by the shared assistant. The server keeps
+   * no conversation, so each call carries the last turns and a summary of the
+   * diagnosis on screen. Returns true when an answer was added.
+   */
+  const askFollowUp = async (question: string, channel: 'text' | 'voice'): Promise<boolean> => {
+    if (!diagnosis || isChatLoading) return false;
+    const message = question.trim().slice(0, 2000);
+    if (!message) return false;
+
+    const history = toAssistantHistory(chatMessages);
+    const isFirstTurn = chatMessages.length === 0;
+    const summary = buildDiagnosisSummary({ diagnosis, deepDiagnosis, crop, cropStage, lang });
+    const diagnosisLine = isFirstTurn ? buildDiagnosisHeadline({ diagnosis, crop, lang }) : '';
+    const position = requestLocation(globalLocation);
+
+    setChatMessages(prev => [...prev, { role: 'user', text: message }]);
     setIsChatLoading(true);
 
     const controller = beginAiRequest();
     try {
-      const response = await activeSession.sendMessage({ message: userMessage }, controller.signal);
-      if (!isMountedRef.current) return;
-      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+      // The same weather reading the Home card shows, when there is one.
+      const today = todayForRequest(await getTodayReading(globalLocation));
+      if (controller.signal.aborted) return false;
+      const response = await askAssistant({
+        message,
+        lang,
+        channel,
+        history,
+        ...(position ? { location: position } : {}),
+        ...(today ? { today } : {}),
+        ...(summary ? { attachment: { kind: 'diagnosis' as const, summary } } : {}),
+      }, controller.signal);
+      if (!isMountedRef.current) return false;
+      const text = (response.text || '').trim();
+      setChatMessages(prev => [...prev, { role: 'model', text, sources: response.sources }]);
+      void saveFollowUpTurn(message, { text: text || '…', toolCalls: response.toolCalls }, isFirstTurn ? 'photo' : channel, diagnosisLine);
+      return true;
     } catch (error) {
       if (isAbortError(error)) {
         console.info('Chat request cancelled.');
-        return;
+        return false;
       }
       console.error("Chat error:", error);
-      toast.error(isSafetyBlockError(error) ? safetyBlockMessage(lang) : t.tooltips.chatError);
+      toast.error(isSafetyBlockError(error) ? safetyBlockMessage(lang) : followUpErrorMessage(error));
+      return false;
     } finally {
       endAiRequest(controller);
       if (isMountedRef.current) setIsChatLoading(false);
@@ -1184,43 +1230,35 @@ export default function AgriCopilot({
     }
   };
 
+  // The assistant's error kinds (offline, limit, capacity, auth, server) show
+  // in the same toast the chat always used, with the service's own wording.
+  const followUpErrorMessage = (error: unknown): string =>
+    error instanceof AssistantError ? assistantErrorMessage(error.kind, lang) : t.tooltips.chatError;
+
+  const sourceLabel = (source: string): string =>
+    (SOURCE_LABELS as Record<string, { bn: string; en: string } | undefined>)[source]?.[lang] ?? source;
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentChatMessage.trim() || isChatLoading || !diagnosis) return;
+
+    const userMessage = currentChatMessage.trim();
+    const channel = questionWasSpokenRef.current ? 'voice' : 'text';
+    questionWasSpokenRef.current = false;
+    setCurrentChatMessage('');
+    await askFollowUp(userMessage, channel);
+  };
+
   const handleAddContextPrompt = async (contextSnippet: string) => {
     if (!diagnosis || isChatLoading) return;
 
-    let activeSession = chatSession;
-    if (!activeSession) {
-      const diagText = diagnosis.disease || diagnosis.diseaseBn || diagnosis.diagnosis || 'Crop disease';
-      const locationContext = buildLocationContext(globalLocation);
-      activeSession = startAgriChat(diagText, lang, locationContext);
-      setChatSession(activeSession);
-    }
-
     const formattedPrompt = lang === 'bn'
-      ? `আমার ফসলে নতুন লক্ষণ ও ফিল্ড পরিস্থিতি: "${contextSnippet}"। এই নতুন তথ্য অনুযায়ী আমার তাৎক্ষণিক কী সতর্কতা ও ব্যবস্থা নেওয়া উচিত?`
+      ? `আমার ফসলে নতুন লক্ষণ ও ফিল্ড পরিস্থিতি: "${contextSnippet}"। এই নতুন তথ্য অনুযায়ী আমার তাৎক্ষণিক কী সতর্কতা ও ব্যবস্থা নেওয়া উচিত?`
       : `Additional field context for this crop: "${contextSnippet}". Based on this specific condition, what immediate measures should I take and what should I apply or avoid?`;
 
-    setChatMessages(prev => [...prev, { role: 'user', text: formattedPrompt }]);
-    setIsChatLoading(true);
-
-    const controller = beginAiRequest();
-    try {
-      const response = await activeSession.sendMessage({ message: formattedPrompt }, controller.signal);
-      if (!isMountedRef.current) return;
-      setChatMessages(prev => [...prev, { role: 'model', text: response.text || '' }]);
+    const answered = await askFollowUp(formattedPrompt, 'text');
+    if (answered && isMountedRef.current) {
       toast.success(lang === 'bn' ? 'নতুন তথ্যের আলোকে পরামর্শ যোগ করা হ\u09DFেছে' : 'Advisory updated with new context');
-    } catch (error) {
-      if (isAbortError(error)) {
-        console.info('Chat request cancelled.');
-        return;
-      }
-      console.error("Chat context error:", error);
-      toast.error(isSafetyBlockError(error) ? safetyBlockMessage(lang) : t.tooltips.chatError);
-    } finally {
-      endAiRequest(controller);
-      if (isMountedRef.current) setIsChatLoading(false);
-      setTimeout(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
     }
   };
 
@@ -1257,6 +1295,7 @@ export default function AgriCopilot({
         setIsVoiceProcessing(true);
         const transcript = event?.results?.[0]?.[0]?.transcript;
         if (transcript) {
+          questionWasSpokenRef.current = true;
           setCurrentChatMessage(prev => prev ? `${prev} ${transcript}` : transcript);
         }
         setTimeout(() => {
@@ -1441,7 +1480,6 @@ export default function AgriCopilot({
       // The call is still counted, because the model really ran and the server
       // charges it to the daily allowance either way.
       if (result.status === 'Invalid') {
-        setChatSession(null);
         setChatMessages([]);
         setDeepDiagnosis(null);
         setChatSummary(null);
@@ -1454,10 +1492,8 @@ export default function AgriCopilot({
         return;
       }
 
-      // Initialize chat session
-      const locationContext = buildLocationContext(globalLocation);
-      const session = startAgriChat(result.diagnosis, lang, locationContext);
-      setChatSession(session);
+      // A new diagnosis starts a new follow-up chat; each question carries a
+      // summary of this result to the assistant, so nothing is set up here.
       setChatMessages([]);
       
       // Counting the usage is bookkeeping, not part of the answer. A failure
@@ -3161,6 +3197,15 @@ export default function AgriCopilot({
                                         <div className="markdown-body leading-relaxed text-xs prose-sm prose-invert">
                                           <ReactMarkdown>{msg.text}</ReactMarkdown>
                                         </div>
+                                        {msg.role !== 'user' && msg.sources && msg.sources.length > 0 && (
+                                          <ul className="flex flex-wrap gap-1.5 mt-2.5 list-none p-0" aria-label={lang === 'bn' ? 'তথ্যের উৎস' : 'Sources'}>
+                                            {msg.sources.map((source) => (
+                                              <li key={source} className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-100">
+                                                {sourceLabel(source)}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        )}
                                       </div>
                                     </motion.div>
                                   ))}

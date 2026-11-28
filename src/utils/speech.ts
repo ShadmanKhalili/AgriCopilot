@@ -147,6 +147,12 @@ export interface ListenHandlers {
   onEnd?: () => void;
   /** `code` is the browser's error name, such as `not-allowed` or `no-speech`. */
   onError?: (code: string) => void;
+  /**
+   * The words heard so far, while the person is still speaking. When given, the
+   * browser also reports unfinished text, which goes here and never to
+   * `onResult`; `onResult` still gets only the finished phrase.
+   */
+  onInterim?: (text: string) => void;
 }
 
 /**
@@ -160,11 +166,18 @@ export const startListening = (lang: SpeechLang, handlers: ListenHandlers): (() 
     const recognition = new Recognition();
     recognition.lang = localeFor(lang);
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = typeof handlers.onInterim === 'function';
     recognition.maxAlternatives = 1;
     recognition.onresult = (event: any) => {
-      const transcript = String(event?.results?.[0]?.[0]?.transcript || '').trim();
-      if (transcript) handlers.onResult(transcript);
+      const result = event?.results?.[0];
+      const transcript = String(result?.[0]?.transcript || '').trim();
+      if (!transcript) return;
+      // Only when interim text was asked for can a result be unfinished.
+      if (handlers.onInterim && result?.isFinal === false) {
+        handlers.onInterim(transcript);
+        return;
+      }
+      handlers.onResult(transcript);
     };
     recognition.onerror = (event: any) => handlers.onError?.(String(event?.error || 'unknown'));
     recognition.onend = () => handlers.onEnd?.();

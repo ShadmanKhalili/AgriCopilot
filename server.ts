@@ -27,6 +27,7 @@ import dailyForecastHandler from "./netlify/functions/daily-forecast.ts";
 import historicalDataHandler from "./netlify/functions/historical-data.ts";
 import wbIndicatorsHandler from "./netlify/functions/wb-indicators.ts";
 import sentinelHandler from "./netlify/functions/sentinel.ts";
+import assistantHandler from "./netlify/functions/assistant.ts";
 import { normalizeWeatherQuery, serverWeatherKey } from "./netlify/functions/_shared/weather-request.ts";
 import {
   getFreshMarketBulletin,
@@ -247,6 +248,10 @@ async function startServer() {
             ...(req.ip ? { "x-real-ip": req.ip } : {}),
             // The admin-only handlers read the caller's Firebase ID token.
             ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
+            // The AI handlers check Firebase App Check when APP_CHECK_MODE is set.
+            ...(typeof req.headers["x-firebase-appcheck"] === "string"
+              ? { "x-firebase-appcheck": req.headers["x-firebase-appcheck"] }
+              : {}),
           },
           body: hasBody ? JSON.stringify(req.body ?? null) : undefined,
         })
@@ -446,6 +451,9 @@ async function startServer() {
       res.status(500).json({ error: "farm_record_score_failed" });
     }
   });
+
+  // Phase 9 assistant (talk and read). Same handler as the Netlify function.
+  app.post("/api/assistant", aiLimiter, (req, res) => callFetchHandler(assistantHandler, req, res));
 
   app.post("/api/ai-proxy", aiLimiter, async (req, res) => {
     try {

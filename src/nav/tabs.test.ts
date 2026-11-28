@@ -27,6 +27,11 @@ describe('tabFromHash', () => {
     expect(tabFromHash('#calculator')).toBe('krishi-profit');
   });
 
+  it('opens the assistant from #assistant', () => {
+    expect(tabFromHash('#assistant')).toBe('assistant');
+    expect(hashForTab('assistant')).toBe('#assistant');
+  });
+
   it('returns null for a hash that names no tab', () => {
     expect(tabFromHash('#nothing-here')).toBeNull();
     expect(tabFromHash('#%E0%A4%A')).toBeNull();
@@ -52,15 +57,17 @@ describe('tool layers', () => {
   it('shows every tool in full mode and only the core ones in simple mode', () => {
     for (const tab of TAB_IDS) expect(isTabInMode(tab, 'full')).toBe(true);
     expect(isTabInMode('agri-copilot', 'simple')).toBe(true);
+    expect(isTabInMode('assistant', 'simple')).toBe(true);
     expect(isTabInMode('weather-advisory', 'simple')).toBe(true);
     expect(isTabInMode('admin-dashboard', 'simple')).toBe(false);
     expect(isTabInMode('smart-planting', 'simple')).toBe(false);
   });
 
-  it('lists the six simple tools in simple mode', () => {
+  it('lists the seven simple tools in simple mode', () => {
     const simple = TAB_IDS.filter((tab) => isTabInMode(tab, 'simple'));
     expect(simple).toEqual([
       'home',
+      'assistant',
       'agri-copilot',
       'market-connect',
       'weather-advisory',
@@ -77,6 +84,7 @@ describe('partitionTabsByMode', () => {
     const { main, more } = partitionTabsByMode(items, 'simple');
     expect(main.map((i) => i.id)).toEqual([
       'home',
+      'assistant',
       'agri-copilot',
       'market-connect',
       'weather-advisory',
