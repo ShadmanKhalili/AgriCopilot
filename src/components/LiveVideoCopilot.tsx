@@ -36,6 +36,7 @@ const THINKING_LEVEL_HINT_BN: Record<ThinkingLevelOption, string> = {
   HIGH: 'গভীরতম বিশ্লেষণ, ধীর',
 };
 import toast from 'react-hot-toast';
+import { speakChecked } from '../utils/speech';
 import { Language } from '../utils/translations';
 import { useAuth } from './AuthProvider';
 import { useUiMode } from '../context/useUiMode';
@@ -525,7 +526,7 @@ export default function LiveVideoCopilot({
       const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       const msg = lang === 'bn' 
         ? (isDenied
-            ? "ক্যামেরা বা মাইক্রোফোন ব্যবহারের অনুমতি পাওয়া যায়নি। ব্রাউজারের লক আইকনে ক্লিক করে অনুমতি দিন অথবা নমুনা প্রিসেট ব্যবহার করুন।" 
+            ? "ক্যামেরা বা মাইক্রোফোন ব্যবহারের অনুমতি পাওয়া যায়নি। ফোনের সেটিংসে এই অ্যাপকে ক্যামেরা ও মাইক্রোফোনের অনুমতি দিন, অথবা নিচের নমুনা বেছে নিন।" 
             : "ক্যামেরা ডিভাইসটি খুঁজে পাওয়া যায়নি। নিচে উল্লেখিত নমুনা প্রিসেট দিয়ে পরীক্ষা করতে পারেন।")
         : (isDenied
             ? "Camera or microphone permission was denied. Please allow access in browser permissions or select a sample preset below."
@@ -908,7 +909,7 @@ export default function LiveVideoCopilot({
           isLimitReached
             ? (lang === 'bn'
                 ? "আজকের লাইভ সেশনের সীমা শেষ, অথবা এই সংযোগ থেকে অনেক অনুরোধ এসেছে। ছবি দিয়ে রোগ নির্ণয় ও চ্যাট এখনো চালু আছে; পরে আবার চেষ্টা করুন।"
-                : errorMsg)
+                : 'The live session limit for today has been reached. Photo diagnosis and chat still work; please try again later.')
             : isKeySuspended
             ? (lang === 'bn' 
                 ? "জেমিনি এআই কি সাময়িকভাবে স্থগিত বা পরিবর্তিত হয়েছে। .env ফাইলে সক্রিয় GEMINI_API_KEY প্রদান করুন বা ডেমো মোড ব্যবহার করুন।" 
@@ -1237,6 +1238,12 @@ export default function LiveVideoCopilot({
 
     } catch (err: any) {
       console.error("Failed to start Live Video Copilot:", err);
+      toast.error(
+        lang === 'bn'
+          ? 'লাইভ ভিডিও চালু করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+          : 'Could not start live video. Check your internet connection and try again.',
+        { id: 'live-start-failed' }
+      );
       setIsConnecting(false);
       isStartingSessionRef.current = false;
       stopAllMedia();
@@ -1761,19 +1768,17 @@ Return a JSON object with this exact structure:
       setIsActionAudioPlaying(true);
     } catch (err) {
       console.warn('Action card TTS failed, falling back to Web Speech:', err);
-      if ('speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_`🔒]/g, ''));
-          utterance.lang = lang === 'bn' ? 'bn-BD' : 'en-US';
-          utterance.rate = 0.95;
-          utterance.onend = () => setIsActionAudioPlaying(false);
-          utterance.onerror = () => setIsActionAudioPlaying(false);
-          window.speechSynthesis.speak(utterance);
-          setIsActionAudioPlaying(true);
-        } catch (synthErr) {
-          toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
-        }
+      // Browser voice, but never Bangla text read by a voice that cannot speak Bangla.
+      const result = await speakChecked(text, lang === 'bn' ? 'bn' : 'en', { rate: 0.95, onEnd: () => setIsActionAudioPlaying(false) });
+      if (result === 'started') {
+        setIsActionAudioPlaying(true);
+      } else if (result === 'no-voice') {
+        toast.error(
+          lang === 'bn'
+            ? 'এই ফোনে বাংলা কণ্ঠ নেই। ফোনের সেটিংসে Text-to-speech-এ গিয়ে বাংলা ভাষা যোগ করুন।'
+            : 'This phone has no Bangla voice. In your phone settings, open Text-to-speech and add Bangla.',
+          { id: 'no-bangla-voice', duration: 7000 }
+        );
       } else {
         toast.error(lang === 'bn' ? 'ভয়েস চালু করা যায়নি।' : 'Could not start voice playback.');
       }

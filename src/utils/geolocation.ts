@@ -189,6 +189,7 @@ export async function detectGpsLocation(timeout: number = 10000): Promise<{ lati
   if (found.isFallback || found.isWithinBangladesh === false) {
     const err = new Error('GPS position is outside Bangladesh');
     (err as any).code = 2;
+    (err as any).outsideBangladesh = true;
     throw err;
   }
   return { latitude: found.latitude, longitude: found.longitude };
@@ -200,6 +201,11 @@ export async function detectGpsLocation(timeout: number = 10000): Promise<{ lati
  */
 export function gpsFailureMessage(error: unknown, lang: 'bn' | 'en'): string {
   const code = (error as any)?.code;
+  if ((error as any)?.outsideBangladesh) {
+    return lang === 'bn'
+      ? 'আপনার অবস্থান বাংলাদেশের বাইরে দেখাচ্ছে। তালিকা থেকে আপনার জেলা বেছে নিন।'
+      : 'Your location appears to be outside Bangladesh. Choose your district from the list.';
+  }
   if (code === 1) {
     return lang === 'bn'
       ? 'ফোনের সেটিংসে এই অ্যাপকে লোকেশনের অনুমতি দিন, অথবা তালিকা থেকে আপনার জেলা বেছে নিন।'

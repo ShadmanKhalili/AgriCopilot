@@ -15,6 +15,8 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firestore';
 import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 import { audioFeedback } from '../utils/audioFeedback';
+import { copyText } from '../utils/clipboard';
+import toBn from '../utils/banglaNum';
 import {
   toStorablePrescription,
   stableRxId,
@@ -114,6 +116,8 @@ export default function DigitalPrescriptionModal({
     year: 'numeric'
   });
   const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Capitals and wide spacing are for English labels only; Bangla reads worse with them.
+  const caps = (cls: string) => (lang === 'bn' ? '' : cls);
 
   // Download high-resolution PNG
   const handleDownloadImage = async () => {
@@ -241,13 +245,13 @@ export default function DigitalPrescriptionModal({
   };
 
   // Copy textual summary to clipboard
-  const handleCopyText = () => {
+  const handleCopyText = async () => {
     const text = `📋 DIGITAL KRISHI PRESCRIPTION (${rxId})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌾 ${lang === 'bn' ? 'ফসল' : 'Crop'}: ${data.crop} (${data.cropStage || 'Field'})
 📍 ${lang === 'bn' ? 'এলাকা' : 'Location'}: ${data.location}
 🔬 ${lang === 'bn' ? 'রোগ নির্ণয়' : 'Diagnosis'}: ${data.diseaseName} (${severityUnknown ? (lang === 'bn' ? 'তীব্রতা জানা নেই — কৃষি অফিসারকে দেখান' : 'Severity unknown — show an agriculture officer') : data.severity})
-📊 ${lang === 'bn' ? 'নির্ভুলতা' : 'Confidence'}: ${data.confidence !== null && data.confidence !== undefined ? `${data.confidence}%` : (lang === 'bn' ? 'মূল্যায়ন করা হয়নি' : 'Not assessed')}
+📊 ${lang === 'bn' ? 'নির্ভুলতা' : 'Confidence'}: ${data.confidence !== null && data.confidence !== undefined ? `${lang === 'bn' ? toBn(data.confidence) : data.confidence}%` : (lang === 'bn' ? 'মূল্যায়ন করা হয়নি' : 'Not assessed')}
 
 💊 ${data.chemicalGated ? (lang === 'bn' ? 'রাসায়নিক চিকিৎসা স্থগিত — কৃষি কর্মকর্তার অনুমোদন ছাড়া স্প্রে করবেন না' : 'Chemical treatment withheld — do not spray without an agriculture officer\'s approval') : (lang === 'bn' ? 'এআই পরামর্শ — বোতলের লেবেল মিলিয়ে নিন' : 'AI suggestion — check the product label')}:
 ${data.chemicalGated ? '' : data.chemicalSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
@@ -259,7 +263,10 @@ ${data.organicSteps.map((s, i) => `• ${s}`).join('\n')}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
 
-    navigator.clipboard.writeText(text);
+    if (!(await copyText(text))) {
+      toast.error(lang === 'bn' ? 'কপি করা যায়নি' : 'Could not copy');
+      return;
+    }
     setIsCopied(true);
     toast.success(lang === 'bn' ? 'প্রেসক্রিপশন টেক্সট কপি হয়েছে!' : 'Prescription copied to clipboard!');
     setTimeout(() => setIsCopied(false), 2500);
@@ -279,7 +286,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
         localStorage.setItem('farmer_saved_prescriptions', JSON.stringify(existing.slice(0, 20)));
         toast.success(lang === 'bn' ? 'স্থানীয় ডসিয়ারে সংরক্ষিত হয়েছে!' : 'Saved to local dossier!');
       } catch (e) {
-        toast.error('Error saving');
+        toast.error(lang === 'bn' ? 'সংরক্ষণ করা যায়নি' : 'Error saving');
       }
     };
     try {
@@ -323,7 +330,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               <FileText className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-950 dark:text-emerald-300">
+              <span className={`text-xs font-black text-emerald-950 dark:text-emerald-300 ${caps('uppercase tracking-wider')}`}>
                 {lang === 'bn' ? 'ডিজিটাল কৃষি ব্যবস্থাপত্র (Rx)' : 'Digital Krishi Prescription (Rx)'}
               </span>
               <p className="text-[11px] text-stone-500 font-mono">ID: {rxId}</p>
@@ -428,7 +435,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     <Leaf className="w-7 h-7" />
                   </div>
                   <div>
-                    <h2 className="text-lg sm:text-xl font-display font-black text-emerald-950 uppercase tracking-tight leading-tight">
+                    <h2 className={`text-lg sm:text-xl font-display font-black text-emerald-950 tracking-tight leading-tight ${caps('uppercase')}`}>
                       {lang === 'bn' ? 'ডিজিটাল কৃষি ব্যবস্থাপত্র ও পরামর্শপত্র' : 'Digital Krishi Clinical Prescription'}
                     </h2>
                     <p className="text-[11px] font-bold text-emerald-800 mt-0.5 tracking-wide">
@@ -451,7 +458,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     </span>
                   </div>
                   <div className="text-[11px] font-medium text-stone-500">
-                    <span>{currentDate} • {currentTime}</span>
+                    <span>{currentDate} • {lang === 'bn' ? toBn(currentTime) : currentTime}</span>
                   </div>
                 </div>
               </div>
@@ -460,7 +467,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
             {/* Farmer & Plot Details Grid */}
             <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-50/90 rounded-2xl p-4 border border-stone-200 mb-6 text-xs">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className={`text-[11px] font-bold text-stone-500 block mb-0.5 ${caps('uppercase tracking-wider')}`}>
                   {lang === 'bn' ? 'কৃষক / গ্রাহক' : 'Grower / User'}
                 </span>
                 <span className="font-bold text-stone-900 truncate block">
@@ -469,7 +476,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               </div>
 
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className={`text-[11px] font-bold text-stone-500 block mb-0.5 ${caps('uppercase tracking-wider')}`}>
                   {lang === 'bn' ? 'এলাকা / প্লট' : 'Location / Plot'}
                 </span>
                 <span className="font-semibold text-stone-900 flex items-center gap-1 truncate">
@@ -479,7 +486,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               </div>
 
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className={`text-[11px] font-bold text-stone-500 block mb-0.5 ${caps('uppercase tracking-wider')}`}>
                   {lang === 'bn' ? 'আক্রান্ত ফসল' : 'Host Plant / Crop'}
                 </span>
                 <span className="font-bold text-emerald-950 truncate block">
@@ -491,7 +498,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               </div>
 
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block mb-0.5">
+                <span className={`text-[11px] font-bold text-stone-500 block mb-0.5 ${caps('uppercase tracking-wider')}`}>
                   {lang === 'bn' ? 'আবহাওয়া পরিস্থিতি' : 'Microclimate'}
                 </span>
                 <span className="text-[11px] font-medium text-stone-800 flex items-center gap-1.5">
@@ -511,7 +518,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl font-serif font-black text-amber-400">℞</span>
-                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-300">
+                    <span className={`text-[11px] font-black text-emerald-300 ${caps('uppercase tracking-widest')}`}>
                       {lang === 'bn' ? 'শনাক্তকৃত রোগ / সমস্যা' : 'Primary Pathological Diagnosis'}
                     </span>
                   </div>
@@ -547,7 +554,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   {/* Confidence or Not Assessed */}
                   {data.confidence !== null && data.confidence !== undefined ? (
                     <div className="bg-white/10 px-3 py-1 rounded-xl text-xs font-bold text-white border border-white/20">
-                      {data.confidence}% {lang === 'bn' ? 'সঠিকতা' : 'Confidence'}
+                      {lang === 'bn' ? toBn(data.confidence) : data.confidence}% {lang === 'bn' ? 'সঠিকতা' : 'Confidence'}
                     </div>
                   ) : (
                     <div className="bg-amber-500/20 text-amber-200 border border-amber-400/40 px-3 py-1 rounded-xl text-xs font-bold">
@@ -560,7 +567,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Observed Symptoms */}
               {data.symptoms && data.symptoms.length > 0 && (
                 <div className="mt-3.5 pt-3 border-t border-emerald-800/80">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
+                  <span className={`text-[11px] font-bold text-emerald-300 block mb-1.5 ${caps('uppercase tracking-wider')}`}>
                     {lang === 'bn' ? 'প্রাথমিক দৃশ্যমান পর্যবেক্ষণ (Visual Symptoms):' : 'Preliminary Visual Observations:'}
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -577,7 +584,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   states it, so the card should carry it. */}
               {data.differentialDiagnosis && (
                 <div className="mt-3 pt-3 border-t border-emerald-800/80">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300 block mb-1.5">
+                  <span className={`text-[11px] font-bold text-emerald-300 block mb-1.5 ${caps('uppercase tracking-wider')}`}>
                     {lang === 'bn' ? 'কেন এই রোগ — অন্য সম্ভাবনার তুলনায়' : 'Why this condition, and not the alternatives'}
                   </span>
                   <p className="text-[11px] leading-relaxed text-emerald-50/90">
@@ -593,7 +600,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Recommended Agronomic Investigation Steps */}
               {data.investigationSteps && data.investigationSteps.length > 0 && (
                 <div className="border border-amber-300/80 rounded-2xl p-4 bg-amber-50/60 shadow-2xs">
-                  <div className="flex items-center space-x-2 text-amber-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-amber-200">
+                  <div className={`flex items-center space-x-2 text-amber-950 font-bold text-xs mb-2.5 pb-1.5 border-b border-amber-200 ${caps('uppercase tracking-wide')}`}>
                     <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[11px] font-black">🔬</span>
                     <span>{lang === 'bn' ? 'সুপারিশকৃত সরেজমিন অনুসন্ধান ও ল্যাব পরীক্ষা' : 'Recommended Field Investigations & Lab Diagnostics'}</span>
                   </div>
@@ -610,7 +617,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
 
               {/* Section 1: Immediate Field Cultural & Mechanical Action */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
-                <div className="flex items-center space-x-2 text-stone-900 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-stone-100">
+                <div className={`flex items-center space-x-2 text-stone-900 font-bold text-xs mb-2.5 pb-1.5 border-b border-stone-100 ${caps('uppercase tracking-wide')}`}>
                   <span className="w-5 h-5 rounded-full bg-stone-800 text-white flex items-center justify-center text-[11px] font-black">1</span>
                   <span>{lang === 'bn' ? 'তাৎক্ষণিক জমি/টব স্যানিটেশন ও নন-কেমিক্যাল পরিচর্যা' : 'Immediate Cultural & Sanitation Protocols'}</span>
                 </div>
@@ -635,7 +642,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               {/* Section 2: Chemical Regimen with Gating */}
               {data.chemicalGated ? (
                 <div className="border-2 border-rose-500/40 rounded-2xl p-4 bg-rose-50/70 shadow-2xs">
-                  <div className="flex items-center justify-between text-rose-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-rose-200">
+                  <div className={`flex items-center justify-between text-rose-950 font-bold text-xs mb-2.5 pb-1.5 border-b border-rose-200 ${caps('uppercase tracking-wide')}`}>
                     <div className="flex items-center space-x-2">
                       <span className="w-5 h-5 rounded-full bg-rose-700 text-white flex items-center justify-center text-[11px] font-black">🔒</span>
                       <span>{lang === 'bn' ? 'রাসায়নিক চিকিৎসা স্থগিত • বিশেষজ্ঞ অনুমোদন আবশ্যক' : 'Chemical Rx Withheld • Agronomic Review Required'}</span>
@@ -662,7 +669,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 </div>
               ) : (
                 <div className="border-2 border-emerald-600/30 rounded-2xl p-4 bg-emerald-50/40 shadow-2xs">
-                  <div className="flex items-center justify-between text-emerald-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-emerald-200">
+                  <div className={`flex items-center justify-between text-emerald-950 font-bold text-xs mb-2.5 pb-1.5 border-b border-emerald-200 ${caps('uppercase tracking-wide')}`}>
                     <div className="flex items-center space-x-2">
                       <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[11px] font-black">2</span>
                       <span>{lang === 'bn' ? 'এআই পরামর্শ — বোতলের লেবেল মিলিয়ে নিন' : 'AI suggestion — check the product label'}</span>
@@ -696,7 +703,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
 
               {/* Section 3: Organic & Eco-Friendly Alternative */}
               <div className="border border-stone-200 rounded-2xl p-4 bg-white shadow-2xs">
-                <div className="flex items-center space-x-2 text-stone-900 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-stone-100">
+                <div className={`flex items-center space-x-2 text-stone-900 font-bold text-xs mb-2.5 pb-1.5 border-b border-stone-100 ${caps('uppercase tracking-wide')}`}>
                   <span className="w-5 h-5 rounded-full bg-teal-700 text-white flex items-center justify-center text-[11px] font-black">3</span>
                   <span>{lang === 'bn' ? 'জৈব ও পরিবেশবান্ধব বিকল্প সমাধান' : 'Bio-Control & Organic Alternatives'}</span>
                 </div>
@@ -757,7 +764,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
               <div className="flex items-center space-x-3.5">
                 {/* Reference number box (plain text, not a scannable code) */}
                 <div className="min-w-[7rem] bg-white border-2 border-stone-800 px-2.5 py-1.5 rounded-xl flex flex-col items-center justify-center shadow-xs flex-shrink-0 text-center">
-                  <span className="text-[9px] font-bold text-stone-600 uppercase tracking-wide">
+                  <span className={`text-[9px] font-bold text-stone-600 ${caps('uppercase tracking-wide')}`}>
                     {lang === 'bn' ? 'রেফারেন্স নম্বর' : 'Reference no.'}
                   </span>
                   <span className="text-[11px] font-mono font-bold text-stone-900 break-all leading-tight mt-0.5">{rxId}</span>
@@ -785,7 +792,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     KrishiVip AI Advisory
                   </div>
                 </div>
-                <p className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                <p className={`text-[11px] font-black text-emerald-900 ${caps('uppercase tracking-wider')}`}>
                   {data.expertVerified 
                     ? (lang === 'bn' ? 'বিশেষজ্ঞ কর্তৃক যাচাইকৃত' : 'Expert Verified') 
                     : (lang === 'bn' ? 'এআই সিদ্ধান্ত সহায়তা • রিভিউ পেন্ডিং' : 'AI Decision Support • Review Pending')}

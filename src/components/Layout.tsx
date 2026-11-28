@@ -240,7 +240,8 @@ export default function Layout() {
         .filter(Boolean)
         .join(', ')
     : lookedUpName;
-  const { user, userRole, isAuthReady, isGuest, signOut } = useAuth();
+  // Home shows as soon as Firebase Auth knows the user; the profile/role loads in the background.
+  const { user, userRole, isUserKnown, isGuest, signOut } = useAuth();
   // Simple view: the few core tools, large and uncluttered. Full view: everything.
   const mode = useUiMode();
   const simple = mode === 'simple';
@@ -498,7 +499,7 @@ export default function Layout() {
     </div>
   );
 
-  if (!isAuthReady) {
+  if (!isUserKnown) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-emerald-800">
         <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mb-3" />

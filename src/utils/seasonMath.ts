@@ -169,6 +169,15 @@ export const sortExpenses = <T extends Pick<Expense, 'date' | 'createdAt'>>(list
     a.date === b.date ? b.createdAt.localeCompare(a.createdAt) : b.date.localeCompare(a.date)
   );
 
+/**
+ * Join a freshly loaded list with items added on screen while it loaded.
+ * An item present in both keeps the loaded copy; the result is sorted.
+ */
+export const mergeExpensesById = <T extends Pick<Expense, 'id' | 'date' | 'createdAt'>>(loaded: T[], local: T[]): T[] => {
+  const ids = new Set(loaded.map((e) => e.id));
+  return sortExpenses([...loaded, ...local.filter((e) => !ids.has(e.id))]);
+};
+
 /** Most recently changed plan first. */
 export const sortSeasons = <T extends Pick<SeasonPlan, 'updatedAt'>>(list: T[]): T[] =>
   [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

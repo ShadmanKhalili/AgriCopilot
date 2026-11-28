@@ -10,7 +10,7 @@ interface Coordinates {
 type State =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; weather: TodayWeather }
+  | { status: 'ready'; weather: TodayWeather; fetchedAt: number }
   | { status: 'error' };
 
 // One reading per area is reused for a while, so going back to Home does not
@@ -25,7 +25,7 @@ export function useTodayWeather(location: Coordinates | null) {
   const key = location ? keyFor(location) : null;
   const [state, setState] = useState<State>(() => {
     const hit = key ? cache.get(key) : undefined;
-    return hit && Date.now() - hit.at < CACHE_MS ? { status: 'ready', weather: hit.weather } : { status: 'idle' };
+    return hit && Date.now() - hit.at < CACHE_MS ? { status: 'ready', weather: hit.weather, fetchedAt: hit.at } : { status: 'idle' };
   });
   const [attempt, setAttempt] = useState(0);
 
@@ -36,7 +36,7 @@ export function useTodayWeather(location: Coordinates | null) {
     }
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < CACHE_MS) {
-      setState({ status: 'ready', weather: hit.weather });
+      setState({ status: 'ready', weather: hit.weather, fetchedAt: hit.at });
       return;
     }
 
@@ -51,8 +51,9 @@ export function useTodayWeather(location: Coordinates | null) {
         if (!response.ok) throw new Error(`weather status ${response.status}`);
         const weather = todayWeatherFromFeed(await readJsonWithTimeout<any>(response, 10000));
         if (!weather) throw new Error('weather feed had no current reading');
-        cache.set(key, { at: Date.now(), weather });
-        if (!cancelled) setState({ status: 'ready', weather });
+        const fetchedAt = Date.now();
+        cache.set(key, { at: fetchedAt, weather });
+        if (!cancelled) setState({ status: 'ready', weather, fetchedAt });
       } catch (error) {
         console.warn('Could not load today\'s weather:', error);
         if (!cancelled) setState({ status: 'error' });

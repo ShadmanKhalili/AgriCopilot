@@ -50,7 +50,8 @@ import { cleanSeasonProgress, SALE_LIMIT, type SeasonProgress } from '../../netl
 /** A season with the optional Phase 7 progress fields (plot, stage, dates, harvest). */
 export type SeasonWithProgress = SeasonPlan & SeasonProgress;
 
-export const SEASON_LIMIT = 20;
+/** Plans kept per farmer. Raised from 20 so a busy farmer's older plans are not silently dropped. */
+export const SEASON_LIMIT = 100;
 export const EXPENSE_LIMIT = 200;
 
 export interface Pending<T> {
@@ -148,15 +149,27 @@ const expensesCol = (uid: string, seasonId: string) =>
 // The API the screens use. `uid` null means "this device only".
 // ---------------------------------------------------------------------------
 
-/** Saved plans, most recently changed first. */
-export const listSeasons = async (uid: string | null): Promise<SeasonWithProgress[]> => {
-  if (!uid) return sortSeasons(readLocalStore().seasons);
-  const snap = await getDocs(query(seasonsCol(uid), where('uid', '==', uid), limit(SEASON_LIMIT)));
+/**
+ * Saved plans, most recently changed first, and whether there are more than
+ * `SEASON_LIMIT` (so the screen can say some are not shown).
+ */
+export const listSeasonsPage = async (
+  uid: string | null
+): Promise<{ seasons: SeasonWithProgress[]; truncated: boolean }> => {
+  if (!uid) return { seasons: sortSeasons(readLocalStore().seasons), truncated: false };
+  // Ask for one more than the limit: if it comes back, the list is cut short.
+  const snap = await getDocs(query(seasonsCol(uid), where('uid', '==', uid), limit(SEASON_LIMIT + 1)));
+  const truncated = snap.docs.length > SEASON_LIMIT;
   const seasons = snap.docs
+    .slice(0, SEASON_LIMIT)
     .map((d) => parseSeason(d.id, d.data() as Record<string, unknown>))
     .filter((s): s is SeasonWithProgress => s !== null);
-  return sortSeasons(seasons);
+  return { seasons: sortSeasons(seasons), truncated };
 };
+
+/** Saved plans, most recently changed first. */
+export const listSeasons = async (uid: string | null): Promise<SeasonWithProgress[]> =>
+  (await listSeasonsPage(uid)).seasons;
 
 /**
  * Save a plan. With `existing` the plan is updated in place (same id and

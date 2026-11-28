@@ -13,6 +13,8 @@ interface Props {
   uid: string | null;
   plans: SeasonPlan[];
   loaded: boolean;
+  /** The account has more plans than are shown. */
+  truncated?: boolean;
   /** The plan whose details are open, if any. */
   openPlan: SeasonPlan | null;
   onToggle: (plan: SeasonPlan) => void;
@@ -22,7 +24,7 @@ interface Props {
 }
 
 /** The farmer's saved plans, each with its own cost notes. */
-export default function SavedPlans({ lang, uid, plans, loaded, openPlan, onToggle, onEdit, onDelete }: Props) {
+export default function SavedPlans({ lang, uid, plans, loaded, truncated = false, openPlan, onToggle, onEdit, onDelete }: Props) {
   const bn = lang === 'bn';
   const taka = (v: number) => formatTaka(v, lang);
 
@@ -49,6 +51,14 @@ export default function SavedPlans({ lang, uid, plans, loaded, openPlan, onToggl
           </p>
         )}
       </div>
+
+      {truncated && (
+        <p role="status" className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+          {bn
+            ? 'আপনার ১০০টির বেশি হিসাব আছে, তাই সবগুলো এখানে দেখানো যাচ্ছে না। দরকার নেই এমন হিসাব মুছে দিলে বাকিগুলো দেখা যাবে।'
+            : 'You have more than 100 plans, so not all of them are shown here. Delete plans you no longer need to see the others.'}
+        </p>
+      )}
 
       {!loaded ? (
         <p className="text-base text-stone-500 dark:text-stone-400">{bn ? 'হিসাব আনা হচ্ছে…' : 'Loading plans…'}</p>

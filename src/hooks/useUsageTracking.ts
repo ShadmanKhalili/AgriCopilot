@@ -6,7 +6,10 @@ import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHand
 import { hasGuestAllowance } from '../firebase';
 
 export function useUsageTracking(tabId: string = 'global') {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, isAuthReady } = useAuth();
+  // The app now shows before the profile has loaded. Until it has, do not
+  // block a premium farmer on free limits: the AI proxy enforces the real ones.
+  const profilePending = !!user && !userProfile && !isAuthReady;
   const [anonUsage, setAnonUsage] = useState(0);
   const [premiumUsage, setPremiumUsage] = useState(0);
 
@@ -59,7 +62,7 @@ export function useUsageTracking(tabId: string = 'global') {
 
   const getPremiumLimit = () => {
      if (!user) return 0; // Guest cannot use premium
-     if (userProfile?.tier === 'premium') return 1000;
+     if (userProfile?.tier === 'premium' || profilePending) return 1000;
      return 1; // Free account gets 1 premium analysis per tab
   }
 

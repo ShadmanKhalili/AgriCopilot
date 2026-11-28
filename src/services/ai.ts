@@ -1,4 +1,5 @@
 import { fixSchemeLinks } from '../utils/schemeLinks';
+import { createSlotLimiter } from './aiQueue';
 import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
 import { ensureAiSession, getAppCheckHeader } from '../firebase';
@@ -81,45 +82,10 @@ type AiProxyResult = {
 // Google Gemini Free Tier limits to 15 RPM.
 // The burst queue restricts in-flight requests (max 2 concurrent) and enforces spacing
 // between requests, with automatic 429 exponential backoff retry.
-let activeRequests = 0;
 const MAX_CONCURRENT_REQUESTS = 2;
-const requestQueue: Array<() => void> = [];
-
-const acquireSlot = async (signal?: AbortSignal): Promise<() => void> => {
-  if (activeRequests < MAX_CONCURRENT_REQUESTS) {
-    activeRequests++;
-    return () => {
-      activeRequests--;
-      if (requestQueue.length > 0) {
-        const next = requestQueue.shift();
-        if (next) setTimeout(next, 100);
-      }
-    };
-  }
-
-  return new Promise<() => void>((resolve, reject) => {
-    const onAbort = () => {
-      const idx = requestQueue.indexOf(run);
-      if (idx !== -1) requestQueue.splice(idx, 1);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-
-    const run = () => {
-      signal?.removeEventListener('abort', onAbort);
-      activeRequests++;
-      resolve(() => {
-        activeRequests--;
-        if (requestQueue.length > 0) {
-          const next = requestQueue.shift();
-          if (next) setTimeout(next, 100);
-        }
-      });
-    };
-
-    signal?.addEventListener('abort', onAbort, { once: true });
-    requestQueue.push(run);
-  });
-};
+// An aborted request leaves the line or gives its slot back (see aiQueue.ts).
+const aiLimiter = createSlotLimiter(MAX_CONCURRENT_REQUESTS);
+const acquireSlot = (signal?: AbortSignal): Promise<() => void> => aiLimiter.acquire(signal);
 
 // Helper to call AI via backend proxy with burst protection
 const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyResult> => {

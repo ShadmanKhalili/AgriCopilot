@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import type { Language } from '../../utils/translations';
-import { deleteSeason, listSeasons, saveSeason } from '../../services/seasons';
+import { deleteSeason, listSeasonsPage, saveSeason } from '../../services/seasons';
 import { withDeviceRecordMoved } from '../../services/deviceRecordMove';
 import { sortSeasons, type SeasonInput, type SeasonPlan } from '../../utils/seasonMath';
 
@@ -20,6 +20,8 @@ export const accountSaveFailed = (lang: Language) =>
 export function useSeasonPlans(uid: string | null, lang: Language) {
   const [plans, setPlans] = useState<SeasonPlan[]>([]);
   const [loaded, setLoaded] = useState(false);
+  /** True when the account holds more plans than are shown. */
+  const [truncated, setTruncated] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,8 +30,8 @@ export function useSeasonPlans(uid: string | null, lang: Language) {
     setOpenId(null);
     // Plans kept on the phone move into the account first (see deviceRecordMove).
     withDeviceRecordMoved(uid)
-      .then(() => listSeasons(uid))
-      .then((list) => { if (alive) setPlans(list); })
+      .then(() => listSeasonsPage(uid))
+      .then(({ seasons, truncated: more }) => { if (alive) { setPlans(seasons); setTruncated(more); } })
       .catch(() => {
         if (!alive) return;
         setPlans([]);
@@ -79,5 +81,5 @@ export function useSeasonPlans(uid: string | null, lang: Language) {
 
   const openPlan = plans.find((p) => p.id === openId) ?? null;
 
-  return { plans, loaded, openPlan, setOpenId, save, remove };
+  return { plans, loaded, truncated, openPlan, setOpenId, save, remove };
 }

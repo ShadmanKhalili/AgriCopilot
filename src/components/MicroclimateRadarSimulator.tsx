@@ -20,6 +20,7 @@ import {
 import { motion } from 'motion/react';
 import { Language } from '../utils/translations';
 import { toBn } from '../utils/banglaNum';
+import { timeLabel } from '../utils/bnTime';
 import DataStatusBadge from './DataStatusBadge';
 
 export interface HourlyPoint {
@@ -323,7 +324,7 @@ export default function MicroclimateRadarSimulator({
                   {dayName}
                 </span>
                 <span className="text-sm font-bold text-gray-300">
-                  {bn ? toBn(activePoint.time) : activePoint.time}
+                  {timeLabel(activePoint.rawTime, bn) ?? (bn ? toBn(activePoint.time) : activePoint.time)}
                 </span>
               </div>
 
@@ -362,7 +363,7 @@ export default function MicroclimateRadarSimulator({
                 {bn ? 'এই ঘণ্টার কৃষি কাজের নির্দেশিকা' : 'Field work advice for this hour'}
               </span>
               <span className="text-sm text-gray-300 font-normal">
-                {bn ? toBn(activePoint.time) : activePoint.time}
+                {timeLabel(activePoint.rawTime, bn) ?? (bn ? toBn(activePoint.time) : activePoint.time)}
               </span>
             </h4>
             <p className="text-sm text-stone-400 mb-3">

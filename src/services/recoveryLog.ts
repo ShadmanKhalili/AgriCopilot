@@ -21,6 +21,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../firestore';
+import { dhakaDateString } from '../utils/farmTaskDates';
 
 export const RECOVERY_LOG_LIMIT = 50;
 export const RECOVERY_TEXT_MAX = 500;
@@ -50,7 +51,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const clampText = (value: unknown, max: number): string =>
   typeof value === 'string' ? value.trim().slice(0, max) : '';
 
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
+// Dhaka calendar day: between midnight and 6 AM the UTC date is still yesterday.
+const todayIso = (): string => dhakaDateString();
 
 /**
  * Trim and clamp an entry to the stored limits. Returns null when it cannot

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Droplets, Wind, ShieldCheck, ShieldAlert, Sparkles, AlertCircle } from 'lucide-react';
 import { Language } from '../utils/translations';
+import toBn from '../utils/banglaNum';
+import { timeLabel } from '../utils/bnTime';
 
 export interface HourlySpreadItem {
   time: string;
@@ -32,6 +34,11 @@ interface Props {
 
 export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow, safeWindowDetail }: Props) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const bn = lang === 'bn';
+  /** A number for display: Bangla numerals in Bangla. */
+  const nb = (value: number | string): string => (bn ? toBn(value) : String(value));
+  /** The hour as the farmer says it in Bangla; the server's own label in English. */
+  const hourText = (item: HourlySpreadItem): string => (bn ? timeLabel(item.time, true) ?? item.displayTime : item.displayTime);
 
   if (!data || data.length === 0) {
     return null;
@@ -138,7 +145,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
                   fontSize="9"
                   fontFamily="monospace"
                 >
-                  {valMm}mm
+                  {nb(valMm)}mm
                 </text>
               </g>
             );
@@ -253,7 +260,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
                 fontSize="9"
                 fontFamily="monospace"
               >
-                {item.displayTime}
+                {hourText(item)}
               </text>
             );
           })}
@@ -267,7 +274,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
                 {lang === 'bn' ? 'সময় ও তাপমাত্রা' : 'Hour & Temp'}
               </span>
               <span className="font-bold text-white tabular-nums">
-                {activeItem.displayTime} · {activeItem.temp.toFixed(1)}°C
+                {hourText(activeItem)} · {nb(activeItem.temp.toFixed(1))}°C
               </span>
             </div>
 
@@ -276,7 +283,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
                 {lang === 'bn' ? 'বৃষ্টিপাত সম্ভাবনা' : 'Rain Prob'}
               </span>
               <span className="font-bold text-cyan-400 tabular-nums">
-                {activeItem.rainProb}% ({activeItem.rainQpf.toFixed(1)} mm)
+                {nb(activeItem.rainProb)}% ({nb(activeItem.rainQpf.toFixed(1))} mm)
               </span>
             </div>
 
@@ -285,7 +292,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
                 {lang === 'bn' ? 'সম্ভাব্য বৃষ্টি বিস্তার' : 'P10 - P90 Spread'}
               </span>
               <span className="font-bold text-sky-300 tabular-nums">
-                {activeItem.p10.toFixed(1)} - {activeItem.p90.toFixed(1)} mm
+                {nb(activeItem.p10.toFixed(1))} - {nb(activeItem.p90.toFixed(1))} mm
               </span>
             </div>
 
@@ -328,7 +335,7 @@ export default function PrecipitationRiskCurve({ data, lang, safeSprayingWindow,
             </p>
             {safeWindowDetail && (
               <p className="text-sm text-stone-400 mt-0.5 font-mono">
-                {lang === 'bn' ? 'বাতাস:' : 'Wind:'} {safeWindowDetail.avgWind} km/h · {lang === 'bn' ? 'তাপমাত্রা:' : 'Temp:'} {safeWindowDetail.avgTemp}°C · {lang === 'bn' ? 'বৃষ্টির ঝুঁকি:' : 'Rain Risk:'} {safeWindowDetail.rainRisk}%
+                {lang === 'bn' ? 'বাতাস:' : 'Wind:'} {nb(safeWindowDetail.avgWind)} km/h · {lang === 'bn' ? 'তাপমাত্রা:' : 'Temp:'} {nb(safeWindowDetail.avgTemp)}°C · {lang === 'bn' ? 'বৃষ্টির ঝুঁকি:' : 'Rain Risk:'} {nb(safeWindowDetail.rainRisk)}%
               </p>
             )}
           </div>

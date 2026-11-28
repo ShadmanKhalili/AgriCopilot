@@ -41,6 +41,17 @@ describe('normaliseRecoveryInput', () => {
     const out = normaliseRecoveryInput({ diagnosisId: 'd1', date: 'yesterday', action: 'a', change: '' });
     expect(out?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it('uses the Dhaka day when it is after midnight there but still yesterday in UTC', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-11-12T20:30:00Z')); // 02:30 on 13 Nov in Dhaka
+      const out = normaliseRecoveryInput({ diagnosisId: 'd1', date: 'yesterday', action: 'a', change: '' });
+      expect(out?.date).toBe('2026-11-13');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('sortRecoveryLogs', () => {

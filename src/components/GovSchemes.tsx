@@ -12,6 +12,7 @@ import { CURRENT_PDF_SCHEMES, SEED_ELIGIBILITY_TAGS, seedGovSchemes } from '../d
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
 import { useUiMode } from '../context/useUiMode';
+import ListenButton from './ui/ListenButton';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { mainCropLabel } from '../data/mainCrops';
 import {
@@ -231,7 +232,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
           </div>
           <div>
             <h2 className="text-lg md:text-2xl font-black text-gray-900 tracking-tight leading-tight">{t.govSchemes}</h2>
-            <p className="text-gray-500 text-[11px] md:text-sm font-medium">{t.govSchemesDesc}</p>
+            <p className="text-gray-500 text-sm font-medium">{t.govSchemesDesc}</p>
           </div>
         </div>
       </div>
@@ -385,7 +386,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setSelectedTag(tag)}
-                    className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${
+                    className={`px-5 py-2.5 min-h-[48px] rounded-xl text-sm font-black transition-all border ${
                       selectedTag === tag 
                         ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30' 
                         : 'bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600'
@@ -445,13 +446,15 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-black text-lg leading-tight uppercase tracking-tight">{lang === 'bn' ? 'স্কিম গাইড' : 'Scheme Advisor'}</h3>
-                    <p className="text-[11px] font-bold opacity-70 uppercase tracking-widest">{chatScheme.title[lang]}</p>
+                    <h3 className="font-black text-lg leading-tight">{lang === 'bn' ? 'স্কিম গাইড' : 'Scheme Advisor'}</h3>
+                    <p className="text-sm font-bold opacity-80">{chatScheme.title[lang]}</p>
                   </div>
                 </div>
                 <button 
+                  type="button"
                   onClick={() => setChatScheme(null)}
-                  className="p-2 hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+                  aria-label={lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+                  className="min-w-[48px] min-h-[48px] flex items-center justify-center shrink-0 hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -466,12 +469,24 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                     animate={{ opacity: 1, x: 0 }}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[85%] p-5 rounded-[2rem] text-sm font-medium shadow-sm leading-relaxed ${
-                      msg.role === 'user' 
-                        ? 'bg-blue-600 text-white rounded-tr-none' 
-                        : 'bg-blue-50 text-gray-900 rounded-tl-none border border-blue-100'
-                    }`}>
-                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    <div className="max-w-[85%] min-w-0">
+                      <div className={`p-5 rounded-[2rem] text-base font-medium shadow-sm leading-relaxed ${
+                        msg.role === 'user' 
+                          ? 'bg-blue-600 text-white rounded-tr-none' 
+                          : 'bg-blue-50 text-gray-900 rounded-tl-none border border-blue-100'
+                      }`}>
+                        <ReactMarkdown>{msg.text}</ReactMarkdown>
+                      </div>
+                      {msg.role === 'model' && i > 0 && (
+                        <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
+                          <ListenButton text={msg.text} lang={lang} />
+                          <p className="text-sm font-medium text-gray-600 flex-1 min-w-[12rem]">
+                            {lang === 'bn'
+                              ? 'এটি এআই-এর উত্তর। আবেদনের আগে কৃষি অফিসে নিশ্চিত করুন।'
+                              : 'AI answer. Confirm at the agriculture office before applying.'}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -479,7 +494,7 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                   <div className="flex justify-start">
                     <div className="bg-blue-50 p-5 rounded-[2rem] rounded-tl-none border border-blue-100 flex items-center gap-3">
                       <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                      <span className="text-xs font-black text-blue-600 uppercase tracking-widest">
+                      <span className="text-sm font-black text-blue-600">
                         {lang === 'bn' ? 'পরামর্শদাতা লিখছেন...' : 'Advisor is typing...'}
                       </span>
                     </div>
@@ -496,13 +511,14 @@ export default function GovSchemes({ lang, globalLocation }: Props) {
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder={lang === 'bn' ? 'কিভাবে আবেদন করব?' : 'How do I apply? Ask anything...'}
-                    className="w-full bg-white border border-gray-200 p-5 pr-16 rounded-[2rem] text-sm font-medium focus:ring-4 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all shadow-inner"
+                    className="w-full bg-white border border-gray-200 p-5 pr-20 rounded-[2rem] text-base font-medium focus:ring-4 focus:ring-blue-100 focus:border-blue-600 outline-none transition-all shadow-inner"
                     disabled={isChatLoading}
                   />
                   <button
                     type="submit"
                     disabled={!chatInput.trim() || isChatLoading}
-                    className="absolute right-2 top-2 bottom-2 aspect-square bg-blue-600 text-white rounded-2xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors cursor-pointer"
+                    aria-label={lang === 'bn' ? 'পাঠান' : 'Send'}
+                    className="absolute right-2 top-2 bottom-2 min-w-[48px] aspect-square bg-blue-600 text-white rounded-2xl flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors cursor-pointer"
                   >
                     <Send className="w-5 h-5" />
                   </button>

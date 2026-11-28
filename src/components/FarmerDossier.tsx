@@ -20,6 +20,7 @@ import {
 } from '../utils/farmerProfiler';
 import { Language } from '../utils/translations';
 import toast from 'react-hot-toast';
+import { toBn } from '../utils/banglaNum';
 import FarmRecordSection from './farmRecord/FarmRecordSection';
 import FarmRecordPrint from './farmRecord/FarmRecordPrint';
 import RecordScoreCard from './farmRecord/RecordScoreCard';
@@ -33,7 +34,7 @@ interface Props {
 }
 
 export default function FarmerDossier({ lang, onNavigateToTab, active = true }: Props) {
-  const { user, userRole } = useAuth();
+  const { user, userRole, isGuest } = useAuth();
   const [profile, setProfile] = useState<FarmerProfileData | null>(null);
   const [timeline, setTimeline] = useState<FarmerTimelineEventData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,11 +44,6 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [assistedRouteMode, setAssistedRouteMode] = useState<'self' | 'saao'>('self');
   const [isAppealModalOpen, setIsAppealModalOpen] = useState(false);
-  const [appealForm, setAppealForm] = useState({
-    subject: 'land_decimals',
-    explanation: '',
-    proposedCorrection: ''
-  });
   const [editForm, setEditForm] = useState({
     fullName: '',
     primaryCrop: '',
@@ -58,6 +54,9 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
   });
 
   const effectiveUid = user?.uid || 'guest_farmer_demo';
+  const num = (n: number | string) => (lang === 'bn' ? toBn(n) : String(n));
+  // A Krishi ID is shown only for a signed-in account, never for a guest or signed-out phone.
+  const hasAccountId = Boolean(user?.uid) && !isGuest;
   const effectiveName = user?.displayName || profile?.fullName || '';
 
   const loadData = async () => {
@@ -210,7 +209,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold uppercase tracking-wider border border-emerald-400/30">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-sm font-semibold border border-emerald-400/30">
               <Sparkles className="w-3.5 h-3.5" />
               {lang === 'bn' ? 'আপনার ব্যবহার থেকে তৈরি রেকর্ড' : 'Built from your app use'}
             </div>
@@ -227,7 +226,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={openEditModal}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold text-xs sm:text-sm backdrop-blur-md transition-all cursor-pointer active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[48px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 font-bold text-sm backdrop-blur-md transition-all cursor-pointer active:scale-95 shadow-sm"
               title={lang === 'bn' ? 'খামারের তথ্য সম্পাদনা করুন' : 'Edit Farm Profile'}
             >
               <Edit3 className="w-4 h-4 text-emerald-300" />
@@ -235,7 +234,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             </button>
             <button
               onClick={handleResetProfile}
-              className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-xs sm:text-sm transition-all cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 min-h-[48px] rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/30 font-bold text-sm transition-all cursor-pointer active:scale-95"
               title={lang === 'bn' ? 'সকল রেকর্ড মুছে খালি করুন' : 'Reset All Records'}
             >
               <Trash2 className="w-4 h-4 text-rose-400" />
@@ -245,7 +244,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[48px] rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm shadow-md transition-all disabled:opacity-50 cursor-pointer active:scale-95"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
               {lang === 'bn' ? 'নমুনা লোড' : 'Demo Load'}
@@ -253,7 +252,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             )}
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-xs sm:text-sm backdrop-blur-md border border-white/20 shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 min-h-[48px] rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium text-sm backdrop-blur-md border border-white/20 shadow-sm transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               {lang === 'bn' ? 'প্রিন্ট' : 'Print'}
@@ -263,15 +262,15 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
       </div>
 
       {/* Methodology Transparency Notice & Non-Automated Aid Policy */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-xs">
+      <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm flex items-start gap-3 shadow-xs">
         <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <p className="font-bold text-xs sm:text-sm">
+          <p className="font-bold text-sm">
             {lang === 'bn' 
               ? 'পদ্ধতিগত স্বচ্ছতা ও অ-স্বয়ংক্রিয় বরাদ্দ নির্দেশিকা (Transparency & Human Verification):' 
               : 'Methodology Transparency & Non-Automated Aid Policy:'}
           </p>
-          <p className="leading-relaxed opacity-95 text-[11px] sm:text-xs">
+          <p className="leading-relaxed opacity-95 text-sm">
             {lang === 'bn'
               ? 'এখানে প্রদর্শিত স্কোর ও উপাত্তগুলো সিদ্ধান্ত-সহায়ক প্রাক-বিশ্লেষণ। এটি সংবিধিবদ্ধ প্রমাণিত বরাদ্দ পদ্ধতি নয় এবং কোনো সাহায্য, বীজ বা ঋণ স্বয়ংক্রিয়ভাবে প্রদান করে না। যেকোনো সহায়তার ক্ষেত্রে উপজেলা কৃষি কর্মকর্তা ও মাঠ পর্যায়ের কৃষিবিদের শারীরিক যাচাই (Human Field Assessment) বাধ্যতামূলক। তথ্যের ঘাটতি বা কম অ্যাপ ব্যবহারের কারণে কোনো খামারির অগ্রাধিকার কমে না — বরং অগ্রাধিকারমূলক মাঠ যাচাই সক্রিয় হয়।'
               : 'The scores, indicators, and vulnerability models displayed are illustrative decision-support tools, NOT validated methodology for statutory or automated grant decisions. Software must never automatically allocate financial assistance or aid without human assessment by qualified field teams and agronomists. Missing data or low smartphone activity triggers field verification, not automated exclusion.'}
@@ -282,10 +281,10 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
       {/* Observation Channel Route: Direct Smartphone vs SAAO Assisted Route for Non-Smartphone Farmers */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <p className="text-sm font-black text-slate-500 dark:text-slate-400">
             {lang === 'bn' ? 'তথ্য সংগ্রহ ও পর্যবেক্ষণ চ্যানেল' : 'Observation Collection Route'}
           </p>
-          <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
             {assistedRouteMode === 'saao'
               ? (lang === 'bn' ? 'উপজেলা উপ-সহকারী কৃষি কর্মকর্তা (SAAO) সহায়তায় সংগৃহীত • স্মার্টফোনবিহীন খামারি অন্তর্ভুক্তকরণ' : 'Assisted Route: SAAO Field Agent (For Farmers Without Smartphones)')
               : (lang === 'bn' ? 'খামারি সম্মতিভিত্তিক সরাসরি স্মার্টফোন ব্যবহার' : 'Direct Consented Farmer Smartphone Mode')}
@@ -296,7 +295,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
           <button
             type="button"
             onClick={() => setAssistedRouteMode('self')}
-            className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-2 min-h-[48px] rounded-xl text-sm font-bold transition-all cursor-pointer ${
               assistedRouteMode === 'self'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
@@ -307,7 +306,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
           <button
             type="button"
             onClick={() => setAssistedRouteMode('saao')}
-            className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-2 min-h-[48px] rounded-xl text-sm font-bold transition-all cursor-pointer ${
               assistedRouteMode === 'saao'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
@@ -335,7 +334,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   🌾
                 </div>
                 <div>
-                  <h2 className="text-sm uppercase tracking-wider text-emerald-300 font-semibold">
+                  <h2 className="text-sm text-emerald-300 font-semibold">
                     {lang === 'bn' ? 'আপনার সম্মতিতে রাখা খামার রেকর্ড' : 'Farm record kept with your consent'}
                   </h2>
                   <p className="text-base font-bold text-white tracking-wide">
@@ -343,7 +342,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   </p>
                 </div>
               </div>
-              <div className="px-2.5 py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-[11px] font-bold text-emerald-200">
+              <div className="px-3 py-1 rounded-full bg-emerald-500/30 border border-emerald-400/50 text-sm font-bold text-emerald-200">
                 {lang === 'bn' ? 'যাচাই করা হয়নি' : 'Not verified'}
               </div>
             </div>
@@ -352,7 +351,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             <div className="space-y-4 text-sm relative z-10">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'কৃষকের নাম' : 'Farmer Name'}
                   </p>
                   <p className="text-lg font-bold text-white tracking-wide">
@@ -360,18 +359,24 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'কৃষি আইডি' : 'Krishi ID'}
                   </p>
-                  <p className="font-mono text-xs font-semibold text-emerald-200">
-                    BD-KRISHI-{effectiveUid.substring(0, 8).toUpperCase()}
-                  </p>
+                  {hasAccountId ? (
+                    <p className="font-mono text-sm font-semibold text-emerald-200">
+                      BD-KRISHI-{effectiveUid.substring(0, 8).toUpperCase()}
+                    </p>
+                  ) : (
+                    <p className="text-sm font-semibold text-emerald-200">
+                      {lang === 'bn' ? 'এই ফোনে রাখা' : 'Saved on this phone'}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-emerald-700/40">
                 <div>
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'প্রধান ফসল' : 'Primary Crop'}
                   </p>
                   <p className="font-semibold text-white">
@@ -379,28 +384,28 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'মোট জমি' : 'Cultivated Land'}
                   </p>
                   <p className="font-semibold text-white">
-                    {profile?.totalLandDecimals ? `${profile.totalLandDecimals} ${lang === 'bn' ? 'শতক' : 'decimals'}` : (lang === 'bn' ? 'তথ্য নেই' : 'Not recorded')}
+                    {profile?.totalLandDecimals ? `${num(profile.totalLandDecimals)} ${lang === 'bn' ? 'শতক' : 'decimals'}` : (lang === 'bn' ? 'তথ্য নেই' : 'Not recorded')}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'অবস্থান' : 'Location'}
                   </p>
-                  <p className="font-semibold text-white text-xs">
+                  <p className="font-semibold text-white text-sm">
                     {profile?.locationDistrict || profile?.locationUpazila 
                       ? [profile.locationUpazila, profile.locationDistrict].filter(Boolean).join(', ') 
                       : (lang === 'bn' ? 'তথ্য নেই' : 'Not recorded')}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-emerald-300/80 font-medium">
+                  <p className="text-sm text-emerald-300/80 font-medium">
                     {lang === 'bn' ? 'মাটি ও সেচ' : 'Soil & Irrigation'}
                   </p>
-                  <p className="font-semibold text-white text-xs">
+                  <p className="font-semibold text-white text-sm">
                     {profile?.soilType ? profile.soilType.split('(')[0].trim() : (lang === 'bn' ? 'তথ্য নেই' : 'Not recorded')}
                   </p>
                 </div>
@@ -410,16 +415,16 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
               <div className="pt-4 mt-2 border-t border-emerald-700/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div>
-                    <p className="text-[11px] text-emerald-200 font-mono">
-                      SELF-REPORTED FARM RECORD
+                    <p className={`text-sm text-emerald-200 ${lang === 'bn' ? '' : 'font-mono'}`}>
+                      {lang === 'bn' ? 'নিজে জানানো খামার রেকর্ড' : 'SELF-REPORTED FARM RECORD'}
                     </p>
-                    <p className="text-[11px] text-emerald-300/70">
+                    <p className="text-sm text-emerald-300/70">
                       {lang === 'bn' ? 'নিজের দেওয়া ও অ্যাপ ব্যবহারের তথ্য' : 'Your details and app use'}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-500/30">
+                  <div className="inline-flex items-center gap-1 text-sm font-bold text-emerald-300 bg-emerald-950/60 px-2 py-1 rounded border border-emerald-500/30">
                     <ShieldCheck className="w-3.5 h-3.5" />
                     {lang === 'bn' ? 'ঋণের প্রমাণ নয়' : 'Not proof for a loan'}
                   </div>
@@ -431,22 +436,22 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
           {/* Quick Stats Pill Grid */}
           <div className="grid grid-cols-2 gap-3 mt-4">
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
                 <Video className="w-3.5 h-3.5 text-emerald-600" />
                 {lang === 'bn' ? 'লাইভ পরামর্শ সেশন' : 'Live Consultations'}
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">
-                {profile?.totalSessionsCompleted ?? 0} {lang === 'bn' ? 'টি' : ''}
+                {num(profile?.totalSessionsCompleted ?? 0)} {lang === 'bn' ? 'টি' : ''}
               </p>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
                 <Sprout className="w-3.5 h-3.5 text-lime-600" />
                 {lang === 'bn' ? 'বালাই ও রোগ মনিটরিং' : 'Disease Surveillance'}
               </div>
               <p className="text-2xl font-black text-slate-900 dark:text-white">
-                {profile?.totalDiagnoses ?? 0} {lang === 'bn' ? 'টি' : ''}
+                {num(profile?.totalDiagnoses ?? 0)} {lang === 'bn' ? 'টি' : ''}
               </p>
             </div>
           </div>
@@ -461,21 +466,21 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             {/* Separated 4 Pillars of Proprietary Intelligence (Need, Eligibility, Intervention, Data Confidence) */}
             <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-800/70 border border-stone-200 dark:border-stone-700/80 space-y-3">
               <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-700 pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                <span className="text-sm font-bold text-stone-700 dark:text-stone-300">
                   {lang === 'bn' ? '৪টি আলাদা তথ্যের অংশ' : '4 separate parts of your record'}
                 </span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">
                   {lang === 'bn' ? 'আপনার নিজের দেওয়া তথ্য' : 'From what you entered'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 {/* Pillar 1: Need Assessment */}
                 <div className="p-2.5 rounded-xl bg-white dark:bg-stone-900 border border-stone-200/80 dark:border-stone-700">
                   <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
                     <span>1️⃣</span> {lang === 'bn' ? 'প্রয়োজন মূল্যায়ন (Need)' : 'Need Assessment'}
                   </p>
-                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                  <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
                     {profile?.totalLandDecimals && profile.totalLandDecimals < 50
                       ? (lang === 'bn' ? 'উচ্চ অগ্রাধিকার: প্রান্তিক/ক্ষুদ্র খামারি (<৫০ শতক জমি)' : 'High Need: Marginal smallholder (<50 decimals)')
                       : (lang === 'bn' ? 'মাঝারি প্রয়োজন: স্বাভাবিক কৃষি জমিদারি' : 'Medium Need: Standard smallholder')}
@@ -487,7 +492,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
                     <span>2️⃣</span> {lang === 'bn' ? 'কর্মসূচি যোগ্যতা (Eligibility)' : 'Programme Eligibility'}
                   </p>
-                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                  <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
                     {lang === 'bn' 
                       ? 'স্বচ্ছ নির্দেশিকা ভিত্তিক • মানুষের সিদ্ধান্ত সাপেক্ষ (অ-স্বয়ংক্রিয় বরাদ্দ)' 
                       : 'Transparent rule-based • Human assessed (No automated aid grant)'}
@@ -499,7 +504,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
                     <span>3️⃣</span> {lang === 'bn' ? 'প্রস্তাবিত পদক্ষেপ (Intervention)' : 'Recommended Intervention'}
                   </p>
-                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                  <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
                     {lang === 'bn' 
                       ? 'উপজেলা কৃষি কর্মকর্তার সরেজমিন পরিদর্শন ও বালাই ব্যবস্থাপনা পরামর্শ' 
                       : 'SAAO Field inspection & stepped IPM pest advisory package'}
@@ -511,7 +516,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   <p className="font-bold text-stone-900 dark:text-white flex items-center gap-1.5">
                     <span>4️⃣</span> {lang === 'bn' ? 'উপাত্তের নির্ভরযোগ্যতা (Confidence)' : 'Data Confidence Level'}
                   </p>
-                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1">
+                  <p className="text-sm text-stone-600 dark:text-stone-400 mt-1">
                     {timeline.length >= 3
                       ? (lang === 'bn' ? '৩টির বেশি রেকর্ড আছে, যাচাই করা হয়নি' : '3+ records kept, not verified')
                       : (lang === 'bn' ? 'যাচাই প্রক্রিয়াধীন: তথ্যের ঘাটতি মাঠ পরিদর্শনকে সক্রিয় করে' : 'Verification Triggered: Missing data prompts field review')}
@@ -520,7 +525,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
               </div>
 
               {/* Exclusion Error Safeguard Notice */}
-              <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-stone-200 dark:border-stone-700 text-[11px] text-stone-500 dark:text-stone-400">
+              <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-stone-200 dark:border-stone-700 text-sm text-stone-500 dark:text-stone-400">
                 <span>
                   {lang === 'bn' 
                     ? '🛡️ বর্জন ত্রুটি প্রতিরোধ: তথ্যের ঘাটতি থাকলে কোনো খামারির অগ্রাধিকার কমে না; বরং মাঠ যাচাই সক্রিয় হয়।' 
@@ -530,7 +535,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                 <button
                   type="button"
                   onClick={() => setIsAppealModalOpen(true)}
-                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline shrink-0 inline-flex items-center min-h-[44px] cursor-pointer"
+                  className="text-emerald-700 dark:text-emerald-300 font-bold hover:underline shrink-0 inline-flex items-center min-h-[48px] cursor-pointer"
                 >
                   {lang === 'bn' ? 'তথ্য সংশোধন বা আপিল আবেদন ↗' : 'Request Correction or Appeal ↗'}
                 </button>
@@ -539,7 +544,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
 
             {/* Synthesized Agricultural Facts */}
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <p className="text-sm font-bold text-slate-400 mb-2">
                 {lang === 'bn' ? 'এআই দ্বারা সংকলিত পর্যবেক্ষণ ও খামারের বৈশিষ্ট্য' : 'AI-Compiled Farm Insights'}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -547,14 +552,14 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   profile.keyInsights.map((insight, idx) => (
                     <span 
                       key={idx}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                       {insight}
                     </span>
                   ))
                 ) : (
-                  <p className="text-xs text-slate-400 italic">
+                  <p className="text-sm text-slate-400 italic">
                     {lang === 'bn' 
                       ? 'এখনো কোনো পর্যবেক্ষণ যুক্ত হয়নি। পরামর্শ সেশন বা ছবি স্ক্যান শুরু করলে তথ্য স্বয়ংক্রিয়ভাবে লিপিবদ্ধ হবে।' 
                       : 'No farm insights logged yet. Complete a consultation or photo diagnosis to populate.'}
@@ -570,7 +575,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
       <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-5">
           <div>
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <div className="inline-flex items-center gap-2 text-sm font-bold text-emerald-600 dark:text-emerald-400">
               <Layers className="w-4 h-4" />
               {lang === 'bn' ? 'কার্যক্রম ও ইন্টারঅ্যাকশন ইতিহাস' : 'Progressive Interaction History'}
             </div>
@@ -578,8 +583,8 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
               {lang === 'bn' ? 'ধাপে ধাপে তৈরি হওয়া খামার টাইমলাইন' : 'Compounding Agricultural Timeline'}
             </h3>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {timeline.length} {lang === 'bn' ? 'টি সেশন ও রেকর্ড' : 'sessions and records'}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {num(timeline.length)} {lang === 'bn' ? 'টি সেশন ও রেকর্ড' : 'sessions and records'}
           </p>
         </div>
 
@@ -592,7 +597,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
               <p className="font-bold text-slate-800 dark:text-slate-200">
                 {lang === 'bn' ? 'এখনও কোনো ইন্টারঅ্যাকশন রেকর্ড নেই' : 'No recorded interactions yet'}
               </p>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-slate-500">
                 {lang === 'bn' 
                   ? 'লাইভ সেশন শেষ হলে বা ফসলের ছবি দিলে তা এখানে স্বয়ংক্রিয়ভাবে খামার রেকর্ডে যুক্ত হবে।'
                   : 'Start a live consultation or upload a crop photo to automatically log events.'}
@@ -602,7 +607,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
             <button
               onClick={handleSimulateDemo}
               disabled={isSeeding}
-              className="inline-flex items-center gap-2 px-5 py-2 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2 min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               {lang === 'bn' ? 'নমুনা তথ্য লোড করুন' : 'Load Demo History'}
@@ -622,14 +627,14 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                 <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors shadow-sm space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
+                      <span className="px-2.5 py-0.5 rounded-md text-sm font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">
                         {getEventBadge(event.eventType)}
                       </span>
                       <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
                         {event.title}
                       </h4>
                     </div>
-                    <span className="text-xs text-slate-400 font-mono">
+                    <span className="text-sm text-slate-400 font-mono">
                       {new Date(event.createdAt).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', {
                         day: 'numeric',
                         month: 'short',
@@ -639,7 +644,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   </div>
 
                   {/* Summary */}
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                     {event.summary}
                   </p>
 
@@ -649,7 +654,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                       {event.keyFacts.map((fact, fIdx) => (
                         <span 
                           key={fIdx}
-                          className="text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                          className="text-sm font-medium px-2.5 py-0.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                         >
                           ✓ {fact}
                         </span>
@@ -696,7 +701,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                     <h3 className="font-bold text-base text-slate-900 dark:text-white">
                       {lang === 'bn' ? 'খামারের তথ্য হালনাগাদ করুন' : 'Edit Farm Profile Details'}
                     </h3>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm text-slate-500">
                       {lang === 'bn' ? 'প্রকৃত তথ্য প্রদান করুন, কোনো কাল্পনিক তথ্য থাকবে না' : 'Enter accurate farm facts with zero hallucination'}
                     </p>
                   </div>
@@ -704,7 +709,8 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
+                  aria-label={lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+                  className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -712,7 +718,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
 
               <form onSubmit={handleSaveEdit} className="p-5 sm:p-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                     {lang === 'bn' ? 'কৃষকের পূর্ণ নাম' : 'Farmer Full Name'}
                   </label>
                   <input
@@ -720,13 +726,13 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                     value={editForm.fullName}
                     onChange={(e) => setEditForm(prev => ({ ...prev, fullName: e.target.value }))}
                     placeholder={lang === 'bn' ? 'যেমন: মোঃ রফিকুল ইসলাম' : 'e.g. Md. Rafiqul Islam'}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {lang === 'bn' ? 'প্রধান ফসল' : 'Primary Crop'}
                     </label>
                     <input
@@ -734,12 +740,12 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                       value={editForm.primaryCrop}
                       onChange={(e) => setEditForm(prev => ({ ...prev, primaryCrop: e.target.value }))}
                       placeholder={lang === 'bn' ? 'যেমন: আমন ধান, টমেটো, ভুট্টা' : 'e.g. Aman Rice, Tomato, Maize'}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {lang === 'bn' ? 'চাষযোগ্য মোট জমি (শতক)' : 'Cultivated Land (Decimals)'}
                     </label>
                     <input
@@ -749,14 +755,14 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                       value={editForm.totalLandDecimals || ''}
                       onChange={(e) => setEditForm(prev => ({ ...prev, totalLandDecimals: Number(e.target.value) }))}
                       placeholder="e.g. 50"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {lang === 'bn' ? 'জেলা' : 'District'}
                     </label>
                     <input
@@ -764,12 +770,12 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                       value={editForm.locationDistrict}
                       onChange={(e) => setEditForm(prev => ({ ...prev, locationDistrict: e.target.value }))}
                       placeholder={lang === 'bn' ? 'যেমন: বগুড়া, রংপুর, যশোর' : 'e.g. Bogura, Rangpur'}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                       {lang === 'bn' ? 'উপজেলা' : 'Upazila'}
                     </label>
                     <input
@@ -777,13 +783,13 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                       value={editForm.locationUpazila}
                       onChange={(e) => setEditForm(prev => ({ ...prev, locationUpazila: e.target.value }))}
                       placeholder={lang === 'bn' ? 'যেমন: শিবগঞ্জ, মিঠাপুকুর' : 'e.g. Shibganj'}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">
                     {lang === 'bn' ? 'মাটি ও সেচ ব্যবস্থা' : 'Soil & Irrigation Type'}
                   </label>
                   <input
@@ -791,7 +797,7 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                     value={editForm.soilType}
                     onChange={(e) => setEditForm(prev => ({ ...prev, soilType: e.target.value }))}
                     placeholder={lang === 'bn' ? 'যেমন: দোআঁশ মাটি (নলকূপ সেচ)' : 'e.g. Loamy (Deep Tubewell)'}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
 
@@ -799,13 +805,13 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     {lang === 'bn' ? 'বাতিল' : 'Cancel'}
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-5 py-2 min-h-[48px] rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
                   >
                     <Save className="w-4 h-4" />
                     {lang === 'bn' ? 'সংরক্ষণ করুন' : 'Save Details'}
@@ -836,84 +842,43 @@ export default function FarmerDossier({ lang, onNavigateToTab, active = true }: 
                     <h3 className="font-bold text-base text-slate-900 dark:text-white">
                       {lang === 'bn' ? 'তথ্য সংশোধন বা আপিল আবেদন' : 'Data Correction & Explanation Appeal'}
                     </h3>
-                    <p className="text-xs text-slate-500">
-                      {lang === 'bn' ? 'মাঠ কর্মকর্তা ও কৃষিবিদ পর্যালোচনার জন্য জমা দিন' : 'Submit for Agronomist & Field Team Verification'}
+                    <p className="text-sm text-slate-500">
+                      {lang === 'bn' ? 'অ্যাপ থেকে এখনো পাঠানো যায় না' : 'Not available in the app yet'}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsAppealModalOpen(false)}
-                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                  aria-label={lang === 'bn' ? 'বন্ধ করুন' : 'Close'}
+                  className="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    {lang === 'bn' ? 'সংশোধনের বিষয়' : 'Correction Field'}
-                  </label>
-                  <select
-                    value={appealForm.subject}
-                    onChange={(e) => setAppealForm(prev => ({ ...prev, subject: e.target.value }))}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="land_decimals">{lang === 'bn' ? 'জমির পরিমাপ ও অবস্থান' : 'Land acreage & location'}</option>
-                    <option value="crop_disease">{lang === 'bn' ? 'রোগ নিদান বা বালাই লক্ষণ' : 'Disease diagnosis or pest symptom'}</option>
-                    <option value="weather_damage">{lang === 'bn' ? 'আবহাওয়া ক্ষতি বা প্রাকৃতিক দুর্যোগ' : 'Weather/Climate disaster shock'}</option>
-                    <option value="mandi_price">{lang === 'bn' ? 'বাজার দর বা গ্রেডিং মান' : 'Market price or produce grade'}</option>
-                    <option value="other">{lang === 'bn' ? 'অন্যান্য তথ্য' : 'Other information'}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    {lang === 'bn' ? 'প্রস্তাবিত সংশোধিত তথ্য' : 'Proposed Correction'}
-                  </label>
-                  <input
-                    type="text"
-                    value={appealForm.proposedCorrection}
-                    onChange={(e) => setAppealForm(prev => ({ ...prev, proposedCorrection: e.target.value }))}
-                    placeholder={lang === 'bn' ? 'যেমন: প্রকৃত চাষযোগ্য জমি ৭৫ শতক' : 'e.g. Actual land is 75 decimals'}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    {lang === 'bn' ? 'আপিলের কারণ বা ব্যাখ্যা' : 'Explanation & Evidence Context'}
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={appealForm.explanation}
-                    onChange={(e) => setAppealForm(prev => ({ ...prev, explanation: e.target.value }))}
-                    placeholder={lang === 'bn' ? 'কেন এই তথ্য সংশোধন প্রয়োজন তা সংক্ষেপে লিখুন...' : 'Briefly explain the discrepancy for field team review...'}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
-                  />
-                </div>
+              {/* Nothing is sent from here yet: there is no office queue for
+                  corrections. Say so plainly instead of collecting a form. */}
+              <div className="space-y-3 text-base text-slate-700 dark:text-slate-300">
+                <p>
+                  {lang === 'bn'
+                    ? 'আপনার নিজের তথ্য ভুল থাকলে উপরের "তথ্য সম্পাদনা" বোতাম দিয়ে নিজেই ঠিক করুন।'
+                    : 'If your own details are wrong, correct them yourself with the "Edit Details" button above.'}
+                </p>
+                <p>
+                  {lang === 'bn'
+                    ? 'অন্য কোনো ভুলের জন্য উপজেলা কৃষি অফিসে বা উপসহকারী কৃষি কর্মকর্তাকে জানান। কৃষি কল সেন্টার: ১৬১২৩।'
+                    : 'For anything else, tell your upazila agriculture office or your sub-assistant agriculture officer. Krishi call centre: 16123.'}
+                </p>
               </div>
 
-              <div className="pt-2 flex justify-end gap-2.5 border-t border-slate-100 dark:border-slate-800">
+              <div className="pt-2 flex justify-end border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsAppealModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="px-5 py-2 min-h-[48px] rounded-xl text-base font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
                 >
-                  {lang === 'bn' ? 'বাতিল' : 'Cancel'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAppealModalOpen(false);
-                    toast.success(lang === 'bn' 
-                      ? 'আপিল আবেদন গৃহীত হয়েছে! উপজেলা কৃষি কর্মকর্তা ও মাঠ দল সরেজমিনে যাচাই করবে।' 
-                      : 'Appeal submitted! SAAO field team will conduct physical verification.');
-                  }}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer"
-                >
-                  {lang === 'bn' ? 'আবেদন জমা দিন' : 'Submit Appeal'}
+                  {lang === 'bn' ? 'ঠিক আছে' : 'OK'}
                 </button>
               </div>
             </motion.div>

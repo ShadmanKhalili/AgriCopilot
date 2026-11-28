@@ -3,6 +3,7 @@ import {
   addDaysToDateString,
   dhakaDateString,
   isTaskDue,
+  restoreTask,
   sortTasksForHome,
 } from '../utils/farmTaskDates';
 
@@ -51,5 +52,18 @@ describe('sortTasksForHome', () => {
       '2026-03-10',
     );
     expect(out.map((t) => t.id)).toEqual(['old', 'today', 'soon', 'later']);
+  });
+});
+
+describe('restoreTask', () => {
+  it('puts a task back in order after a failed save', () => {
+    const list = [task('b', '2026-03-12'), task('c', '2026-03-15')];
+    const back = restoreTask(list, task('a', '2026-03-09'), '2026-03-10');
+    expect(back.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('does not duplicate a task that is already in the list', () => {
+    const list = [task('a', '2026-03-09')];
+    expect(restoreTask(list, task('a', '2026-03-09'), '2026-03-10')).toHaveLength(1);
   });
 });
