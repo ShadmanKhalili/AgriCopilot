@@ -11,6 +11,7 @@
 
 import { auth } from '../firebase';
 import { areaKey } from '../../netlify/functions/_shared/area-model';
+import { pickSubscriptionId, type SavedSubscription } from '../utils/pushSubscriptionId';
 
 export type PushLang = 'bn' | 'en';
 
@@ -51,7 +52,11 @@ const urlBase64ToBytes = (value: string): Uint8Array => {
   return bytes;
 };
 
-/** Document id for one phone: the first 40 hex digits of the SHA-256 of its endpoint. */
+/**
+ * The OLD document id for one phone: the first 40 hex digits of the SHA-256 of
+ * its endpoint. New saves use `<uid>_<slot>` (see pushSubscriptionId.ts); this
+ * is kept to clean up documents written by earlier versions.
+ */
 const subscriptionId = async (endpoint: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
   return Array.from(new Uint8Array(digest))
@@ -81,6 +86,23 @@ interface EnableInput {
   upazila?: string | null;
 }
 
+/**
+ * This account's saved subscriptions (at most a handful, the rules cap them).
+ * Empty on any failure: the caller then falls back to a hash-chosen slot.
+ */
+const listOwnSubscriptions = async (uid: string): Promise<SavedSubscription[]> => {
+  try {
+    const [{ collection, getDocs, limit, query, where }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('../firestore'),
+    ]);
+    const snapshot = await getDocs(query(collection(db, COLLECTION), where('uid', '==', uid), limit(20)));
+    return snapshot.docs.map((item) => ({ id: item.id, endpoint: item.data().endpoint }));
+  } catch {
+    return [];
+  }
+};
+
 const save = async (subscription: PushSubscription, uid: string, input: EnableInput): Promise<void> => {
   const json = subscription.toJSON();
   const p256dh = json.keys?.p256dh;
@@ -88,8 +110,11 @@ const save = async (subscription: PushSubscription, uid: string, input: EnableIn
   if (!json.endpoint || !p256dh || !authSecret) throw new Error('incomplete_subscription');
 
   const area = areaKey(input.district, input.upazila);
-  const id = await subscriptionId(json.endpoint);
-  const [{ doc, setDoc }, { db }] = await Promise.all([import('firebase/firestore'), import('../firestore')]);
+  // The rules only accept `<uid>_0` to `<uid>_4`, so one account holds at most
+  // five subscriptions. Reuse the slot this phone already has, else take a free one.
+  const saved = await listOwnSubscriptions(uid);
+  const id = pickSubscriptionId(uid, json.endpoint, saved);
+  const [{ doc, setDoc, deleteDoc }, { db }] = await Promise.all([import('firebase/firestore'), import('../firestore')]);
   await setDoc(doc(db, COLLECTION, id), {
     uid,
     endpoint: json.endpoint,
@@ -99,6 +124,13 @@ const save = async (subscription: PushSubscription, uid: string, input: EnableIn
     ...(area ? { areaKey: area } : {}),
     createdAt: new Date().toISOString(),
   });
+
+  // Earlier versions saved this phone under a hash id. Drop that copy so the
+  // phone is not notified twice. Best effort: the server also drops dead ones.
+  const legacyId = await subscriptionId(json.endpoint);
+  if (legacyId !== id && saved.some((item) => item.id === legacyId)) {
+    await deleteDoc(doc(db, COLLECTION, legacyId)).catch(() => undefined);
+  }
 };
 
 /** Ask permission, subscribe, and save. Safe to call again to refresh the language or area. */
@@ -108,7 +140,6 @@ export const enableNotifications = async (input: EnableInput): Promise<EnableRes
   if (!key) return { ok: false, reason: 'not_configured' };
   const user = auth.currentUser;
   if (!user) return { ok: false, reason: 'signed_out' };
-
   try {
     const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
     if (permission !== 'granted') return { ok: false, reason: 'denied' };
@@ -144,12 +175,18 @@ export const disableNotifications = async (): Promise<DisableResult> => {
   try {
     const subscription = await currentSubscription();
     if (!subscription) return { ok: true };
-    const id = await subscriptionId(subscription.endpoint);
+    const legacyId = await subscriptionId(subscription.endpoint);
+    const endpoint = subscription.endpoint;
     await subscription.unsubscribe();
-    if (auth.currentUser) {
+    const user = auth.currentUser;
+    if (user) {
       try {
         const [{ doc, deleteDoc }, { db }] = await Promise.all([import('firebase/firestore'), import('../firestore')]);
-        await deleteDoc(doc(db, COLLECTION, id));
+        // The slot this phone is saved under, plus the old hash id from earlier versions.
+        const saved = await listOwnSubscriptions(user.uid);
+        const ids = new Set<string>([legacyId]);
+        for (const item of saved) if (item.endpoint === endpoint) ids.add(item.id);
+        await Promise.all([...ids].map((id) => deleteDoc(doc(db, COLLECTION, id)).catch(() => undefined)));
       } catch {
         // The server drops dead subscriptions the first time it tries one.
       }

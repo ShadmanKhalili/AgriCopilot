@@ -21,7 +21,7 @@ interface Props {
   onSent?: () => void;
 }
 
-type Problem = 'not_configured' | 'signed_out' | 'failed' | 'invalid';
+type Problem = 'not_configured' | 'signed_out' | 'too_new' | 'failed' | 'invalid';
 type Status = 'idle' | 'sending' | 'thanks' | Problem;
 
 /** "What price did you get today?" One tap or one spoken number sends it. */
@@ -101,6 +101,7 @@ export default function ReportPriceForm({ lang, crop, cropName, onSent }: Props)
   const message: Record<Problem, string> = {
     not_configured: bn ? 'এই সুবিধা এখনো চালু হয়নি। কিছুদিন পরে চেষ্টা করুন।' : 'This is not set up yet. Please try again later.',
     signed_out: bn ? 'দাম জানাতে অ্যাকাউন্টে ঢুকুন।' : 'Please sign in to send your price.',
+    too_new: bn ? 'নতুন অ্যাকাউন্ট থেকে এক ঘণ্টা পরে দাম জানানো যাবে। একটু পরে আবার চেষ্টা করুন।' : 'A new account can send a price after one hour. Please try again a little later.',
     failed: bn ? 'পাঠানো যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'It could not be sent. Check your internet and try again.',
     invalid: bn
       ? 'দামটি ঠিক মনে হচ্ছে না। সংখ্যাটি দেখে আবার লিখুন।'

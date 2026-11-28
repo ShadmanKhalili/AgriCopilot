@@ -14,6 +14,8 @@
  *    rather than assuming one shape.
  */
 
+import { SEVERITY_NOT_ASSESSED, normalizeSeverity } from './severity';
+
 export interface DiseaseCandidate {
   disease: string;
   /** Rubric match score 0-100 for this candidate, or null if the model did not give one. */
@@ -157,7 +159,10 @@ export const confidenceValue = (diagnosis: any): number | null => {
 /** The maximum number of symptom entries the Firestore rule accepts. */
 export const MAX_SYMPTOM_ENTRIES = 25;
 
-/** The severities the Firestore rule accepts for a diagnosis. */
+/**
+ * The severities the model may state. The Firestore rule also accepts
+ * 'Not Assessed' (SEVERITY_NOT_ASSESSED), stored when the model gave none.
+ */
 export const ALLOWED_SEVERITIES = ['Low', 'Medium', 'High'] as const;
 
 /**
@@ -174,7 +179,7 @@ export const AUTO_DETECTED = 'auto-detected';
  *
  *   - `crop`, `cropStage` and `analysisType` to be NON-EMPTY strings
  *     (`isStr(val, 1, 128)`);
- *   - `qualitativeSeverity` to be one of Low / Medium / High;
+ *   - `qualitativeSeverity` to be one of Low / Medium / High / Not Assessed;
  *   - `symptomsBreakdown` to be a list of at most 25 entries.
  *
  * The crop and the crop-stage picker both offer "Auto detect" as their first
@@ -200,16 +205,17 @@ export const resolveDiagnosisRecordFields = (input: {
   qualitativeSeverity: string;
   symptomsBreakdown: string[];
 } => {
-  const severity = String(input.severity || '');
+  // A severity the model did not state (or stated outside Low/Medium/High) is
+  // stored as 'Not Assessed'. It used to be forced to 'Medium', an invented value.
+  const stated = normalizeSeverity(input.severity).toLowerCase();
+  const severity = ALLOWED_SEVERITIES.find((allowed) => allowed.toLowerCase() === stated);
   const symptoms = Array.isArray(input.symptoms) ? (input.symptoms as any[]) : [];
 
   return {
     crop: String(input.crop || '') || AUTO_DETECTED,
     cropStage: String(input.cropStage || '') || AUTO_DETECTED,
     analysisType: String(input.analysisType || '') || 'disease',
-    qualitativeSeverity: (ALLOWED_SEVERITIES as readonly string[]).includes(severity)
-      ? severity
-      : 'Medium',
+    qualitativeSeverity: severity ?? SEVERITY_NOT_ASSESSED,
     symptomsBreakdown: symptoms.slice(0, MAX_SYMPTOM_ENTRIES).map((s) => String(s)),
   };
 };

@@ -16,6 +16,7 @@ import { maxOutputTokensFromEnv, sanitizeGenerationConfig, findUnsupportedConten
 import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
 import { farmActionsFromFeed } from "./netlify/functions/_shared/farm-actions.ts";
 import { isSafeSprayWindowHour } from "./netlify/functions/_shared/spray-window.ts";
+import { parseIpLiteral, isNonPublicIp } from "./netlify/functions/_shared/client-ip.ts";
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./netlify/functions/_shared/daily-merge.ts";
 import areaReportHandler from "./netlify/functions/area-report.ts";
 import farmRecordScoreHandler from "./netlify/functions/farm-record-score.ts";
@@ -854,21 +855,20 @@ async function startServer() {
   app.get("/api/ip-location", async (req, res) => {
     try {
       const forwarded = req.headers['x-forwarded-for'];
-      const rawClientIp = typeof forwarded === 'string' 
-        ? forwarded.split(',')[0].trim() 
+      const rawClientIp = typeof forwarded === 'string'
+        ? forwarded.split(',')[0].trim()
         : (req.socket.remoteAddress || '');
 
+      // Strict IPv4/IPv6 literal only: the value goes into a URL path, so
+      // anything else (paths, queries, hostnames) is refused.
+      const clientIp = parseIpLiteral(rawClientIp);
+      if (rawClientIp && !clientIp) throw new Error('invalid client address');
+
       let geoUrl = 'https://get.geojs.io/v1/ip/geo.json';
-      // Only query specific IP if it's a valid public IPv4/IPv6 that is not local/loopback/private
-      if (
-        rawClientIp && 
-        !rawClientIp.startsWith('127.') && 
-        !rawClientIp.startsWith('10.') && 
-        !rawClientIp.startsWith('172.') && 
-        !rawClientIp.startsWith('192.168.') &&
-        rawClientIp !== '::1'
-      ) {
-        geoUrl = `https://get.geojs.io/v1/ip/geo/${rawClientIp}.json`;
+      // Only query a specific IP if it is public; local/private addresses
+      // (dev machines) fall back to the server's own address.
+      if (clientIp && !isNonPublicIp(clientIp)) {
+        geoUrl = `https://get.geojs.io/v1/ip/geo/${encodeURIComponent(clientIp)}.json`;
       }
 
       const response = await axios.get(geoUrl, { timeout: 3500 });

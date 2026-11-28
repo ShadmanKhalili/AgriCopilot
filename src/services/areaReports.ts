@@ -2,10 +2,13 @@
  * Area reports, from the app's side.
  *
  * Sending: the app tells the server "a farmer here saw this problem" or
- * "a farmer here got this price". The server checks the sign-in and keeps
- * only an anonymous count. Reading: the app reads the summary for the
- * farmer's own upazila and shows a warning or a local price only when at
- * least 3 different farmers stand behind it (see `area-model.ts`).
+ * "a farmer here got this price". The server checks the sign-in, the place,
+ * crop and disease, and (for a problem) a recent diagnosis, and keeps the
+ * per-farmer data private. Reading: the app reads the published summary for
+ * the farmer's own upazila. The server publishes only groups of 3 or more
+ * farmers, as counts and rounded prices; the app checks the same minimum
+ * again before showing a warning or a local price (see `area-model.ts`).
+ * Summaries in the older shape (without `version: 2`) are ignored.
  *
  * Everything here fails quietly: an area report is a courtesy to neighbours,
  * and must never block or break the farmer's own task.
@@ -13,6 +16,7 @@
 
 import { auth } from '../firebase';
 import {
+  AREA_SUMMARY_VERSION,
   activeBroadcasts,
   activeWarnings,
   areaKey,
@@ -31,7 +35,7 @@ export type { AreaWarning, LocalPrice, Broadcast };
 export type AreaReportResult =
   | { ok: true }
   /** `not_configured`: the server has no service account yet. */
-  | { ok: false; reason: 'signed_out' | 'invalid' | 'not_configured' | 'failed' };
+  | { ok: false; reason: 'signed_out' | 'invalid' | 'not_configured' | 'too_new' | 'failed' };
 
 /** Send one anonymous report for the farmer's area. Never throws. */
 export const sendAreaReport = async (input: AreaReportInput): Promise<AreaReportResult> => {
@@ -49,9 +53,16 @@ export const sendAreaReport = async (input: AreaReportInput): Promise<AreaReport
     if (response.ok) return { ok: true };
     if (response.status === 503) return { ok: false, reason: 'not_configured' };
     if (response.status === 400) return { ok: false, reason: 'invalid' };
-    // 403: a guest account. Reports need a real account, or the 3-farmer
-    // minimum could be faked with throwaway guests.
-    if (response.status === 401 || response.status === 403) return { ok: false, reason: 'signed_out' };
+    if (response.status === 403) {
+      // 403 is a guest account (reports need a real account, or the 3-farmer
+      // minimum could be faked with throwaway guests), an account made in the
+      // last hour, or a problem with no matching recent diagnosis.
+      const error = await response.json().then((body: any) => String(body?.error ?? ''), () => '');
+      if (error === 'account_too_new') return { ok: false, reason: 'too_new' };
+      if (error === 'no_recent_diagnosis') return { ok: false, reason: 'invalid' };
+      return { ok: false, reason: 'signed_out' };
+    }
+    if (response.status === 401) return { ok: false, reason: 'signed_out' };
     return { ok: false, reason: 'failed' };
   } catch (error) {
     console.warn('[AreaReports] report was not sent:', error);
@@ -59,7 +70,10 @@ export const sendAreaReport = async (input: AreaReportInput): Promise<AreaReport
   }
 };
 
-/** The summary for one upazila, or null when there is none or it cannot be read. */
+/**
+ * The published summary for one upazila, or null when there is none, it cannot
+ * be read, or it is in an older shape (those held per-farmer data and are ignored).
+ */
 export const fetchAreaSummary = async (
   district: string | null | undefined,
   upazila: string | null | undefined
@@ -70,7 +84,9 @@ export const fetchAreaSummary = async (
     // Loaded on demand so the database library stays out of the first load.
     const [{ doc, getDoc }, { db }] = await Promise.all([import('firebase/firestore'), import('../firestore')]);
     const snapshot = await getDoc(doc(db, 'area_summaries', key));
-    return snapshot.exists() ? (snapshot.data() as AreaSummary) : null;
+    if (!snapshot.exists()) return null;
+    const data = snapshot.data() as AreaSummary;
+    return data?.version === AREA_SUMMARY_VERSION ? data : null;
   } catch (error) {
     console.warn('[AreaReports] summary could not be read:', error);
     return null;

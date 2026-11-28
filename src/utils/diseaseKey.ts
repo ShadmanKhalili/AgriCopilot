@@ -54,6 +54,13 @@ for (const [cropName, knowledge] of Object.entries(CROP_KNOWLEDGE)) {
 
 const ENTRY_BY_KEY = new Map(ENTRIES.map((e) => [e.key, e]));
 
+/**
+ * Every known key with its crop id and names. Used to build the compact list the
+ * area-report server checks reports against (see scripts/gen-area-catalog.ts).
+ */
+export const listDiseaseEntries = (): Array<{ key: string; cropId: string; disease: string; diseaseBn: string }> =>
+  ENTRIES.map((e) => ({ key: e.key, cropId: e.cropId, disease: e.disease.disease, diseaseBn: e.disease.diseaseBn }));
+
 const isBangla = (ch: string): boolean => /[ঀ-৿]/.test(ch);
 const isAsciiWord = (ch: string): boolean => /[a-z0-9]/i.test(ch);
 

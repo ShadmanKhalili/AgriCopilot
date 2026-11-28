@@ -29,17 +29,23 @@ export interface PushMessage {
   tag?: string;
 }
 
-/** Most phones fetched for one send. */
-const MAX_SUBSCRIPTIONS = 500;
+/** Most phones sent to for one area warning. */
+export const MAX_SUBSCRIPTIONS_PER_AREA = 5000;
+/** Most phones sent to for one farmer. */
+export const MAX_SUBSCRIPTIONS_PER_USER = 100;
+/** Subscriptions read per Firestore query. */
+export const PAGE_SIZE = 300;
 /** Phones contacted at the same time. */
-const CONCURRENCY = 10;
+const CONCURRENCY = 40;
+/** No new phone is started after this long, so the function ends before its own time limit. */
+const SEND_BUDGET_MS = 6500;
 /** How long one push service may take to answer. */
 const PUSH_TIMEOUT_MS = 8000;
 
 /** True when the keys needed to send notifications are set on the server. */
 export const pushConfigured = (): boolean => readVapidKeys() !== null && serviceAccountConfigured();
 
-interface Subscription {
+export interface Subscription {
   id: string;
   endpoint: string;
   p256dh: string;
@@ -86,31 +92,58 @@ const toSubscription = (row: any): Subscription | null => {
   };
 };
 
-/** Subscriptions whose `field` equals `value`. Empty on any failure. */
-const findSubscriptions = async (field: 'areaKey' | 'uid', value: string): Promise<Subscription[]> => {
+/**
+ * Subscriptions whose `field` equals `value`, read page by page up to `cap`.
+ * Pages are ordered by document name, so the cursor for the next page is just
+ * the last name seen (no composite index needed). A failed first page gives an
+ * empty list; a failed later page keeps what was already read. When the cap
+ * cuts the list short, a count (never an endpoint) is logged.
+ */
+export const findSubscriptions = async (
+  field: 'areaKey' | 'uid',
+  value: string,
+  cap: number = MAX_SUBSCRIPTIONS_PER_AREA
+): Promise<Subscription[]> => {
   if (!value) return [];
+  const documents: any[] = [];
+  let cursor: string | null = null;
   try {
-    const response = await adminFetch('/documents:runQuery', {
-      method: 'POST',
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: 'push_subscriptions' }],
-          where: { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: { stringValue: value } } },
-          limit: MAX_SUBSCRIPTIONS,
-        },
-      }),
-    });
-    if (!response.ok) {
-      console.warn(`[push] subscription lookup failed (${response.status}).`);
-      return [];
+    // One document past the cap is read, only to learn that the list was cut.
+    while (documents.length < cap + 1) {
+      const asked = Math.min(PAGE_SIZE, cap + 1 - documents.length);
+      const response = await adminFetch('/documents:runQuery', {
+        method: 'POST',
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: 'push_subscriptions' }],
+            where: { fieldFilter: { field: { fieldPath: field }, op: 'EQUAL', value: { stringValue: value } } },
+            orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+            ...(cursor ? { startAt: { values: [{ referenceValue: cursor }], before: false } } : {}),
+            limit: asked,
+          },
+        }),
+      });
+      if (!response.ok) {
+        console.warn(`[push] subscription lookup failed (${response.status}).`);
+        break;
+      }
+      const rows: any = await response.json();
+      // A query with no result still answers with one row that has no document.
+      const page = Array.isArray(rows) ? rows.filter((row) => typeof row?.document?.name === 'string') : [];
+      documents.push(...page);
+      if (page.length < asked) break;
+      cursor = page[page.length - 1].document.name as string;
     }
-    const rows: any = await response.json();
-    if (!Array.isArray(rows)) return [];
-    return rows.map(toSubscription).filter((item): item is Subscription => item !== null);
   } catch {
     console.warn('[push] subscription lookup failed.');
-    return [];
   }
+  if (documents.length > cap) {
+    console.warn(`[push] more than ${cap} subscriptions for one ${field}; only the first ${cap} are sent to.`);
+  }
+  return documents
+    .slice(0, cap)
+    .map(toSubscription)
+    .filter((item): item is Subscription => item !== null);
 };
 
 const deleteSubscription = async (id: string): Promise<void> => {
@@ -153,13 +186,17 @@ const sendToAll = async (subscriptions: Subscription[], message: PushMessage): P
   if (!keys || subscriptions.length === 0) return 0;
   let sent = 0;
   let next = 0;
+  const deadline = Date.now() + SEND_BUDGET_MS;
   const worker = async () => {
-    while (next < subscriptions.length) {
+    while (next < subscriptions.length && Date.now() < deadline) {
       const subscription = subscriptions[next++];
       if (await sendOne(subscription, message, keys)) sent += 1;
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, subscriptions.length) }, worker));
+  if (next < subscriptions.length) {
+    console.warn(`[push] time budget used up; ${subscriptions.length - next} of ${subscriptions.length} phones were not sent to.`);
+  }
   return sent;
 };
 
@@ -170,7 +207,7 @@ const sendToAll = async (subscriptions: Subscription[], message: PushMessage): P
 export const sendPushToArea = async (areaKey: string, message: PushMessage): Promise<number> => {
   try {
     if (!pushConfigured() || !/^[a-z0-9_]+$/.test(areaKey || '')) return 0;
-    return await sendToAll(await findSubscriptions('areaKey', areaKey), message);
+    return await sendToAll(await findSubscriptions('areaKey', areaKey, MAX_SUBSCRIPTIONS_PER_AREA), message);
   } catch {
     return 0;
   }
@@ -183,7 +220,7 @@ export const sendPushToArea = async (areaKey: string, message: PushMessage): Pro
 export const sendPushToUser = async (uid: string, message: PushMessage): Promise<number> => {
   try {
     if (!pushConfigured() || !uid) return 0;
-    return await sendToAll(await findSubscriptions('uid', uid), message);
+    return await sendToAll(await findSubscriptions('uid', uid, MAX_SUBSCRIPTIONS_PER_USER), message);
   } catch {
     return 0;
   }
