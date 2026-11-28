@@ -130,6 +130,45 @@ describe('netlify/functions surface', () => {
     expect(keyAt).toBeGreaterThan(adminAt);
   });
 
+  it('keeps the assistant authenticated, quota-charged, rate-limited and on a custom path', () => {
+    const source = readFileSync(path.join(FUNCTIONS_DIR, 'assistant.ts'), 'utf8');
+    expect(source).toContain("path: '/api/assistant'");
+    expect(source).toMatch(/rateLimit:\s*\{/);
+    expect(source).not.toMatch(/Access-Control-Allow-Origin/i);
+    // Token, then App Check, then the allowance, all before the model is called.
+    const authAt = source.indexOf('authenticate(request)');
+    const appCheckAt = source.indexOf('verifyAppCheck(request)');
+    const quotaAt = source.indexOf('countAiUsageToday(');
+    const turnAt = source.indexOf('runAssistantTurn(req');
+    expect(authAt).toBeGreaterThan(-1);
+    expect(appCheckAt).toBeGreaterThan(authAt);
+    expect(quotaAt).toBeGreaterThan(appCheckAt);
+    expect(turnAt).toBeGreaterThan(quotaAt);
+    expect(source).toContain("recordAiUsage(user.uid, idToken, dayNumber, 'text')");
+    expect(source).toContain("chargeGlobalAiCall('text')");
+    // A safety block is a 400 with the shared safety code, so the client can recognise it.
+    expect(source).toContain('jsonResponse(400, { error: SAFETY_BLOCK_MESSAGE, code: SAFETY_BLOCK_CODE })');
+    // Slow feeds start before the farmer facts are awaited, and tools reuse them.
+    const factsAt = source.indexOf('await loadFarmerFacts(');
+    expect(source.indexOf('bulletinOnce(\'dam\').catch')).toBeGreaterThan(-1);
+    expect(source.indexOf('bulletinOnce(\'dam\').catch')).toBeLessThan(factsAt);
+    expect(source.indexOf('if (req.location) prefetchFeed(')).toBeLessThan(factsAt);
+    expect(source).toContain('reading: req.today');
+    expect(source).toContain('quickAnswer: quickAnswerFromTools');
+    // The last call keeps the declarations and turns calling off with mode NONE.
+    expect(source).toContain('FunctionCallingConfigMode.NONE');
+    expect(source).not.toMatch(/tools:\s*null/);
+    // Helpers live in _shared/, never next to the functions.
+    expect(topLevelFiles).not.toContain('assistant-core.ts');
+    expect(topLevelFiles).not.toContain('assistant-tools.ts');
+  });
+
+  it('mirrors /api/assistant in the dev server with the same handler', () => {
+    const server = readFileSync(path.join(REPO_ROOT, 'server.ts'), 'utf8');
+    expect(server).toContain('import assistantHandler from "./netlify/functions/assistant.ts"');
+    expect(server).toMatch(/app\.post\("\/api\/assistant",[^\n]*callFetchHandler\(assistantHandler/);
+  });
+
   it.each(subDirs)('subdirectory %s is not treated as a function', (dir) => {
     const inner = readdirSync(path.join(FUNCTIONS_DIR, dir));
     const offending = inner.filter((f) => {

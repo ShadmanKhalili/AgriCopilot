@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sprout, Cloud, FileText, Grid, HeartHandshake, Home, TrendingUp } from 'lucide-react';
+import { Sprout, Cloud, FileText, Grid, HeartHandshake, Home, MessageCircle, TrendingUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../utils/translations';
 import toBn from '../utils/banglaNum';
@@ -17,7 +17,7 @@ interface PrimaryNavItem {
 }
 
 interface Props {
-  /** The simple view shows Home, Crop, Weather and Market; the full view keeps the earlier bar. */
+  /** The simple view shows Home, Ask, Crop and Market (weather is reached from Home); the full view keeps the earlier bar. */
   mode: UiMode;
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
@@ -46,8 +46,8 @@ export default function MobileBottomNav({
 
   const simpleNavItems: PrimaryNavItem[] = [
     { id: 'home', targetTab: 'home', label: lang === 'bn' ? 'হোম' : 'Home', sublabel: '', icon: Home },
+    { id: 'ask-assistant', targetTab: 'assistant', label: lang === 'bn' ? 'জিজ্ঞাসা' : 'Ask', sublabel: '', icon: MessageCircle },
     { id: 'ask-crop', targetTab: 'agri-copilot', label: lang === 'bn' ? 'ফসল' : 'Crop', sublabel: '', icon: Sprout },
-    { id: 'check-weather', targetTab: 'weather-advisory', label: lang === 'bn' ? 'আবহাওয়া' : 'Weather', sublabel: '', icon: Cloud },
     { id: 'market', targetTab: 'market-connect', label: lang === 'bn' ? 'বাজার' : 'Market', sublabel: '', icon: TrendingUp },
   ];
 

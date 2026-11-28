@@ -85,3 +85,52 @@ describe('speakChecked with a fake speech engine', () => {
     expect(speak).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('startListening with a fake recogniser', () => {
+  let instance: any;
+  class FakeRecognition {
+    interimResults = true;
+    started = false;
+    onresult: ((e: any) => void) | null = null;
+    onend: (() => void) | null = null;
+    onerror: ((e: any) => void) | null = null;
+    constructor() {
+      instance = this;
+    }
+    start() {
+      this.started = true;
+    }
+    stop() {}
+  }
+
+  const heard = (transcript: string, isFinal: boolean) => ({ results: [Object.assign([{ transcript }], { isFinal })] });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps interim results off and delivers the phrase as before when no interim handler is given', () => {
+    vi.stubGlobal('window', { SpeechRecognition: FakeRecognition });
+    const onResult = vi.fn();
+    expect(startListening('bn', { onResult })).toBeTypeOf('function');
+    expect(instance.interimResults).toBe(false);
+    instance.onresult(heard(' আলুর দাম ', true));
+    expect(onResult).toHaveBeenCalledWith('আলুর দাম');
+  });
+
+  it('sends unfinished text to onInterim only, and the finished phrase to onResult', () => {
+    vi.stubGlobal('window', { SpeechRecognition: FakeRecognition });
+    const onResult = vi.fn();
+    const onInterim = vi.fn();
+    startListening('en', { onResult, onInterim });
+    expect(instance.interimResults).toBe(true);
+    instance.onresult(heard('can I', false));
+    instance.onresult(heard('can I spray', false));
+    expect(onInterim.mock.calls).toEqual([['can I'], ['can I spray']]);
+    expect(onResult).not.toHaveBeenCalled();
+    instance.onresult(heard('can I spray today', true));
+    expect(onResult).toHaveBeenCalledTimes(1);
+    expect(onResult).toHaveBeenCalledWith('can I spray today');
+    expect(onInterim).toHaveBeenCalledTimes(2);
+  });
+});

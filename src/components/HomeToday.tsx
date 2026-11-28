@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   BellRing, Camera, CloudSun, Grid, HeartHandshake,
-  Loader2, MapPin, TrendingUp, ChevronRight,
+  Loader2, MapPin, MessageCircle, TrendingUp, ChevronRight,
 } from 'lucide-react';
 import type { Language } from '../utils/translations';
 import type { Tab } from '../nav/tabs';
@@ -14,6 +14,8 @@ import BigActionButton from './ui/BigActionButton';
 import Card from './ui/Card';
 import ListenButton from './ui/ListenButton';
 import HomeCalendarTasks from './HomeCalendarTasks';
+import { AskBar } from './assistant/AskBar';
+import { ASK_HEADING } from '../constants/assistant';
 import AreaWarningStrip from './home/AreaWarningStrip';
 import SignalList from './weather/SignalList';
 import { useAuth } from './AuthProvider';
@@ -30,13 +32,15 @@ interface Props {
   locationName: string | null;
   /** Expert replies the farmer has not read yet. */
   unreadExpertCount: number;
+  /** A question typed or spoken in the Ask bar; the caller opens the assistant with it. */
+  onAsk: (text: string, channel: 'text' | 'voice') => void;
 }
 
 /**
  * The simple Home screen: what to do on the farm today, then four big doors
  * into the tools a farmer uses most.
  */
-export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetArea, locationName, unreadExpertCount }: Props) {
+export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetArea, locationName, unreadExpertCount, onAsk }: Props) {
   const { location } = useAppSettings();
   const { state, retry } = useTodayWeather(location);
   const bn = lang === 'bn';
@@ -166,6 +170,14 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
             <span className="text-base font-bold">{bn ? 'আজকের আবহাওয়া আনা হচ্ছে...' : 'Loading today\'s weather...'}</span>
           </div>
         )}
+      </Card>
+
+      <Card>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-stone-900 dark:text-white mb-3">
+          <MessageCircle className="w-6 h-6 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
+          <span>{ASK_HEADING[bn ? 'bn' : 'en']}</span>
+        </h2>
+        <AskBar lang={lang} compact onAsk={onAsk} />
       </Card>
 
       <AreaWarningStrip lang={lang} onNavigate={onNavigate} />

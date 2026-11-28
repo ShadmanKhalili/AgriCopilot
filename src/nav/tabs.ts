@@ -8,6 +8,7 @@
 
 export const TAB_IDS = [
   'home',
+  'assistant',
   'agri-copilot',
   'smart-grade',
   'smart-planting',
@@ -46,6 +47,7 @@ export type UiMode = 'simple' | 'full';
  */
 export const TAB_LEVEL: Record<Tab, UiMode> = {
   'home': 'simple',
+  'assistant': 'simple',
   'agri-copilot': 'simple',
   'weather-advisory': 'simple',
   'market-connect': 'simple',
