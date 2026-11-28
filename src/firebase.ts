@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, createUserWithEm
 import type { User } from 'firebase/auth';
 import toast from 'react-hot-toast';
 import firebaseConfig from '../firebase-applet-config.json';
+import { initAppCheck } from './appCheck';
 
 // NOTE: Firestore is deliberately NOT imported in this module. Keeping it auth-only
 // lets Vite code-split the Firestore SDK (~94 KB gzip) so it is only downloaded when
@@ -10,7 +11,12 @@ import firebaseConfig from '../firebase-applet-config.json';
 // The Firestore instance lives in `src/firestore.ts`.
 const app = initializeApp(firebaseConfig);
 
+// App Check is off unless VITE_RECAPTCHA_ENTERPRISE_SITE_KEY is set; its SDK is
+// loaded on demand, so this import adds only a few hundred bytes up front.
+initAppCheck(app);
+
 export { app };
+export { getAppCheckHeader } from './appCheck';
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

@@ -223,13 +223,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
 
       // Real-time request headers with strict cache-busting to guarantee live data
       const cacheBustParam = `&_t=${Date.now()}`;
-      const gMapKey = (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || '';
       const liveFetchOptions: RequestInit = {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
-          ...(gMapKey ? { 'x-google-maps-key': gMapKey } : {})
         }
       };
 

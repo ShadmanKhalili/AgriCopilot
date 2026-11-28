@@ -92,7 +92,7 @@ const SatelliteHealth: React.FC<Props> = ({ lang, globalLocation, setGlobalLocat
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchWithTimeout('/.netlify/functions/sentinel', {
+      const response = await fetchWithTimeout('/api/sentinel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lat: globalLocation.latitude, lng: globalLocation.longitude }),

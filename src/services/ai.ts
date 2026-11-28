@@ -1,7 +1,7 @@
 import { fixSchemeLinks } from '../utils/schemeLinks';
 import type { GoogleGenAI } from '@google/genai';
 import { db } from '../firestore';
-import { ensureAiSession } from '../firebase';
+import { ensureAiSession, getAppCheckHeader } from '../firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import { readAiNdjsonStream } from '../utils/ndjsonStream';
@@ -137,6 +137,8 @@ const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyRe
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${idToken}`,
+            // {} unless App Check is configured; never throws or waits > ~3 s.
+            ...(await getAppCheckHeader()),
           },
           body: JSON.stringify({ ...params, stream: true }),
           timeoutMs: AI_PROXY_HEADER_TIMEOUT_MS,
@@ -196,17 +198,43 @@ const callAiProxy = async (params: any, signal?: AbortSignal): Promise<AiProxyRe
   }
 };
 
+// What the server needs to build a Live session's instructions. The server owns
+// the system instruction and locks it into the token, so these are the only
+// inputs: the screen, quick or deep mode, language, a place name and the
+// farm-memory text. Nothing here is an instruction.
+export interface LiveSessionOptions {
+  kind: 'video' | 'voice';
+  mode: 'quick' | 'deep';
+  lang: 'bn' | 'en';
+  thinkingLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+  locationContext?: string;
+  diagnosisContext?: string;
+  farmContext?: string;
+}
+
 // Ephemeral Live API Token retrieval for direct WebSocket sessions. The server
-// locks the token to `model`, so a session must connect with that same model.
-export const getEphemeralLiveToken = async (model: string): Promise<string> => {
+// locks the token to `model` and to the instructions it builds from `options`,
+// so a session must connect with that same model and send no instructions or
+// tools of its own.
+export const getEphemeralLiveToken = async (model: string, options: LiveSessionOptions): Promise<string> => {
   const idToken = await ensureAiSession();
   const response = await fetchWithTimeout('/api/gemini/live-token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`,
+      ...(await getAppCheckHeader()),
     },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({
+      model,
+      kind: options.kind,
+      mode: options.mode,
+      lang: options.lang,
+      thinkingLevel: options.thinkingLevel,
+      locationContext: options.locationContext,
+      diagnosisContext: options.diagnosisContext,
+      farmContext: options.farmContext,
+    }),
     timeoutMs: 15000,
     retries: 0
   });
@@ -240,8 +268,8 @@ export const getEphemeralLiveToken = async (model: string): Promise<string> => {
 
 // Returns a fresh GoogleGenAI instance initialized with a single-use ephemeral token.
 // The token is minted server-side; no long-lived provider key reaches the browser.
-export const getLiveAiClient = async (model: string): Promise<GoogleGenAI> => {
-  const token = await getEphemeralLiveToken(model);
+export const getLiveAiClient = async (model: string, options: LiveSessionOptions): Promise<GoogleGenAI> => {
+  const token = await getEphemeralLiveToken(model, options);
   const GenAI = await loadGoogleGenAI();
   return new GenAI({ apiKey: token });
 };

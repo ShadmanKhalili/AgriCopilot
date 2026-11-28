@@ -1,6 +1,7 @@
-import { Handler } from '@netlify/functions';
+import type { Config } from '@netlify/functions';
 import axios from 'axios';
-import { checkIpRateLimit, extractClientIpFromHeaders, sentinelCallsPerIpPerMinute } from './_shared/ip-limit.ts';
+import { checkIpRateLimit, extractClientIp, sentinelCallsPerIpPerMinute } from './_shared/ip-limit.ts';
+import { jsonResponse, methodNotAllowed, parseCoordinateInput, roundCoordinate } from './_shared/proxy-guard.ts';
 
 // Upstream call deadline for Copernicus/Sentinel requests
 const UPSTREAM_TIMEOUT_MS = 8_000;
@@ -53,28 +54,43 @@ function getAgroClimaticVegetationIndex(lat: number, lng: number) {
   };
 }
 
-export const handler: Handler = async (event) => {
-  // Only allow POST requests
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+/** A JSON 200 carrying the calibrated model reading. */
+const modelResponse = (lat: number, lng: number): Response =>
+  jsonResponse(200, getAgroClimaticVegetationIndex(lat, lng));
 
-  let latNum = 23.685;
-  let lngNum = 90.3563;
+/**
+ * POST /api/sentinel  { lat, lng }
+ *
+ * A v2 function with its own `path`: it is not reachable at
+ * /.netlify/functions/sentinel, so the platform rate limit in `config`
+ * always applies. No CORS header (same-origin app). Coordinates are
+ * validated and rounded to 3 decimals (about 100 m) before they are used
+ * for the model, the cache or the upstream request.
+ */
+export default async (request: Request, _context?: unknown): Promise<Response> => {
+  if (request.method !== 'POST') return methodNotAllowed('POST');
 
+  let rawBody = '';
   try {
-    const body = JSON.parse(event.body || '{}');
-    const parsedLat = Number(body.lat);
-    const parsedLng = Number(body.lng);
-    if (Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90) {
-      latNum = parsedLat;
-    }
-    if (Number.isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180) {
-      lngNum = parsedLng;
-    }
+    rawBody = await request.text();
   } catch {
-    // Default to Bangladesh central coordinates if body parsing fails
+    return jsonResponse(400, { error: 'Invalid request' });
   }
+  if (rawBody.length > 2_000) return jsonResponse(413, { error: 'Request too large' });
+
+  let body: any = null;
+  try {
+    body = JSON.parse(rawBody || 'null');
+  } catch {
+    return jsonResponse(400, { error: 'Invalid request' });
+  }
+  const parsedLat = parseCoordinateInput(body?.lat, 90);
+  const parsedLng = parseCoordinateInput(body?.lng, 180);
+  if (parsedLat === null || parsedLng === null) {
+    return jsonResponse(400, { error: 'Valid lat and lng are required' });
+  }
+  const latNum = roundCoordinate(parsedLat, 3);
+  const lngNum = roundCoordinate(parsedLng, 3);
 
   const rawClientId = process.env.SENTINEL_HUB_CLIENT_ID || "";
   const rawClientSecret = process.env.SENTINEL_HUB_CLIENT_SECRET || "";
@@ -85,34 +101,22 @@ export const handler: Handler = async (event) => {
 
   // If credentials are unconfigured or placeholder, immediately serve calibrated agro-climatic model
   if (!clientId || !clientSecret || clientId.includes("placeholder") || clientId.length < 5) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getAgroClimaticVegetationIndex(latNum, lngNum))
-    };
+    return modelResponse(latNum, lngNum);
   }
 
   const cacheKey = `${latNum.toFixed(3)}_${lngNum.toFixed(3)}`;
   const cached = readingCache.get(cacheKey);
   if (cached && Date.now() - cached.at < READING_CACHE_MS) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: cached.body
-    };
+    return new Response(cached.body, { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
 
   const ipLimit = checkIpRateLimit(
-    extractClientIpFromHeaders(event.headers as Record<string, string | undefined>),
+    extractClientIp(request),
     sentinelCallsPerIpPerMinute(),
     'sentinel'
   );
   if (!ipLimit.allowed) {
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getAgroClimaticVegetationIndex(latNum, lngNum))
-    };
+    return modelResponse(latNum, lngNum);
   }
 
   try {
@@ -235,11 +239,7 @@ export const handler: Handler = async (event) => {
       const statsNdmi = processResponse.data.data[0].outputs.ndmi.bands.B0.stats;
       ndmiValue = statsNdmi.mean;
     } catch {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(getAgroClimaticVegetationIndex(latNum, lngNum))
-      };
+      return modelResponse(latNum, lngNum);
     }
     
     const body = JSON.stringify({
@@ -250,20 +250,17 @@ export const handler: Handler = async (event) => {
     });
     if (readingCache.size >= READING_CACHE_MAX) readingCache.clear();
     readingCache.set(cacheKey, { at: Date.now(), body });
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body
-    };
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.warn("[Sentinel Function Fallback] Upstream Copernicus Sentinel API failed, delivering calibrated agro-climatic model:", error.response?.data || error.message);
+    console.warn("[Sentinel Function Fallback] Upstream Copernicus Sentinel API failed, delivering calibrated agro-climatic model:", error?.response?.status ?? error?.code ?? 'error');
     
     // Always return 200 with calibrated model data so user features never fail
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getAgroClimaticVegetationIndex(latNum, lngNum))
-    };
+    return modelResponse(latNum, lngNum);
   }
+};
+
+export const config: Config = {
+  path: '/api/sentinel',
+  rateLimit: { windowLimit: 60, windowSize: 60, aggregateBy: ['ip', 'domain'] },
 };

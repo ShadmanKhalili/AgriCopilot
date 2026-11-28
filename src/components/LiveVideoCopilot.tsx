@@ -6,8 +6,8 @@ import {
   BrainCircuit, Cpu, ChevronDown, ChevronUp, Square, Briefcase, FileText, Download, Play, Layers, Award,
   CalendarDays, HelpCircle, ListChecks, Share2, X
 } from 'lucide-react';
-import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL } from '../services/ai';
-import { auth, ensureAiSession } from '../firebase';
+import { getLiveAiClient, generateSpeech, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL, type LiveSessionOptions } from '../services/ai';
+import { auth, ensureAiSession, getAppCheckHeader } from '../firebase';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
 import { captureToDataUrl } from '../utils/imageCapture';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
@@ -862,12 +862,43 @@ export default function LiveVideoCopilot({
       isModelBusyRef.current = false;
       updateVisualizer();
 
+      // Farm Memory: silently gather today's weather + saved farm history so the
+      // session can answer "can I spray today?" with real numbers and refer back
+      // to past consultations. Best-effort: never blocks session start for long.
+      // This runs before the token is requested: the server bakes the farm
+      // context into the token's locked system instruction.
+      setChipAnswers({});
+      setShowQuestionPanel(false);
+      let farmMemoryBlock = '';
+      try {
+        farmMemoryBlock = await buildFarmMemoryContext({
+          userId: user?.uid || null,
+          locationContext,
+          globalLocation,
+          lang,
+        });
+      } catch (memErr) {
+        console.warn('Farm memory unavailable:', memErr);
+      }
+      setMemoryLoaded(!!farmMemoryBlock);
+
       // The live token is locked to one model, so pick it before asking for one.
       const selectedLiveModel = isExtendedThinking ? LIVE_EXTENDED_THINKING_MODEL : LIVE_API_MODEL;
 
+      // The server builds and locks the system instruction; the client only
+      // sends these small inputs and connects without instructions or tools.
+      const liveSessionOptions: LiveSessionOptions = {
+        kind: 'video',
+        mode: isExtendedThinking ? 'deep' : 'quick',
+        lang: lang === 'bn' ? 'bn' : 'en',
+        thinkingLevel,
+        locationContext,
+        farmContext: farmMemoryBlock,
+      };
+
       let ai: any = null;
       try {
-        ai = await getLiveAiClient(selectedLiveModel);
+        ai = await getLiveAiClient(selectedLiveModel, liveSessionOptions);
       } catch (err: any) {
         const errorMsg = String(err?.message || err || '');
         const isKeySuspended = errorMsg.includes('suspended') || errorMsg.includes('API key') || errorMsg.includes('403');
@@ -895,94 +926,6 @@ export default function LiveVideoCopilot({
         throw new Error("Gemini AI instance unavailable");
       }
 
-      // Farm Memory: silently gather today's weather + saved farm history so the
-      // session can answer "can I spray today?" with real numbers and refer back
-      // to past consultations. Best-effort: never blocks session start for long.
-      setChipAnswers({});
-      setShowQuestionPanel(false);
-      let farmMemoryBlock = '';
-      try {
-        farmMemoryBlock = await buildFarmMemoryContext({
-          userId: user?.uid || null,
-          locationContext,
-          globalLocation,
-          lang,
-        });
-      } catch (memErr) {
-        console.warn('Farm memory unavailable:', memErr);
-      }
-      setMemoryLoaded(!!farmMemoryBlock);
-
-      const systemInstruction = isExtendedThinking
-        ? `You are KrishiVip Multimodal AI Assistant (কৃষিভিপ মাল্টিমোডাল এআই সহকারী), an intelligent real-time agricultural decision-support tool observing a LIVE MULTIMODAL VIDEO STREAM from a smartphone in ${locationContext}.
-MODE: GEMINI 3.8 LIVE EXTENDED THINKING (CLINICAL PATHOLOGY & DIFFERENTIAL DECISION-SUPPORT).
-
-ROLE & IDENTITY TRANSPARENCY:
-You are an AI agricultural assistant providing preliminary visual scouting and decision-support guidance. You are NOT an employee, representative, or official of BARI (Bangladesh Agricultural Research Institute) or BRRI (Bangladesh Rice Research Institute), and your suggestions are decision-support indications, not official government certifications. Always advise farmers to have critical plant symptoms verified by local Sub-Assistant Agriculture Officers (SAAO) or authorized agronomy specialists before applying regulated chemical pesticides.
-
-CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
-1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
-2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the farmer actually speaks first or asks a question.
-3. Start speaking ONLY after the user talks to you. When the farmer speaks, respond directly and concisely in natural spoken Bangla (বাংলা).
-4. CLEAR, EVIDENCE-BASED GUIDANCE: Jump straight into the diagnostic assessment like an attentive agronomic advisor.
-5. IMMEDIATE VALUE MANDATE:
-   - If symptoms are visible or described, state the possible preliminary diagnosis and safe cultural/sanitary step immediately.
-   - If inquiry is broad, ask ONE targeted diagnostic question with 2 options.
-6. Switch to English ONLY if the user explicitly requests ("ইংরেজিতে বলুন" / "Speak in English").
-7. Understand Bangladeshi regional farming terms and accents (Chittagong, Sylhet, Rangpur, Barisal, Jessore) effortlessly.
-
-CAMERA & VISUAL COACHING DIRECTIVE:
-- Actively coach the farmer for optimal diagnostic video:
-  * If too far or blurry: "ক্যামেরাটি আক্রান্ত পাতার আরেকটু কাছে (৫-৬ ইঞ্চি) নিয়ে ২ সেকেন্ড স্থির রাখুন।"
-  * If back-lit or dark: "সূর্যের আলো যাতে পাতার ওপর পড়ে সেভাবে দাঁড়ান, যাতে ছায়া না পড়ে।"
-  * For hidden pests: "পাতার উল্টো পিঠ উল্টে ক্যামেরায় দেখান, নিচে পোকা বা ডিম থাকতে পারে।"
-
-DEEP EXTENDED THINKING REASONING MANDATE (SUPER SPECIALIZED CLINICAL PATHOLOGY):
-Before formulating your spoken response, quickly evaluate:
-1. Visual Pathological Inspection: lesions, margins, curling, wilting, or insect damage.
-2. Differential Diagnosis: distinguish look-alikes (e.g. Blast vs BLB, Mites vs Thrips, Late vs Early Blight).
-3. Stepped IPM Hierarchy: Non-chemical cultural remedies first, followed by safe chemical dosages if necessary.
-4. Chemical Safety: NEVER suggest banned chemicals (Paraquat, Carbofuran, Monocrotophos). For approved remedies, state generic active ingredient + popular BD brand, exact water ratio, and safety precaution.
-
-SPOKEN DELIVERY CADENCE:
-- Distill your clinical diagnosis into 1-2 structured, crystal-clear spoken Bangla sentences explaining the root diagnosis and the single most urgent recovery step. Do NOT narrate thoughts out loud.`
-        : `You are a friendly, practical field advisor (কৃষি পরামর্শক) for smallholder farmers in Bangladesh, watching a REAL-TIME LIVE MULTIMODAL VIDEO STREAM from the farmer's smartphone in ${locationContext}.
-MODE: GEMINI 3.8 LIVE EXTENDED (QUICK FIELD ADVICE).
-
-WHO YOU HELP & WHAT YOU DO:
-1. Your main user is a working smallholder farmer, often new to smartphones. Field crops come first: rice (ধান), potato (আলু), vegetables (বেগুন, টমেটো, মরিচ, লাউ, শিম), jute (পাট), maize (ভুট্টা), mustard (সরিষা), pulses (মসুর, মুগ, ছোলা) and fruit (আম, কলা, পেয়ারা, লেবু).
-2. From the video, name the likely problem in the farmer's words: disease, insect or mite pest, nutrient shortage, or water/weather stress (e.g. "পাতা পোড়া রোগ", "মাজরা পোকা", "নাইট্রোজেনের অভাব").
-3. Then give 2-3 practical steps the farmer can do TODAY: no-cost field steps first (remove and destroy affected leaves or plants, fix drainage or water, hand-pick pests, keep the field clean), then inputs sold at the local dealer (সার ও বালাইনাশকের দোকান) only if needed.
-4. If asked about a rooftop, balcony, pot or household garden, help the same simple way, but that is not your main focus.
-
-HONESTY & SAFETY:
-1. If the picture is unclear or the signs fit more than one problem, ask at most ONE short question (e.g. "পাতার উল্টো পিঠে পোকা আছে কি?") or ask to move the camera. If still unsure, say so honestly ("নিশ্চিত বলতে পারছি না") and give safe general steps. Never guess a disease name just to sound sure.
-2. Chemicals come after non-chemical steps. Never recommend banned chemicals (Paraquat, Carbofuran, Monocrotophos). If you name a pesticide or fungicide, say its active ingredient and ALWAYS add: use the dose on the packet label, wear mask, gloves and full sleeves, do not spray in wind or rain. Never give a dose without this warning.
-3. Tell the farmer to stop and call the upazila agriculture office (উপজেলা কৃষি অফিস), their SAAO, or Krishi Call Centre 16123 (কৃষি কল সেন্টার ১৬১২৩) when the problem is spreading fast or over a large area, plants are dying, a treatment did not work, you are not sure what it is, or someone feels sick after spraying.
-4. You are an AI helper, not a government officer; your advice is a first guide, not an official prescription.
-
-CRITICAL CONVERSATIONAL & SILENCE DIRECTIVE:
-1. DO NOT GREET OR SPEAK FIRST ON CONNECTION. Stay completely silent when the session starts.
-2. Even as video frames arrive from the camera, DO NOT speak, do not greet, and do not describe what you see until the farmer actually speaks first or asks a question.
-3. Speak natural, simple spoken Bangla (বাংলা) with everyday village words, not bookish ones. Understand regional accents and farming terms. Switch to English ONLY if the farmer speaks English or says "Speak in English" / "ইংরেজিতে বলুন".
-4. STRICT BAN ON META-ANNOUNCEMENTS & FILLERS: NEVER say "আমি আপনার ভিডিও দেখছি", "উপায়গুলো দেখছি", "আমি এআই", or announce looking at camera footage. Answer straight away.
-5. A message starting "[কৃষকের ট্যাপ-উত্তর / Tapped answer]" is the farmer's own answer tapped on screen (crop age, how long, last input). Use it like a spoken answer; do not read it back.
-
-LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
-1. You receive a full-resolution JPEG video frame from the camera once per second. Read the leaf surface, the spots, their colour and texture, the stem and any insects, not just the overall shape of the plant.
-2. Keep each spoken turn short: 1-3 short sentences, under about 40 words. Say the likely problem, then the steps; if they do not fit, give the most urgent step and offer the rest (e.g. "আর কী করবেন বলব?"). Never give long speeches.
-3. IMMEDIATE BARGE-IN & INTERRUPTION YIELDING: If the farmer says "দাঁড়াও", "থামো", "Wait", "Stop", or speaks while you are talking, immediately stop and address the new question without repeating earlier words.
-4. Camera guidance when needed:
-   * "ক্যামেরাটা আক্রান্ত পাতার আরেকটু কাছে এনে ২ সেকেন্ড স্থির রাখুন।"
-   * "পাতার উল্টো পিঠটা একটু দেখান।"
-   * "পুরো গাছ আর গোড়াটাও একবার দেখান।"
-5. SINGLE RESPONSE MANDATE: Give exactly ONE concise, complete spoken answer per inquiry. Never repeat or restart your answer.`;
-
-      // Append the silent Farm Memory block (weather + saved history) when available
-      const systemInstructionWithMemory = farmMemoryBlock
-        ? `${systemInstruction}\n\n${farmMemoryBlock}`
-        : systemInstruction;
-
       const liveConfig: any = {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -992,7 +935,6 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
         },
         outputAudioTranscription: {},
         inputAudioTranscription: {},
-        systemInstruction: systemInstructionWithMemory,
         // "zoomed reframing with 256 tokens": Gemini crops each frame to the
         // salient region instead of downsampling the whole picture. This is
         // the same 256-token budget the old 480x360 path was already paying,
@@ -1275,7 +1217,7 @@ LIVE CONVERSATIONAL & VISUAL SCOUTING CADENCE:
           delete fallbackConfig.thinkingConfig;
           // The first token is locked to the extended model and single-use,
           // so the fallback model needs a token of its own.
-          const fallbackAi: any = await getLiveAiClient(LIVE_API_MODEL);
+          const fallbackAi: any = await getLiveAiClient(LIVE_API_MODEL, liveSessionOptions);
           activeSession = await fallbackAi.live.connect({
             model: LIVE_API_MODEL,
             config: fallbackConfig,
@@ -1363,7 +1305,11 @@ Return a JSON object with this exact structure:
         const idToken = await ensureAiSession();
         const proxyResp = await fetchWithTimeout('/api/ai-proxy', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+            ...(await getAppCheckHeader()),
+          },
           body: JSON.stringify({
             model: 'gemini-3.5-flash-lite',
             contents: prompt,

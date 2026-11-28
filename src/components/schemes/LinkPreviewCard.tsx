@@ -4,6 +4,7 @@ import { Globe, ExternalLink, UserCheck } from 'lucide-react';
 import type { Language } from '../../utils/translations';
 import { safeExternalUrl, externalHostLabel } from '../../utils/security';
 import { fetchWithTimeout, readJsonWithTimeout } from '../../utils/fetchWithTimeout';
+import { auth } from '../../firebase';
 
 interface LinkMetadata {
   title?: string;
@@ -28,7 +29,17 @@ export default function LinkPreviewCard({ url, lang }: { url: string; lang: Lang
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const res = await fetchWithTimeout(`/api/link-preview?url=${encodeURIComponent(url)}`, { timeoutMs: 10000, retries: 1 });
+        // A signed-in visitor (a guest counts) may preview any public site; the
+        // server only previews the official Bangladesh sites for anyone else.
+        // No account is created just to show a preview.
+        let headers: Record<string, string> | undefined;
+        try {
+          const idToken = await auth.currentUser?.getIdToken();
+          if (idToken) headers = { Authorization: `Bearer ${idToken}` };
+        } catch {
+          // Signed out or offline: ask without a token.
+        }
+        const res = await fetchWithTimeout(`/api/link-preview?url=${encodeURIComponent(url)}`, { timeoutMs: 10000, retries: 1, headers });
         const data = await readJsonWithTimeout<any>(res, 10000);
         if (!data.error) setMetadata(data);
         // A site that no longer exists must not look like a working link.

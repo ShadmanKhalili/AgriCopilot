@@ -1,7 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { authenticate } from "./_shared/auth.ts";
+import { verifyAppCheck } from "./_shared/app-check.ts";
 import { aiCallsPerIpPerMinute, checkIpRateLimit, extractClientIp } from "./_shared/ip-limit.ts";
 import {
+  DAILY_CAPACITY_ERROR,
+  chargeGlobalAiCall,
   countAiUsageToday,
   dailyAiLimit,
   dailyLimitMessage,
@@ -644,6 +647,15 @@ export default async (request: Request, _context: any): Promise<Response> => {
     });
   }
 
+  // ── 1b. Firebase App Check ───────────────────────────────────────────────
+  // Off unless APP_CHECK_MODE is set. In "monitor" a failure is only logged;
+  // in "enforce" a request without a valid token from the real web app is
+  // refused here, before any quota or Gemini work.
+  const appCheck = await verifyAppCheck(request);
+  if (!appCheck.ok) {
+    return jsonResponse(401, { error: "app_check" });
+  }
+
   const idToken = (request.headers.get("authorization") || "")
     .replace(/^Bearer\s+/i, "")
     .trim();
@@ -761,6 +773,14 @@ export default async (request: Request, _context: any): Promise<Response> => {
   // check above before any of them was counted. Now no write means no call, and
   // counting again after the write catches a burst. A call that fails upstream
   // stays counted, because the ledger can't be edited.
+  //
+  // The app-wide daily cap (AI_GLOBAL_DAILY_CALL_CAP, off unless set) is charged
+  // first, so a call refused because the whole app is out of budget does not
+  // also eat the caller's own allowance.
+  const globalCharge = await chargeGlobalAiCall(isAudio ? "audio" : "text");
+  if (!globalCharge.ok) {
+    return jsonResponse(503, { error: DAILY_CAPACITY_ERROR });
+  }
   const reserved = await recordAiUsage(user.uid, idToken, dayNumber, isAudio ? "audio" : "text");
   if (!reserved) {
     return jsonResponse(503, { error: "The AI service is busy. Please try again in a moment." });
