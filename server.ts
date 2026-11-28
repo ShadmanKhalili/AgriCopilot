@@ -22,6 +22,7 @@ import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./net
 import areaReportHandler from "./netlify/functions/area-report.ts";
 import farmRecordScoreHandler from "./netlify/functions/farm-record-score.ts";
 import configStatusHandler from "./netlify/functions/config-status.ts";
+import aiModelCheckHandler from "./netlify/functions/ai-model-check.ts";
 import dailyForecastHandler from "./netlify/functions/daily-forecast.ts";
 import historicalDataHandler from "./netlify/functions/historical-data.ts";
 import wbIndicatorsHandler from "./netlify/functions/wb-indicators.ts";
@@ -244,6 +245,8 @@ async function startServer() {
           headers: {
             "Content-Type": "application/json",
             ...(req.ip ? { "x-real-ip": req.ip } : {}),
+            // The admin-only handlers read the caller's Firebase ID token.
+            ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
           },
           body: hasBody ? JSON.stringify(req.body ?? null) : undefined,
         })
@@ -257,6 +260,9 @@ async function startServer() {
 
   // Which provider keys are configured (booleans only, no secrets).
   app.get("/api/config-status", (req, res) => callFetchHandler(configStatusHandler, req, res));
+
+  // Admin-only check of which Gemini models, Search grounding and speech the key can use.
+  app.post("/api/ai-model-check", (req, res) => callFetchHandler(aiModelCheckHandler, req, res));
 
   // Live market prices from the Department of Agricultural Marketing.
   //

@@ -12,9 +12,12 @@
  *   - limited to a session of `AI_LIVE_SESSION_MINUTES` (default 15): Gemini
  *     rejects messages on the session after the token's `expireTime`;
  *   - locked to a server-built system instruction, an empty tool list, the
- *     response modality and the voice, so the browser cannot open the
- *     WebSocket with its own instructions or tools. The request body carries
- *     only small validated inputs (see `parseLiveTokenRequest`).
+ *     response modality, the voice and context window compression, so the
+ *     browser cannot open the WebSocket with its own instructions or tools and
+ *     a video session is not cut off after about two minutes. Session
+ *     resumption is left unlocked so the browser can pass a resume handle. The
+ *     request body carries only small validated inputs (see
+ *     `parseLiveTokenRequest`).
  *
  * How the lock works (@google/genai `Tokens.create`): every field set in
  * `liveConnectConstraints.config` becomes part of the token's `fieldMask`
@@ -30,6 +33,7 @@
  */
 
 import { buildLiveSystemInstruction, type LiveKind, type LiveMode } from './live-instructions.ts';
+import { liveContextWindowCompression } from './live-session-config.ts';
 import {
   countAiUsageToday,
   dailyAiLimit,
@@ -196,11 +200,19 @@ export const parseLiveTokenRequest = (body: unknown): ParsedLiveTokenRequest => 
  * `liveConnectConstraints.config` are locked: the client cannot change them.
  * `lockAdditionalFields: ['tools']` also locks the tool list while leaving it
  * unset, so the session has no tools.
+ *
+ * `contextWindowCompression` is locked too, so a session with video is always
+ * compressed (otherwise Google ends it after about two minutes). Nothing about
+ * `sessionResumption` is set or locked: the browser passes its resume `handle`
+ * there when it reconnects, and a locked field would block that.
+ * `lockCompression: false` builds the same token without the compression lock;
+ * `issueLiveToken` uses it once if Gemini refuses the locked field.
  */
 export const buildLiveTokenParams = (
   request: LiveTokenRequest,
   model: string,
-  times: { expireTime: string; newSessionExpireTime: string }
+  times: { expireTime: string; newSessionExpireTime: string },
+  options: { lockCompression?: boolean } = {}
 ) => {
   const config: Record<string, unknown> = {
     responseModalities: ['AUDIO'],
@@ -215,6 +227,9 @@ export const buildLiveTokenParams = (
       farmContext: request.farmContext,
     }),
   };
+  if (options.lockCompression !== false) {
+    config.contextWindowCompression = liveContextWindowCompression();
+  }
   // Only the extended-thinking model accepts a thinking level.
   if (/thinking/i.test(model)) {
     config.thinkingConfig = { thinkingLevel: request.kind === 'voice' ? 'LOW' : request.thinkingLevel };
@@ -229,6 +244,10 @@ export const buildLiveTokenParams = (
     },
   };
 };
+
+/** True for a Gemini "bad request" (HTTP 400 / INVALID_ARGUMENT) error. */
+const isInvalidArgumentError = (err: any): boolean =>
+  err?.status === 400 || err?.code === 400 || /INVALID_ARGUMENT|invalid argument|field.?mask/i.test(String(err?.message || ''));
 
 /**
  * Check the account's allowance, count the session, and mint a single-use
@@ -286,12 +305,25 @@ export const issueLiveToken = async (
 
   const now = Date.now();
   const expireTime = new Date(now + liveSessionMinutes() * 60_000).toISOString();
-  const tokenResponse = await client.authTokens.create(
-    buildLiveTokenParams(request, model, {
-      expireTime,
-      newSessionExpireTime: new Date(now + NEW_SESSION_WINDOW_MS).toISOString(),
-    })
-  );
+  const times = {
+    expireTime,
+    newSessionExpireTime: new Date(now + NEW_SESSION_WINDOW_MS).toISOString(),
+  };
+  let tokenResponse: any;
+  try {
+    tokenResponse = await client.authTokens.create(buildLiveTokenParams(request, model, times));
+  } catch (err: any) {
+    // The compression lock (a field-mask path) is not covered by Google's
+    // token docs. If Gemini rejects the token as invalid, mint it once without
+    // that lock rather than leave every Live session broken; the browser still
+    // sends the same compression setting itself. Any other failure, and a
+    // second failure, propagate as before.
+    if (!isInvalidArgumentError(err)) throw err;
+    console.warn('[live-token] Gemini refused the locked compression field; minting without that lock.');
+    tokenResponse = await client.authTokens.create(
+      buildLiveTokenParams(request, model, times, { lockCompression: false })
+    );
+  }
 
   return {
     ok: true,

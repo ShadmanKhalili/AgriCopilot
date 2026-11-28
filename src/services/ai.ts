@@ -797,89 +797,6 @@ ${text}`;
   }, AI_MAX_ATTEMPTS, 1500, signal);
 };
 
-export const generateWeatherAdvisory = async (
-  weatherData: any, 
-  lang: string, 
-  coords: { latitude: number; longitude: number }
-) => {
-  return await callAiWithRetry(async () => {
-    try {
-      const now = new Date();
-      const currentTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const currentDate = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-      
-      let climateContext = "";
-      if (weatherData.historicalAvgTemp) {
-        const diff = weatherData.temp - weatherData.historicalAvgTemp;
-        const diffText = Math.abs(diff).toFixed(1);
-        const direction = diff > 0 ? "hotter" : "cooler";
-        climateContext = `Climate Context: This month's historical average temperature over the last 5 years is ${weatherData.historicalAvgTemp.toFixed(1)}°C. Currently, it is ${diffText}°C ${direction} than the historical average.`;
-      }
-
-      let historicalTodayContext = "";
-      if (weatherData.historicalToday) {
-        historicalTodayContext = `Last Year Today's Weather: Max ${weatherData.historicalToday.maxTemp}°C, Min ${weatherData.historicalToday.minTemp}°C, Rain ${weatherData.historicalToday.rain}mm.`;
-      }
-
-      let soilContext = "";
-      if (weatherData.soilMoisture !== undefined || weatherData.soilPH !== undefined) {
-        soilContext = `Soil & Hydrology Context:
-        - Soil Moisture (0-7cm): ${weatherData.soilMoisture !== undefined ? weatherData.soilMoisture + ' m³/m³' : 'N/A'}
-        - Evapotranspiration: ${weatherData.evapotranspiration !== undefined ? weatherData.evapotranspiration + ' mm/day' : 'N/A'}
-        - Soil pH: ${weatherData.soilPH !== undefined ? weatherData.soilPH : 'N/A'}
-        - Soil Nitrogen: ${weatherData.soilNitrogen !== undefined ? weatherData.soilNitrogen + ' g/kg' : 'N/A'}
-        - Soil Organic Carbon: ${weatherData.soilCarbon !== undefined ? weatherData.soilCarbon + ' g/kg' : 'N/A'}`;
-      }
-
-      let weatherNext3Context = "";
-      if (weatherData.isWeatherNext3 && weatherData.weatherNext3) {
-        const wn = weatherData.weatherNext3;
-        const wnSourceLabel = wn.source === 'google_weather_api' ? 'live Google Maps Platform Weather API' : 'Open-Meteo 5 km grid (automatic fallback)';
-        weatherNext3Context = `AgroCast AI agro-forecast (source: ${wnSourceLabel}):
-        - Data Source: ${wn.source === 'google_weather_api' ? 'Google Maps Platform Weather API (weather.googleapis.com) with server-side agro-metric computation' : 'Open-Meteo high-resolution model data with server-side agro-metric computation'}
-        - 100m Upper Canopy Wind: ${wn.agro_metrics?.boundary_layer_wind_100m_kmh || 'N/A'} km/h
-        - Direct Solar Irradiance (DNI): ${wn.agro_metrics?.direct_normal_irradiance_wm2 || 0} W/m²
-        - Dew Point Depression & Spore Risk: ${wn.agro_metrics?.dew_point_depression_celsius || 'N/A'}°C (${wn.agro_metrics?.fungal_blight_risk?.toUpperCase()} risk of fungal blight)
-        - Estimated Precipitation Spread: ${wn.ensemble?.precipitation_spread_mm?.p10 || 0}mm - ${wn.ensemble?.precipitation_spread_mm?.p90 || 0}mm`;
-      }
-
-      const prompt = `You are an expert agricultural meteorologist and agronomist in Bangladesh.${outputRules(lang)}
-      Current Date: ${currentDate}
-      Current Time: ${currentTime}
-      ${buildLocationContext(coords)}
-      Current Weather at GPS (${coords.latitude}, ${coords.longitude}):
-      Temp: ${weatherData.temp.toFixed(1)}°C, Condition: ${weatherData.condition}, Humidity: ${weatherData.humidity}%, Wind: ${weatherData.windSpeed}km/h, Rain: ${weatherData.rainfall}mm.
-      Safe Spraying Window: ${weatherData.safeSprayingWindow}
-      ${climateContext}
-      ${historicalTodayContext}
-      ${soilContext}
-      ${weatherNext3Context}
-      
-      Provide a short, actionable farming advisory in ${lang === 'bn' ? 'Bangla' : 'English'} (approx 80-100 words).
-      Focus on:
-      - Time of day: Adjust your advice based on the current time (${currentTime}).
-      - Irrigation needs (use soil moisture and evapotranspiration data if available)
-      - Fertilizer/Soil health advice (use soil pH, Nitrogen, Carbon data if available)
-      - Pest/Disease & Fungal Blight risk (reference dew point depression and humidity)
-      - Sowing/Harvesting timing
-      - Use of the Safe Spraying Window for pesticide application.
-      ${weatherData.isWeatherNext3 ? '- Note that agro-meteorological metrics are computed server-side from the active weather data source (Google Weather API or Open-Meteo).' : ''}
-      
-      Use markdown for formatting. Be direct and practical.`;
-
-      const response = await generateContent({
-        contents: [{ parts: [{ text: prompt }] }],
-        model: SEARCH_MODEL
-      });
-      
-      return response.text || '';
-    } catch (error) {
-      console.error("AI Service Error (Weather Advisory):", error);
-      throw error;
-    }
-  });
-};
-
 export const generateSpeech = async (text: string, signal?: AbortSignal) => {
   return await callAiWithRetry(async () => {
     try {
@@ -1147,79 +1064,6 @@ Give a short, plain market note for a smallholder farmer growing ${produce} in B
       }
     } catch (error) {
       console.error("AI Service Error (Market Insights):", error);
-      throw error;
-    }
-  });
-};
-
-export const findGovernmentSchemes = async (
-  location: string, 
-  crop: string, 
-  lang: string
-) => {
-  return await callAiWithRetry(async () => {
-    try {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const prompt = `Use Google Search to find the LATEST active agricultural subsidies, government incentive schemes, input support programs, or low-interest agricultural loans for farmers in ${location || 'Bangladesh'}, specifically for ${crop || 'crops'} or general farming in ${currentYear}.
-      Focus on official circulars from the Department of Agricultural Extension (DAE), Bangladesh Krishi Bank, Rajshahi Krishi Unnayan Bank, Bangladesh Bank Agricultural Credit Department, or Ministry of Agriculture (moa.gov.bd).
-      
-      RESPONSE FORMAT:
-      - Respond in JSON format.
-      - 'schemes': array of objects with 'title', 'description', 'eligibility', and 'howToApply'.
-      - 'sourceLinks': array of strings (URLs) where the user can find more info.
-      - Language: ${lang === 'bn' ? 'Bangla' : 'English'}.
-      - CRITICAL: Keep descriptions practical and actionable.`;
-      
-      const config: any = {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            schemes: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  description: { type: Type.STRING },
-                  eligibility: { type: Type.STRING },
-                  howToApply: { type: Type.STRING }
-                }
-              }
-            },
-            sourceLinks: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            }
-          },
-          required: ['schemes']
-        },
-        tools: [{ googleSearch: {} }]
-      };
-
-      try {
-        const response = await generateContent({
-          contents: [{ parts: [{ text: prompt }] }],
-          config,
-          toolConfig: { includeServerSideToolInvocations: true },
-          model: SEARCH_MODEL
-        });
-        return parseJsonResponse(response.text);
-      } catch (searchError) {
-        console.warn("Search model failed for schemes, falling back:", searchError);
-        const fallbackResponse = await generateContent({
-          contents: [{ parts: [{ text: `Provide general information about common agricultural subsidies in Bangladesh for ${crop} farmers. Return JSON with 'schemes' array. Language: ${lang === 'bn' ? 'Bangla' : 'English'}.` }] }],
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: config.responseSchema
-          },
-          model: BACKUP_MODEL
-        });
-        return parseJsonResponse(fallbackResponse.text);
-      }
-    } catch (error) {
-      console.error("AI Service Error (Gov Schemes):", error);
       throw error;
     }
   });
@@ -1557,11 +1401,4 @@ export const syncCuratedSchemes = async () => {
       throw error;
     }
   });
-};
-
-export const getMarketInsightsByLocation = async (produce: string, location: string, lang: string) => {
-  // Location is intentionally not forwarded to the shared insight engine yet: the
-  // current model prompt is location-agnostic. Kept in the signature for API
-  // stability — callers get the same behaviour as getMarketInsights.
-  return await getMarketInsights(produce, lang, false);
 };

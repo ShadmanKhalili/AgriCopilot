@@ -66,6 +66,19 @@ export const TAB_LEVEL: Record<Tab, UiMode> = {
 export const isTabInMode = (tab: Tab, mode: UiMode): boolean =>
   mode === 'full' || TAB_LEVEL[tab] === 'simple';
 
+/**
+ * Splits a list of tools for the "All services" drawer. `main` holds the tools
+ * of the current view; in the simple view `more` holds the rest, so they stay
+ * reachable under their own heading. In the full view `more` is empty.
+ */
+export const partitionTabsByMode = <T extends { id: Tab }>(
+  items: readonly T[],
+  mode: UiMode
+): { main: T[]; more: T[] } => ({
+  main: items.filter((item) => isTabInMode(item.id, mode)),
+  more: mode === 'simple' ? items.filter((item) => !isTabInMode(item.id, 'simple')) : [],
+});
+
 // Short names used by the sitemap and older shared links.
 const TAB_HASH_ALIASES: Record<string, Tab> = {
   copilot: 'agri-copilot',

@@ -1149,5 +1149,165 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create, update, delete: if false;
     }
+
+    // ===============================================================
+    // The assistant (Phase 8): the farmer's profile on the server, what the
+    // assistant remembers, and the conversation. All of it is under the
+    // farmer's own account: only the owner writes, and the owner and the
+    // admin read. The server (service account) bypasses these rules, which is
+    // how it will later write the assistant's own messages and read the
+    // profile for the daily briefing. The shapes are mirrored by
+    // netlify/functions/_shared/assistant-memory-model.ts.
+    //
+    // No emulator test exists for this block yet: re-read it after any edit.
+    // ===============================================================
+
+    function isNullOrStr(val, min, max) {
+      return val == null || isStr(val, min, max);
+    }
+
+    // The area the farmer picked by name. District (English and Bangla) is
+    // required; the upazila is optional and may be null.
+    function isValidFarmPlace(p) {
+      return p is map &&
+             p.keys().hasAll(['district', 'districtBn']) &&
+             p.keys().hasOnly(['district', 'districtBn', 'upazila', 'upazilaBn']) &&
+             isStr(p.district, 1, 60) &&
+             isStr(p.districtBn, 1, 60) &&
+             (!p.keys().hasAny(['upazila']) || isNullOrStr(p.upazila, 1, 60)) &&
+             (!p.keys().hasAny(['upazilaBn']) || isNullOrStr(p.upazilaBn, 1, 60));
+    }
+
+    // GPS inside Bangladesh (the same box the app uses).
+    function isValidFarmLocation(l) {
+      return l is map &&
+             l.keys().hasAll(['latitude', 'longitude']) &&
+             l.keys().hasOnly(['latitude', 'longitude']) &&
+             l.latitude is number && l.latitude >= 20.5 && l.latitude <= 26.7 &&
+             l.longitude is number && l.longitude >= 88.0 && l.longitude <= 92.7;
+    }
+
+    // The crop calendar plan from onboarding (src/utils/cropPlan.ts).
+    function isValidFarmCropPlan(c) {
+      return c is map &&
+             c.keys().hasAll(['cropKey', 'sowingDate', 'completedStages']) &&
+             c.keys().hasOnly(['cropKey', 'sowingDate', 'completedStages']) &&
+             isStr(c.cropKey, 1, 40) &&
+             c.sowingDate is string && c.sowingDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             c.completedStages is list && c.completedStages.size() <= 30;
+    }
+
+    // users/{uid}/farm_profile/main. `mainCrop`, `place`, `location` and
+    // `cropPlan` may be left out or null; when present they are checked.
+    function isValidAssistantFarmProfile(data) {
+      return data.keys().hasAll(['schemaVersion', 'lang', 'updatedAt']) &&
+             data.keys().hasOnly(['schemaVersion', 'lang', 'mainCrop', 'place', 'location', 'cropPlan', 'updatedAt']) &&
+             data.schemaVersion is int && data.schemaVersion == 1 &&
+             data.lang in ['bn', 'en'] &&
+             data.updatedAt == request.time &&
+             (!data.keys().hasAny(['mainCrop']) || isNullOrStr(data.mainCrop, 1, 40)) &&
+             (!data.keys().hasAny(['place']) || data.place == null || isValidFarmPlace(data.place)) &&
+             (!data.keys().hasAny(['location']) || data.location == null || isValidFarmLocation(data.location)) &&
+             (!data.keys().hasAny(['cropPlan']) || data.cropPlan == null || isValidFarmCropPlan(data.cropPlan));
+    }
+
+    match /users/{userId}/farm_profile/{docId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) && docId == 'main' && isValidAssistantFarmProfile(incoming());
+      allow delete: if isOwner(userId) && docId == 'main';
+    }
+
+    // Short facts the farmer told the assistant. The farmer can edit the text,
+    // switch a fact off (active = false) or delete it. A new fact is always
+    // 'farmer_said' and active; an edit may mark it 'farmer_edited'. The 200
+    // fact limit is kept by the app, not here.
+    match /users/{userId}/assistant_memory/{factId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) &&
+                    isValidId(factId) &&
+                    incoming().keys().hasAll(['text', 'category', 'source', 'createdAt', 'updatedAt', 'active']) &&
+                    incoming().keys().hasOnly(['text', 'category', 'source', 'createdAt', 'updatedAt', 'active']) &&
+                    isStr(incoming().text, 3, 200) &&
+                    incoming().category in ['farm', 'crop', 'water', 'money', 'family', 'preference', 'other'] &&
+                    incoming().source == 'farmer_said' &&
+                    incoming().active == true &&
+                    incoming().createdAt == request.time &&
+                    incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) &&
+                    incoming().keys().hasAll(['text', 'category', 'source', 'createdAt', 'updatedAt', 'active']) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['text', 'category', 'active', 'updatedAt', 'source']) &&
+                    isStr(incoming().text, 3, 200) &&
+                    incoming().category in ['farm', 'crop', 'water', 'money', 'family', 'preference', 'other'] &&
+                    incoming().active is bool &&
+                    (incoming().source == existing().source || incoming().source == 'farmer_edited') &&
+                    incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+    }
+
+    // One tool call recorded on a message: { name, status }.
+    function isValidToolCall(tc) {
+      return tc is map &&
+             tc.keys().hasAll(['name', 'status']) &&
+             tc.keys().hasOnly(['name', 'status']) &&
+             isStr(tc.name, 1, 60) &&
+             tc.status in ['proposed', 'confirmed', 'declined', 'done', 'failed'];
+    }
+
+    // The rules language has no loops, so each of the 10 allowed places is
+    // checked on its own. A place past the end of the list passes.
+    function isToolCallAt(tcs, i) {
+      return tcs.size() <= i || isValidToolCall(tcs[i]);
+    }
+
+    function isValidToolCalls(tcs) {
+      return tcs is list && tcs.size() <= 10 &&
+             isToolCallAt(tcs, 0) && isToolCallAt(tcs, 1) && isToolCallAt(tcs, 2) &&
+             isToolCallAt(tcs, 3) && isToolCallAt(tcs, 4) && isToolCallAt(tcs, 5) &&
+             isToolCallAt(tcs, 6) && isToolCallAt(tcs, 7) && isToolCallAt(tcs, 8) &&
+             isToolCallAt(tcs, 9);
+    }
+
+    // A conversation with the assistant, and its messages. A message is written
+    // once and never edited (the owner may still delete it). The app may log
+    // both roles for now; later the server writes the assistant's messages with
+    // the service account. A thread may only change its title, summary, time
+    // and message count.
+    match /users/{userId}/assistant_threads/{threadId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) &&
+                    isValidId(threadId) &&
+                    incoming().keys().hasAll(['title', 'summary', 'createdAt', 'updatedAt', 'messageCount']) &&
+                    incoming().keys().hasOnly(['title', 'summary', 'createdAt', 'updatedAt', 'messageCount']) &&
+                    isStr(incoming().title, 0, 80) &&
+                    isStr(incoming().summary, 0, 2000) &&
+                    incoming().messageCount is int && incoming().messageCount >= 0 && incoming().messageCount <= 100000 &&
+                    incoming().createdAt == request.time &&
+                    incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) &&
+                    incoming().keys().hasAll(['title', 'summary', 'createdAt', 'updatedAt', 'messageCount']) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['title', 'summary', 'updatedAt', 'messageCount']) &&
+                    isStr(incoming().title, 0, 80) &&
+                    isStr(incoming().summary, 0, 2000) &&
+                    incoming().messageCount is int && incoming().messageCount >= 0 && incoming().messageCount <= 100000 &&
+                    incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+
+      match /messages/{messageId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) &&
+                      isValidId(messageId) &&
+                      incoming().keys().hasAll(['role', 'text', 'createdAt', 'channel']) &&
+                      incoming().keys().hasOnly(['role', 'text', 'createdAt', 'channel', 'toolCalls']) &&
+                      incoming().role in ['user', 'assistant'] &&
+                      isStr(incoming().text, 1, 4000) &&
+                      incoming().channel in ['text', 'voice', 'live', 'photo'] &&
+                      incoming().createdAt == request.time &&
+                      (!incoming().keys().hasAny(['toolCalls']) || isValidToolCalls(incoming().toolCalls)) &&
+                      // existsAfter, not exists: the thread and its first message may be one batch.
+                      existsAfter(/databases/$(database)/documents/users/$(userId)/assistant_threads/$(threadId));
+        allow update: if false;
+        allow delete: if isOwner(userId);
+      }
+    }
   }
 }
