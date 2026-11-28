@@ -61,11 +61,12 @@ import { useExpertUnread } from '../hooks/useExpertUnread';
 import toBn from '../utils/banglaNum';
 import { safeStorage } from '../utils/security';
 import { ErrorBoundary } from './ErrorBoundary';
-import { HOME_TAB, hashForTab, tabFromHash, type PillarKey, type Tab } from '../nav/tabs';
+import { HOME_TAB, hashForTab, partitionTabsByMode, tabFromHash, type PillarKey, type Tab } from '../nav/tabs';
 import { useAppSettings } from '../context/AppSettingsContext';
 import { useUiMode } from '../context/useUiMode';
 import HomeToday from './HomeToday';
 import Onboarding from './Onboarding';
+import FarmProfileSync from './FarmProfileSync';
 
 interface TabItem {
   id: Tab;
@@ -451,11 +452,19 @@ export default function Layout() {
     );
   };
 
+  // The drawer lists the tools of the current view first. In the simple view the
+  // other tools stay visible, grouped under "More services" below. The admin hub is
+  // already dropped from `tabs` for everyone who is not an admin.
+  const { main: mainTabs, more: moreTabsAll } = partitionTabsByMode(tabs, mode);
+  const moreTabs = moreTabsAll.filter(
+    (tab) => matchesSearch(tab) && (selectedPillarFilter === 'all' || tab.pillar === selectedPillarFilter)
+  );
+
   const filteredPillars = pillarDefinitions.filter((p) => {
     if (selectedPillarFilter !== 'all' && selectedPillarFilter !== p.key) {
       return false;
     }
-    return tabs.some((tab) => tab.pillar === p.key && matchesSearch(tab));
+    return mainTabs.some((tab) => tab.pillar === p.key && matchesSearch(tab));
   });
 
   const toggleLanguage = () => {
@@ -464,6 +473,83 @@ export default function Layout() {
   };
 
   const activeTabDetails = tabs.find(tab => tab.id === activeTab);
+
+  // One tool button in the drawer. Shared by the pillar groups and the "More services" group.
+  const renderNavButton = (tab: TabItem, index: number) => {
+    const Icon = tab.icon;
+    const isActive = activeTab === tab.id;
+    return (
+      <motion.button
+        key={tab.id}
+        type="button"
+        role="tab"
+        initial={{ opacity: 0, x: -6 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: index * 0.015, duration: 0.15 }}
+        aria-selected={isActive}
+        aria-controls={`panel-${tab.id}`}
+        id={`tab-${tab.id}`}
+        whileHover={{ x: 2 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => {
+          setActiveTab(tab.id);
+          setIsMobileMenuOpen(false);
+        }}
+        className={`w-full min-h-[48px] flex items-center justify-between px-3 py-2 rounded-2xl transition-all duration-150 text-left relative overflow-hidden group outline-none cursor-pointer ${
+          isActive 
+            ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 dark:bg-white dark:text-emerald-950 dark:shadow-lg dark:shadow-emerald-950/40' 
+            : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-950 dark:text-emerald-100 dark:hover:bg-white/10 dark:hover:text-white'
+        }`}
+      >
+        {isActive && (
+          <motion.div 
+            layoutId="activeSidebarTabBg"
+            className="absolute inset-0 bg-emerald-700 dark:bg-white"
+            transition={{ type: "spring", bounce: 0, duration: 0.2 }}
+          />
+        )}
+        
+        <div className="relative z-10 flex items-center space-x-2.5 min-w-0 flex-1">
+          <div className={`p-2 rounded-xl transition-colors shrink-0 ${
+            isActive 
+              ? 'bg-emerald-800 text-white dark:bg-emerald-100 dark:text-emerald-800' 
+              : 'bg-emerald-100/80 text-emerald-700 group-hover:bg-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-300 dark:group-hover:bg-white/15'
+          }`}>
+            <Icon className="w-4 h-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1 pr-1">
+            <div className="flex items-center space-x-1.5 truncate">
+              <span className={`font-bold ${simple ? 'text-sm' : 'text-xs'} tracking-tight truncate ${isActive ? 'text-white dark:text-emerald-950' : 'text-slate-800 dark:text-emerald-50'}`}>
+                {tab.name}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1.5 mt-0.5">
+              {!simple && <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-md tracking-tight shrink-0 ${
+                isActive 
+                  ? 'bg-emerald-800/90 text-emerald-100 border border-emerald-600 dark:bg-emerald-100 dark:text-emerald-900 dark:border-emerald-300/80 font-semibold' 
+                  : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-emerald-950/80 dark:text-emerald-300/90 dark:border-emerald-700/50'
+              }`}>
+                {tab.subcategory}
+              </span>}
+              <span className={`${simple ? 'text-sm' : 'text-[11px]'} truncate ${isActive ? 'text-emerald-50 dark:text-emerald-900' : 'text-slate-600 dark:text-emerald-200'}`}>
+                {tab.description}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {tab.badge && (
+          <span className={`relative z-10 ${simple ? 'text-sm' : 'text-[11px]'} font-semibold px-2 py-0.5 rounded-full tracking-wide shrink-0 ml-1 ${
+            isActive 
+              ? 'bg-white text-emerald-900 dark:bg-emerald-800 dark:text-white' 
+              : 'bg-emerald-100 text-emerald-800 border border-emerald-300/70 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+          }`}>
+            {tab.badge}
+          </span>
+        )}
+      </motion.button>
+    );
+  };
 
   // Dynamic SEO & Title synchronization
   useEffect(() => {
@@ -512,6 +598,8 @@ export default function Layout() {
 
   return (
     <>
+      {/* Keeps the farmer's crop, area and crop plan saved to their account. */}
+      <FarmProfileSync />
       {!hasOnboarded && <Onboarding onDone={() => undefined} />}
       <OfflineBanner lang={lang} />
       
@@ -659,7 +747,7 @@ export default function Layout() {
               <HomeIcon className="w-5 h-5 shrink-0" aria-hidden="true" />
               <span>{lang === 'bn' ? 'হোম (আজ)' : 'Home (Today)'}</span>
             </button>
-            {filteredPillars.length === 0 ? (
+            {filteredPillars.length === 0 && moreTabs.length === 0 ? (
               <div className="py-8 text-center px-4">
                 <div className="p-3 bg-emerald-100/60 dark:bg-white/5 rounded-2xl inline-flex text-emerald-700 dark:text-emerald-400 mb-2">
                   <Search className="w-5 h-5" />
@@ -680,7 +768,7 @@ export default function Layout() {
             ) : (
               filteredPillars.map((pillar) => {
                 const PillarIcon = pillar.icon;
-                const pillarTabs = tabs.filter(
+                const pillarTabs = mainTabs.filter(
                   (t) => t.pillar === pillar.key && matchesSearch(t)
                 );
                 if (pillarTabs.length === 0) return null;
@@ -694,100 +782,44 @@ export default function Layout() {
                           <PillarIcon className="w-3.5 h-3.5" />
                         </div>
                         <div className="min-w-0">
-                          <span className="font-bold text-xs tracking-tight text-emerald-950 dark:text-emerald-200 block truncate">
+                          <span className={`font-bold ${simple ? 'text-sm' : 'text-xs'} tracking-tight text-emerald-950 dark:text-emerald-200 block truncate`}>
                             {pillar.title}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
+                      <span className={`${simple ? 'text-sm' : 'text-[11px]'} font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0`}>
                         {pillarTabs.length}
                       </span>
                     </div>
-                    <div className="text-[11px] text-emerald-800 dark:text-emerald-300 pl-7 leading-tight mb-1 truncate">
-                      {pillar.subtitle}
-                    </div>
+                    {!simple && (
+                      <div className="text-[11px] text-emerald-800 dark:text-emerald-300 pl-7 leading-tight mb-1 truncate">
+                        {pillar.subtitle}
+                      </div>
+                    )}
 
                     {/* Subcategorized Tools in this Pillar */}
                     <div className="space-y-1">
-                      {pillarTabs.map((tab, index) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                          <motion.button
-                            key={tab.id}
-                            type="button"
-                            role="tab"
-                            initial={{ opacity: 0, x: -6 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.015, duration: 0.15 }}
-                            aria-selected={isActive}
-                            aria-controls={`panel-${tab.id}`}
-                            id={`tab-${tab.id}`}
-                            whileHover={{ x: 2 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              setActiveTab(tab.id);
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-2xl transition-all duration-150 text-left relative overflow-hidden group outline-none cursor-pointer ${
-                              isActive 
-                                ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20 dark:bg-white dark:text-emerald-950 dark:shadow-lg dark:shadow-emerald-950/40' 
-                                : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-950 dark:text-emerald-100 dark:hover:bg-white/10 dark:hover:text-white'
-                            }`}
-                          >
-                            {isActive && (
-                              <motion.div 
-                                layoutId="activeSidebarTabBg"
-                                className="absolute inset-0 bg-emerald-700 dark:bg-white"
-                                transition={{ type: "spring", bounce: 0, duration: 0.2 }}
-                              />
-                            )}
-                            
-                            <div className="relative z-10 flex items-center space-x-2.5 min-w-0 flex-1">
-                              <div className={`p-2 rounded-xl transition-colors shrink-0 ${
-                                isActive 
-                                  ? 'bg-emerald-800 text-white dark:bg-emerald-100 dark:text-emerald-800' 
-                                  : 'bg-emerald-100/80 text-emerald-700 group-hover:bg-emerald-200 dark:bg-emerald-900/60 dark:text-emerald-300 dark:group-hover:bg-white/15'
-                              }`}>
-                                <Icon className="w-4 h-4" aria-hidden="true" />
-                              </div>
-                              <div className="min-w-0 flex-1 pr-1">
-                                <div className="flex items-center space-x-1.5 truncate">
-                                  <span className={`font-bold text-xs tracking-tight truncate ${isActive ? 'text-white dark:text-emerald-950' : 'text-slate-800 dark:text-emerald-50'}`}>
-                                    {tab.name}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-1.5 mt-0.5">
-                                  <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-md tracking-tight shrink-0 ${
-                                    isActive 
-                                      ? 'bg-emerald-800/90 text-emerald-100 border border-emerald-600 dark:bg-emerald-100 dark:text-emerald-900 dark:border-emerald-300/80 font-semibold' 
-                                      : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-emerald-950/80 dark:text-emerald-300/90 dark:border-emerald-700/50'
-                                  }`}>
-                                    {tab.subcategory}
-                                  </span>
-                                  <span className={`text-[11px] truncate ${isActive ? 'text-emerald-50 dark:text-emerald-900' : 'text-slate-600 dark:text-emerald-200'}`}>
-                                    {tab.description}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {tab.badge && (
-                              <span className={`relative z-10 text-[11px] font-semibold px-2 py-0.5 rounded-full tracking-wide shrink-0 ml-1 ${
-                                isActive 
-                                  ? 'bg-white text-emerald-900 dark:bg-emerald-800 dark:text-white' 
-                                  : 'bg-emerald-100 text-emerald-800 border border-emerald-300/70 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
-                              }`}>
-                                {tab.badge}
-                              </span>
-                            )}
-                          </motion.button>
-                        );
-                      })}
+                      {pillarTabs.map(renderNavButton)}
                     </div>
                   </div>
                 );
               })
+            )}
+            {/* Simple view only: the tools that live in the full view, kept visible below the core ones. */}
+            {moreTabs.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-emerald-100 dark:border-white/10" role="group" aria-labelledby="more-services-heading">
+                <div className="px-1.5 pt-1 flex items-center justify-between">
+                  <span id="more-services-heading" className="font-bold text-sm tracking-tight text-emerald-950 dark:text-emerald-200">
+                    {lang === 'bn' ? 'আরও সেবা' : 'More services'}
+                  </span>
+                  <span className="text-sm font-semibold px-2 py-0.5 rounded-full bg-emerald-100/90 text-emerald-800 border border-emerald-200/80 dark:bg-emerald-900/90 dark:text-emerald-300 dark:border-emerald-700/40 shrink-0">
+                    {moreTabs.length}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {moreTabs.map(renderNavButton)}
+                </div>
+              </div>
             )}
           </nav>
           

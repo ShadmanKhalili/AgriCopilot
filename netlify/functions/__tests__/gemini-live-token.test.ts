@@ -75,6 +75,16 @@ describe('gemini-live-token handler', () => {
     expect(params.config.lockAdditionalFields).toContain('tools');
   });
 
+  it('locks compression but not session resumption in the token', async () => {
+    create.mockResolvedValue({ name: 'auth_tokens/xyz' });
+    await call({ kind: 'video', mode: 'quick', lang: 'bn' });
+    const params = create.mock.calls[0][0];
+    const cfg = params.config.liveConnectConstraints.config;
+    expect(cfg.contextWindowCompression.slidingWindow).toBeDefined();
+    expect(cfg.sessionResumption).toBeUndefined();
+    expect(params.config.lockAdditionalFields).not.toContain('sessionResumption');
+  });
+
   it('rejects invalid JSON and bad inputs without calling Gemini', async () => {
     const bad = await call('{not json');
     expect(bad.statusCode).toBe(400);

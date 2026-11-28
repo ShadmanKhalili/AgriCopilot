@@ -89,6 +89,8 @@ import DigitalPrescriptionModal from './DigitalPrescriptionModal';
 import { buildPrescriptionFromRecord, isSeverityUnknown, type PrescriptionData } from '../utils/prescriptionData';
 import { csvEscape } from '../utils/csv';
 import { useAuth } from './AuthProvider';
+import { auth } from '../firebase';
+import type { CheckFeature, ModelCheckReport } from '../../netlify/functions/_shared/model-check';
 import {
   BROADCAST_MAX_DAYS,
   BROADCAST_MAX_LENGTH,
@@ -1223,6 +1225,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 </table>
               </div>
             </div>
+            <AiModelCheckCard lang={lang} />
           </motion.div>
         )}
 
@@ -2275,5 +2278,146 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
       )}
 
     </div>
+  );
+}
+
+const MODEL_CHECK_FEATURE_LABEL: Record<CheckFeature, { bn: string; en: string }> = {
+  text: { bn: 'লেখা (টেক্সট)', en: 'Text answers' },
+  search: { bn: 'গুগল সার্চ টুল', en: 'Google Search tool' },
+  tts: { bn: 'কণ্ঠস্বর (পড়ে শোনানো)', en: 'Speech (read aloud)' },
+};
+
+/**
+ * Admin-only: asks the server to make a few tiny AI calls and shows which
+ * models, the Google Search tool and speech the key can use right now.
+ * Runs only when the button is pressed; the server allows one run a minute.
+ */
+function AiModelCheckCard({ lang }: { lang: Language }) {
+  const bn = lang === 'bn';
+  const [running, setRunning] = useState(false);
+  const [report, setReport] = useState<ModelCheckReport | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const run = async () => {
+    if (running) return;
+    setRunning(true);
+    setProblem(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        setProblem(bn ? 'আগে সাইন ইন করুন।' : 'Please sign in first.');
+        return;
+      }
+      const token = await user.getIdToken();
+      const response = await fetch('/api/ai-model-check', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(40_000),
+      });
+      if (response.status === 429) {
+        setProblem(bn ? 'এইমাত্র চালানো হয়েছে। এক মিনিট পর আবার চেষ্টা করুন।' : 'It was just run. Please wait a minute and try again.');
+        return;
+      }
+      if (response.status === 403 || response.status === 401) {
+        setProblem(bn ? 'এই পরীক্ষা শুধু যাচাইকৃত অ্যাডমিন চালাতে পারেন।' : 'Only the verified administrator can run this check.');
+        return;
+      }
+      if (response.status === 503) {
+        setProblem(bn ? 'সার্ভারে এআই কী সেট করা নেই।' : 'The server has no AI key set up.');
+        return;
+      }
+      if (!response.ok) {
+        setProblem(bn ? 'পরীক্ষা চালানো যায়নি। একটু পরে আবার চেষ্টা করুন।' : 'The check could not run. Please try again shortly.');
+        return;
+      }
+      setReport((await response.json()) as ModelCheckReport);
+    } catch {
+      setProblem(bn ? 'সার্ভারে পৌঁছানো যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।' : 'Could not reach the server. Check the connection and try again.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <section
+      aria-labelledby="ai-model-check-title"
+      className="bg-white dark:bg-stone-900 p-5 sm:p-6 rounded-3xl border border-stone-200 dark:border-stone-800 shadow-sm space-y-4"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
+          <h3 id="ai-model-check-title" className="font-display font-black text-base text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+            <Cpu className="w-5 h-5 shrink-0" aria-hidden="true" />
+            <span>{bn ? 'এআই মডেল পরীক্ষা' : 'AI model check'}</span>
+          </h3>
+          <p className="text-sm text-stone-700 dark:text-stone-300 max-w-2xl">
+            {bn
+              ? 'প্রতিটি এআই মডেল, গুগল সার্চ টুল ও কণ্ঠস্বর এই মুহূর্তে চলছে কি না দেখতে একটি করে ছোট কল পাঠানো হয়। কয়েক সেকেন্ড লাগে এবং সামান্য খরচ হয়। এটি নিজে থেকে চলে না।'
+              : 'Sends one tiny call to each AI model, the Google Search tool and speech to see what works right now. It takes a few seconds and costs a very small amount. It never runs by itself.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={run}
+          disabled={running}
+          className="min-h-[48px] px-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white text-sm font-bold flex items-center justify-center gap-2 cursor-pointer disabled:cursor-wait shrink-0"
+        >
+          <RefreshCw className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} aria-hidden="true" />
+          <span>
+            {running ? (bn ? 'পরীক্ষা চলছে…' : 'Checking…') : report ? (bn ? 'আবার পরীক্ষা করুন' : 'Check again') : (bn ? 'পরীক্ষা চালান' : 'Run the check')}
+          </span>
+        </button>
+      </div>
+
+      <div aria-live="polite" className="space-y-3">
+        {problem && (
+          <p role="alert" className="text-sm font-semibold text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-3">
+            {problem}
+          </p>
+        )}
+
+        {report && (
+          <>
+            <p className="text-sm font-bold text-stone-900 dark:text-stone-100">
+              {bn
+                ? `${report.results.length}টির মধ্যে ${report.passed}টি চলছে${report.failed ? `, ${report.failed}টি চলছে না` : ''}।`
+                : `${report.passed} of ${report.results.length} checks work${report.failed ? `, ${report.failed} do not` : ''}.`}
+              <span className="font-normal text-stone-600 dark:text-stone-400">
+                {' '}
+                {new Date(report.checkedAt).toLocaleTimeString(bn ? 'bn-BD' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </p>
+            <ul className="divide-y divide-stone-200 dark:divide-stone-800 rounded-2xl border border-stone-200 dark:border-stone-800">
+              {report.results.map((r) => (
+                <li key={`${r.feature}-${r.model}`} className="p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <div className="min-w-0 sm:flex-1">
+                    <div className="text-sm font-bold text-stone-900 dark:text-stone-100">{bn ? MODEL_CHECK_FEATURE_LABEL[r.feature].bn : MODEL_CHECK_FEATURE_LABEL[r.feature].en}</div>
+                    <div className="text-sm font-mono text-stone-700 dark:text-stone-300 break-all">{r.model}</div>
+                  </div>
+                  <span
+                    className={`self-start sm:self-center text-sm font-bold px-3 py-1 rounded-full border ${
+                      r.ok
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+                        : 'bg-red-50 text-red-900 border-red-300 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800'
+                    }`}
+                  >
+                    {r.ok ? (bn ? 'চলছে' : 'Works') : (bn ? 'চলছে না' : 'Not working')}
+                  </span>
+                  <div className="text-sm text-stone-700 dark:text-stone-300 sm:w-64">
+                    {r.ok
+                      ? bn ? `${r.latencyMs} মিলিসেকেন্ডে উত্তর এসেছে` : `Answered in ${r.latencyMs} ms`
+                      : <>
+                          <span>{r.message}</span>
+                          <span className="block font-mono text-stone-600 dark:text-stone-400">
+                            {r.errorCode}{r.status ? ` · ${r.status}` : ''}
+                          </span>
+                        </>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </section>
   );
 }

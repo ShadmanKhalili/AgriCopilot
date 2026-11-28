@@ -4,6 +4,13 @@ import { getLiveAiClient, LIVE_API_MODEL, LIVE_EXTENDED_THINKING_MODEL, type Liv
 import { LiveServerMessage, Modality, ThinkingLevel } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
+import {
+  createLiveReconnector,
+  liveReconnectMessage,
+  liveResilienceConfig,
+  withResumeHandle,
+  type LiveReconnector,
+} from '../utils/liveSession';
 
 interface LiveExpertCallProps {
   diagnosisContext: string;
@@ -41,6 +48,11 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const lastAiSpeechEndTimeRef = useRef<number>(0);
   const userSpeakingHangoverRef = useRef<number>(0);
   const sessionIdRef = useRef<number>(0);
+  // One number per WebSocket connection inside a call. A reconnect keeps the
+  // call (microphone, audio contexts) and bumps this, so late callbacks of the
+  // old socket are ignored.
+  const connGenRef = useRef<number>(0);
+  const reconnectorRef = useRef<LiveReconnector<any> | null>(null);
   const isStartingCallRef = useRef<boolean>(false);
   const isAiTurnInProgressRef = useRef<boolean>(false);
   // True while Gemini 3.8 Live Extended Thinking is still reasoning in the
@@ -276,6 +288,10 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
         },
         outputAudioTranscription: {},
         inputAudioTranscription: {},
+        // Compression keeps the session from ending after Google's audio
+        // limit; resumption lets a dropped or 10-minute connection carry on
+        // (see utils/liveSession).
+        ...liveResilienceConfig(),
       };
 
       if (isExtendedThinking) {
@@ -284,11 +300,19 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
         };
       }
 
-      let activeLiveSession: any = null;
+      // The model and config the CURRENT connection uses; a reconnect must use
+      // the same ones (the fallback below can change both).
+      let connectModel: string = selectedLiveModel;
+      let connectConfig: any = liveConfig;
 
-      const liveCallbacks = {
+      // One set of callbacks per connection. `isResume` is true for a
+      // reconnect, whose `onopen` must not rebuild the microphone pipeline that
+      // is still running.
+      const makeLiveCallbacks = (connGen: number, isResume: boolean) => ({
         onopen: async () => {
-          if (sessionIdRef.current !== currentSessionId) return;
+          if (sessionIdRef.current !== currentSessionId || connGenRef.current !== connGen) return;
+          if (isResume) return;
+          reconnector.markConnected();
           setIsConnected(true);
           setIsCalling(false);
           setIsRinging(false);
@@ -379,7 +403,9 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
               }
               const base64 = btoa(binary);
               
-              const currentSession = activeLiveSession || sessionRef.current;
+              // sessionRef is empty while a reconnect is in progress, so audio
+              // is dropped (not sent to a dead socket) until the new one is up.
+              const currentSession = sessionRef.current;
               if (currentSession && sessionIdRef.current === currentSessionId) {
                 try {
                   currentSession.sendRealtimeInput({
@@ -398,7 +424,12 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
           }
         },
         onmessage: (message: LiveServerMessage) => {
-          if (sessionIdRef.current !== currentSessionId) return;
+          if (sessionIdRef.current !== currentSessionId || connGenRef.current !== connGen) return;
+
+          // Resume handles and the server's "connection ends soon" notice.
+          if (message.sessionResumptionUpdate || message.goAway) {
+            reconnector.handleMessage(message);
+          }
 
           // 1. Audio stream playback
           const parts = message.serverContent?.modelTurn?.parts;
@@ -479,50 +510,108 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
             setCallStatus('listening');
           }
         },
+        // An unexpected close or error (not the farmer hanging up, which bumps
+        // sessionIdRef first) hands over to the reconnector: it resumes from the
+        // latest handle, or gives up with a message and ends the call.
         onclose: () => {
-          if (sessionIdRef.current === currentSessionId) {
-            endCall();
+          if (sessionIdRef.current === currentSessionId && connGenRef.current === connGen) {
+            reconnector.handleClose();
           }
         },
         onerror: (err: any) => {
-          if (sessionIdRef.current === currentSessionId) {
+          if (sessionIdRef.current === currentSessionId && connGenRef.current === connGen) {
             console.error("Live API Error:", err);
-            if (err?.message === 'Network error' || err instanceof Event) {
-               toast.error(lang === 'bn' ? "লাইভ এআই কল সংযোগ করতে পারেনি। দয়া করে নতুন উইন্ডোতে অ্যাপটি খুলুন বা একটু পরে আবার চেষ্টা করুন।" : "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab.");
-            }
-            endCall();
+            reconnector.handleError();
           }
         }
-      };
+      });
+
+      // Reconnects keep the microphone, audio contexts and timer running; only
+      // the WebSocket is replaced.
+      const reconnectToastId = 'live-call-reconnect';
+      const reconnector = createLiveReconnector<any, any>({
+        connect: (client, handle) => {
+          const gen = ++connGenRef.current;
+          return client.live.connect({
+            model: connectModel,
+            config: withResumeHandle(connectConfig, handle),
+            callbacks: makeLiveCallbacks(gen, true),
+          });
+        },
+        // A new token counts one more live session against the daily allowance.
+        getFreshClient: () => getLiveAiClient(connectModel, liveSessionOptions),
+        isCurrent: () => sessionIdRef.current === currentSessionId,
+        closeOld: () => {
+          // Empty sessionRef first so audio stops going to the old socket, then
+          // bump the generation so its late callbacks are ignored.
+          const old = sessionRef.current;
+          sessionRef.current = null;
+          connGenRef.current += 1;
+          try { old?.close(); } catch (e) {}
+        },
+        onReconnecting: () => {
+          // Do not mix the old connection's half-spoken turn into the new one.
+          isAiTurnInProgressRef.current = false;
+          isModelBusyRef.current = false;
+          setLiveTranscription('');
+          toast.loading(liveReconnectMessage('reconnecting', lang), { id: reconnectToastId });
+        },
+        onResumed: (session) => {
+          if (sessionIdRef.current !== currentSessionId) {
+            try { session.close(); } catch (e) {}
+            return;
+          }
+          sessionRef.current = session;
+          setCallStatus('listening');
+          toast.dismiss(reconnectToastId);
+        },
+        onGiveUp: (reason) => {
+          toast.dismiss(reconnectToastId);
+          toast.error(
+            reason === 'limit' || reason === 'resume-cap'
+              ? liveReconnectMessage(reason, lang)
+              : reason === 'never-connected' && lang !== 'bn'
+              ? "Live API connection failed. This might be due to iframe security policies. Please try opening the app in a new tab."
+              : liveReconnectMessage('failed', lang),
+            { id: 'live-call-disconnected' }
+          );
+          endCall();
+        },
+      });
+      reconnectorRef.current = reconnector;
 
       let activeSession: any = null;
+      const firstGen = ++connGenRef.current;
       try {
         activeSession = await ai.live.connect({
           model: selectedLiveModel,
           config: liveConfig,
-          callbacks: liveCallbacks
+          callbacks: makeLiveCallbacks(firstGen, false)
         });
       } catch (connectError) {
         if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
           console.warn("Live Extended Thinking connection error, falling back to Gemini 3.8 Live Extended:", connectError);
-          toast(lang === 'bn' 
-            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) কল সংযোগ করা হচ্ছে...' 
+          toast(lang === 'bn'
+            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) কল সংযোগ করা হচ্ছে...'
             : 'Connecting via Gemini 3.8 Live Extended mode...', { icon: '⚡' });
           const fallbackConfig = { ...liveConfig };
           delete fallbackConfig.thinkingConfig;
           // The first token is locked to the extended model and single-use,
           // so the fallback model needs a token of its own.
           const fallbackAi: any = await getLiveAiClient(LIVE_API_MODEL, liveSessionOptions);
+          const fallbackGen = ++connGenRef.current;
+          // A reconnect must use the model and config this connection uses.
+          connectModel = LIVE_API_MODEL;
+          connectConfig = fallbackConfig;
           activeSession = await fallbackAi.live.connect({
             model: LIVE_API_MODEL,
             config: fallbackConfig,
-            callbacks: liveCallbacks
+            callbacks: makeLiveCallbacks(fallbackGen, false)
           });
         } else {
           throw connectError;
         }
       }
-      activeLiveSession = activeSession;
       if (sessionIdRef.current !== currentSessionId) {
         try { activeSession.close(); } catch (e) {}
         return;
@@ -604,6 +693,10 @@ export function LiveExpertCall({ diagnosisContext, lang, locationContext = "Bang
   const endCall = () => {
     sessionIdRef.current += 1;
     isStartingCallRef.current = false;
+    // Cancel any pending reconnect so it cannot reopen a call the farmer ended.
+    reconnectorRef.current?.stop();
+    reconnectorRef.current = null;
+    toast.dismiss('live-call-reconnect');
     if (isConnected) {
       playSystemSound('end');
       setTimeout(() => playSystemSound('hangup'), 200);

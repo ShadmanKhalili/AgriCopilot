@@ -11,6 +11,14 @@ import { auth, ensureAiSession, getAppCheckHeader } from '../firebase';
 import { buildFarmMemoryContext } from '../utils/farmMemory';
 import { captureToDataUrl } from '../utils/imageCapture';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
+import {
+  LIVE_VIDEO_FRAME_INTERVAL_MS,
+  createLiveReconnector,
+  liveReconnectMessage,
+  liveResilienceConfig,
+  withResumeHandle,
+  type LiveReconnector,
+} from '../utils/liveSession';
 import type { LiveServerMessage } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -246,6 +254,11 @@ export default function LiveVideoCopilot({
   const lastAiSpeechEndTimeRef = useRef<number>(0);
   const userSpeakingHangoverRef = useRef<number>(0);
   const sessionIdRef = useRef<number>(0);
+  // One number per WebSocket connection inside a session. A reconnect keeps the
+  // session (camera, microphone, audio, transcript) and bumps this, so late
+  // callbacks of the old socket are ignored.
+  const connGenRef = useRef<number>(0);
+  const reconnectorRef = useRef<LiveReconnector<any> | null>(null);
   const isStartingSessionRef = useRef<boolean>(false);
   const isAiTurnInProgressRef = useRef<boolean>(false);
   // True while Gemini 3.8 Live Extended Thinking is still reasoning in the
@@ -941,6 +954,10 @@ export default function LiveVideoCopilot({
         // the same 256-token budget the old 480x360 path was already paying,
         // but the model now actually gets to see the leaf.
         mediaResolution: 'MEDIA_RESOLUTION_HIGH',
+        // Without compression Google ends a session that carries video after
+        // about two minutes; with resumption on, the server sends handles so a
+        // dropped or 10-minute connection can carry on (see utils/liveSession).
+        ...liveResilienceConfig(),
       };
 
       if (isExtendedThinking) {
@@ -949,11 +966,19 @@ export default function LiveVideoCopilot({
         };
       }
 
-      let activeLiveSession: any = null;
+      // The model and config the CURRENT connection uses; a reconnect must use
+      // the same ones (the fallback below can change both).
+      let connectModel: string = selectedLiveModel;
+      let connectConfig: any = liveConfig;
 
-      const liveCallbacks = {
+      // One set of callbacks per connection. `connGen` ties them to that
+      // connection; `isResume` is true for a reconnect, whose `onopen` must not
+      // rebuild the microphone, frame loop or timers that are still running.
+      const makeLiveCallbacks = (connGen: number, isResume: boolean) => ({
         onopen: async () => {
-          if (sessionIdRef.current !== currentSessionId) return;
+          if (sessionIdRef.current !== currentSessionId || connGenRef.current !== connGen) return;
+          if (isResume) return;
+          reconnector.markConnected();
           setIsConnecting(false);
           isStartingSessionRef.current = false;
           setIsSessionActive(true);
@@ -1037,7 +1062,9 @@ export default function LiveVideoCopilot({
               }
               const base64 = btoa(binary);
 
-              const currentSession = activeLiveSession || sessionRef.current;
+              // sessionRef is empty while a reconnect is in progress, so audio
+              // is dropped (not sent to a dead socket) until the new one is up.
+              const currentSession = sessionRef.current;
               if (currentSession && sessionIdRef.current === currentSessionId) {
                 try {
                   currentSession.sendRealtimeInput({
@@ -1062,11 +1089,11 @@ export default function LiveVideoCopilot({
             // win comes from the frame resolution and MEDIA_RESOLUTION_HIGH,
             // not from sending more frames.
             frameIntervalRef.current = setInterval(() => {
-              const currentSession = activeLiveSession || sessionRef.current;
+              const currentSession = sessionRef.current;
               if (currentSession && sessionIdRef.current === currentSessionId) {
                 sendVideoFrame(currentSession);
               }
-            }, 1000);
+            }, LIVE_VIDEO_FRAME_INTERVAL_MS);
 
             // Duration Timer
             durationIntervalRef.current = setInterval(() => {
@@ -1085,7 +1112,14 @@ export default function LiveVideoCopilot({
         },
 
         onmessage: (message: LiveServerMessage) => {
-          if (sessionIdRef.current !== currentSessionId) return;
+          if (sessionIdRef.current !== currentSessionId || connGenRef.current !== connGen) return;
+
+          // Resume handles and the server's "connection ends soon" notice.
+          // These carry no audio or text, so they are read first and the
+          // rest of the handler sees an ordinary message.
+          if (message.sessionResumptionUpdate || message.goAway) {
+            reconnector.handleMessage(message);
+          }
 
           // Discard subsequent chunks if the response was cancelled or stopped by user
           if (isAiTurnCancelledRef.current) {
@@ -1184,51 +1218,108 @@ export default function LiveVideoCopilot({
           }
         },
 
+        // An unexpected close or error (not the farmer pressing stop, which
+        // bumps sessionIdRef first) hands over to the reconnector: it resumes
+        // from the latest handle, or gives up with a message and stops.
         onclose: () => {
-          if (sessionIdRef.current === currentSessionId) {
-            stopAllMedia();
+          if (sessionIdRef.current === currentSessionId && connGenRef.current === connGen) {
+            reconnector.handleClose();
           }
         },
 
         onerror: (err: any) => {
-          if (sessionIdRef.current === currentSessionId) {
+          if (sessionIdRef.current === currentSessionId && connGenRef.current === connGen) {
             console.error("Gemini 3.8 Live Extended Error:", err);
-            toast.error(lang === 'bn' 
-              ? "লাইভ ভিডিও সংযোগে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।" 
-              : "Live video stream error. Please try again.");
-            stopAllMedia();
+            reconnector.handleError();
           }
         }
-      };
+      });
+
+      // Reconnects keep the camera, microphone, audio contexts, transcript and
+      // timers running; only the WebSocket is replaced.
+      const reconnectToastId = 'live-video-reconnect';
+      const reconnector = createLiveReconnector<any, any>({
+        connect: (client, handle) => {
+          const gen = ++connGenRef.current;
+          return client.live.connect({
+            model: connectModel,
+            config: withResumeHandle(connectConfig, handle),
+            callbacks: makeLiveCallbacks(gen, true),
+          });
+        },
+        // A new token counts one more live session against the daily allowance.
+        getFreshClient: () => getLiveAiClient(connectModel, liveSessionOptions),
+        isCurrent: () => sessionIdRef.current === currentSessionId,
+        closeOld: () => {
+          // Empty sessionRef first so audio and frames stop going to the old
+          // socket, then bump the generation so its late callbacks are ignored.
+          const old = sessionRef.current;
+          sessionRef.current = null;
+          connGenRef.current += 1;
+          try { old?.close(); } catch (e) {}
+        },
+        onReconnecting: () => {
+          // Do not mix the old connection's half-spoken turn into the new one.
+          flushRemainingModelText();
+          isAiTurnInProgressRef.current = false;
+          isModelBusyRef.current = false;
+          isAiTurnCancelledRef.current = false;
+          toast.loading(liveReconnectMessage('reconnecting', lang), { id: reconnectToastId });
+        },
+        onResumed: (session) => {
+          if (sessionIdRef.current !== currentSessionId) {
+            try { session.close(); } catch (e) {}
+            return;
+          }
+          sessionRef.current = session;
+          setLiveState('listening');
+          toast.dismiss(reconnectToastId);
+        },
+        onGiveUp: (reason) => {
+          toast.dismiss(reconnectToastId);
+          toast.error(
+            reason === 'limit' || reason === 'resume-cap'
+              ? liveReconnectMessage(reason, lang)
+              : liveReconnectMessage('failed', lang),
+            { id: 'live-video-disconnected' }
+          );
+          stopAllMedia();
+        },
+      });
+      reconnectorRef.current = reconnector;
 
       let activeSession: any = null;
+      const firstGen = ++connGenRef.current;
       try {
         activeSession = await ai.live.connect({
           model: selectedLiveModel,
           config: liveConfig,
-          callbacks: liveCallbacks
+          callbacks: makeLiveCallbacks(firstGen, false)
         });
       } catch (connectError) {
         if (isExtendedThinking && sessionIdRef.current === currentSessionId) {
           console.warn("Live Video Extended Thinking connection error, falling back to Gemini 3.8 Live Extended:", connectError);
-          toast(lang === 'bn' 
-            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) ভিডিও সংযোগ করা হচ্ছে...' 
+          toast(lang === 'bn'
+            ? 'লাইভ এক্সটেন্ডেড মডেলে (Gemini 3.8 Live Extended) ভিডিও সংযোগ করা হচ্ছে...'
             : 'Connecting via Gemini 3.8 Live Extended video mode...', { icon: '⚡' });
           const fallbackConfig = { ...liveConfig };
           delete fallbackConfig.thinkingConfig;
           // The first token is locked to the extended model and single-use,
           // so the fallback model needs a token of its own.
           const fallbackAi: any = await getLiveAiClient(LIVE_API_MODEL, liveSessionOptions);
+          const fallbackGen = ++connGenRef.current;
+          // A reconnect must use the model and config this connection uses.
+          connectModel = LIVE_API_MODEL;
+          connectConfig = fallbackConfig;
           activeSession = await fallbackAi.live.connect({
             model: LIVE_API_MODEL,
             config: fallbackConfig,
-            callbacks: liveCallbacks
+            callbacks: makeLiveCallbacks(fallbackGen, false)
           });
         } else {
           throw connectError;
         }
       }
-      activeLiveSession = activeSession;
       if (sessionIdRef.current !== currentSessionId) {
         try { activeSession.close(); } catch (e) {}
         return;
@@ -1444,6 +1535,10 @@ Return a JSON object with this exact structure:
     setIsFullscreen(false);
     sessionIdRef.current += 1;
     isStartingSessionRef.current = false;
+    // Cancel any pending reconnect so it cannot reopen a session the farmer ended.
+    reconnectorRef.current?.stop();
+    reconnectorRef.current = null;
+    toast.dismiss('live-video-reconnect');
     releaseWakeLock();
     if (frameIntervalRef.current) {
       clearInterval(frameIntervalRef.current);

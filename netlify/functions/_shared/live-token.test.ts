@@ -130,6 +130,34 @@ describe('buildLiveTokenParams', () => {
     expect(cfg.tools).toBeUndefined();
   });
 
+  it('locks context window compression and leaves session resumption unlocked', () => {
+    const params = buildLiveTokenParams(request(), 'gemini-3.8-live', times);
+    const cfg = params.config.liveConnectConstraints.config as any;
+    expect(cfg.contextWindowCompression).toEqual({
+      triggerTokens: '50000',
+      slidingWindow: { targetTokens: '25000' },
+    });
+    // The browser passes its resume handle in sessionResumption, so the lock must not name it.
+    expect(cfg.sessionResumption).toBeUndefined();
+    expect(params.config.lockAdditionalFields).not.toContain('sessionResumption');
+    expect(JSON.stringify(params)).not.toMatch(/sessionResumption/);
+    // The target is below the trigger, as the SDK type requires.
+    expect(Number(cfg.contextWindowCompression.slidingWindow.targetTokens)).toBeLessThan(
+      Number(cfg.contextWindowCompression.triggerTokens)
+    );
+    // Instruction and tools stay locked as before.
+    expect(typeof cfg.systemInstruction).toBe('string');
+    expect(params.config.lockAdditionalFields).toContain('tools');
+  });
+
+  it('can build the token without the compression lock', () => {
+    const params = buildLiveTokenParams(request(), 'gemini-3.8-live', times, { lockCompression: false });
+    const cfg = params.config.liveConnectConstraints.config as any;
+    expect(cfg.contextWindowCompression).toBeUndefined();
+    expect(typeof cfg.systemInstruction).toBe('string');
+    expect(params.config.lockAdditionalFields).toContain('tools');
+  });
+
   it('builds the instruction from the server template, farm context and safety rules', () => {
     const cfg = buildLiveTokenParams(request({ locationContext: 'Rangpur' }), 'gemini-3.8-live', times).config
       .liveConnectConstraints.config as any;
@@ -196,6 +224,39 @@ describe('issueLiveToken', () => {
     const r = await issueLiveToken(client, 'u1', 'tok', { ...valid, lang: 'en' }, false);
     expect(r).toMatchObject({ ok: false, status: 429, code: 'LIVE_SESSIONS_LIMIT' });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('locks compression in the token it mints', async () => {
+    const { client, create } = makeClient();
+    await issueLiveToken(client, 'u1', 'tok', valid, false);
+    const params = (create.mock.calls[0] as any[])[0];
+    expect(params.config.liveConnectConstraints.config.contextWindowCompression.slidingWindow).toBeDefined();
+  });
+
+  it('mints once more without the compression lock when Gemini rejects the locked field', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(quota.recordAiUsage).mockClear();
+    const create = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('400 INVALID_ARGUMENT: bad field mask'), { status: 400 }))
+      .mockResolvedValueOnce({ name: 'auth_tokens/second' });
+    const r = await issueLiveToken({ authTokens: { create } }, 'u1', 'tok', valid, false);
+    expect(r).toMatchObject({ ok: true, token: 'auth_tokens/second' });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect((create.mock.calls[0] as any[])[0].config.liveConnectConstraints.config.contextWindowCompression).toBeDefined();
+    const retry = (create.mock.calls[1] as any[])[0];
+    expect(retry.config.liveConnectConstraints.config.contextWindowCompression).toBeUndefined();
+    expect(retry.config.liveConnectConstraints.config.systemInstruction).toBeTruthy();
+    expect(retry.config.lockAdditionalFields).toContain('tools');
+    // The usage was counted once, not once per mint.
+    expect(quota.recordAiUsage).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('does not retry other token-service failures', async () => {
+    const create = vi.fn().mockRejectedValue(Object.assign(new Error('503 unavailable'), { status: 503 }));
+    await expect(issueLiveToken({ authTokens: { create } }, 'u1', 'tok', valid, false)).rejects.toThrow();
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('lets a token-service failure propagate so the handler can log it and answer generically', async () => {

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { HOME_TAB, TAB_IDS, TAB_LEVEL, hashForTab, isTabInMode, tabFromHash } from './tabs';
+import {
+  HOME_TAB,
+  TAB_IDS,
+  TAB_LEVEL,
+  hashForTab,
+  isTabInMode,
+  partitionTabsByMode,
+  tabFromHash,
+} from './tabs';
 
 describe('tabFromHash', () => {
   it('treats an empty hash as home', () => {
@@ -47,5 +55,52 @@ describe('tool layers', () => {
     expect(isTabInMode('weather-advisory', 'simple')).toBe(true);
     expect(isTabInMode('admin-dashboard', 'simple')).toBe(false);
     expect(isTabInMode('smart-planting', 'simple')).toBe(false);
+  });
+
+  it('lists the six simple tools in simple mode', () => {
+    const simple = TAB_IDS.filter((tab) => isTabInMode(tab, 'simple'));
+    expect(simple).toEqual([
+      'home',
+      'agri-copilot',
+      'market-connect',
+      'weather-advisory',
+      'expert-hub',
+      'profile',
+    ]);
+  });
+});
+
+describe('partitionTabsByMode', () => {
+  const items = TAB_IDS.map((id) => ({ id }));
+
+  it('puts the simple tools first and the rest under "more" in simple mode', () => {
+    const { main, more } = partitionTabsByMode(items, 'simple');
+    expect(main.map((i) => i.id)).toEqual([
+      'home',
+      'agri-copilot',
+      'market-connect',
+      'weather-advisory',
+      'expert-hub',
+      'profile',
+    ]);
+    expect(more.map((i) => i.id)).toContain('smart-planting');
+    expect(more.map((i) => i.id)).toContain('admin-dashboard');
+    // Nothing is lost: every tool is in exactly one group.
+    expect(main.length + more.length).toBe(items.length);
+    expect(main.some((i) => more.includes(i))).toBe(false);
+  });
+
+  it('shows everything in main and nothing under "more" in full mode', () => {
+    const { main, more } = partitionTabsByMode(items, 'full');
+    expect(main).toHaveLength(items.length);
+    expect(more).toEqual([]);
+  });
+
+  it('never invents the admin tool: it only appears when the caller passes it in', () => {
+    const noAdmin = items.filter((i) => i.id !== 'admin-dashboard');
+    for (const mode of ['simple', 'full'] as const) {
+      const { main, more } = partitionTabsByMode(noAdmin, mode);
+      expect([...main, ...more].some((i) => i.id === 'admin-dashboard')).toBe(false);
+    }
   });
 });

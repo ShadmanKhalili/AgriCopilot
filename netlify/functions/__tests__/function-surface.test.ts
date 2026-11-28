@@ -116,6 +116,20 @@ describe('netlify/functions surface', () => {
     }
   });
 
+  it('keeps the admin model check admin-only, rate-limited and on a custom path', () => {
+    const source = readFileSync(path.join(FUNCTIONS_DIR, 'ai-model-check.ts'), 'utf8');
+    expect(source).toContain("path: '/api/ai-model-check'");
+    expect(source).toMatch(/rateLimit:\s*\{/);
+    expect(source).not.toMatch(/Access-Control-Allow-Origin/i);
+    // The token check and the admin check both come before the key is read.
+    const authAt = source.indexOf('authenticate(request)');
+    const adminAt = source.indexOf('isAdminUser(user)');
+    const keyAt = source.indexOf('process.env.GEMINI_API_KEY');
+    expect(authAt).toBeGreaterThan(-1);
+    expect(adminAt).toBeGreaterThan(authAt);
+    expect(keyAt).toBeGreaterThan(adminAt);
+  });
+
   it.each(subDirs)('subdirectory %s is not treated as a function', (dir) => {
     const inner = readdirSync(path.join(FUNCTIONS_DIR, dir));
     const offending = inner.filter((f) => {
