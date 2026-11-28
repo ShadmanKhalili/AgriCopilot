@@ -10,11 +10,11 @@ const state = vi.hoisted(() => ({
   writes: [] as any[],
 }));
 
-vi.mock('./_shared/auth.ts', () => ({
+vi.mock('../_shared/auth.ts', () => ({
   authenticate: async () => ({ user: state.user }),
 }));
 
-vi.mock('./_shared/record-facts.ts', () => ({
+vi.mock('../_shared/record-facts.ts', () => ({
   gatherFarmRecordFacts: async () => ({
     plots: 1,
     seasons: 1,
@@ -28,7 +28,7 @@ vi.mock('./_shared/record-facts.ts', () => ({
   }),
 }));
 
-vi.mock('./_shared/service-account.ts', async (importOriginal) => {
+vi.mock('../_shared/service-account.ts', async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
@@ -45,8 +45,8 @@ vi.mock('./_shared/service-account.ts', async (importOriginal) => {
   };
 });
 
-import handler from './farm-record-score';
-import { toFirestoreValue } from './_shared/service-account.ts';
+import handler from '../farm-record-score';
+import { toFirestoreValue } from '../_shared/service-account.ts';
 
 const post = () => new Request('https://example.test/api/farm-record-score', { method: 'POST' });
 
