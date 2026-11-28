@@ -27,5 +27,10 @@ jobs:
         run: npm run lint
       - name: Tests
         run: npm test
+      - name: Bundle Netlify functions
+        # Netlify deploys every top-level file in netlify/functions as a
+        # function and bundles each with esbuild. Do the same here so a broken
+        # import or syntax error fails the PR, not the deploy.
+        run: npx esbuild netlify/functions/*.ts --bundle --platform=node --format=esm --outdir="$RUNNER_TEMP/fn" --log-level=warning
       - name: Build
         run: npm run build

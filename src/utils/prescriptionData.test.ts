@@ -5,6 +5,7 @@ import {
   normalizeSeverity,
   isSeverityUnknown,
   stableRxId,
+  toStorablePrescription,
   SEVERITY_NOT_ASSESSED,
 } from './prescriptionData';
 import { ESCALATION_THRESHOLD } from './diagnosisTypes';
@@ -89,6 +90,47 @@ describe('severity is never invented', () => {
     expect(normalizeSeverity('N/A')).toBe(SEVERITY_NOT_ASSESSED);
     expect(normalizeSeverity('যাচাই করা হয়নি (Not Assessed)')).toBe(SEVERITY_NOT_ASSESSED);
     expect(isSeverityUnknown('High')).toBe(false);
+  });
+});
+
+describe('toStorablePrescription (what firestore.rules accepts)', () => {
+  const base = buildPrescriptionData({ diagnosis: diagnosisWith(), deepDiagnosis: protocol, lang: 'en' });
+  const KEYS = [
+    'rxId', 'userId', 'farmerName', 'crop', 'diseaseName', 'severity', 'confidence', 'confidenceAssessed',
+    'location', 'createdAt', 'verified', 'pathogen', 'cropStage', 'symptoms', 'culturalSteps', 'organicSteps',
+    'chemicalSteps', 'chemicalGated', 'harvestIntervalDays', 'differentialDiagnosis',
+  ];
+
+  it('is never verified and only writes fields the rule lists', () => {
+    const doc = toStorablePrescription({ ...base, expertVerified: true }, 'u1', 'Rahim');
+    expect(doc.verified).toBe(false);
+    expect(Object.keys(doc).every((key) => KEYS.includes(key))).toBe(true);
+    expect(doc).not.toHaveProperty('verifiedAt');
+    expect(doc).not.toHaveProperty('verifiedBy');
+  });
+
+  it('drops leading formula characters and cuts text to the rule limits', () => {
+    const doc = toStorablePrescription(
+      { ...base, crop: '=HYPERLINK("x")', diseaseName: 'x'.repeat(400), location: '+88 Dhaka', pathogen: '-cmd' },
+      'u1',
+      '@evil'
+    );
+    expect(doc.farmerName).toBe('evil');
+    expect(doc.crop).toBe('HYPERLINK("x")');
+    expect(doc.location).toBe('88 Dhaka');
+    expect(doc.pathogen).toBe('cmd');
+    expect((doc.diseaseName as string).length).toBe(256);
+  });
+
+  it('keeps Bangla text and caps list sizes', () => {
+    const doc = toStorablePrescription(
+      { ...base, crop: 'ধান', symptoms: Array.from({ length: 80 }, (_, i) => `s${i}`) },
+      'u1',
+      ''
+    );
+    expect(doc.crop).toBe('ধান');
+    expect(doc.farmerName).toBe('Registered Grower');
+    expect((doc.symptoms as string[]).length).toBe(50);
   });
 });
 

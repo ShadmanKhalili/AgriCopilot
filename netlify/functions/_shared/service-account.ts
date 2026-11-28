@@ -70,6 +70,13 @@ const projectId = (): string =>
 export const firestoreBase = (): string =>
   `https://firestore.googleapis.com/v1/projects/${projectId()}/databases/${DATABASE_ID}`;
 
+/**
+ * Full resource name of a document, as `documents:commit` wants it:
+ * `firestoreDocumentName('area_raw/x')` is `projects/P/databases/D/documents/area_raw/x`.
+ */
+export const firestoreDocumentName = (path: string): string =>
+  `projects/${projectId()}/databases/${DATABASE_ID}/documents/${path.replace(/^\/+/, '')}`;
+
 const b64url = (input: Buffer | string): string =>
   Buffer.from(input).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 

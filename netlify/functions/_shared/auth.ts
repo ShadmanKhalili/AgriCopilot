@@ -31,6 +31,11 @@ export interface VerifiedUser {
    * whose address was never verified. These get the smaller guest allowance.
    */
   isGuest: boolean;
+  /**
+   * When the account was created, in epoch milliseconds, from the same
+   * `accounts:lookup` record. Null when Google did not say.
+   */
+  createdAtMs?: number | null;
 }
 
 /**
@@ -47,6 +52,12 @@ export const isGuestAccount = (record: any): boolean => {
   const email = record?.email ? String(record.email).toLowerCase() : '';
   if (!email || email.endsWith('@agri.local')) return true;
   return !record?.emailVerified;
+};
+
+/** Creation time of an `accounts:lookup` record (a string of epoch milliseconds), or null. */
+export const accountCreatedAtMs = (record: any): number | null => {
+  const ms = Number(record?.createdAt);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
 };
 
 /**
@@ -90,6 +101,7 @@ export const verifyIdToken = async (idToken: string): Promise<VerifiedUser | nul
       email: user.email ? String(user.email) : null,
       emailVerified: !!user.emailVerified,
       isGuest: isGuestAccount(user),
+      createdAtMs: accountCreatedAtMs(user),
     };
   } catch {
     return null;

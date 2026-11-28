@@ -73,7 +73,10 @@ The first time the reminder runs, if the index is missing, its log shows an erro
 
 ## 7. Privacy notes
 
-- Area summaries hold only counts, dates and prices, plus crop and problem names. They never hold names, phone numbers or user IDs.
+- Area summaries (`area_summaries`) hold only groups that 3 or more different farmers stand behind: a count, the date of the latest report, and for prices a rounded average and range. They never hold one farmer's day or price, names, phone numbers or user IDs. The date of the last update is a day, not a time. The server rebuilds the summary on every report, so a group that falls below 3 farmers or out of the 14-day window disappears.
+- Each farmer's own day and price are kept in `area_raw` (one document per upazila), which no one in the app can read.
+- A problem report is accepted only for a place, crop and disease in the app's own lists, and only when the same account saved a diagnosis for that disease in that upazila in the last 14 days. The notification text is built from the app's own names, never from what the app sent. If you change the places, crops or diseases in the app, run `npx tsx scripts/gen-area-catalog.ts` (a test fails when the list is out of date).
+- Summaries written by earlier versions held one date per farmer. The app ignores them; delete the `area_summaries` collection once after this version is live (Firebase console, Firestore Database, area_summaries, Delete collection), because those old documents still hold the per-farmer dates for anyone who reads them directly. Counts start again from zero after this; the first 3 reports of a problem rebuild each warning.
 - Records of who reported are stored under a one-way code, made from the user ID and a secret server key. The code cannot be turned back into a user ID. Anyone holding the service-account key could still check a known user, so keep that key private.
 - No one in the app can read who reported. The database rules block all reads of those records.
 - Keep the service-account key and the VAPID private key secret. Never paste them into chat, email or code.

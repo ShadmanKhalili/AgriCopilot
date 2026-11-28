@@ -4,47 +4,55 @@
  * run it against a fake database.
  *
  * Layout (see area-model.ts):
- *   area_reporters/{groupKey}__{anonymousId}   private: {groupKey, day, pricePerMon?}
- *   area_reporters/quota__{anonymousId}        private: {day, count}  (reports sent today)
- *   area_summaries/{areaKey}                   public to signed-in users: counts and prices only
+ *   area_raw/{areaKey}                  PRIVATE: every farmer's latest day and price, per problem / crop
+ *   area_reporters/quota__{anonymousId} PRIVATE: {day, count}  (reports sent today)
+ *   area_summaries/{areaKey}            signed-in read: aggregates of groups with 3+ farmers only
  *
- * A report is stored in four steps:
- *   1. If this farmer already reported this group today, stop (no rewrite).
- *   2. If this farmer has already sent the daily maximum, stop.
- *   3. Write the farmer's reporter document (one per farmer per group, so a
- *      farmer who reports again only moves their own day forward).
- *   4. Read every reporter of the group, rebuild that one entry and patch it
- *      into the summary with an updateMask that names only that entry, so
- *      reports for other problems arriving at the same moment never overwrite
- *      each other.
+ * A report is stored like this, as one optimistic transaction:
+ *   1. Read the farmer's quota document and the area's raw document, each
+ *      with its `updateTime`.
+ *   2. If this farmer already reported this group today, stop (no rewrite).
+ *      If this farmer has already sent the daily maximum, stop.
+ *   3. Drop everything outside the 14-day window, add this report, and build
+ *      the summary again from scratch, so a group that has fallen below 3
+ *      farmers (or out of the window) disappears from the published summary.
+ *   4. Commit the quota, the raw document and the summary in ONE
+ *      `documents:commit`. The quota and the raw document carry a
+ *      precondition on the `updateTime` read in step 1 (or "must not exist"),
+ *      so when two reports arrive at the same moment, one is refused and
+ *      starts again from step 1. The daily limit therefore cannot be
+ *      overshot, and no report can overwrite another's.
  */
 
 import {
+  AREA_MAX_GROUPS,
   AREA_MIN_FARMERS,
-  pricesFromReporters,
-  problemFromReporters,
-  problemKey,
+  AREA_SUMMARY_VERSION,
+  buildPublished,
+  emptyRaw,
+  farmersInGroup,
+  groupKeyIn,
+  pruneRaw,
+  withReport,
+  type AreaRaw,
   type CleanAreaReport,
-  type ReporterEntry,
 } from './area-model.ts';
 import { fromFirestoreDocument, toFirestoreValue } from './service-account.ts';
 
 /** Most reports one farmer may send in a Dhaka day. */
 export const MAX_REPORTS_PER_DAY = 20;
-/** Most reporter documents read for one group. */
-export const MAX_REPORTERS_READ = 200;
-/** Most problems (or most crops with prices) kept in one area's summary. */
-export const MAX_SUMMARY_KEYS = 120;
+/** Times a report starts over when another report changed the same documents. */
+export const MAX_ATTEMPTS = 5;
 
 export interface AreaStoreDeps {
   /** Firestore REST as the service account; `path` starts after the database root. */
   adminFetch: (path: string, init?: RequestInit) => Promise<Response>;
   /** Stable private code for a user (never the uid itself). */
   anonymousId: (uid: string) => string;
+  /** Full resource name of a document, e.g. `projects/p/databases/d/documents/area_raw/x`. */
+  documentName: (path: string) => string;
   /** Today in Dhaka, 'YYYY-MM-DD'. */
   today: string;
-  /** Overridable clock for `updatedAt`. */
-  now?: () => Date;
 }
 
 export type AreaStoreResult =
@@ -52,152 +60,151 @@ export type AreaStoreResult =
   | { status: 'repeat' }
   | { status: 'limited' };
 
-const SIMPLE_SEGMENT = /^[a-zA-Z_][a-zA-Z_0-9]*$/;
-
-/** A Firestore field path, backtick-quoting any segment that is not a plain identifier. */
-export const fieldPath = (...segments: string[]): string =>
-  segments
-    .map((segment) =>
-      SIMPLE_SEGMENT.test(segment) ? segment : `\`${segment.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``
-    )
-    .join('.');
-
 const fail = (what: string, response: Response): never => {
   throw new Error(`area_store_${what}_${response.status}`);
 };
 
-const docPath = (collection: string, id: string): string => `/documents/${collection}/${encodeURIComponent(id)}`;
+const encode = (id: string): string => encodeURIComponent(id);
 
-const getDoc = async (deps: AreaStoreDeps, collection: string, id: string): Promise<Record<string, unknown> | null> => {
-  const response = await deps.adminFetch(docPath(collection, id));
-  if (response.status === 404) return null;
+interface Loaded {
+  data: Record<string, unknown> | null;
+  /** The document's `updateTime`, or null when it does not exist yet. */
+  updateTime: string | null;
+}
+
+const load = async (deps: AreaStoreDeps, collection: string, id: string): Promise<Loaded> => {
+  const response = await deps.adminFetch(`/documents/${collection}/${encode(id)}`);
+  if (response.status === 404) return { data: null, updateTime: null };
   if (!response.ok) return fail('read', response);
-  return fromFirestoreDocument(await response.json());
+  const document: any = await response.json();
+  return {
+    data: fromFirestoreDocument(document),
+    updateTime: typeof document?.updateTime === 'string' ? document.updateTime : null,
+  };
 };
 
-/** Create or replace a whole document. */
-const putDoc = async (deps: AreaStoreDeps, collection: string, id: string, data: Record<string, unknown>) => {
-  const response = await deps.adminFetch(docPath(collection, id), {
-    method: 'PATCH',
-    body: JSON.stringify({
-      fields: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)])),
-    }),
-  });
-  if (!response.ok) fail('write', response);
-};
+const record = (value: unknown): Record<string, any> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, any>) : {};
 
-/** Every reporter document of one group, with the document id of each. */
-const readGroup = async (deps: AreaStoreDeps, groupKey: string): Promise<Array<{ id: string; entry: ReporterEntry }>> => {
-  const response = await deps.adminFetch('/documents:runQuery', {
-    method: 'POST',
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'area_reporters' }],
-        where: {
-          fieldFilter: { field: { fieldPath: 'groupKey' }, op: 'EQUAL', value: { stringValue: groupKey } },
-        },
-        limit: MAX_REPORTERS_READ,
-      },
-    }),
-  });
-  if (!response.ok) return fail('query', response);
-  const rows: any[] = await response.json();
-  const result: Array<{ id: string; entry: ReporterEntry }> = [];
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (!row?.document) continue;
-    const data = fromFirestoreDocument(row.document);
-    if (typeof data.day !== 'string') continue;
-    const id = String(row.document.name || '').split('/').pop() || '';
-    result.push({
-      id,
-      entry: {
-        day: data.day,
-        ...(typeof data.pricePerMon === 'number' ? { pricePerMon: data.pricePerMon } : {}),
-      },
-    });
+/** The raw document as a typed object. Anything that is not shaped as expected is ignored. */
+export const parseRaw = (data: Record<string, unknown> | null): AreaRaw => {
+  const raw = emptyRaw();
+  if (!data) return raw;
+  const reportersOf = (value: unknown) => {
+    const out: Record<string, { day: string; pricePerMon?: number }> = {};
+    for (const [who, entry] of Object.entries(record(value))) {
+      const e = record(entry);
+      if (typeof e.day !== 'string') continue;
+      out[who] = { day: e.day, ...(typeof e.pricePerMon === 'number' ? { pricePerMon: e.pricePerMon } : {}) };
+    }
+    return out;
+  };
+  for (const [key, group] of Object.entries(record(data.problems))) {
+    const g = record(group);
+    raw.problems[key] = { crop: String(g.crop ?? ''), diseaseKey: String(g.diseaseKey ?? ''), reporters: reportersOf(g.reporters) };
   }
-  return result;
+  for (const [key, group] of Object.entries(record(data.prices))) {
+    const g = record(group);
+    raw.prices[key] = { crop: String(g.crop ?? ''), reporters: reportersOf(g.reporters) };
+  }
+  return raw;
 };
 
-const countFarmers = (report: CleanAreaReport, entries: ReporterEntry[], today: string): number =>
-  report.kind === 'problem'
-    ? problemFromReporters(report, entries, today).reporterDays.length
-    : pricesFromReporters(entries, today).length;
+const fieldsOf = (data: Record<string, unknown>): Record<string, any> =>
+  Object.fromEntries(Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)]));
 
-/** Store one clean report for this user. Throws when Firestore refuses. */
+const precondition = (updateTime: string | null) => (updateTime ? { updateTime } : { exists: false });
+
+/** True when Firestore refused a commit because another write got there first. */
+const isConflict = async (response: Response): Promise<boolean> => {
+  if (response.status === 409 || response.status === 412) return true;
+  if (response.status !== 400) return false;
+  try {
+    const body: any = await response.clone().json();
+    return body?.error?.status === 'FAILED_PRECONDITION';
+  } catch {
+    return false;
+  }
+};
+
+/** Store one clean, validated report for this user. Throws when Firestore refuses. */
 export const recordAreaReport = async (
   deps: AreaStoreDeps,
   report: CleanAreaReport,
   uid: string
 ): Promise<AreaStoreResult> => {
   const who = deps.anonymousId(uid);
-  const reporterId = `${report.groupKey}__${who}`;
   const today = deps.today;
-
-  // 1. Already reported this group today: nothing to do.
-  const existing = await getDoc(deps, 'area_reporters', reporterId);
-  if (existing && existing.day === today) return { status: 'repeat' };
-
-  // 2. Daily maximum per farmer.
-  const quotaId = `quota__${who}`;
-  const quota = await getDoc(deps, 'area_reporters', quotaId);
-  const usedToday = quota && quota.day === today && typeof quota.count === 'number' ? quota.count : 0;
-  if (usedToday >= MAX_REPORTS_PER_DAY) return { status: 'limited' };
-
-  // 3. This farmer's own entry.
-  const own: ReporterEntry = { day: today, ...(report.kind === 'price' ? { pricePerMon: report.pricePerMon } : {}) };
-  await putDoc(deps, 'area_reporters', reporterId, {
-    groupKey: report.groupKey,
-    day: today,
-    ...(report.kind === 'price' ? { pricePerMon: report.pricePerMon } : {}),
-  });
-  await putDoc(deps, 'area_reporters', quotaId, { day: today, count: usedToday + 1 });
-
-  // 4. Rebuild this one summary entry from everyone's reports.
-  const group = await readGroup(deps, report.groupKey);
-  const others = group.filter((row) => row.id !== reporterId).map((row) => row.entry);
-  const before = existing
-    ? [...others, { day: String(existing.day), ...(typeof existing.pricePerMon === 'number' ? { pricePerMon: existing.pricePerMon } : {}) }]
-    : others;
-  const after = [...others, own];
-  const farmersBefore = countFarmers(report, before, today);
-  const farmersAfter = countFarmers(report, after, today);
-
-  const key = report.kind === 'problem' ? problemKey(report.crop, report.diseaseKey) : report.crop;
+  const key = groupKeyIn(report);
   if (!key) throw new Error('area_store_bad_key');
   const section = report.kind === 'problem' ? 'problems' : 'prices';
+  const quotaId = `quota__${who}`;
 
-  // Keys come from what farmers send, so one area's summary could slowly
-  // fill with made-up crops or problems. Past a cap, a new key is not added
-  // (its private reporter entry is still kept); existing keys still update.
-  const summary = await getDoc(deps, 'area_summaries', report.areaKey);
-  const sectionMap = summary && typeof summary[section] === 'object' && summary[section] ? (summary[section] as Record<string, unknown>) : {};
-  if (!(key in sectionMap) && Object.keys(sectionMap).length >= MAX_SUMMARY_KEYS) {
-    return { status: 'stored', farmers: farmersAfter, crossedThreshold: false };
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const [quota, rawDoc] = await Promise.all([
+      load(deps, 'area_reporters', quotaId),
+      load(deps, 'area_raw', report.areaKey),
+    ]);
+
+    // Already reported this group today: nothing to do.
+    const raw = pruneRaw(parseRaw(rawDoc.data), today);
+    const group = report.kind === 'problem' ? raw.problems[key] : raw.prices[key];
+    if (group?.reporters?.[who]?.day === today) return { status: 'repeat' };
+
+    // Daily maximum per farmer.
+    const usedToday =
+      quota.data && quota.data.day === today && typeof quota.data.count === 'number' ? quota.data.count : 0;
+    if (usedToday >= MAX_REPORTS_PER_DAY) return { status: 'limited' };
+
+    const farmersBefore = farmersInGroup(raw, report, today);
+
+    // An area never holds more groups than this, whatever is sent.
+    if (!group && Object.keys(raw[section]).length >= AREA_MAX_GROUPS) {
+      return { status: 'stored', farmers: farmersBefore, crossedThreshold: false };
+    }
+
+    const next = withReport(raw, report, who, today);
+    const farmersAfter = farmersInGroup(next, report, today);
+    const published = buildPublished(next, today);
+
+    const response = await deps.adminFetch('/documents:commit', {
+      method: 'POST',
+      body: JSON.stringify({
+        writes: [
+          {
+            update: { name: deps.documentName(`area_reporters/${quotaId}`), fields: fieldsOf({ day: today, count: usedToday + 1 }) },
+            currentDocument: precondition(quota.updateTime),
+          },
+          {
+            update: { name: deps.documentName(`area_raw/${report.areaKey}`), fields: fieldsOf({ ...next, updatedAt: today }) },
+            currentDocument: precondition(rawDoc.updateTime),
+          },
+          {
+            // A whole-document replace: it also removes the fields of an older summary.
+            update: {
+              name: deps.documentName(`area_summaries/${report.areaKey}`),
+              fields: fieldsOf({
+                version: AREA_SUMMARY_VERSION,
+                district: report.district,
+                upazila: report.upazila,
+                problems: published.problems,
+                prices: published.prices,
+                updatedAt: today,
+              }),
+            },
+          },
+        ],
+      }),
+    });
+    if (response.ok) {
+      return {
+        status: 'stored',
+        farmers: farmersAfter,
+        crossedThreshold: report.kind === 'problem' && farmersBefore < AREA_MIN_FARMERS && farmersAfter >= AREA_MIN_FARMERS,
+      };
+    }
+    if (await isConflict(response)) continue;
+    return fail('commit', response);
   }
-  const value =
-    report.kind === 'problem' ? problemFromReporters(report, after, today) : pricesFromReporters(after, today);
-
-  const updatedAt = (deps.now ? deps.now() : new Date()).toISOString();
-  const params = [fieldPath(section, key), 'district', 'upazila', 'updatedAt']
-    .map((path) => `updateMask.fieldPaths=${encodeURIComponent(path)}`)
-    .join('&');
-  const response = await deps.adminFetch(`${docPath('area_summaries', report.areaKey)}?${params}`, {
-    method: 'PATCH',
-    body: JSON.stringify({
-      fields: {
-        district: toFirestoreValue(report.district),
-        upazila: toFirestoreValue(report.upazila),
-        updatedAt: toFirestoreValue(updatedAt),
-        [section]: { mapValue: { fields: { [key]: toFirestoreValue(value) } } },
-      },
-    }),
-  });
-  if (!response.ok) fail('summary', response);
-
-  return {
-    status: 'stored',
-    farmers: farmersAfter,
-    crossedThreshold: report.kind === 'problem' && farmersBefore < AREA_MIN_FARMERS && farmersAfter >= AREA_MIN_FARMERS,
-  };
+  throw new Error('area_store_conflict');
 };

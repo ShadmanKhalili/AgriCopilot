@@ -1506,6 +1506,9 @@ export default function AgriCopilot({
       // has already been given.
       const effectiveUid = sessionUser?.uid || 'guest_farmer_demo';
       const cropTitle = crop ? crop.trim() : '';
+      const severityBn = ({ Low: 'কম', Medium: 'মাঝারি', High: 'বেশি' } as Record<string, string>)[
+        String(recordFields.qualitativeSeverity)
+      ];
       try {
         recordFarmerInteractionEvent({
           userId: effectiveUid,
@@ -1517,13 +1520,16 @@ export default function AgriCopilot({
           summary: String(result.diagnosis || 'Diagnosis completed').substring(0, 1000),
           keyFacts: [
             ...(cropTitle ? [`ফসল: ${cropTitle}`] : []),
-            `রোগের তীব্রতা: ${recordFields.qualitativeSeverity}`,
+            // Unknown severity is left out rather than shown as "Not Assessed".
+            ...(severityBn ? [`রোগের তীব্রতা: ${severityBn}`] : []),
             `লক্ষণ: ${recordFields.symptomsBreakdown.slice(0, 2).join(', ') || 'পাতার দাগ/ক্ষতি'}`,
             `পরামর্শ: ${String(result.verificationAdvice || 'সঠিক বালাইনাশক ও সার ব্যবস্থাপনা').substring(0, 120)}`
           ],
           crop: cropTitle || undefined,
           district: selectedDistrict || undefined,
-          insight: `নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন (তীব্রতা: ${recordFields.qualitativeSeverity})`
+          insight: severityBn
+            ? `নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন (তীব্রতা: ${severityBn})`
+            : 'নিয়মিত ফসলের স্বাস্থ্য পরীক্ষা করছেন'
         }).then(() => {
           toast.success(lang === 'bn' ? 'রোগ নির্ণয়ের তথ্য আপনার স্মার্ট কৃষক কার্ডে সংরক্ষিত হয়েছে!' : 'Logged to your Smart Krishi Dossier!');
         }).catch(err => console.warn('Dossier event could not be recorded:', err));

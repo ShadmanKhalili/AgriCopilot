@@ -56,6 +56,7 @@ import {
   query, 
   orderBy, 
   limit, 
+  getCountFromServer,
   where,
   updateDoc,
   doc,
@@ -86,7 +87,7 @@ import { Language } from '../utils/translations';
 import { confidenceLabel, confidenceValue } from '../utils/diagnosisTypes';
 import DigitalPrescriptionModal from './DigitalPrescriptionModal';
 import { buildPrescriptionFromRecord, isSeverityUnknown, type PrescriptionData } from '../utils/prescriptionData';
-import { INVESTOR_DEMO_PRESETS } from '../data/investorDemoPresets';
+import { csvEscape } from '../utils/csv';
 import { useAuth } from './AuthProvider';
 import {
   BROADCAST_MAX_DAYS,
@@ -101,16 +102,84 @@ import {
   type StoredBroadcastRow,
 } from '../services/broadcasts';
 
+// A null figure means "not measured": the UI shows "—", never an invented number.
 interface Stats {
-  totalUsers: number;
-  totalDiagnoses: number;
-  totalPrescriptions: number;
-  premiumUsers: number;
-  dailyActive: number;
-  helpfulRatio: number;
-  liveVideoSessions: number;
-  avgConfidence: number;
+  totalUsers: number | null;
+  totalDiagnoses: number | null;
+  totalPrescriptions: number | null;
+  // Share of recent diagnoses rated helpful, and how many ratings that is based on.
+  helpfulRatio: number | null;
+  ratedCount: number;
 }
+
+const USERS_LIMIT = 200;
+const DIAGNOSES_LIMIT = 100;
+const PRESCRIPTIONS_LIMIT = 50;
+
+/**
+ * Total documents in a collection. Uses a server-side count so the figure is
+ * not capped by the bounded list reads above. If the count is unavailable,
+ * the loaded list length is only trusted when the list was not cut off by its
+ * limit; otherwise the total is unknown (null).
+ */
+async function countDocs(name: string, loadedLength: number, loadLimit: number): Promise<number | null> {
+  try {
+    const snap = await getCountFromServer(collection(db, name));
+    return snap.data().count;
+  } catch (err) {
+    console.warn(`Could not count ${name}:`, err);
+    return loadedLength < loadLimit ? loadedLength : null;
+  }
+}
+
+// createdAt arrives as a Firestore Timestamp, an ISO string or epoch millis.
+function toDateOrNull(value: any): Date | null {
+  if (!value) return null;
+  const d = typeof value?.toDate === 'function' ? value.toDate() : new Date(value);
+  return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+}
+
+const localDayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * Per-day counts for the last 7 days (local time), from real createdAt dates.
+ * Returns [] when none of the records carry a usable date, so the chart is
+ * hidden rather than drawn from nothing.
+ */
+function buildGrowthSeries(users: any[], diagnoses: any[], prescriptions: any[], lang: string) {
+  const days: { key: string; label: string }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - i);
+    days.push({ key: localDayKey(d), label: d.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short' }) });
+  }
+  const bucket = (rows: any[]) => {
+    const counts = new Map<string, number>();
+    let dated = 0;
+    for (const row of rows) {
+      const d = toDateOrNull(row?.createdAt);
+      if (!d) continue;
+      dated++;
+      const key = localDayKey(d);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return { counts, dated };
+  };
+  const u = bucket(users);
+  const dg = bucket(diagnoses);
+  const rx = bucket(prescriptions);
+  if (u.dated + dg.dated + rx.dated === 0) return [];
+  return days.map(({ key, label }) => ({
+    name: label,
+    users: u.counts.get(key) || 0,
+    diagnoses: dg.counts.get(key) || 0,
+    prescriptions: rx.counts.get(key) || 0,
+  }));
+}
+
+const fmtCount = (n: number | null) => (n === null ? '—' : n.toLocaleString());
 
 type AdminTab = 'command' | 'intelligence' | 'prescriptions' | 'users' | 'investor';
 
@@ -207,14 +276,11 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   const isAdmin = userRole === 'admin';
   const [activeTab, setActiveTab] = useState<AdminTab>('command');
   const [stats, setStats] = useState<Stats>({
-    totalUsers: 0,
-    totalDiagnoses: 0,
-    totalPrescriptions: 0,
-    premiumUsers: 0,
-    dailyActive: 0,
-    helpfulRatio: 96.4,
-    liveVideoSessions: 42,
-    avgConfidence: 96.8
+    totalUsers: null,
+    totalDiagnoses: null,
+    totalPrescriptions: null,
+    helpfulRatio: null,
+    ratedCount: 0
   });
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -224,6 +290,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   // fallback rows, so the UI can label it instead of silently implying live data.
   const [usingFallbackData, setUsingFallbackData] = useState(false);
   const [userGrowth, setUserGrowth] = useState<any[]>([]);
+  const [growthIsPartial, setGrowthIsPartial] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [outbreaks, setOutbreaks] = useState<OutbreakHotspot[]>(DEFAULT_OUTBREAK_HOTSPOTS);
   const [searchUserQuery, setSearchUserQuery] = useState('');
@@ -291,127 +358,65 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
       try {
         // Bound the read: an unbounded users query bills every user document.
         const usersSnap = await getDocs(
-          query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200))
+          query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(USERS_LIMIT))
         );
         users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
-        console.warn("Could not fetch users collection, using base:", err);
+        console.warn("Could not fetch users collection:", err);
         usedFallback = true;
       }
 
-      // If empty in dev, synthesize a few realistic users so table is rich
-      if (users.length === 0) {
-        usedFallback = true;
-        users = [
-          { id: 'usr_001', name: 'Md. Rafiqul Islam', email: 'rafiqul.farmer@gmail.com', phone: '+8801711234567', role: 'agri-preneur', tier: 'premium', district: 'Bogura', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_002', name: 'Dr. Shahinur Alam', email: 'shahinur.dae@gov.bd', phone: '+8801819876543', role: 'hub-manager', tier: 'premium', district: 'Rajshahi', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_003', name: 'Nazmul Hossain', email: 'nazmul.krishi@gmail.com', phone: '+8801912348899', role: 'agri-preneur', tier: 'free', district: 'Mymensingh', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_004', name: 'Sadman Khalili (Superadmin)', email: 'sadmankhalili@gmail.com', phone: '+8801552000000', role: 'admin', tier: 'premium', district: 'Dhaka', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_005', name: 'Tanvir Ahmed (Rooftop Gardener)', email: 'tanvir.green@yahoo.com', phone: '+8801678112233', role: 'agri-preneur', tier: 'free', district: 'Dhaka', lastUsedDate: new Date().toISOString().split('T')[0] },
-          { id: 'usr_006', name: 'Abdul Matin', email: 'matin.grower@gmail.com', phone: '+8801722334455', role: 'agri-preneur', tier: 'free', district: 'Jessore', lastUsedDate: new Date().toISOString().split('T')[0] }
-        ];
-      }
       setAllUsers(users);
 
       // 2. Fetch Diagnoses
       let diagnosesData: any[] = [];
       try {
-        const diagnosesSnap = await getDocs(query(collection(db, 'diagnoses'), orderBy('createdAt', 'desc'), limit(100)));
+        const diagnosesSnap = await getDocs(query(collection(db, 'diagnoses'), orderBy('createdAt', 'desc'), limit(DIAGNOSES_LIMIT)));
         diagnosesData = diagnosesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
-        console.warn("Could not fetch diagnoses from firestore, using synthesized logs:", err);
+        console.warn("Could not fetch diagnoses from firestore:", err);
         usedFallback = true;
       }
 
-      if (diagnosesData.length === 0) {
-        usedFallback = true;
-        diagnosesData = [
-          { id: 'diag_101', crop: 'Paddy', diagnosisText: 'Bacterial Leaf Blight (Xanthomonas oryzae) with wavy chlorosis', qualitativeSeverity: 'Critical', confidence: 98.4, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(), district: 'Bogura' },
-          { id: 'diag_102', crop: 'Tomato', diagnosisText: 'Tomato Late Blight (Phytophthora infestans) with water-soaked lesion', qualitativeSeverity: 'Critical', confidence: 97.2, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), district: 'Rajshahi' },
-          { id: 'diag_103', crop: 'Citrus', diagnosisText: 'Citrus Leaf Miner & Bacterial Canker on rooftop lemon', qualitativeSeverity: 'Medium', confidence: 96.5, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(), district: 'Dhaka' },
-          { id: 'diag_104', crop: 'Brinjal', diagnosisText: 'Brinjal Shoot & Fruit Borer (Leucinodes orbonalis)', qualitativeSeverity: 'Medium', confidence: 95.0, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(), district: 'Jessore' },
-          { id: 'diag_105', crop: 'Potato', diagnosisText: 'Early Blight of Potato (Alternaria solani)', qualitativeSeverity: 'Low', confidence: 94.8, helpful: true, createdAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(), district: 'Rangpur' }
-        ];
-      }
       setDiagnoses(diagnosesData);
 
       // 3. Fetch Prescriptions
       let rxList: any[] = [];
       try {
-        const rxSnap = await getDocs(query(collection(db, 'prescriptions'), orderBy('createdAt', 'desc'), limit(50)));
+        const rxSnap = await getDocs(query(collection(db, 'prescriptions'), orderBy('createdAt', 'desc'), limit(PRESCRIPTIONS_LIMIT)));
         rxList = rxSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       } catch (err) {
         console.warn("Could not fetch prescriptions:", err);
         usedFallback = true;
       }
 
-      if (rxList.length === 0) {
-        usedFallback = true;
-        rxList = INVESTOR_DEMO_PRESETS.map((preset, idx) => ({
-          id: `rx_mock_${idx + 1}`,
-          rxId: `RX-BD-2026-89${idx}42`,
-          farmerName: idx === 0 ? 'Md. Rafiqul Islam' : idx === 1 ? 'Anisur Rahman' : idx === 2 ? 'Farhana Chowdhury (Rooftop)' : 'Tanvir Ahmed',
-          crop: preset.cropEn,
-          diseaseName: preset.diseaseEn,
-          pathogen: preset.pathogen,
-          severity: preset.severityEn,
-          confidence: preset.confidence,
-          location: preset.location,
-          createdAt: new Date(Date.now() - (idx + 1) * 3600000 * 8).toISOString(),
-          symptoms: preset.symptomsEn,
-          culturalSteps: preset.culturalStepsEn,
-          organicSteps: preset.organicStepsEn,
-          chemicalSteps: preset.chemicalStepsEn,
-          harvestIntervalDays: preset.harvestIntervalDays,
-          weatherSnapshot: preset.weatherSnapshot,
-          verified: true,
-          // Explicit marker so the registry never presents synthesized rows as certified records
-          isDemoData: true
-        }));
-      }
       setAllPrescriptions(rxList);
 
-      // Compute statistics
-      const totalUsers = Math.max(users.length, 128);
-      const premiumUsers = Math.max(users.filter((u: any) => u.tier === 'premium').length, 36);
-      const totalDiagnoses = Math.max(diagnosesData.length, 482);
-      const totalPrescriptions = Math.max(rxList.length, 319);
-      const helpfulCount = diagnosesData.filter((d: any) => d.helpful === true).length;
-      const totalRatings = diagnosesData.filter((d: any) => d.helpful !== undefined).length;
-      const helpfulRatio = totalRatings > 0 ? (helpfulCount / totalRatings) * 100 : 96.8;
+      // Compute statistics from what was actually read. Anything that is not
+      // measured stays null and the UI shows "—" rather than an invented number.
+      const [totalUsersCount, totalDiagnosesCount, totalPrescriptionsCount] = await Promise.all([
+        countDocs('users', users.length, USERS_LIMIT),
+        countDocs('diagnoses', diagnosesData.length, DIAGNOSES_LIMIT),
+        countDocs('prescriptions', rxList.length, PRESCRIPTIONS_LIMIT),
+      ]);
+      const ratedDiagnoses = diagnosesData.filter((d: any) => typeof d.helpful === 'boolean');
+      const helpfulCount = ratedDiagnoses.filter((d: any) => d.helpful === true).length;
+      const helpfulRatio = ratedDiagnoses.length > 0 ? (helpfulCount / ratedDiagnoses.length) * 100 : null;
 
-      // 7-Day Scaling Curve
-      const days = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().split('T')[0]);
-      }
-
-      const growth = days.map((day, idx) => {
-        const dayUsers = 12 + idx * 4 + Math.floor(Math.random() * 6);
-        const dayDiagnoses = 28 + idx * 11 + Math.floor(Math.random() * 14);
-        const dayPrescriptions = Math.round(dayDiagnoses * 0.75);
-
-        return {
-          name: new Date(day).toLocaleDateString(undefined, { weekday: 'short' }),
-          users: dayUsers,
-          diagnoses: dayDiagnoses,
-          prescriptions: dayPrescriptions
-        };
-      });
+      // 7-day growth, bucketed from the real createdAt dates of the records read.
+      const growth = buildGrowthSeries(users, diagnosesData, rxList, lang);
+      const sampleIsCapped =
+        users.length >= USERS_LIMIT || diagnosesData.length >= DIAGNOSES_LIMIT || rxList.length >= PRESCRIPTIONS_LIMIT;
 
       setStats({
-        totalUsers,
-        totalDiagnoses,
-        totalPrescriptions,
-        premiumUsers,
-        dailyActive: Math.max(users.filter((u: any) => u.lastUsedDate === new Date().toISOString().split('T')[0]).length, 48),
+        totalUsers: totalUsersCount,
+        totalDiagnoses: totalDiagnosesCount,
+        totalPrescriptions: totalPrescriptionsCount,
         helpfulRatio,
-        liveVideoSessions: 86,
-        avgConfidence: 96.8
+        ratedCount: ratedDiagnoses.length,
       });
       setUserGrowth(growth);
+      setGrowthIsPartial(sampleIsCapped);
       setUsingFallbackData(usedFallback);
     } catch (error) {
       console.error("Error fetching admin stats:", error);
@@ -612,11 +617,6 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   };
 
   // Export Prescriptions to CSV
-  const csvEscape = (value: unknown): string => {
-    // Wrap in quotes and escape embedded quotes/newlines so fields can't corrupt columns
-    return `"${String(value ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-  };
-
   const handleExportPrescriptionsCSV = () => {
     if (allPrescriptions.length === 0) {
       toast.error('No prescriptions to export');
@@ -734,18 +734,18 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
   return (
     <div ref={dashboardContainerRef} className="space-y-6 pb-16 text-stone-900 dark:text-stone-100">
 
-      {/* Data provenance banner — shown whenever Firestore reads failed and synthesized rows are displayed */}
+      {/* Data provenance banner — shown whenever a Firestore read failed; nothing is synthesized */}
       {usingFallbackData && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 px-4 py-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-xs leading-relaxed text-amber-900 dark:text-amber-200">
             <span className="font-black uppercase tracking-wider">
-              {lang === 'bn' ? 'ডেমো ডেটা প্রদর্শিত' : 'Demo data displayed'}
+              {lang === 'bn' ? 'কিছু সরাসরি ডেটা পড়া যায়নি' : 'Some live data could not be read'}
             </span>
             <p className="mt-0.5 text-amber-800/90 dark:text-amber-300/80">
               {lang === 'bn'
-                ? 'ফায়ারস্টোর থেকে সরাসরি ডেটা পড়া গেল না (অনুমতি বা সংযোগ সমস্যা)। নিচের তালিকায় কৃত্রিম নমুনারেকর্ড দেখানো হচ্ছে, যা সার্টিফাইড রেকর্ড নয়।'
-                : 'Live Firestore data could not be read (permissions or connectivity). Rows below are synthesized demo records, not certified registry entries.'}
+                ? 'ফায়ারস্টোর থেকে কিছু ডেটা পড়া গেল না (অনুমতি বা সংযোগ সমস্যা)। যে সংখ্যা পাওয়া যায়নি তা “—” দিয়ে দেখানো হয়েছে এবং তালিকা অসম্পূর্ণ হতে পারে।'
+                : 'Some Firestore data could not be read (permissions or connectivity). Figures that are unavailable show "—" and lists may be incomplete.'}
             </p>
           </div>
         </div>
@@ -844,7 +844,6 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
           </div>
 
           {/* Core KPI Stat Cards */}
-          <div className="inline-block mb-3 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black">{lang === 'bn' ? 'নমুনা ডেটা (Sample data)' : 'Sample data'}</div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             
             {/* Card 1: Total Farmers & Users */}
@@ -853,14 +852,17 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   <Users className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-black text-emerald-400 font-mono">+18% Weekly</span>
+                <span className="text-[11px] font-black text-emerald-400 font-mono">{lang === 'bn' ? 'মোট' : 'Total'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-                {stats.totalUsers.toLocaleString()}
+                {fmtCount(stats.totalUsers)}
               </div>
               <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'মোট নিবন্ধিত কৃষক' : 'Registered Farmers & Users'}
               </div>
+              {stats.totalUsers === null && (
+                <div className="text-[10px] font-mono text-amber-300 mt-1">{lang === 'bn' ? 'সংখ্যা পাওয়া যায়নি' : 'count unavailable'}</div>
+              )}
             </div>
 
             {/* Card 2: Multimodal AI Diagnoses */}
@@ -869,14 +871,17 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   <Leaf className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-black text-emerald-400 font-mono">Live Stream</span>
+                <span className="text-[11px] font-black text-emerald-400 font-mono">{lang === 'bn' ? 'মোট' : 'Total'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-                {stats.totalDiagnoses.toLocaleString()}
+                {fmtCount(stats.totalDiagnoses)}
               </div>
               <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
                 {lang === 'bn' ? 'মোট এআই রোগনির্ণয়' : 'Multimodal Consultations'}
               </div>
+              {stats.totalDiagnoses === null && (
+                <div className="text-[10px] font-mono text-amber-300 mt-1">{lang === 'bn' ? 'সংখ্যা পাওয়া যায়নি' : 'count unavailable'}</div>
+              )}
             </div>
 
             {/* Card 3: Digital Krishi Prescriptions Generated */}
@@ -885,14 +890,17 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   <FileText className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-black text-purple-300 font-mono">Certified Rx</span>
+                <span className="text-[11px] font-black text-purple-300 font-mono">{lang === 'bn' ? 'মোট' : 'Total'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-                {stats.totalPrescriptions.toLocaleString()}
+                {fmtCount(stats.totalPrescriptions)}
               </div>
               <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
-                {lang === 'bn' ? 'ইস্যুকৃত ডিজিটাল প্রেসক্রিপশন' : 'Certified Krishi Rx Cards'}
+                {lang === 'bn' ? 'ইস্যুকৃত ডিজিটাল প্রেসক্রিপশন' : 'Krishi Rx Records'}
               </div>
+              {stats.totalPrescriptions === null && (
+                <div className="text-[10px] font-mono text-amber-300 mt-1">{lang === 'bn' ? 'সংখ্যা পাওয়া যায়নি' : 'count unavailable'}</div>
+              )}
             </div>
 
             {/* Card 4: Clinical Accuracy & Satisfaction */}
@@ -901,14 +909,17 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-black text-emerald-300 font-mono">{lang === 'bn' ? 'মাঠ মূল্যায়ন' : 'Field Evaluated'}</span>
+                <span className="text-[11px] font-black text-emerald-300 font-mono">{stats.ratedCount > 0 ? `n=${stats.ratedCount}` : 'n/a'}</span>
               </div>
               <div className="text-2xl sm:text-3xl font-display font-black text-white tracking-tight">
-                {stats.helpfulRatio.toFixed(1)}%
+                {stats.helpfulRatio === null ? '—' : `${stats.helpfulRatio.toFixed(1)}%`}
               </div>
               <div className="text-[11px] font-mono font-bold text-stone-400 uppercase tracking-widest mt-0.5">
-                {lang === 'bn' ? 'মডেল নির্ভুলতা সন্তুষ্টি' : 'Pathology Accuracy Score'}
+                {lang === 'bn' ? 'সাম্প্রতিক রোগনির্ণয়ে সহায়ক রেটিং' : 'Rated Helpful (recent diagnoses)'}
               </div>
+              {stats.helpfulRatio === null && (
+                <div className="text-[10px] font-mono text-amber-300 mt-1">{lang === 'bn' ? 'এখনো পরিমাপ হয়নি' : 'not measured yet'}</div>
+              )}
             </div>
 
           </div>
@@ -1000,8 +1011,8 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     </h3>
                     <p className="text-xs text-stone-500 mt-0.5">
                       {lang === 'bn' 
-                        ? 'নতুন ব্যবহারকারী বৃদ্ধি বনাম প্রতিদিনের এআই রোগনির্ণয় ও প্রেসক্রিপশন ভলিউম' 
-                        : 'Correlation of new grower onboarding with daily AI diagnostics & prescriptions'}
+                        ? 'গত ৭ দিনে প্রতিদিন নতুন ব্যবহারকারী ও এআই রোগনির্ণয় (রেকর্ডের তারিখ থেকে গণনা)' 
+                        : 'New users and AI diagnoses per day over the last 7 days, counted from record dates'}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-[11px] font-mono">
@@ -1016,7 +1027,14 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   </div>
                 </div>
 
-                <div className="inline-block mb-3 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black">{lang === 'bn' ? 'নমুনা ডেটা (Sample data)' : 'Sample data'}</div>
+                {userGrowth.length === 0 ? (
+                  <div className="h-[280px] w-full flex items-center justify-center text-center text-xs text-stone-500 px-6">
+                    {lang === 'bn'
+                      ? 'চার্ট দেখানো হচ্ছে না: তারিখসহ কোনো রেকর্ড পড়া যায়নি।'
+                      : 'Chart hidden: no records with usable creation dates could be read.'}
+                  </div>
+                ) : (
+                <>
                 <div className="h-[280px] w-full pt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={userGrowth}>
@@ -1039,6 +1057,15 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
+                {growthIsPartial && (
+                  <p className="text-[11px] text-stone-500">
+                    {lang === 'bn'
+                      ? 'দ্রষ্টব্য: সাম্প্রতিক সীমিত সংখ্যক রেকর্ড থেকে গণনা, তাই সংখ্যা কম হতে পারে।'
+                      : 'Note: counted from the most recent records read (read limit reached), so busy days may be undercounted.'}
+                  </p>
+                )}
+                </>
+                )}
               </div>
 
               {/* Right Chart: AI Modality & Channel Breakdown */}
@@ -1158,11 +1185,13 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
-                            diag.qualitativeSeverity === 'Critical' 
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' 
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                            isSeverityUnknown(diag.qualitativeSeverity)
+                              ? 'bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300'
+                              : diag.qualitativeSeverity === 'High' || diag.qualitativeSeverity === 'Critical'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
                           }`}>
-                            {diag.qualitativeSeverity || 'Medium'}
+                            {isSeverityUnknown(diag.qualitativeSeverity) ? 'Not assessed' : diag.qualitativeSeverity}
                           </span>
                         </td>
                         <td className="px-6 py-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
@@ -2183,7 +2212,7 @@ export default function AdminDashboard({ lang }: { lang: Language }) {
                   required
                   value={inviteForm.phone}
                   onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
-                  placeholder="+8801711234567"
+                  placeholder="+8801XXXXXXXXX"
                   className="w-full bg-stone-800 border border-stone-700 rounded-xl px-3 py-2 text-white outline-none focus:border-blue-500"
                 />
               </div>

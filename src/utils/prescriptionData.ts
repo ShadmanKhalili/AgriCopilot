@@ -34,28 +34,11 @@
  */
 import { normalizeDiseaseCandidates, confidenceSignal, ESCALATION_THRESHOLD } from './diagnosisTypes';
 import type { Language } from './translations';
+import { SEVERITY_NOT_ASSESSED, normalizeSeverity, isSeverityUnknown } from './severity';
 
-/**
- * What `severity` holds when the model did not state one. It used to default
- * to 'Medium', which printed an invented severity on an official-looking card.
- */
-export const SEVERITY_NOT_ASSESSED = 'Not Assessed';
-
-/** Severity text that means "no real severity was given". */
-const SEVERITY_MISSING = /^(|unknown|n\/?a|none|null|undefined|-|—|not\s*assessed|জানা\s*নেই|যাচাই\s*করা\s*হয়নি)$/i;
-
-/** A real severity string, or SEVERITY_NOT_ASSESSED. Never invents one. */
-export const normalizeSeverity = (...values: unknown[]): string => {
-  for (const value of values) {
-    const text = value === null || value === undefined ? '' : String(value).trim();
-    if (text && !SEVERITY_MISSING.test(text) && !/not\s*assessed/i.test(text)) return text;
-  }
-  return SEVERITY_NOT_ASSESSED;
-};
-
-/** True when no real severity is known (missing, 'Not Assessed' or the Bangla equivalent). */
-export const isSeverityUnknown = (severity: unknown): boolean =>
-  normalizeSeverity(severity) === SEVERITY_NOT_ASSESSED;
+// The severity helpers live in ./severity (so diagnosisTypes can use them
+// without a circular import); re-exported here so existing imports keep working.
+export { SEVERITY_NOT_ASSESSED, normalizeSeverity, isSeverityUnknown };
 
 export interface PrescriptionData {
   rxId?: string;
@@ -349,6 +332,23 @@ export const buildPrescriptionFromRecord = (
   };
 };
 
+/** The most list entries (symptoms, steps) a stored prescription keeps. Mirrors firestore.rules. */
+const MAX_STORED_STEPS = 50;
+
+/** Text starting with one of these is read as a formula by a spreadsheet. */
+const FORMULA_LEAD = /^[\s=+\-@]+/;
+
+/**
+ * Text as stored in the registry: the leading characters that would make a
+ * spreadsheet read it as a formula are dropped (the Firestore rule refuses
+ * them), the text is trimmed and cut to the rule's size limit. Falls back to
+ * `fallback` when nothing is left.
+ */
+const storableText = (value: unknown, max: number, fallback = ''): string => {
+  const text = String(value ?? '').replace(FORMULA_LEAD, '').trim().slice(0, max);
+  return text || fallback;
+};
+
 /**
  * The shape written to the `prescriptions` collection.
  *
@@ -361,29 +361,39 @@ export const toStorablePrescription = (
   data: PrescriptionData,
   userId: string,
   farmerName: string
-): Record<string, unknown> => ({
-  rxId: data.rxId || stableRxId(`${data.crop}|${data.diseaseName}`),
-  userId,
-  farmerName: farmerName || 'Registered Grower',
-  crop: data.crop,
-  diseaseName: data.diseaseName,
-  severity: data.severity,
-  confidence: typeof data.confidence === 'number' ? data.confidence : 0,
-  confidenceAssessed: data.confidenceAssessed !== false && typeof data.confidence === 'number',
-  location: data.location,
-  createdAt: new Date().toISOString(),
-  // A prescription is NOT verified just because it was issued by the model.
-  // Only an agronomist can certify it (AdminDashboard -> Certify).
-  verified: false,
-  ...(data.pathogen ? { pathogen: data.pathogen } : {}),
-  ...(data.cropStage ? { cropStage: data.cropStage } : {}),
-  symptoms: data.symptoms,
-  culturalSteps: data.culturalSteps,
-  organicSteps: data.organicSteps,
-  chemicalSteps: data.chemicalSteps,
-  chemicalGated: data.chemicalGated === true,
-  ...(typeof data.harvestIntervalDays === 'number'
-    ? { harvestIntervalDays: data.harvestIntervalDays }
-    : {}),
-  ...(data.differentialDiagnosis ? { differentialDiagnosis: data.differentialDiagnosis } : {}),
-});
+): Record<string, unknown> => {
+  const pathogen = storableText(data.pathogen, 500);
+  const cropStage = storableText(data.cropStage, 128);
+  const differentialDiagnosis = storableText(data.differentialDiagnosis, 4000);
+  const list = (items: unknown): string[] =>
+    (Array.isArray(items) ? items : []).slice(0, MAX_STORED_STEPS).map((item) => String(item));
+  return {
+    rxId: storableText(data.rxId, 64) || stableRxId(`${data.crop}|${data.diseaseName}`),
+    userId,
+    farmerName: storableText(farmerName, 128, 'Registered Grower'),
+    crop: storableText(data.crop, 128, 'Unknown'),
+    diseaseName: storableText(data.diseaseName, 256, 'Unknown'),
+    severity: storableText(data.severity, 64, SEVERITY_NOT_ASSESSED),
+    confidence: typeof data.confidence === 'number' ? data.confidence : 0,
+    confidenceAssessed: data.confidenceAssessed !== false && typeof data.confidence === 'number',
+    location: storableText(data.location, 256, 'Bangladesh'),
+    createdAt: new Date().toISOString(),
+    // A prescription is NOT verified just because it was issued by the model.
+    // Only an agronomist can certify it (AdminDashboard -> Certify). The
+    // Firestore rule refuses a create with verified: true.
+    verified: false,
+    ...(pathogen ? { pathogen } : {}),
+    ...(cropStage ? { cropStage } : {}),
+    symptoms: list(data.symptoms),
+    culturalSteps: list(data.culturalSteps),
+    organicSteps: list(data.organicSteps),
+    chemicalSteps: list(data.chemicalSteps),
+    chemicalGated: data.chemicalGated === true,
+    ...(typeof data.harvestIntervalDays === 'number' &&
+    data.harvestIntervalDays >= 0 &&
+    data.harvestIntervalDays <= 365
+      ? { harvestIntervalDays: data.harvestIntervalDays }
+      : {}),
+    ...(differentialDiagnosis ? { differentialDiagnosis } : {}),
+  };
+};

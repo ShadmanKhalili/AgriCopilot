@@ -27,6 +27,30 @@ service cloud.firestore {
       return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // A guest session: a true Firebase anonymous user (that has not linked an
+    // email yet), or the throwaway `guest-…@agri.local` password account the
+    // app creates when anonymous sign-in is unavailable (see src/firebase.ts
+    // isGuestUser). A guest that linked Google gets an `email` claim on its next
+    // token, so the anonymous branch stops matching it.
+    function isGuestAuth() {
+      return (request.auth.token.firebase.sign_in_provider == 'anonymous' &&
+                !('email' in request.auth.token)) ||
+             (request.auth.token.firebase.sign_in_provider == 'password' &&
+                ('email' in request.auth.token) &&
+                request.auth.token.email.matches('^guest-[a-z0-9]{1,64}@agri\\.local$'));
+    }
+
+    // Signed in and not a guest.
+    function isRegisteredUser() {
+      return isSignedIn() && !isGuestAuth();
+    }
+
+    // CSV / spreadsheet formula-injection defence in depth: free text that an
+    // admin may export must not start with = + - or @. Bangla text never does.
+    function isFormulaSafe(val) {
+      return val is string && val.matches('^[^=+@\\-][\\s\\S]*$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -66,8 +90,30 @@ service cloud.firestore {
              isStr(data.email, 3, 128) &&
              data.role in ['agri-preneur', 'hub-manager', 'admin', 'expert_pending', 'expert', 'org_admin'] &&
              data.tier in ['free', 'premium', 'anon'] &&
-             data.usageCount is number && data.usageCount >= 0 &&
+             data.usageCount is number && data.usageCount >= 0 && data.usageCount <= 1000000 &&
+             // Optional fields are typed and bounded when present.
+             (!data.keys().hasAny(['name']) || isStr(data.name, 0, 256)) &&
+             (!data.keys().hasAny(['lastUsedDate']) || isStr(data.lastUsedDate, 0, 32)) &&
+             (!data.keys().hasAny(['updatedAt']) || isTimestamp(data.updatedAt)) &&
+             (!data.keys().hasAny(['expertLevel']) || data.expertLevel in ['provisional', 'verified', 'senior']) &&
+             (!data.keys().hasAny(['orgId']) || isStr(data.orgId, 1, 128)) &&
              isTimestamp(data.createdAt);
+    }
+
+    // The fields a diagnosis may be created with. Later updates are held to
+    // their own narrow list by the update rule, so legacy documents that carry
+    // extra fields stay editable.
+    function hasOnlyDiagnosisCreateFields(data) {
+      return data.keys().hasOnly(['userId', 'crop', 'cropStage', 'analysisType', 'diagnosisText', 'qualitativeSeverity', 'symptomsBreakdown', 'verificationAdvice', 'createdAt', 'district', 'upazila', 'diseaseKey']);
+    }
+
+    // Fields that are added to a diagnosis after it is created.
+    function isValidDiagnosisLateFields(data) {
+      return (!data.keys().hasAny(['deepDiagnosis']) || data.deepDiagnosis is map) &&
+             (!data.keys().hasAny(['deepDiagnosedAt']) || isTimestamp(data.deepDiagnosedAt)) &&
+             (!data.keys().hasAny(['helpful']) || data.helpful is bool) &&
+             (!data.keys().hasAny(['chatSummary']) || isStr(data.chatSummary, 0, 30000)) &&
+             (!data.keys().hasAny(['updatedAt']) || isTimestamp(data.updatedAt));
     }
 
     function isValidDiagnosis(data) {
@@ -77,7 +123,9 @@ service cloud.firestore {
              isStr(data.cropStage, 1, 128) &&
              isStr(data.analysisType, 1, 64) &&
              isStr(data.diagnosisText, 1, 30000) &&
-             data.qualitativeSeverity in ['Low', 'Medium', 'High'] &&
+             // 'Not Assessed' is stored when the model gave no severity, rather
+             // than an invented 'Medium'.
+             data.qualitativeSeverity in ['Low', 'Medium', 'High', 'Not Assessed'] &&
              data.symptomsBreakdown is list &&
              data.symptomsBreakdown.size() <= 25 &&
              isStr(data.verificationAdvice, 1, 10000) &&
@@ -172,6 +220,9 @@ service cloud.firestore {
                     userId == request.auth.uid &&
                     isValidId(userId) &&
                     isEmailBoundToAuth(incoming().email) &&
+                    // Expert level and organisation are granted by an admin
+                    // later (the update rule), never claimed at sign-up.
+                    !incoming().keys().hasAny(['expertLevel', 'orgId']) &&
                     (
                       (incoming().role == 'agri-preneur' && incoming().tier == 'free') ||
                       (isAdmin() && incoming().role == 'admin' && incoming().tier == 'premium')
@@ -203,15 +254,34 @@ service cloud.firestore {
         return data.keys().hasAll(['rxId', 'userId', 'farmerName', 'crop', 'diseaseName', 'severity', 'confidence', 'location', 'createdAt', 'verified']) &&
                isStr(data.rxId, 1, 64) &&
                isStr(data.userId, 1, 128) &&
-               isStr(data.farmerName, 1, 128) &&
-               isStr(data.crop, 1, 128) &&
-               isStr(data.diseaseName, 1, 256) &&
+               isStr(data.farmerName, 1, 128) && isFormulaSafe(data.farmerName) &&
+               isStr(data.crop, 1, 128) && isFormulaSafe(data.crop) &&
+               isStr(data.diseaseName, 1, 256) && isFormulaSafe(data.diseaseName) &&
                isStr(data.severity, 1, 64) &&
                data.confidence is number && data.confidence >= 0 && data.confidence <= 100 &&
-               isStr(data.location, 1, 256) &&
+               isStr(data.location, 1, 256) && isFormulaSafe(data.location) &&
                isTimestamp(data.createdAt) &&
                data.verified is bool &&
-               isValidId(prescriptionId);
+               isValidId(prescriptionId) &&
+               // Optional fields the card carries (toStorablePrescription).
+               (!data.keys().hasAny(['confidenceAssessed']) || data.confidenceAssessed is bool) &&
+               (!data.keys().hasAny(['chemicalGated']) || data.chemicalGated is bool) &&
+               (!data.keys().hasAny(['pathogen']) || (isStr(data.pathogen, 1, 500) && isFormulaSafe(data.pathogen))) &&
+               (!data.keys().hasAny(['cropStage']) || isStr(data.cropStage, 1, 128)) &&
+               (!data.keys().hasAny(['differentialDiagnosis']) || isStr(data.differentialDiagnosis, 1, 4000)) &&
+               (!data.keys().hasAny(['harvestIntervalDays']) || (data.harvestIntervalDays is number && data.harvestIntervalDays >= 0 && data.harvestIntervalDays <= 365)) &&
+               (!data.keys().hasAny(['symptoms']) || (data.symptoms is list && data.symptoms.size() <= 50)) &&
+               (!data.keys().hasAny(['culturalSteps']) || (data.culturalSteps is list && data.culturalSteps.size() <= 50)) &&
+               (!data.keys().hasAny(['organicSteps']) || (data.organicSteps is list && data.organicSteps.size() <= 50)) &&
+               (!data.keys().hasAny(['chemicalSteps']) || (data.chemicalSteps is list && data.chemicalSteps.size() <= 50));
+      }
+
+      // Exactly the fields toStorablePrescription writes. `verified`,
+      // `verifiedAt` and `verifiedBy` are not self-service: a new prescription
+      // is always unverified, and only the admin update below can certify it.
+      function hasOnlyPrescriptionCreateFields(data) {
+        return data.keys().hasOnly(['rxId', 'userId', 'farmerName', 'crop', 'diseaseName', 'severity', 'confidence', 'confidenceAssessed', 'location', 'createdAt', 'verified',
+                                    'pathogen', 'cropStage', 'symptoms', 'culturalSteps', 'organicSteps', 'chemicalSteps', 'chemicalGated', 'harvestIntervalDays', 'differentialDiagnosis']);
       }
 
       // Farmers read their own Rx history; admins read the national audit registry.
@@ -222,8 +292,17 @@ service cloud.firestore {
       // let any anonymous caller inject rows into the national audit registry.
       allow create: if isSignedIn() &&
                     isValidPrescription(incoming()) &&
+                    hasOnlyPrescriptionCreateFields(incoming()) &&
+                    incoming().verified == false &&
                     incoming().userId == request.auth.uid;
-      allow update: if isAdmin() && isValidPrescription(incoming());
+      // The admin certification step: only the three verification fields may
+      // change, so a certified record cannot have its contents rewritten.
+      allow update: if isAdmin() &&
+                    isValidPrescription(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['verified', 'verifiedAt', 'verifiedBy']) &&
+                    (!incoming().keys().hasAny(['verifiedAt']) || isTimestamp(incoming().verifiedAt)) &&
+                    (!incoming().keys().hasAny(['verifiedBy']) || isStr(incoming().verifiedBy, 1, 128));
       allow delete: if isAdmin();
     }
 
@@ -232,10 +311,12 @@ service cloud.firestore {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidId(diagnosisId);
       
       allow create: if isSignedIn() && isValidDiagnosis(incoming()) &&
+                    hasOnlyDiagnosisCreateFields(incoming()) &&
                     incoming().userId == request.auth.uid &&
                     isValidId(diagnosisId);
-      
+
       allow update: if isSignedIn() && isValidDiagnosis(incoming()) &&
+                    isValidDiagnosisLateFields(incoming()) &&
                     existing().userId == request.auth.uid &&
                     incoming().userId == existing().userId &&
                     incoming().createdAt == existing().createdAt &&
@@ -388,13 +469,29 @@ service cloud.firestore {
              isTimestamp(data.updatedAt);
     }
 
+    // Fields written by approveApplication (expertService.ts) plus the
+    // expert-editable ones. Nothing else may be stored.
     function isValidExpertPrivate(data) {
       return data.keys().hasAll(['uid', 'updatedAt']) &&
+             data.keys().hasOnly(['uid', 'phone', 'email', 'availability', 'maxConcurrent', 'currentLoad', 'verifiedBy', 'verifiedAt', 'createdAt', 'updatedAt']) &&
              isStr(data.uid, 1, 128) &&
              isTimestamp(data.updatedAt) &&
              (!data.keys().hasAny(['phone']) || isStr(data.phone, 0, 24)) &&
              (!data.keys().hasAny(['email']) || isStr(data.email, 0, 128)) &&
-             (!data.keys().hasAny(['availability']) || data.availability in ['online', 'offline', 'busy']);
+             (!data.keys().hasAny(['availability']) || data.availability in ['online', 'offline', 'busy']) &&
+             (!data.keys().hasAny(['maxConcurrent']) || (data.maxConcurrent is number && data.maxConcurrent >= 0 && data.maxConcurrent <= 1000)) &&
+             (!data.keys().hasAny(['currentLoad']) || (data.currentLoad is number && data.currentLoad >= 0 && data.currentLoad <= 1000)) &&
+             (!data.keys().hasAny(['verifiedBy']) || isStr(data.verifiedBy, 0, 128)) &&
+             (!data.keys().hasAny(['verifiedAt']) || isTimestamp(data.verifiedAt)) &&
+             (!data.keys().hasAny(['createdAt']) || isTimestamp(data.createdAt));
+    }
+
+    // Fields written by applyAsExpert (create) and by approve/rejectApplication
+    // (`level`, `reviewerNote`, admin update).
+    // Closed field list for a NEW application (applyAsExpert). Updates are
+    // admin-only and narrower, so legacy documents stay approvable.
+    function hasOnlyExpertApplicationCreateFields(data) {
+      return data.keys().hasOnly(['applicantId', 'fullName', 'phone', 'email', 'affiliationType', 'affiliationName', 'roleTitle', 'districts', 'upazilas', 'specializations', 'languages', 'yearsExperience', 'registrationNo', 'referenceName', 'referencePhone', 'motivation', 'publicBio', 'conflictOfInterest', 'status', 'createdAt', 'updatedAt']);
     }
 
     function isValidExpertApplication(data) {
@@ -406,11 +503,19 @@ service cloud.firestore {
              isStr(data.affiliationName, 0, 128) &&
              isStr(data.roleTitle, 2, 128) &&
              data.districts is list && data.districts.size() <= 64 &&
+             (!data.keys().hasAny(['upazilas']) || (data.upazilas is list && data.upazilas.size() <= 128)) &&
              data.specializations is list && data.specializations.size() >= 1 && data.specializations.size() <= 16 &&
              data.languages is list && data.languages.size() >= 1 && data.languages.size() <= 8 &&
              data.yearsExperience is number && data.yearsExperience >= 0 && data.yearsExperience <= 70 &&
              isStr(data.motivation, 10, 2000) &&
+             (!data.keys().hasAny(['email']) || isStr(data.email, 0, 128)) &&
+             (!data.keys().hasAny(['registrationNo']) || isStr(data.registrationNo, 0, 64)) &&
+             (!data.keys().hasAny(['referenceName']) || isStr(data.referenceName, 0, 128)) &&
+             (!data.keys().hasAny(['referencePhone']) || isStr(data.referencePhone, 0, 24)) &&
+             (!data.keys().hasAny(['conflictOfInterest']) || isStr(data.conflictOfInterest, 0, 500)) &&
              (!data.keys().hasAny(['publicBio']) || isStr(data.publicBio, 0, 600)) &&
+             (!data.keys().hasAny(['level']) || data.level in ['provisional', 'verified', 'senior']) &&
+             (!data.keys().hasAny(['reviewerNote']) || isStr(data.reviewerNote, 0, 500)) &&
              data.status in ['pending', 'approved', 'rejected'] &&
              isTimestamp(data.createdAt) &&
              isTimestamp(data.updatedAt);
@@ -426,6 +531,7 @@ service cloud.firestore {
              data.status == 'requested' &&
              data.urgency in ['emergency', 'urgent', 'general'] &&
              isStr(data.category, 1, 64) &&
+             (!data.keys().hasAny(['crop']) || isStr(data.crop, 0, 64)) &&
              data.lang in ['bn', 'en'] &&
              isStr(data.district, 0, 64) &&
              isStr(data.upazila, 0, 64) &&
@@ -531,11 +637,21 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Private expert details: phone, documents, availability, admin notes.
+    // Private expert details: phone, availability, load and who verified them.
+    // Only the admin approval flow creates the record. The expert may later
+    // change just their contact details and availability: `verifiedBy`,
+    // `verifiedAt` and the load limits are the admin's.
     match /experts_private/{expertId} {
       allow get: if isAdmin() || isOwner(expertId);
       allow list: if isAdmin();
-      allow create, update: if (isAdmin() || isOwner(expertId)) && isValidExpertPrivate(incoming()) && isValidId(expertId);
+      allow create: if isAdmin() && isValidExpertPrivate(incoming()) && isValidId(expertId);
+      allow update: if isValidId(expertId) && isValidExpertPrivate(incoming()) &&
+                    (
+                      isAdmin() ||
+                      (isOwner(expertId) &&
+                       incoming().uid == existing().uid &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'email', 'availability', 'updatedAt']))
+                    );
       allow delete: if isAdmin();
     }
 
@@ -544,6 +660,7 @@ service cloud.firestore {
       allow list: if isAdmin() || (isSignedIn() && resource.data.applicantId == request.auth.uid);
       allow create: if isSignedIn() &&
                     isValidExpertApplication(incoming()) &&
+                    hasOnlyExpertApplicationCreateFields(incoming()) &&
                     incoming().applicantId == request.auth.uid &&
                     incoming().status == 'pending' &&
                     isValidId(applicationId);
@@ -558,11 +675,20 @@ service cloud.firestore {
                       (resource.data.expertId == request.auth.uid &&
                        resource.data.consentRevoked == false &&
                        resource.data.consentExpiresAtMs > request.time.toMillis())));
+      // NOTE: no consentExpiresAtMs check here on purpose. A list rule is
+      // proven against the query's own filters, and a query cannot be filtered
+      // on `request.time`, so adding the expiry would make the expert queue
+      // query (expertId + consentRevoked) fail outright. The listed parent
+      // document is metadata only; the case details, messages and photos are
+      // gated by expiry (isConsultationParticipant) and get/update above check
+      // it too. The client hides expired rows (watchExpertConsultations).
       allow list: if isAdmin() ||
                     (isSignedIn() &&
                      (resource.data.farmerId == request.auth.uid ||
                       (resource.data.expertId == request.auth.uid &&
                        resource.data.consentRevoked == false)));
+      // Guests may open a consultation: the Experts screen lets a farmer start
+      // as a guest and save the account later. Sizes are bounded in isValidConsultation.
       allow create: if isSignedIn() &&
                     isValidConsultation(incoming()) &&
                     incoming().farmerId == request.auth.uid &&
@@ -594,14 +720,22 @@ service cloud.firestore {
                          // status they own.
                          incoming().status in ['requested', 'cancelled', 'closed', 'resolved', 'in_progress']
                        ) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'consentRevoked', 'consentRevokedAt', 'farmerRating', 'farmerFeedback', 'closedAt', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastFarmerMessageAt'])) ||
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'consentRevoked', 'consentRevokedAt', 'farmerRating', 'farmerFeedback', 'closedAt', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastFarmerMessageAt']) &&
+                       (!incoming().keys().hasAny(['farmerRating']) || (incoming().farmerRating is number && incoming().farmerRating >= 1 && incoming().farmerRating <= 5)) &&
+                       (!incoming().keys().hasAny(['farmerFeedback']) || isStr(incoming().farmerFeedback, 0, 1000))) ||
                       // Expert: accept, progress, resolve, refresh counters.
+                      // The expert's access ends with the consent: once the
+                      // farmer revokes it or it expires, nothing can be written.
                       (existing().expertId == request.auth.uid &&
+                       existing().consentRevoked == false &&
+                       existing().consentExpiresAtMs > request.time.toMillis() &&
                        incoming().farmerId == existing().farmerId &&
                        incoming().expertId == existing().expertId &&
                        incoming().createdAt == existing().createdAt &&
                        incoming().status in ['requested', 'accepted', 'in_progress', 'awaiting_farmer', 'resolved', 'closed', 'escalated'] &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'firstResponseAt', 'closedAt', 'outcome', 'expertNotes', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastExpertMessageAt']))
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedAt', 'firstResponseAt', 'closedAt', 'outcome', 'expertNotes', 'updatedAt', 'lastMessageAt', 'lastMessageSenderRole', 'lastExpertMessageAt']) &&
+                       (!incoming().keys().hasAny(['outcome']) || isStr(incoming().outcome, 0, 200)) &&
+                       (!incoming().keys().hasAny(['expertNotes']) || isStr(incoming().expertNotes, 0, 2000)))
                     );
       allow delete: if isAdmin();
 
@@ -663,10 +797,6 @@ service cloud.firestore {
                     get(/databases/$(database)/documents/consultations/$(incoming().consultationId)).data.status in ['resolved', 'closed'] &&
                     isValidId(reviewId);
       allow update, delete: if isAdmin();
-    }
-
-    match /test/{testId} {
-      allow read: if true;
     }
 
     // ===============================================================
@@ -780,6 +910,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Raw per-farmer area reports. Server only (service account); never readable by clients.
+    match /area_raw/{areaKey} {
+      allow read, write: if false;
+    }
+
     // A message from the admin to farmers in one district or everywhere.
     match /broadcasts/{broadcastId} {
       allow get, list: if isSignedIn();
@@ -802,17 +937,34 @@ service cloud.firestore {
     // One phone's permission to receive notifications. The farmer who owns
     // it can create, replace, read and delete it. The server reads these with
     // the service account to send a notification; no other user can.
+    //
+    // The document id is `<uid>_<slot>` with slot 0 to 4, so one account can
+    // hold at most five subscriptions (five phones). Guests cannot subscribe:
+    // a guest account is free to create in bulk. The endpoint must be one of
+    // the browsers' own push services (same list as isPushServiceEndpoint in
+    // netlify/functions/_shared/push-send.ts).
+    function isOwnSubscriptionSlot(subscriptionId) {
+      return subscriptionId in [
+        request.auth.uid + '_0',
+        request.auth.uid + '_1',
+        request.auth.uid + '_2',
+        request.auth.uid + '_3',
+        request.auth.uid + '_4'
+      ];
+    }
+
     match /push_subscriptions/{subscriptionId} {
       allow get: if isSignedIn() && resource.data.uid == request.auth.uid;
       allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      // Guests too (most farmers are guests); the five slots per account are the cap.
       allow create, update: if isSignedIn() &&
-                    isValidId(subscriptionId) &&
+                    isOwnSubscriptionSlot(subscriptionId) &&
                     incoming().keys().hasAll(['uid', 'endpoint', 'p256dh', 'auth', 'lang', 'createdAt']) &&
                     incoming().keys().hasOnly(['uid', 'endpoint', 'p256dh', 'auth', 'lang', 'areaKey', 'createdAt']) &&
                     incoming().uid == request.auth.uid &&
                     (resource == null || resource.data.uid == request.auth.uid) &&
                     isStr(incoming().endpoint, 20, 2000) &&
-                    incoming().endpoint.matches('^https://.*') &&
+                    incoming().endpoint.matches('^https://(fcm\\.googleapis\\.com|android\\.googleapis\\.com|updates\\.push\\.services\\.mozilla\\.com|[a-z0-9-]+\\.notify\\.windows\\.com|web\\.push\\.apple\\.com)/[^\\s]*$') &&
                     isStr(incoming().p256dh, 20, 300) &&
                     isStr(incoming().auth, 8, 100) &&
                     incoming().lang in ['bn', 'en'] &&
