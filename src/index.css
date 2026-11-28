@@ -234,3 +234,17 @@
 }
 
 
+
+/* Printing (farm record, prescriptions): only the page content, never the
+   app's header, menus or bottom bar, and no clipped scroll area. */
+@media print {
+  header,
+  nav {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+}

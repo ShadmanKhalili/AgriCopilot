@@ -62,6 +62,17 @@
     window_size = 60
     aggregate_by = ["ip", "domain"]
 
+# Farm record score. Each call reads the farmer's record and writes one
+# document, so it is capped; the function also refuses repeats within minutes.
+[[redirects]]
+  from = "/api/farm-record-score"
+  to = "/.netlify/functions/farm-record-score"
+  status = 200
+  [redirects.rate_limit]
+    window_limit = 20
+    window_size = 60
+    aggregate_by = ["ip", "domain"]
+
 [[redirects]]
   from = "/api/weather-next"
   to = "/.netlify/functions/weathernext-3"

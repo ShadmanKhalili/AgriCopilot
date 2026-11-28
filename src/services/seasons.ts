@@ -8,7 +8,9 @@
  * Firestore document shapes are fixed, because the security rules match
  * them exactly:
  *   season:  { uid, crop, landSize, landUnit, expectedYieldMon,
- *              expectedPricePerMon, plannedCost, createdAt, updatedAt }
+ *              expectedPricePerMon, plannedCost, createdAt, updatedAt,
+ *              plotId?, stage?, sowingDate?, harvestDate?, harvestMon? }
+ *            (the last five are Phase 7 progress; saving a plan must keep them)
  *   expense: { uid, seasonId, category, amount, note, date, createdAt }
  *
  * Writes return the stored item at once plus a `saved` promise. With the
@@ -43,6 +45,10 @@ import {
   type SeasonPlan,
 } from '../utils/seasonMath';
 import { dhakaDateString } from '../utils/farmTaskDates';
+import { cleanSeasonProgress, SALE_LIMIT, type SeasonProgress } from '../../netlify/functions/_shared/farm-record-model';
+
+/** A season with the optional Phase 7 progress fields (plot, stage, dates, harvest). */
+export type SeasonWithProgress = SeasonPlan & SeasonProgress;
 
 export const SEASON_LIMIT = 20;
 export const EXPENSE_LIMIT = 200;
@@ -60,7 +66,7 @@ export interface Pending<T> {
 export const LOCAL_SEASONS_KEY = 'krishi_seasons_v1';
 
 interface LocalStore {
-  seasons: SeasonPlan[];
+  seasons: SeasonWithProgress[];
   expenses: Expense[];
 }
 
@@ -71,12 +77,13 @@ const str = (value: unknown, max: number): string =>
   typeof value === 'string' ? value.slice(0, max) : '';
 
 /** Rebuild a season from untrusted stored data; null when it is not one. */
-export const parseSeason = (id: string, data: Record<string, unknown>): SeasonPlan | null => {
+export const parseSeason = (id: string, data: Record<string, unknown>): SeasonWithProgress | null => {
   const clean = normaliseSeasonInput(data as Partial<SeasonInput>);
   if (!clean || !id) return null;
   return {
     id,
     ...clean,
+    ...cleanSeasonProgress(data),
     createdAt: str(data.createdAt, 40),
     updatedAt: str(data.updatedAt, 40) || str(data.createdAt, 40),
   };
@@ -112,7 +119,7 @@ export const readLocalStore = (): LocalStore => {
   }
 };
 
-const writeLocalStore = (store: LocalStore): void => {
+export const writeLocalStore = (store: LocalStore): void => {
   try {
     window.localStorage.setItem(
       LOCAL_SEASONS_KEY,
@@ -130,6 +137,9 @@ const writeLocalStore = (store: LocalStore): void => {
 // Firestore
 // ---------------------------------------------------------------------------
 
+/** Sales noted against seasons (Phase 7) are kept by `farmRecord.ts`; they go when their season goes. */
+export const LOCAL_SALES_KEY = 'krishi_sales_v1';
+
 const seasonsCol = (uid: string) => collection(db, 'users', uid, 'seasons');
 const expensesCol = (uid: string, seasonId: string) =>
   collection(db, 'users', uid, 'seasons', seasonId, 'expenses');
@@ -139,51 +149,73 @@ const expensesCol = (uid: string, seasonId: string) =>
 // ---------------------------------------------------------------------------
 
 /** Saved plans, most recently changed first. */
-export const listSeasons = async (uid: string | null): Promise<SeasonPlan[]> => {
+export const listSeasons = async (uid: string | null): Promise<SeasonWithProgress[]> => {
   if (!uid) return sortSeasons(readLocalStore().seasons);
   const snap = await getDocs(query(seasonsCol(uid), where('uid', '==', uid), limit(SEASON_LIMIT)));
   const seasons = snap.docs
     .map((d) => parseSeason(d.id, d.data() as Record<string, unknown>))
-    .filter((s): s is SeasonPlan => s !== null);
+    .filter((s): s is SeasonWithProgress => s !== null);
   return sortSeasons(seasons);
 };
 
 /**
  * Save a plan. With `existing` the plan is updated in place (same id and
  * creation time); otherwise a new plan is made.
+ *
+ * Only the plan fields are written, and the Phase 7 progress fields (plot,
+ * stage, dates, harvest) already on the season are kept: on the device by
+ * carrying them over, in Firestore by merging.
  */
 export const saveSeason = (
   uid: string | null,
   input: SeasonInput,
-  existing?: Pick<SeasonPlan, 'id' | 'createdAt'> | null
-): Pending<SeasonPlan> => {
+  existing?: (Pick<SeasonPlan, 'id' | 'createdAt'> & SeasonProgress) | null
+): Pending<SeasonWithProgress> => {
   const clean = normaliseSeasonInput(input);
   if (!clean) throw new Error('seasons: the plan is not valid');
   const now = new Date().toISOString();
 
   if (!uid) {
-    const item: SeasonPlan = {
+    const store = readLocalStore();
+    const stored = existing?.id ? store.seasons.find((s) => s.id === existing.id) : undefined;
+    const item: SeasonWithProgress = {
       id: existing?.id ?? localId('season'),
       ...clean,
+      ...cleanSeasonProgress(stored ?? existing),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
-    const store = readLocalStore();
     store.seasons = [item, ...store.seasons.filter((s) => s.id !== item.id)];
     writeLocalStore(store);
     return { item, saved: Promise.resolve() };
   }
 
   const ref = existing?.id ? doc(seasonsCol(uid), existing.id) : doc(seasonsCol(uid));
-  const item: SeasonPlan = {
+  const createdAt = existing?.createdAt ?? now;
+  const item: SeasonWithProgress = {
     id: ref.id,
     ...clean,
-    createdAt: existing?.createdAt ?? now,
+    ...cleanSeasonProgress(existing),
+    createdAt,
     updatedAt: now,
   };
-  const { id: _id, ...fields } = item;
-  const saved = setDoc(ref, { uid, ...fields });
+  // Merge: only the plan fields are named here, so progress already stored stays.
+  const saved = setDoc(ref, { uid, ...clean, createdAt, updatedAt: now }, { merge: true });
   return { item, saved };
+};
+
+/** Drop the device copy of the sales noted against a season that is being deleted. */
+const removeLocalSales = (seasonId: string): void => {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_SALES_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.sales)) return;
+    parsed.sales = parsed.sales.filter((sale: any) => sale?.seasonId !== seasonId);
+    window.localStorage.setItem(LOCAL_SALES_KEY, JSON.stringify(parsed));
+  } catch {
+    // Nothing to clean up, or storage is blocked.
+  }
 };
 
 /** Delete a plan and every cost noted against it. */
@@ -194,12 +226,17 @@ export const deleteSeason = async (uid: string | null, seasonId: string): Promis
     store.seasons = store.seasons.filter((s) => s.id !== seasonId);
     store.expenses = store.expenses.filter((e) => e.seasonId !== seasonId);
     writeLocalStore(store);
+    removeLocalSales(seasonId);
     return;
   }
   const snap = await getDocs(
     query(expensesCol(uid, seasonId), where('uid', '==', uid), limit(EXPENSE_LIMIT))
   );
   await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  const salesSnap = await getDocs(
+    query(collection(db, 'users', uid, 'seasons', seasonId, 'sales'), where('uid', '==', uid), limit(SALE_LIMIT))
+  );
+  await Promise.all(salesSnap.docs.map((d) => deleteDoc(d.ref)));
   await deleteDoc(doc(seasonsCol(uid), seasonId));
 };
 

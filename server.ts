@@ -17,6 +17,7 @@ import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
 import { farmActionsFromFeed, isSafeSprayHour } from "./netlify/functions/_shared/farm-actions.ts";
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./netlify/functions/_shared/daily-merge.ts";
 import areaReportHandler from "./netlify/functions/area-report.ts";
+import farmRecordScoreHandler from "./netlify/functions/farm-record-score.ts";
 import {
   getFreshMarketBulletin,
   getStaleMarketBulletin,
@@ -418,6 +419,24 @@ async function startServer() {
       res.status(response.status).type("application/json").send(await response.text());
     } catch {
       res.status(500).json({ error: "area_report_failed" });
+    }
+  });
+
+  // Farm record score (Phase 7). Calculated on the server so the farmer cannot
+  // type the number; same handler as the Netlify function.
+  app.post("/api/farm-record-score", async (req, res) => {
+    try {
+      const response = await farmRecordScoreHandler(
+        new Request("http://localhost/api/farm-record-score", {
+          method: "POST",
+          headers: {
+            ...(req.headers.authorization ? { Authorization: String(req.headers.authorization) } : {}),
+          },
+        })
+      );
+      res.status(response.status).type("application/json").send(await response.text());
+    } catch {
+      res.status(500).json({ error: "farm_record_score_failed" });
     }
   });
 
