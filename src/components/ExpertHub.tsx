@@ -303,29 +303,29 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 {c.expertName || (bn ? 'বিশেষজ্ঞ' : 'Expert')}
               </span>
               <span
-                className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusColor(
+                className={`text-sm font-black px-2 py-0.5 rounded-full border ${statusColor(
                   c.status
                 )}`}
               >
                 {statusLabel(c.status, lang)}
               </span>
               {unread && (
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                <span className="text-sm font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                   {bn ? 'নতুন উত্তর' : 'New reply'}
                 </span>
               )}
             </div>
-            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 mt-1 truncate">
+            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-1 truncate">
               {categoryLabel(c.category, lang)} • {c.crop || (bn ? 'ফসল' : 'Crop')}
             </p>
             {!isPast && (
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1">
                 <Clock className="w-3 h-3 shrink-0" />
                 {bn ? 'লক্ষ্য সময়' : 'Target'}: {new Date(c.slaDueAtMs).toLocaleTimeString(bn ? 'bn-BD' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}
               </p>
             )}
             {!!c.farmerRating && (
-              <p className="text-[11px] font-bold text-amber-600 dark:text-amber-300 mt-1 flex items-center gap-1">
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-300 mt-1 flex items-center gap-1">
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                 {toBn(c.farmerRating)}/৫
               </p>
@@ -350,12 +350,12 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
             <h1 className="font-black text-xl sm:text-2xl leading-tight">
               {bn ? 'মানুষ বিশেষজ্ঞ সহায়তা' : 'Human Expert Help'}
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm font-medium text-emerald-50/90 leading-relaxed">
+            <p className="mt-1.5 text-sm font-medium text-emerald-50/90 leading-relaxed">
               {bn
                 ? 'এআই-এর পরের ধাপ — উপজেলা কৃষি অফিসার, কৃষি এনজিওর মাঠকর্মী ও যাচাইকৃত বিশেষজ্ঞ। আপনি অনুমতি দিলে তবেই তিনি আপনার খামারের তথ্য দেখতে পাবেন।'
                 : 'The layer after AI — Upazila agriculture officers, NGO field staff and vetted experts. They only see your farm data if you allow it.'}
             </p>
-            <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] font-bold">
+            <div className="mt-3 flex items-center gap-2 flex-wrap text-sm font-bold">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/15">
                 <Lock className="w-3.5 h-3.5" />
                 {bn ? 'সম্মতিভিত্তিক তথ্য শেয়ার' : 'Consent-first sharing'}
@@ -397,13 +397,13 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
           <p className="font-black text-slate-900 dark:text-white">
             {bn ? 'এক ট্যাপে বিশেষজ্ঞের সাথে যুক্ত হন' : 'Connect with an expert in one tap'}
           </p>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             {bn
               ? 'সাইন ইন বা পাসওয়ার্ড লাগবে না। গেস্ট হিসেবে শুরু করুন — পরে Google যুক্ত করলে আপনার অনুরোধ ও চ্যাট একই অ্যাকাউন্টে সংরক্ষিত থাকবে।'
               : 'No sign-in or password needed. Start as a guest — link Google later and your requests and chats stay on the same account.'}
           </p>
           {guestError && (
-            <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2 max-w-md mx-auto">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-900 rounded-xl px-3 py-2 max-w-md mx-auto">
               {guestError}
             </p>
           )}
@@ -420,19 +420,19 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
             <button
               type="button"
               onClick={() => signIn().catch(() => {})}
-              className="min-h-[48px] px-5 rounded-2xl bg-white dark:bg-stone-800 border-2 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-200 font-black text-xs active:scale-95 transition-all"
+              className="min-h-[48px] px-5 rounded-2xl bg-white dark:bg-stone-800 border-2 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-200 font-black text-sm active:scale-95 transition-all"
             >
               {bn ? 'Google দিয়ে সাইন ইন' : 'Sign in with Google'}
             </button>
             <a
               href="tel:16123"
-              className="min-h-[48px] px-5 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-black text-xs flex items-center gap-2 active:scale-95 transition-all"
+              className="min-h-[48px] px-5 rounded-2xl bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-black text-sm flex items-center gap-2 active:scale-95 transition-all"
             >
               <PhoneCall className="w-4 h-4" />
               {bn ? '১৬১২৩ কল করুন' : 'Call 16123'}
             </a>
           </div>
-          <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
+          <p className="text-sm font-medium text-slate-400 dark:text-slate-500 max-w-sm mx-auto">
             {bn
               ? 'গেস্ট অ্যাকাউন্ট এই ডিভাইসে সংরক্ষিত থাকে। ব্রাউজার ডেটা মুছলে অনুরোধ হারাতে পারে — তাই পরে অ্যাকাউন্ট সংরক্ষণ করুন।'
               : 'A guest account is stored on this device. Clearing browser data can lose requests — save your account later.'}
@@ -453,10 +453,10 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
               <div className="flex items-start gap-3 min-w-0 flex-1">
                 <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+                  <p className="text-sm font-black text-amber-900 dark:text-amber-200">
                     {bn ? 'আপনি গেস্ট হিসেবে আছেন' : 'You are using a guest account'}
                   </p>
-                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-0.5">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-0.5">
                     {bn
                       ? 'ব্রাউজার ডেটা মুছলে অনুরোধ ও চ্যাট হারাতে পারে। Google যুক্ত করলে সব একই অ্যাকাউন্টে সংরক্ষিত থাকবে।'
                       : 'Clearing browser data can lose your requests and chats. Link Google to keep everything on one account.'}
@@ -467,7 +467,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 type="button"
                 onClick={handleSaveGuest}
                 disabled={savingGuest}
-                className="min-h-[48px] px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black shrink-0 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                className="min-h-[48px] px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black shrink-0 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {savingGuest && <Loader2 className="w-4 h-4 animate-spin" />}
                 {bn ? 'Google যুক্ত করুন' : 'Link Google'}
@@ -477,7 +477,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
           {isLoading ? (
             <div className="py-10 flex flex-col items-center gap-2 text-emerald-700 dark:text-emerald-300">
               <Loader2 className="w-7 h-7 animate-spin" />
-              <span className="text-xs font-bold uppercase tracking-wider">
+              <span className="text-sm font-bold">
                 {bn ? 'বিশেষজ্ঞ খোঁজা হচ্ছে...' : 'Finding experts...'}
               </span>
             </div>
@@ -487,17 +487,17 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 <div className="rounded-3xl border-2 border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-300 shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-black text-amber-900 dark:text-amber-200">
+                    <p className="text-sm font-black text-amber-900 dark:text-amber-200">
                       {bn ? 'বিশেষজ্ঞ তালিকা এখন পাওয়া যাচ্ছে না' : 'Expert directory is unavailable'}
                     </p>
-                    <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-0.5">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-0.5">
                       {describeError(loadError, lang)}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setReloadKey((k) => k + 1)}
-                    className="min-h-[44px] px-3 rounded-2xl bg-amber-500 text-white text-[11px] font-black shrink-0"
+                    className="min-h-[48px] px-3 rounded-2xl bg-amber-500 text-white text-sm font-black shrink-0"
                   >
                     {bn ? 'আবার চেষ্টা' : 'Retry'}
                   </button>
@@ -514,7 +514,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                     <h2 className="font-black text-base text-slate-900 dark:text-white">
                       {bn ? 'বিশেষজ্ঞের কাছে সাহায্য চান' : 'Ask a human expert'}
                     </h2>
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mt-1">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mt-1">
                       {bn
                         ? '৪টি সহজ ধাপে অনুরোধ পাঠান। প্রথমেই আপনি ঠিক করবেন বিশেষজ্ঞ কী কী তথ্য দেখতে পাবেন।'
                         : 'Four simple steps. You decide exactly what the expert can see.'}
@@ -536,7 +536,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 </button>
                 {realExpertCount > 0 ? (
                   <div className="space-y-2">
-                    <p className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                    <p className="text-sm font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
                       <span className="relative flex h-2 w-2 shrink-0">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -545,7 +545,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                         ? `এখন ${toBn(realExpertCount)} জন বিশেষজ্ঞ অনুরোধ নিচ্ছেন — ফ্রি পাইলট সেবা`
                         : `${realExpertCount} experts accepting requests now — free during the pilot`}
                     </p>
-                    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-black">
+                    <div className="flex flex-wrap items-center gap-1.5 text-sm font-black">
                       {SLA_CHIPS.map(({ urgency }) => (
                         <span
                           key={urgency}
@@ -563,7 +563,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     {bn
                       ? 'এখন কোনো বিশেষজ্ঞ তালিকাভুক্ত নন। জরুরি হলে ১৬১২৩ নম্বরে ফোন করুন।'
@@ -602,14 +602,14 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                         {bn ? 'বিশেষজ্ঞ আবেদন' : 'Expert application'}: {application.status === 'pending' ? (bn ? 'যাচাইয়ে' : 'Pending') : application.status === 'approved' ? (bn ? 'অনুমোদিত' : 'Approved') : (bn ? 'প্রত্যাখ্যাত' : 'Rejected')}
                       </p>
                       {application.reviewerNote && (
-                        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1">
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
                           {application.reviewerNote}
                         </p>
                       )}
                       <button
                         type="button"
                         onClick={() => setOnboardingOpen(true)}
-                        className="mt-2 text-[11px] font-black text-emerald-700 dark:text-emerald-300 underline"
+                        className="mt-2 min-h-[48px] inline-flex items-center text-sm font-black text-emerald-700 dark:text-emerald-300 underline"
                       >
                         {bn ? 'বিস্তারিত দেখুন' : 'View details'}
                       </button>
@@ -626,7 +626,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                       <span className="block font-black text-sm text-slate-900 dark:text-white">
                         {bn ? 'আপনি কি কৃষি বিশেষজ্ঞ?' : 'Are you an agri expert?'}
                       </span>
-                      <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                      <span className="block text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5">
                         {bn
                           ? 'কৃষি অফিসার, এনজিও মাঠকর্মী বা অভিজ্ঞ কৃষক হিসেবে আবেদন করুন — যাচাইয়ের পর অনুমোদন।'
                           : 'Agri officers, NGO field staff and experienced farmers can apply — verified before approval.'}
@@ -640,7 +640,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                   <p className="text-sm font-black text-amber-900 dark:text-amber-200">
                     {bn ? 'আপনার বিশেষজ্ঞ আবেদন যাচাইয়ে আছে' : 'Your expert application is under review'}
                   </p>
-                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300 mt-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mt-1">
                     {bn
                       ? 'অনুমোদনের পর আপনি Expert Desk দেখতে পাবেন। ততক্ষণ কৃষক হিসেবে সব সেবা ব্যবহার করতে পারবেন।'
                       : 'Once approved you will see the Expert Desk. Until then all farmer features stay available.'}
@@ -677,20 +677,20 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                                 {e.displayName}
                               </span>
                               {e.isDemo && (
-                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200">
+                                <span className="text-sm font-black px-1.5 py-0.5 rounded bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200">
                                   ডেমো
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 truncate">
+                            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 truncate">
                               {e.roleTitle}
                             </p>
-                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                               {affiliationLabel(e.affiliationType, lang)} •{' '}
                               {[...(e.upazilas || []), ...(e.districts || [])].slice(0, 2).join(', ') ||
                                 (bn ? 'বাংলাদেশ' : 'Bangladesh')}
                             </p>
-                            <p className="text-[11px] font-bold text-amber-600 dark:text-amber-300 mt-1">
+                            <p className="text-sm font-bold text-amber-600 dark:text-amber-300 mt-1">
                               {e.ratingCount > 0
                                 ? `★ ${toBn((e.ratingAverage || 0).toFixed(1))} (${toBn(e.ratingCount)})`
                                 : bn
@@ -722,7 +722,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 type="button"
                 onClick={loadAdminApps}
                 disabled={adminBusy}
-                className="min-h-[44px] px-3 rounded-2xl bg-white dark:bg-stone-900 border border-amber-300 dark:border-amber-900 text-[11px] font-black text-amber-900 dark:text-amber-200 flex items-center gap-1.5 disabled:opacity-60"
+                className="min-h-[48px] px-3 rounded-2xl bg-white dark:bg-stone-900 border border-amber-300 dark:border-amber-900 text-sm font-black text-amber-900 dark:text-amber-200 flex items-center gap-1.5 disabled:opacity-60"
               >
                 {adminBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 {bn ? 'রিফ্রেশ' : 'Refresh'}
@@ -731,7 +731,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 type="button"
                 onClick={handleSeedDemo}
                 disabled={adminBusy}
-                className="min-h-[44px] px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-black flex items-center gap-1.5 disabled:opacity-60"
+                className="min-h-[48px] px-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black flex items-center gap-1.5 disabled:opacity-60"
               >
                 <Sparkles className="w-4 h-4" />
                 {bn ? 'ডেমো বিশেষজ্ঞ' : 'Seed demo'}
@@ -740,7 +740,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
           </div>
 
           {adminApps.length === 0 ? (
-            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
               {bn ? 'কোনো আবেদন নেই।' : 'No applications.'}
             </p>
           ) : (
@@ -752,7 +752,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-sm text-slate-900 dark:text-white">{app.fullName}</span>
                   <span
-                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    className={`text-sm font-black px-2 py-0.5 rounded-full ${
                       app.status === 'pending'
                         ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                         : app.status === 'approved'
@@ -763,21 +763,21 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                     {app.status}
                   </span>
                 </div>
-                <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
                   {app.roleTitle} • {affiliationLabel(app.affiliationType, lang)} • {toBn(app.yearsExperience || 0)}{' '}
                   {bn ? 'বছর' : 'yrs'}
                 </p>
-                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   {app.phone} • {[...(app.districts || []), ...(app.upazilas || [])].join(', ') || '—'}
                 </p>
-                <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{app.motivation}</p>
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{app.motivation}</p>
                 {app.status === 'pending' && (
                   <div className="flex items-center gap-2 flex-wrap pt-1">
                     <button
                       type="button"
                       onClick={() => handleApprove(app, 'verified')}
                       disabled={adminBusy}
-                      className="min-h-[44px] px-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-black disabled:opacity-60"
+                      className="min-h-[48px] px-4 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-black disabled:opacity-60"
                     >
                       {bn ? 'অনুমোদন (যাচাইকৃত)' : 'Approve (verified)'}
                     </button>
@@ -785,7 +785,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                       type="button"
                       onClick={() => handleApprove(app, 'provisional')}
                       disabled={adminBusy}
-                      className="min-h-[44px] px-4 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black disabled:opacity-60"
+                      className="min-h-[48px] px-4 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-sm font-black disabled:opacity-60"
                     >
                       {bn ? 'প্রোবেশন' : 'Provisional'}
                     </button>
@@ -793,7 +793,7 @@ export default function ExpertHub({ lang, requestSeed, onClearRequestSeed }: Exp
                       type="button"
                       onClick={() => handleReject(app)}
                       disabled={adminBusy}
-                      className="min-h-[44px] px-4 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950 dark:text-rose-200 text-[11px] font-black disabled:opacity-60"
+                      className="min-h-[48px] px-4 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950 dark:text-rose-200 text-sm font-black disabled:opacity-60"
                     >
                       {bn ? 'প্রত্যাখ্যান' : 'Reject'}
                     </button>

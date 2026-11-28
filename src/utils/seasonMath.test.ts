@@ -8,6 +8,7 @@ import {
   NOTE_MAX,
   expenseTotalsByCategory,
   landInDecimals,
+  mergeExpensesById,
   normaliseExpenseInput,
   normaliseSeasonInput,
   planResult,
@@ -232,5 +233,25 @@ describe('planResult', () => {
       profit: -5000,
       breakEvenPerMon: null,
     });
+  });
+});
+
+describe('mergeExpensesById', () => {
+  const e = (id: string, date: string, createdAt: string) => ({ id, date, createdAt });
+
+  it('keeps a cost added while the list was loading', () => {
+    const loaded = [e('a', '2026-11-01', '2026-11-01T01:00:00Z')];
+    const added = [e('new', '2026-11-20', '2026-11-20T01:00:00Z')];
+    expect(mergeExpensesById(loaded, added).map((x) => x.id)).toEqual(['new', 'a']);
+  });
+
+  it('does not double an item that is in both lists', () => {
+    const item = e('a', '2026-11-01', '2026-11-01T01:00:00Z');
+    expect(mergeExpensesById([item], [item])).toHaveLength(1);
+  });
+
+  it('returns the loaded list when nothing was added', () => {
+    const loaded = [e('a', '2026-11-01', 'x'), e('b', '2026-11-02', 'y')];
+    expect(mergeExpensesById(loaded, []).map((x) => x.id)).toEqual(['b', 'a']);
   });
 });

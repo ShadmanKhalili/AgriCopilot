@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { audioFeedback } from '../utils/audioFeedback';
 import toBn from '../utils/banglaNum';
+import { dhakaDateString } from '../utils/farmTaskDates';
 import {
   addRecoveryLog,
   deleteRecoveryLog,
@@ -208,7 +209,7 @@ export interface FarmerObservation {
   expertNotes?: string;
 }
 
-const todayIso = () => new Date().toISOString().split('T')[0];
+const todayIso = () => dhakaDateString();
 
 export default function PlantHealthRecoveryTracker({
   lang,

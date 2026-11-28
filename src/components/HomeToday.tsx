@@ -9,6 +9,7 @@ import { useAppSettings } from '../context/AppSettingsContext';
 import { useTodayWeather } from '../hooks/useTodayWeather';
 import { signalsSpeech, todaySignals } from '../utils/todaySignals';
 import toBn from '../utils/banglaNum';
+import { timeLabel } from '../utils/bnTime';
 import BigActionButton from './ui/BigActionButton';
 import Card from './ui/Card';
 import ListenButton from './ui/ListenButton';
@@ -16,7 +17,8 @@ import HomeCalendarTasks from './HomeCalendarTasks';
 import AreaWarningStrip from './home/AreaWarningStrip';
 import SignalList from './weather/SignalList';
 import { useAuth } from './AuthProvider';
-import { dhakaDateString, isTaskDue } from '../utils/farmTaskDates';
+import { dhakaDateString, isTaskDue, restoreTask } from '../utils/farmTaskDates';
+import toast from 'react-hot-toast';
 import type { FarmTask } from '../services/farmTasks';
 
 interface Props {
@@ -62,11 +64,17 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
 
   const finishTask = useCallback((taskId: string) => {
     if (!uid) return;
+    const done = tasks.find((task) => task.id === taskId);
     setTasks((list) => list.filter((task) => task.id !== taskId));
     import('../services/farmTasks')
       .then(({ markTaskDone }) => markTaskDone(uid, taskId))
-      .catch((error) => console.warn('Could not mark the reminder done:', error));
-  }, [uid]);
+      .catch((error) => {
+        console.warn('Could not mark the reminder done:', error);
+        // Put the task back so the farmer can see it was not saved.
+        if (done) setTasks((list) => restoreTask(list, done, dhakaDateString()));
+        toast.error(bn ? 'কাজটি সম্পন্ন হিসেবে রাখা যায়নি। আবার চেষ্টা করুন।' : 'Could not mark the task done. Please try again.');
+      });
+  }, [uid, tasks, bn]);
 
   const today = dhakaDateString();
   const dayLabel = (task: FarmTask): string => {
@@ -118,6 +126,12 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
                   : (bn ? `বৃষ্টির সম্ভাবনা ${num(state.weather.rainChanceToday)}%` : `Chance of rain ${num(state.weather.rainChanceToday)}%`)}
               </span>
             </div>
+
+            <p className="text-sm text-stone-600 dark:text-stone-400">
+              {bn
+                ? `${timeLabel(state.fetchedAt, true)} পর্যন্ত হালনাগাদ`
+                : `Updated ${timeLabel(state.fetchedAt, false)}`}
+            </p>
 
             <SignalList signals={signals} lang={lang} />
 

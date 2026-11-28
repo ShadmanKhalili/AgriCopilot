@@ -9,6 +9,7 @@ import {
   MAX_AMOUNT_BDT,
   NOTE_MAX,
   expenseTotalsByCategory,
+  mergeExpensesById,
   sortExpenses,
   totalExpenses,
   type Expense,
@@ -42,11 +43,12 @@ export default function ExpenseNotes({ lang, uid, season }: Props) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    // Keep only costs of this plan: one added while the list loads must survive.
+    setExpenses((prev) => prev.filter((e) => e.seasonId === season.id));
     listExpenses(uid, season.id)
-      .then((list) => { if (alive) setExpenses(list); })
+      .then((list) => { if (alive) setExpenses((prev) => mergeExpensesById(list, prev.filter((e) => e.seasonId === season.id))); })
       .catch(() => {
         if (!alive) return;
-        setExpenses([]);
         toast.error(bn ? 'খরচের তালিকা আনা যায়নি।' : 'Could not load the noted costs.');
       })
       .finally(() => { if (alive) setLoading(false); });

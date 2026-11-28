@@ -21,6 +21,16 @@ interface AuthContextType {
   user: User | null;
   userRole: string | null;
   userProfile: UserProfile | null;
+  /**
+   * True once Firebase Auth has said who the user is (or that nobody is signed
+   * in). This is quick (it reads the saved sign-in), so the app can show Home
+   * on it. The profile and role may still be loading.
+   */
+  isUserKnown: boolean;
+  /**
+   * True once the profile load has finished (so `userRole` is final). Use this,
+   * not `isUserKnown`, before deciding that someone is not an admin or expert.
+   */
   isAuthReady: boolean;
   /** True for the platform superadmin role. */
   isAdmin: boolean;
@@ -42,6 +52,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userRole: null,
   userProfile: null,
+  isUserKnown: false,
   isAuthReady: false,
   isAdmin: false,
   isExpert: false,
@@ -60,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isUserKnown, setIsUserKnown] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
@@ -91,6 +103,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setUser(currentUser);
+      // Show the app now; the profile (role, usage) loads in the background below.
+      setIsUserKnown(true);
       if (currentUser) {
         try {
           // Firestore is loaded on demand: guests never download the Firestore SDK.
@@ -280,6 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user, 
       userRole, 
       userProfile, 
+      isUserKnown,
       isAuthReady, 
       isAdmin: userRole === 'admin',
       isExpert: userRole === 'expert' || userRole === 'org_admin',

@@ -3,6 +3,7 @@ import { Cloud, CloudRain, Sun, Wind, Droplets, Loader2, MapPin, Navigation, Spa
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Language } from '../utils/translations';
 import toBn from '../utils/banglaNum';
+import { timeLabel } from '../utils/bnTime';
 import Tooltip from './Tooltip';
 import LocationDisplay from './LocationDisplay';
 import { geoData } from '../utils/geoData';
@@ -33,6 +34,18 @@ const numOrUndef = (value: unknown): number | undefined =>
 /** A number for display, or a dash when it is missing. */
 const fmtNum = (value: number | undefined, digits = 0): string =>
   value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits);
+
+/** The sky in Bangla, for the condition words the forecast code uses. */
+const CONDITION_BN: Record<string, string> = {
+  Sunny: 'রৌদ্রোজ্জ্বল',
+  'Partly Cloudy': 'আংশিক মেঘলা',
+  Foggy: 'কুয়াশা',
+  Rainy: 'বৃষ্টি',
+  Snowy: 'তুষারপাত',
+  Showers: 'বৃষ্টির ঝাপটা',
+  Thunderstorm: 'বজ্রসহ বৃষ্টি',
+  Unknown: 'অজানা',
+};
 
 /** What the window holds when no safe time was found. The server sends a similar English sentence. */
 const NO_SAFE_WINDOW = 'No safe window in the next 24 hours';
@@ -138,7 +151,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [selectedUpazila, setSelectedUpazila] = useState(geoData[0].upazilas[0]?.id || '');
   const [forecastModel, setForecastModel] = useState<'weathernext3' | 'standard'>('weathernext3');
   const [showSensorMetrology, setShowSensorMetrology] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [cacheInfo, setCacheInfo] = useState<{ isCached: boolean; timestamp?: number; isFallback?: boolean } | null>(null);
   const [isRefreshingLive, setIsRefreshingLive] = useState(false);
   const [configStatus, setConfigStatus] = useState<{ googleMapsConfigured: boolean; weatherNextConfigured: boolean; activeProviders?: any } | null>(null);
@@ -146,6 +159,9 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
   const [loadError, setLoadError] = useState(false);
   const simple = useUiMode() === 'simple';
   const bn = lang === 'bn';
+  /** A number for display: Bangla numerals in Bangla. */
+  const nb = (value: number | string | null | undefined): string =>
+    value === null || value === undefined || value === '' ? '—' : bn ? toBn(value) : String(value);
   // The area's name, worked out the same way as the header and Home do.
   const { place } = useAppSettings();
   const { locationName: lookedUpName } = useLocationName(globalLocation, lang);
@@ -420,7 +436,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
             if (isSafe) {
               const startWindow = new Date(times[i]);
               const endWindow = new Date(times[i + 2]);
-              const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+              const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
               
               const startDay = new Date(times[i]).getDate();
               const refDay = new Date(referenceTime).getDate();
@@ -588,7 +604,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       setCacheInfo(null);
       const locKey = `${globalLocation.latitude.toFixed(2)}_${globalLocation.longitude.toFixed(2)}`;
       saveCachedWeather(locKey, newWeather, activeModel);
-      setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setLastUpdated(Date.now());
 
       if (usedFallbackStandard) {
         toast(
@@ -613,7 +629,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       if (cached) {
         setWeather(cached.data);
         setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: cached.isFallback });
-        setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setLastUpdated(cached.timestamp);
         if (forceFresh) {
           toast(
             lang === 'bn' ? 'অফলাইন মোড: সংরক্ষিত ক্যাশ ডেটা দেখানো হচ্ছে' : 'Offline mode: displaying saved cache',
@@ -653,7 +669,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
       if (cached && !weather) {
         setWeather(cached.data);
         setCacheInfo({ isCached: true, timestamp: cached.timestamp, isFallback: false });
-        setLastUpdated(new Date(cached.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setLastUpdated(cached.timestamp);
       }
       
       // Always immediately query live API in the background
@@ -1105,12 +1121,12 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                     <div>
                       <div className="flex items-baseline">
                         <span className="text-3xl sm:text-4xl font-extrabold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {fmtNum(weather.temp, 1)}
+                          {nb(fmtNum(weather.temp, 1))}
                         </span>
                         <span className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 ml-1">°C</span>
                       </div>
                       <p className="text-xs sm:text-sm font-bold text-stone-600 dark:text-stone-400 uppercase tracking-wide mt-0.5">
-                        {weather.condition}
+                        {bn ? (CONDITION_BN[weather.condition] ?? weather.condition) : weather.condition}
                       </p>
                     </div>
                   </div>
@@ -1121,7 +1137,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         {lang === 'bn' ? 'বৃষ্টিপাত' : 'Precipitation'}
                       </span>
                       <span className="text-sm font-bold text-cyan-600 dark:text-cyan-400 tabular-nums">
-                        {fmtNum(weather.rainfall, 1)} mm
+                        {nb(fmtNum(weather.rainfall, 1))} mm
                       </span>
                     </div>
                   )}
@@ -1141,7 +1157,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.humidity}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.humidity === undefined ? '—' : `${weather.humidity.toFixed(1)}%`}
+                        {weather.humidity === undefined ? '—' : `${nb(weather.humidity.toFixed(1))}%`}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1159,7 +1175,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       </div>
                       <div className="flex items-baseline">
                         <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                          {fmtNum(weather.windSpeed, 1)}
+                          {nb(fmtNum(weather.windSpeed, 1))}
                         </span>
                         <span className="text-[11px] font-medium text-stone-400 ml-1">km/h</span>
                       </div>
@@ -1178,7 +1194,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.rainChance}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.rainChance === undefined ? '—' : `${weather.rainChance}%`}
+                        {weather.rainChance === undefined ? '—' : `${nb(weather.rainChance)}%`}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1195,7 +1211,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                         <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 truncate">{t.uvIndex}</span>
                       </div>
                       <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                        {weather.uvIndex === undefined ? '—' : weather.uvIndex}
+                        {weather.uvIndex === undefined ? '—' : nb(weather.uvIndex)}
                       </span>
                     </motion.div>
                   </Tooltip>
@@ -1221,7 +1237,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {fmtNum(numOrUndef(weather.boundaryWind100m), 1)}
+                          {nb(fmtNum(numOrUndef(weather.boundaryWind100m), 1))}
                           <span className="text-[11px] text-gray-500 ml-0.5 font-normal">km/h</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
@@ -1238,7 +1254,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {fmtNum(numOrUndef(weather.solarRadiationDNI))}
+                          {nb(fmtNum(numOrUndef(weather.solarRadiationDNI)))}
                           <span className="text-[11px] text-gray-500 ml-0.5 font-normal">W/m²</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
@@ -1271,11 +1287,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           )}
                         </div>
                         <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                          {weather.dewPoint !== undefined ? `${weather.dewPoint.toFixed(1)}°C` : '—'}
+                          {weather.dewPoint !== undefined ? `${nb(weather.dewPoint.toFixed(1))}°C` : '—'}
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
                           {weather.dewPointDepression !== undefined 
-                            ? (lang === 'bn' ? `শিশিরাঙ্ক ${weather.dewPointDepression.toFixed(1)}°C` : `Depr: ${weather.dewPointDepression.toFixed(1)}°C`)
+                            ? (lang === 'bn' ? `শিশিরাঙ্ক ${nb(weather.dewPointDepression.toFixed(1))}°C` : `Depr: ${weather.dewPointDepression.toFixed(1)}°C`)
                             : (lang === 'bn' ? 'তথ্য নেই' : 'Depression: N/A')}
                         </p>
                       </div>
@@ -1289,7 +1305,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           </span>
                         </div>
                         <div className="text-base sm:text-lg font-bold text-stone-900 dark:text-stone-100 tabular-nums">
-                          {fmtNum(numOrUndef(weather.expectedRainToday), 1)}
+                          {nb(fmtNum(numOrUndef(weather.expectedRainToday), 1))}
                           <span className="text-[11px] text-stone-500 ml-0.5 font-normal">mm</span>
                         </div>
                         <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">
@@ -1331,7 +1347,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           }`}
                         >
                           <span className={`text-[11px] font-semibold ${idx === 0 ? 'text-blue-100' : 'text-stone-500 dark:text-stone-400'}`}>
-                            {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : hour.time}
+                            {idx === 0 ? (lang === 'bn' ? 'এখন' : 'Now') : (timeLabel(hour.rawTime, bn) ?? hour.time)}
                           </span>
                           <div className="my-1">
                             {hour.condition === 'Sunny' ? (
@@ -1342,11 +1358,11 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               <Cloud className={`w-4 h-4 ${idx === 0 ? 'text-blue-200' : 'text-blue-400'}`} />
                             )}
                           </div>
-                          <span className="text-xs font-bold tabular-nums">{hour.temp === undefined ? '—' : `${Math.round(hour.temp)}°C`}</span>
+                          <span className="text-xs font-bold tabular-nums">{hour.temp === undefined ? '—' : `${nb(Math.round(hour.temp))}°C`}</span>
                           <div className="mt-0.5 flex items-center gap-0.5 text-[11px]">
                             <Droplets className={`w-2 h-2 ${idx === 0 ? 'text-cyan-200' : 'text-blue-500'}`} />
                             <span className={idx === 0 ? 'text-blue-100 font-bold' : 'text-blue-600 dark:text-blue-400 font-bold'}>
-                              {hour.rainProb === undefined ? '—' : `${hour.rainProb}%`}
+                              {hour.rainProb === undefined ? '—' : `${nb(hour.rainProb)}%`}
                             </span>
                           </div>
                         </div>
@@ -1371,8 +1387,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               {lang === 'bn' ? 'মাটির আর্দ্রতা (০-৭ সেমি)' : 'Soil Moisture (0-7cm)'}
                             </p>
                             <p className="text-stone-600 dark:text-stone-400 mt-0.5">
-                              <span className="font-bold">{weather.soilMoisture} m³/m³</span>
-                              {weather.evapotranspiration !== undefined && ` • বাষ্পীভবন: ${weather.evapotranspiration} mm/দিন`}
+                              <span className="font-bold">{nb(weather.soilMoisture)} m³/m³</span>
+                              {weather.evapotranspiration !== undefined && ` • বাষ্পীভবন: ${nb(weather.evapotranspiration)} mm/দিন`}
                             </p>
                           </div>
                         </div>
@@ -1385,8 +1401,8 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                               {lang === 'bn' ? 'মাটির গুণমান' : 'Soil Properties'}
                             </p>
                             <p className="text-stone-600 dark:text-stone-400 mt-0.5">
-                              pH: <span className="font-bold">{weather.soilPH}</span> | 
-                              নাইট্রোজেন: <span className="font-bold">{weather.soilNitrogen} g/kg</span>
+                              pH: <span className="font-bold">{nb(weather.soilPH)}</span> | 
+                              নাইট্রোজেন: <span className="font-bold">{nb(weather.soilNitrogen)} g/kg</span>
                             </p>
                           </div>
                         </div>
@@ -1423,13 +1439,13 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                           {lang === 'bn' ? 'গত বছর এই দিনে:' : 'This day last year:'}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Thermometer className="w-3 h-3 text-red-500" /> Max: {weather.historicalToday.maxTemp}°C
+                          <Thermometer className="w-3 h-3 text-red-500" /> {bn ? 'সর্বোচ্চ' : 'Max'}: {nb(weather.historicalToday.maxTemp)}°C
                         </span>
                         <span className="flex items-center gap-1">
-                          <Thermometer className="w-3 h-3 text-blue-500" /> Min: {weather.historicalToday.minTemp}°C
+                          <Thermometer className="w-3 h-3 text-blue-500" /> {bn ? 'সর্বনিম্ন' : 'Min'}: {nb(weather.historicalToday.minTemp)}°C
                         </span>
                         <span className="flex items-center gap-1">
-                          <CloudRain className="w-3 h-3 text-cyan-500" /> Rain: {weather.historicalToday.rain}mm
+                          <CloudRain className="w-3 h-3 text-cyan-500" /> {bn ? 'বৃষ্টি' : 'Rain'}: {nb(weather.historicalToday.rain)}mm
                         </span>
                       </div>
                     )}
@@ -1447,7 +1463,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                       return (
                         <p className="text-stone-600 dark:text-stone-400 leading-relaxed">
                           {lang === 'bn'
-                            ? `গত ৫ বছরে এই মাসে দিনের গড় সর্বোচ্চ তাপমাত্রা ছিল ${avgMax.toFixed(1)}°C। আগামী ২৪ ঘণ্টার সর্বোচ্চ তাপমাত্রা (${forecastHigh.toFixed(1)}°C) ${nearNormal ? 'স্বাভাবিকের কাছাকাছি' : `স্বাভাবিকের চেয়ে ${Math.abs(diff).toFixed(1)}°C ${diff > 0 ? 'বেশি' : 'কম'}`}।`
+                            ? `গত ৫ বছরে এই মাসে দিনের গড় সর্বোচ্চ তাপমাত্রা ছিল ${nb(avgMax.toFixed(1))}°C। আগামী ২৪ ঘণ্টার সর্বোচ্চ তাপমাত্রা (${nb(forecastHigh.toFixed(1))}°C) ${nearNormal ? 'স্বাভাবিকের কাছাকাছি' : `স্বাভাবিকের চেয়ে ${nb(Math.abs(diff).toFixed(1))}°C ${diff > 0 ? 'বেশি' : 'কম'}`}।`
                             : `Over the last 5 years, days this month reached an average high of ${avgMax.toFixed(1)}°C. The high over the next 24 hours (${forecastHigh.toFixed(1)}°C) is ${nearNormal ? 'close to normal' : `${Math.abs(diff).toFixed(1)}°C ${diff > 0 ? 'above' : 'below'} that`}.`}
                         </p>
                       );
@@ -1458,7 +1474,7 @@ export default function WeatherAdvisory({ lang, globalLocation, setGlobalLocatio
                 {lastUpdated && (
                   <div className="pt-2 border-t border-stone-100 dark:border-stone-800 flex items-center justify-between text-[11px] text-stone-400">
                     <span className="font-medium uppercase tracking-wider">{lang === 'bn' ? 'সর্বশেষ আপডেট' : 'Last Updated'}</span>
-                    <span className="font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">{lastUpdated}</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">{timeLabel(lastUpdated, bn)}</span>
                   </div>
                 )}
               </div>

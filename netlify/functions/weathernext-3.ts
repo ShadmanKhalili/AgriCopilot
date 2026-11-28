@@ -379,7 +379,7 @@ export const handler: Handler = async (event) => {
           const totalP90 = parseFloat((totalExpectedRain * 1.45 + (maxRainProb > 40 ? 2.5 : 0.4)).toFixed(1));
 
           // Certified 48-Hour Safe Spraying Window
-          let safeSprayingWindow = "No safe window in next 24 hours";
+          let safeSprayingWindow = "No safe window in the next 24 hours";
           let safeWindowDetailed: { start: string; end: string; avgWind: number; avgTemp: number; rainRisk: number } | null = null;
 
           for (let i = 0; i < Math.min(46, hourlySpread.length - 2); i++) {
@@ -703,7 +703,7 @@ export const handler: Handler = async (event) => {
         }
       }
 
-      let safeSprayingWindow = "No safe window in next 24 hours";
+      let safeSprayingWindow = "No safe window in the next 24 hours";
       let safeWindowDetailed: { start: string; end: string; avgWind: number; avgTemp: number; rainRisk: number } | null = null;
 
       if (hourly.time && hourly.precipitation_probability && hourly.wind_speed_10m && hourly.temperature_2m) {

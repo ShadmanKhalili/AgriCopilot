@@ -28,15 +28,72 @@ export interface SpeakOptions {
   onEnd?: () => void;
 }
 
+/** What happened when we tried to read aloud. */
+export type SpeakResult = 'started' | 'no-voice' | 'unsupported';
+
+/**
+ * True when one of the voices speaks the language. Bangla needs its own voice:
+ * an English voice reading Bangla letters only makes noise. Only Bangla is
+ * checked, because every device has some English voice.
+ */
+export const hasVoiceForLang = (voices: ReadonlyArray<{ lang?: string }>, lang: SpeechLang): boolean => {
+  if (lang !== 'bn') return true;
+  return voices.some((voice) => String(voice?.lang || '').toLowerCase().replace('_', '-').startsWith('bn'));
+};
+
+const installedVoices = (): SpeechSynthesisVoice[] => {
+  try {
+    return window.speechSynthesis.getVoices();
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * The installed voices. Many browsers load them a moment after the page opens
+ * (the `voiceschanged` event), so when the list is empty this waits briefly.
+ */
+export const waitForVoices = (timeoutMs = 1000): Promise<SpeechSynthesisVoice[]> => {
+  if (!canSpeak()) return Promise.resolve([]);
+  const now = installedVoices();
+  if (now.length > 0) return Promise.resolve(now);
+  return new Promise((resolve) => {
+    let done = false;
+    const synth = window.speechSynthesis;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        synth.removeEventListener?.('voiceschanged', finish);
+      } catch {
+        // Nothing to remove.
+      }
+      resolve(installedVoices());
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    try {
+      synth.addEventListener?.('voiceschanged', finish);
+    } catch {
+      // The timer still ends the wait.
+    }
+  });
+};
+
 /**
  * Read text aloud with the device's voice. Returns false when the device
  * cannot speak or there is nothing to say, so the caller can show a message.
+ * It also returns false when the voice list is loaded and has no voice for the
+ * language (use `speakChecked` to tell the two apart).
  */
 export const speakWithBrowser = (text: string, lang: SpeechLang, options: SpeakOptions = {}): boolean => {
   if (!canSpeak()) return false;
   const plain = plainSpeechText(text);
   if (!plain) return false;
   try {
+    const voices = installedVoices();
+    // An empty list may just mean the voices are still loading, so only a loaded list can say no.
+    if (voices.length > 0 && !hasVoiceForLang(voices, lang)) return false;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(plain);
     utterance.lang = localeFor(lang);
@@ -50,6 +107,23 @@ export const speakWithBrowser = (text: string, lang: SpeechLang, options: SpeakO
   } catch {
     return false;
   }
+};
+
+/**
+ * Like `speakWithBrowser`, but says why it did not start: the device cannot
+ * speak at all, or it has no voice for the language (for Bangla, none is
+ * installed). It waits briefly for the voice list when it is still loading.
+ * When the voices are already loaded it speaks at once, inside the tap.
+ */
+export const speakChecked = async (text: string, lang: SpeechLang, options: SpeakOptions = {}): Promise<SpeakResult> => {
+  if (!canSpeak() || !plainSpeechText(text)) return 'unsupported';
+  if (lang === 'bn' && installedVoices().length === 0) {
+    const voices = await waitForVoices();
+    if (voices.length > 0 && !hasVoiceForLang(voices, lang)) return 'no-voice';
+  } else if (!hasVoiceForLang(installedVoices(), lang)) {
+    return 'no-voice';
+  }
+  return speakWithBrowser(text, lang, options) ? 'started' : 'unsupported';
 };
 
 export const stopSpeaking = (): void => {

@@ -14,6 +14,7 @@ import { translations, Language } from '../utils/translations';
 import { resizeImage } from '../utils/imageOptimizer';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
+import { copyText } from '../utils/clipboard';
 import Tooltip from './Tooltip';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { useUiMode } from '../context/useUiMode';
@@ -661,10 +662,13 @@ Market type (AI suggestion): ${result.bestMarket}
 
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     const message = offerText();
 
-                    navigator.clipboard.writeText(message);
+                    if (!(await copyText(message))) {
+                      toast.error(lang === 'bn' ? 'কপি করা যায়নি' : 'Could not copy');
+                      return;
+                    }
                     toast.success(lang === 'bn' ? 'বিবরণ ক্লিপবোর্ডে কপি হয়েছে!' : 'Offer copied to clipboard!');
                     setIsBuyerModalOpen(false);
                   }}

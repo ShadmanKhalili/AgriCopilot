@@ -40,3 +40,11 @@ export function sortTasksForHome<T extends FarmTaskShape>(tasks: T[], todayStr: 
       return a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0;
     });
 }
+
+/**
+ * Put a task back into the Home list after a failed "Done" save, in its old
+ * place (the list is re-sorted). Safe to call when the task is already there.
+ */
+export function restoreTask<T extends FarmTaskShape & { id: string }>(tasks: T[], task: T, todayStr: string): T[] {
+  return sortTasksForHome([task, ...tasks.filter((t) => t.id !== task.id)], todayStr);
+}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { Language } from '../utils/translations';
 import { toBn } from '../utils/banglaNum';
+import { copyText } from '../utils/clipboard';
 import {
   computeDose,
   DOSE_BASES,
@@ -43,6 +44,8 @@ export default function DosageCalculator({
   const pricePer100 = Number(priceText) > 0 ? Number(priceText) : null;
 
   const bn = lang === 'bn';
+  // Capitals and wide spacing are for English labels only.
+  const caps = (cls: string) => (bn ? '' : cls);
   // Every number shown to a Bangla reader goes through toBn.
   const fmt = (n: number | string) => (bn ? toBn(n) : String(n));
   const unitLabel = dosageUnit === 'g' ? (bn ? 'গ্রাম' : 'g') : (bn ? 'মিলি' : 'ml');
@@ -88,7 +91,7 @@ export default function DosageCalculator({
       ? `লেবেলে লেখা: ${basisLabel(doseBasis)} ${fmt(labelRate)} ${unitLabel} — ঠিক আছে তো?`
       : `Label says: ${labelRate} ${unitLabel} ${basisLabel(doseBasis)} — is that right?`;
 
-  const copyPrescription = () => {
+  const copyPrescription = async () => {
     if (chemicalPerTank === null || totalChemicalNeeded === null) return;
     const costLineBn = estimatedCost === null ? '' : `\n💰 আনুমানিক খরচ: ৳${fmt(estimatedCost)} টাকা`;
     const costLineEn = estimatedCost === null ? '' : `\n💰 Estimated Cost: ৳${estimatedCost} BDT`;
@@ -114,8 +117,11 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
 📦 Total Chemical (approx.): ${fmtTotal(totalChemicalNeeded)}${costLineEn}
 ⚠️ Wear gloves and a mask. Do not spray in wind or rain. Keep the label's days-before-harvest wait. If unsure, call 16123.`;
 
-    navigator.clipboard.writeText(text);
-    toast.success(bn ? 'ডোজ হিসাব কপি করা হয়েছে!' : 'Dosage calculation copied!');
+    if (await copyText(text)) {
+      toast.success(bn ? 'ডোজ হিসাব কপি করা হয়েছে!' : 'Dosage calculation copied!');
+    } else {
+      toast.error(bn ? 'কপি করা যায়নি' : 'Could not copy');
+    }
   };
 
   return (
@@ -141,7 +147,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
         <button
           onClick={copyPrescription}
           disabled={labelRate === null}
-          className="disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5 self-start sm:self-auto bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer"
+          className="disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-1.5 self-start sm:self-auto bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 px-4 min-h-[48px] rounded-xl text-sm font-black shadow-sm transition-all active:scale-95 cursor-pointer"
         >
           <Copy className="w-3.5 h-3.5" />
           <span>{lang === 'bn' ? 'হিসাব কপি করুন' : 'Copy Slip'}</span>
@@ -182,7 +188,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6 relative z-10">
         {/* Land Size Input */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
-          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+          <label className={`block text-[11px] font-bold text-gray-600 ${caps('uppercase tracking-wider')}`}>
             {lang === 'bn' ? 'জমির পরিমাণ' : 'Land Size'}
           </label>
           <div className="flex space-x-2">
@@ -212,7 +218,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
 
         {/* Dose as written on the label (basis chosen above) */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
-          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+          <label className={`block text-[11px] font-bold text-gray-600 ${caps('uppercase tracking-wider')}`}>
             {bn ? `লেবেলের মাত্রা (${basisLabel(doseBasis)})` : `Label rate (${basisLabel(doseBasis)})`}
           </label>
           <div className="flex space-x-2">
@@ -243,7 +249,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
 
         {/* Sprayer Tank Capacity */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
-          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+          <label className={`block text-[11px] font-bold text-gray-600 ${caps('uppercase tracking-wider')}`}>
             {lang === 'bn' ? 'স্প্রেয়ারের ধারণক্ষমতা' : 'Sprayer Tank Size'}
           </label>
           <select
@@ -263,7 +269,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
 
         {/* Est Price per 100g */}
         <div className="bg-white/90 p-3.5 rounded-2xl border border-emerald-100 shadow-sm space-y-1.5">
-          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+          <label className={`block text-[11px] font-bold text-gray-600 ${caps('uppercase tracking-wider')}`}>
             {lang === 'bn' ? 'ওষুধের দাম (১০০ গ্রাম/মিলি)' : 'Price / 100g or 100ml'}
           </label>
           <div className="relative">
@@ -318,7 +324,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-emerald-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-emerald-700 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">
+            <span className={`text-[11px] font-black ${caps('uppercase tracking-wider')}`}>
               {lang === 'bn' ? 'প্রতি ট্যাংকে মিশ্রণ' : 'Per Knapsack Tank'}
             </span>
             <Droplets className="w-4 h-4 text-emerald-500" />
@@ -347,7 +353,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-teal-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-teal-700 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">
+            <span className={`text-[11px] font-black ${caps('uppercase tracking-wider')}`}>
               {lang === 'bn' ? 'মোট স্প্রে সংখ্যা' : 'Total Tanks'}
             </span>
             <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
@@ -368,7 +374,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-white rounded-2xl p-4 border-2 border-blue-100 shadow-md flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-blue-700 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">
+            <span className={`text-[11px] font-black ${caps('uppercase tracking-wider')}`}>
               {lang === 'bn' ? 'মোট ওষুধ (আনুমানিক)' : 'Total chemical (estimate)'}
             </span>
             <CheckCircle2 className="w-4 h-4 text-blue-500" />
@@ -396,7 +402,7 @@ Land Size: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} decimals)
           className="bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl p-4 shadow-lg shadow-orange-500/20 flex flex-col justify-between"
         >
           <div className="flex items-center justify-between text-amber-100 mb-2">
-            <span className="text-[11px] font-black uppercase tracking-wider">
+            <span className={`text-[11px] font-black ${caps('uppercase tracking-wider')}`}>
               {lang === 'bn' ? 'আনুমানিক মোট খরচ' : 'Estimated Cost'}
             </span>
             <DollarSign className="w-4 h-4 text-white" />

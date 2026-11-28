@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import toast from 'react-hot-toast';
+import { copyText } from '../utils/clipboard';
 import { Language } from '../utils/translations';
 import { AgriCurrency } from '../utils/currency';
 import { TactileStepper } from './TactileStepper';
@@ -37,10 +38,12 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
   const uid = user?.uid ?? null;
   const { mainCrop } = useAppSettings();
   const simple = useUiMode() === 'simple';
-  const { plans, loaded, openPlan, setOpenId, save, remove } = useSeasonPlans(uid, lang);
+  const { plans, loaded, truncated, openPlan, setOpenId, save, remove } = useSeasonPlans(uid, lang);
   /** The saved plan whose numbers are in the calculator, so saving updates it. */
   const [editingId, setEditingId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
+  // A plan from another account (or the device copy) must not be updated after sign-in or sign-out.
+  useEffect(() => { setEditingId(null); }, [uid]);
 
   // The government price is shown next to the farmer's own price, for reference.
   const [bulletin, setBulletin] = useState<OfficialBulletin | null>(null);
@@ -217,7 +220,7 @@ export default function KrishiProfitCalculator({ lang, initialCrop, onCropSelect
     remove(plan);
   };
 
-  const copySummarySlip = () => {
+  const copySummarySlip = async () => {
     const tenureNote = costs.lease > 0 
       ? (lang === 'bn' ? `📑 জমির ধরন: বর্গা/ইজারা (লিজ ফি: ৳${costs.lease.toLocaleString()} টাকা)` : `📑 Land Tenure: Leased/Sharecrop (Rent: ৳${costs.lease.toLocaleString()} BDT)`)
       : (lang === 'bn' ? `📑 জমির ধরন: নিজস্ব জমি` : `📑 Land Tenure: Owner-Operated`);
@@ -231,7 +234,7 @@ ${tenureNote}
 📦 আনুমানিক মোট ফলন: ${totalYieldMon} মণ (${Math.round(totalYieldMon * 40)} কেজি)
 💵 প্রত্যাশিত বিক্রয়মূল্য: ৳${pricePerMon.toLocaleString()} / মণ
 📈 নিট লাভ / ক্ষতি: ৳${netProfit.toLocaleString()} টাকা (ROI: ${roiPercentage}%)
-💡 পরামর্শ: ফরিয়াদের কাছে ৳${breakEvenCostPerMon} টাকার নিচে বিক্রি করবেন না।`
+💡 পরামর্শ: ফড়িয়ার কাছে ৳${breakEvenCostPerMon} টাকার নিচে বিক্রি করবেন না।`
       : `🌾 Crop Production Cost & Profit Statement (${currentBenchmark.nameEn})
 📐 Land Area: ${landSize} ${landUnit} (${normalizedDecimals.toFixed(1)} Decimals)
 ${tenureNote}
@@ -242,7 +245,10 @@ ${tenureNote}
 📈 Net Profit / Loss: ৳${netProfit.toLocaleString()} BDT (ROI: ${roiPercentage}%)
 💡 Farmer Advisory: Do not sell to intermediaries below ৳${breakEvenCostPerMon}/Mon.`;
 
-    navigator.clipboard.writeText(text);
+    if (!(await copyText(text))) {
+      toast.error(lang === 'bn' ? 'কপি করা যায়নি' : 'Could not copy');
+      return;
+    }
     toast.success(lang === 'bn' ? 'হিসাব কপি করা হয়েছে!' : 'Profit statement copied!');
   };
 
@@ -696,6 +702,7 @@ ${tenureNote}
         uid={uid}
         plans={plans}
         loaded={loaded}
+        truncated={truncated}
         openPlan={openPlan}
         onToggle={(plan) => setOpenId(openPlan?.id === plan.id ? null : plan.id)}
         onEdit={editPlan}

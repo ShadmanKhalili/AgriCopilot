@@ -380,14 +380,14 @@ export default function ExpertRequestWizard({
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             {steps.map((label, idx) => (
-              <div key={label} className="flex-1">
+              <div key={label} className="flex-1 min-w-0">
                 <div
                   className={`h-1.5 rounded-full transition-all ${
                     idx <= step ? 'bg-white' : 'bg-white/25'
                   }`}
                 />
                 <span
-                  className={`mt-1 block text-[10px] font-bold uppercase tracking-wider ${
+                  className={`mt-1 block text-sm leading-tight font-bold ${
                     idx <= step ? 'text-white' : 'text-white/50'
                   }`}
                 >
@@ -491,7 +491,7 @@ export default function ExpertRequestWizard({
                         }`}
                       >
                         <Icon className="w-4 h-4 shrink-0" />
-                        <span className="text-xs font-bold leading-tight">{bn ? cat.bn : cat.en}</span>
+                        <span className="text-sm font-bold leading-tight">{bn ? cat.bn : cat.en}</span>
                       </button>
                     );
                   })}
@@ -499,7 +499,7 @@ export default function ExpertRequestWizard({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                       {bn ? 'ফসল / প্রাণী' : 'Crop / animal'}
                     </span>
                     <input
@@ -511,7 +511,7 @@ export default function ExpertRequestWizard({
                   </label>
                   {!profile?.locationDistrict && (
                     <label className="block">
-                      <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                      <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                         {bn ? 'জেলা' : 'District'}
                       </span>
                       <select
@@ -534,7 +534,7 @@ export default function ExpertRequestWizard({
                 </div>
                 {!profile?.locationDistrict && selectedDistrict && (
                   <label className="block">
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                       {bn ? 'উপজেলা' : 'Upazila'}
                     </span>
                     <select
@@ -554,13 +554,13 @@ export default function ExpertRequestWizard({
 
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                       {bn ? 'সমস্যাটি বলুন বা লিখুন *' : 'Describe the problem *'}
                     </span>
                     <button
                       type="button"
                       onClick={isListening ? stopVoiceInput : startVoiceInput}
-                      className={`min-h-[44px] px-3 rounded-2xl text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 ${
+                      className={`min-h-[48px] px-3 rounded-2xl text-sm font-black flex items-center gap-1.5 transition-all active:scale-95 ${
                         isListening
                           ? 'bg-rose-600 text-white animate-pulse'
                           : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/70 dark:text-emerald-200'
@@ -622,7 +622,7 @@ export default function ExpertRequestWizard({
                         <Icon className="w-5 h-5 shrink-0" />
                         <span className="text-sm font-black">{bn ? opt.bn : opt.en}</span>
                       </span>
-                      <span className={`text-[11px] font-bold ${active ? 'text-white/90 dark:text-emerald-900' : 'text-slate-500 dark:text-slate-400'}`}>
+                      <span className={`text-sm font-bold ${active ? 'text-white/90 dark:text-emerald-900' : 'text-slate-500 dark:text-slate-400'}`}>
                         {bn
                           ? `উত্তর লক্ষ্য ${toBn(SLA_MINUTES[opt.id] < 60 ? SLA_MINUTES[opt.id] + ' মিনিট' : SLA_MINUTES[opt.id] / 60 + ' ঘণ্টা')}`
                           : `Target ${SLA_MINUTES[opt.id] < 60 ? SLA_MINUTES[opt.id] + ' min' : SLA_MINUTES[opt.id] / 60 + ' h'}`}
@@ -639,7 +639,7 @@ export default function ExpertRequestWizard({
                   <p className="text-sm font-black text-emerald-900 dark:text-emerald-100">
                     {bn ? '৩. বিশেষজ্ঞ কী কী দেখতে পাবেন?' : '3. What may the expert see?'}
                   </p>
-                  <p className="text-xs font-medium text-emerald-800 dark:text-emerald-300 mt-1">
+                  <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300 mt-1">
                     {bn
                       ? `শুধু আপনি যা অনুমতি দেবেন তা-ই দেখবেন, ${toBn(7)} দিনের জন্য। যেকোনো সময় বাতিল করতে পারবেন।`
                       : 'Only what you allow, for 7 days. You can revoke any time.'}
@@ -664,7 +664,7 @@ export default function ExpertRequestWizard({
                         <span className="block text-sm font-black text-slate-900 dark:text-white">
                           {bn ? item.bn : item.en}
                         </span>
-                        <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                        <span className="block text-sm font-medium text-slate-500 dark:text-slate-400 truncate">
                           {isLocatingGps && item.id === 'gps'
                             ? bn
                               ? 'অবস্থান খোঁজা হচ্ছে...'
@@ -720,7 +720,7 @@ export default function ExpertRequestWizard({
 
                 {consent.phone && (
                   <label className="block">
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                       {bn ? 'কলব্যাকের জন্য আপনার মোবাইল নম্বর' : 'Your mobile number for callback'}
                     </span>
                     <input
@@ -730,7 +730,7 @@ export default function ExpertRequestWizard({
                       className="mt-1.5 w-full min-h-[48px] px-4 rounded-2xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                       placeholder="01XXXXXXXXX"
                     />
-                    <span className="mt-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    <span className="mt-1 block text-sm font-medium text-slate-500 dark:text-slate-400">
                       {bn
                         ? 'শুধু এই বিশেষজ্ঞ এই নম্বরটি দেখতে পাবেন, সম্মতি বাতিল করলে আর দেখতে পারবেন না।'
                         : 'Only this expert can see it, and only while your consent is valid.'}
@@ -750,7 +750,7 @@ export default function ExpertRequestWizard({
                     <p className="text-sm font-black text-amber-900 dark:text-amber-200">
                       {bn ? 'এখন কোনো বিশেষজ্ঞ অনলাইনে নেই' : 'No expert is online right now'}
                     </p>
-                    <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
                       {bn
                         ? 'বিনামূল্যে সরকারি কৃষি কল সেন্টারে ফোন করুন: ১৬১২৩ (সকাল ৮টা – রাত ৮টা)'
                         : 'Call the free government Krishi Call Centre: 16123 (8 AM – 8 PM)'}
@@ -790,20 +790,20 @@ export default function ExpertRequestWizard({
                                 {expert.displayName}
                               </span>
                               {idx === 0 && !active && (
-                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                                <span className="text-sm font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
                                   {bn ? 'সেরা মিল' : 'Best match'}
                                 </span>
                               )}
                               {expert.isDemo && (
-                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200">
+                                <span className="text-sm font-black px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200">
                                   ডেমো
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 truncate">
+                            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300 mt-0.5 truncate">
                               {expert.roleTitle} • {affiliationLabel(expert.affiliationType, lang)}
                             </p>
-                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                               {expert.ratingCount > 0
                                 ? `★ ${toBn((expert.ratingAverage || 0).toFixed(1))} (${toBn(expert.ratingCount)})`
                                 : bn
@@ -825,7 +825,7 @@ export default function ExpertRequestWizard({
                 )}
 
                 {ranked.length > 0 && (
-                  <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-900/70 border border-stone-200 dark:border-stone-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                  <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-900/70 border border-stone-200 dark:border-stone-800 text-sm font-medium text-slate-600 dark:text-slate-300">
                     <p className="font-black text-slate-800 dark:text-slate-100 mb-1">
                       {bn ? 'আপনার সম্মতির সারসংক্ষেপ' : 'Your consent summary'}
                     </p>
