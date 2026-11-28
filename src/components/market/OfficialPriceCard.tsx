@@ -19,7 +19,7 @@ interface Props {
 }
 
 /**
- * Today's government price for one crop, and nothing invented.
+ * The latest government price for one crop, and nothing invented.
  *
  * The figure is the Department of Agricultural Marketing's published range
  * for Dhaka markets. When the bulletin does not list the crop, the card says
@@ -33,7 +33,8 @@ export default function OfficialPriceCard({ lang, crop, cropName, bulletin, stat
   const heading = (
     <h2 className="flex items-center gap-2 text-lg font-bold text-stone-900 dark:text-white">
       <Landmark className="w-6 h-6 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
-      <span>{bn ? `আজকের সরকারি দাম: ${cropName}` : `Today's government price: ${cropName}`}</span>
+      {/* No "today": the bulletin can be an older copy; its date is shown under the price. */}
+      <span>{bn ? `সরকারি দাম: ${cropName}` : `Government price: ${cropName}`}</span>
     </h2>
   );
 
@@ -51,7 +52,7 @@ export default function OfficialPriceCard({ lang, crop, cropName, bulletin, stat
       <Card>
         {heading}
         <p className="mt-2 text-base text-stone-700 dark:text-stone-300">
-          {bn ? 'আজকের সরকারি দাম পাওয়া যায়নি।' : "Today's government prices could not be loaded."}
+          {bn ? 'সরকারি দাম পাওয়া যায়নি।' : 'Government prices could not be loaded.'}
         </p>
         <button
           type="button"

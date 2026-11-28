@@ -20,6 +20,7 @@ import {
   type SaleInput,
   type SeasonProgressChange,
 } from '../../services/farmRecord';
+import { withDeviceRecordMoved } from '../../services/deviceRecordMove';
 import { seasonTotals } from '../../../netlify/functions/_shared/farm-record-model';
 import { accountSaveFailed } from '../profit/useSeasonPlans';
 import { toBn } from '../../utils/banglaNum';
@@ -50,7 +51,9 @@ export default function FarmRecordSection({ lang, onPrint, onNavigate, active = 
 
   const reload = useCallback(() => {
     let alive = true;
-    loadFarmRecord(uid)
+    // A record kept on the phone moves into the account first (see deviceRecordMove).
+    withDeviceRecordMoved(uid)
+      .then(() => loadFarmRecord(uid))
       .then((r) => { if (alive) { setRecord(r); setLoadFailed(false); } })
       .catch(() => { if (alive) setLoadFailed(true); })
       .finally(() => { if (alive) setLoaded(true); });

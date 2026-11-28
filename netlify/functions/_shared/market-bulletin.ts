@@ -112,6 +112,9 @@ const fetchBulletin = async (): Promise<BulletinPayload> => {
 /** The fetch that is currently running, if any. */
 let inFlight: Promise<BulletinPayload> | null = null;
 
+/** The background refresh that is currently running, if any. */
+let refreshing: Promise<void> | null = null;
+
 /**
  * Fetch the bulletin — but only one request to the government site at a
  * time.
@@ -158,12 +161,27 @@ export const getStaleMarketBulletin = (): BulletinPayload | null => {
  * problem: the next request tries again.
  */
 export const refreshMarketBulletinInBackground = (): void => {
-  void loadMarketBulletin().catch((error: any) => {
-    console.warn('[Market Bulletin] background refresh failed:', error?.message || error);
-  });
+  // One background refresh at a time: every request that finds a stale cache
+  // calls this, and they must not pile up.
+  if (refreshing) return;
+  refreshing = loadMarketBulletin()
+    .then(rememberMarketBulletin)
+    .catch((error: any) => {
+      console.warn('[Market Bulletin] background refresh failed:', error?.message || error);
+    })
+    .finally(() => {
+      refreshing = null;
+    });
 };
 
 /** Remember a bulletin for the cache window. */
 export const rememberMarketBulletin = (payload: BulletinPayload): void => {
   cache = { payload, fetchedAt: Date.now() };
+};
+
+/** Forget the cached bulletin and any running refresh (for tests). */
+export const resetMarketBulletinCacheForTests = (): void => {
+  cache = null;
+  inFlight = null;
+  refreshing = null;
 };

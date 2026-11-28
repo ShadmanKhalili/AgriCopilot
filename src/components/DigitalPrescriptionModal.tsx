@@ -17,6 +17,8 @@ import PlantHealthRecoveryTracker from './PlantHealthRecoveryTracker';
 import { audioFeedback } from '../utils/audioFeedback';
 import {
   toStorablePrescription,
+  stableRxId,
+  isSeverityUnknown,
   type PrescriptionData,
 } from '../utils/prescriptionData';
 
@@ -103,7 +105,9 @@ export default function DigitalPrescriptionModal({
 
   if (!isOpen) return null;
 
-  const rxId = data.rxId || `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+  // Stable for the same diagnosis: re-rendering or re-opening must not change the id.
+  const rxId = data.rxId || stableRxId(`${data.crop}|${data.diseaseName}|${data.location}`);
+  const severityUnknown = isSeverityUnknown(data.severity);
   const currentDate = new Date().toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-US', {
     day: 'numeric',
     month: 'long',
@@ -242,11 +246,11 @@ export default function DigitalPrescriptionModal({
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🌾 ${lang === 'bn' ? 'ফসল' : 'Crop'}: ${data.crop} (${data.cropStage || 'Field'})
 📍 ${lang === 'bn' ? 'এলাকা' : 'Location'}: ${data.location}
-🔬 ${lang === 'bn' ? 'রোগ নির্ণয়' : 'Diagnosis'}: ${data.diseaseName} (${data.severity})
+🔬 ${lang === 'bn' ? 'রোগ নির্ণয়' : 'Diagnosis'}: ${data.diseaseName} (${severityUnknown ? (lang === 'bn' ? 'তীব্রতা জানা নেই — কৃষি অফিসারকে দেখান' : 'Severity unknown — show an agriculture officer') : data.severity})
 📊 ${lang === 'bn' ? 'নির্ভুলতা' : 'Confidence'}: ${data.confidence !== null && data.confidence !== undefined ? `${data.confidence}%` : (lang === 'bn' ? 'মূল্যায়ন করা হয়নি' : 'Not assessed')}
 
-💊 ${lang === 'bn' ? 'ব্যবস্থাপত্র ও করণীয়' : 'Prescribed Treatment'}:
-${data.chemicalSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+💊 ${data.chemicalGated ? (lang === 'bn' ? 'রাসায়নিক চিকিৎসা স্থগিত — কৃষি কর্মকর্তার অনুমোদন ছাড়া স্প্রে করবেন না' : 'Chemical treatment withheld — do not spray without an agriculture officer\'s approval') : (lang === 'bn' ? 'এআই পরামর্শ — বোতলের লেবেল মিলিয়ে নিন' : 'AI suggestion — check the product label')}:
+${data.chemicalGated ? '' : data.chemicalSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 🌱 ${lang === 'bn' ? 'জৈব পদ্ধতি' : 'Organic Protocol'}:
 ${data.organicSteps.map((s, i) => `• ${s}`).join('\n')}
@@ -524,16 +528,21 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                 <div className="flex items-center gap-2 self-start sm:self-auto">
                   {/* Severity badge */}
                   <div className={`px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide border ${
-                    data.severity === 'Critical' || data.severity === 'মারাত্মক'
-                      || data.severity === 'High' || data.severity === 'উচ্চ'
+                    severityUnknown
+                      ? 'bg-stone-500/20 text-stone-300 border-stone-400/40'
+                      : data.severity === 'Critical' || data.severity === 'মারাত্মক'
+                        || data.severity === 'High' || data.severity === 'উচ্চ'
                       ? 'bg-rose-500/20 text-rose-300 border-rose-400/40'
                       : data.severity === 'Medium' || data.severity === 'মাঝারি'
                       ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
-                      : data.severity === 'Not Assessed' || (typeof data.severity === 'string' && data.severity.includes('Not Assessed'))
-                      ? 'bg-stone-500/20 text-stone-300 border-stone-400/40'
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                      : data.severity === 'Low' || data.severity === 'নিম্ন'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                      // Anything we do not recognise is shown neutrally, never as "low"
+                      : 'bg-stone-500/20 text-stone-300 border-stone-400/40'
                   }`}>
-                    {lang === 'bn' ? `তীব্রতা: ${data.severity}` : `Severity: ${data.severity}`}
+                    {severityUnknown
+                      ? (lang === 'bn' ? 'তীব্রতা জানা নেই — কৃষি অফিসারকে দেখান' : 'Severity unknown — show an agriculture officer')
+                      : (lang === 'bn' ? `তীব্রতা: ${data.severity}` : `Severity: ${data.severity}`)}
                   </div>
                   {/* Confidence or Not Assessed */}
                   {data.confidence !== null && data.confidence !== undefined ? (
@@ -656,7 +665,7 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                   <div className="flex items-center justify-between text-emerald-950 font-bold text-xs uppercase tracking-wide mb-2.5 pb-1.5 border-b border-emerald-200">
                     <div className="flex items-center space-x-2">
                       <span className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[11px] font-black">2</span>
-                      <span>{lang === 'bn' ? 'অনুমোদিত রাসায়নিক চিকিৎসা ও সুনির্দিষ্ট মাত্রা' : 'Precision Chemical Treatment & Exact Dilution'}</span>
+                      <span>{lang === 'bn' ? 'এআই পরামর্শ — বোতলের লেবেল মিলিয়ে নিন' : 'AI suggestion — check the product label'}</span>
                     </div>
                     {data.harvestIntervalDays && (
                       <span className="text-[11px] bg-emerald-700 text-white px-2 py-0.5 rounded-full font-bold">
@@ -676,6 +685,11 @@ KrishiVip Agri-Copilot Multimodal AI • Decision-Support Advisory`;
                     {lang === 'bn' 
                       ? '⚠️ সতর্কতা: তীব্র রোদে বা বৃষ্টির সম্ভাবনায় স্প্রে করবেন না। স্প্রে করার সময় মাস্ক ও গ্লাভস পরিধান করুন।' 
                       : '⚠️ Caution: Do not spray under direct scorching midday sun or pending rainfall. Wear safety mask and gloves.'}
+                  </p>
+                  <p className="text-xs font-bold text-emerald-900 mt-1.5 pl-6">
+                    {lang === 'bn'
+                      ? 'এটি এআই-এর পরামর্শ, কৃষি কর্মকর্তার অনুমোদিত ব্যবস্থাপত্র নয়। কেনা ওষুধের প্যাকেট বা বোতলের লেবেলের মাত্রা ও অপেক্ষার দিন মিলিয়ে নিন।'
+                      : 'This is an AI suggestion, not an officer-approved prescription. Match the dose and waiting days with the label on the product you buy.'}
                   </p>
                 </div>
               )}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import type { Language } from '../../utils/translations';
 import { deleteSeason, listSeasons, saveSeason } from '../../services/seasons';
+import { withDeviceRecordMoved } from '../../services/deviceRecordMove';
 import { sortSeasons, type SeasonInput, type SeasonPlan } from '../../utils/seasonMath';
 
 /** Toast for a write that reached the screen but not the account. */
@@ -25,7 +26,9 @@ export function useSeasonPlans(uid: string | null, lang: Language) {
     let alive = true;
     setLoaded(false);
     setOpenId(null);
-    listSeasons(uid)
+    // Plans kept on the phone move into the account first (see deviceRecordMove).
+    withDeviceRecordMoved(uid)
+      .then(() => listSeasons(uid))
       .then((list) => { if (alive) setPlans(list); })
       .catch(() => {
         if (!alive) return;

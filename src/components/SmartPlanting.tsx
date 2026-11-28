@@ -11,7 +11,7 @@ import { addDoc, collection } from 'firebase/firestore';
 import { db } from '../firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreErrorHandler';
 import { geoData } from '../utils/geoData';
-import { detectUserLocation } from '../utils/geolocation';
+import { detectGpsLocation, gpsFailureMessage } from '../utils/geolocation';
 import { fetchWithTimeout, readJsonWithTimeout } from '../utils/fetchWithTimeout';
 import toast from 'react-hot-toast';
 import { LiveExpertCall } from './LiveExpertCall';
@@ -68,14 +68,13 @@ export default function SmartPlanting({ lang, globalLocation, setGlobalLocation,
     setIsManualLocation(false);
     
     try {
-      const coords = await detectUserLocation();
+      // Real GPS only: no IP or Dhaka guess is ever saved as the farmer's area.
+      const coords = await detectGpsLocation();
       setGlobalLocation(coords);
       setIsDetectingLocation(false);
     } catch (error: any) {
       console.warn("Location detection notice in SmartPlanting:", error?.message || error);
-      let msg = t.tooltips?.locationError || "Failed to detect location.";
-      if (error?.code === 1) msg = "Permission denied. Please click the lock icon in your browser's address bar to allow location access, or use manual entry.";
-      if (error?.code === 3) msg = "Location request timed out. Please try again or use manual entry.";
+      const msg = gpsFailureMessage(error, lang === 'bn' ? 'bn' : 'en');
       setLocationError(msg);
       setIsDetectingLocation(false);
       setIsManualLocation(true);

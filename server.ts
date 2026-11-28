@@ -14,7 +14,8 @@ import { extractBearerTokenFromHeader, verifyIdToken } from "./netlify/functions
 import { countAiUsageToday, dailyAiLimit, dailyLimitMessage, getUserPlan, recordAiUsage, utcDayNumber } from "./netlify/functions/_shared/usage-quota.ts";
 import { maxOutputTokensFromEnv, sanitizeGenerationConfig, findUnsupportedContent, configTextChars, MAX_CONFIG_TEXT_CHARS } from "./netlify/functions/_shared/ai-config.ts";
 import { issueLiveToken } from "./netlify/functions/_shared/live-token.ts";
-import { farmActionsFromFeed, isSafeSprayHour } from "./netlify/functions/_shared/farm-actions.ts";
+import { farmActionsFromFeed } from "./netlify/functions/_shared/farm-actions.ts";
+import { isSafeSprayWindowHour } from "./netlify/functions/_shared/spray-window.ts";
 import { OPEN_METEO_DAILY_PARAM, dateKeyInZone, mergeDailyForecast } from "./netlify/functions/_shared/daily-merge.ts";
 import areaReportHandler from "./netlify/functions/area-report.ts";
 import farmRecordScoreHandler from "./netlify/functions/farm-record-score.ts";
@@ -1271,7 +1272,10 @@ async function startServer() {
             const currentTemp = currentCond.temperature?.degrees ?? 28;
             const currentHumidity = currentCond.relativeHumidity ?? 60;
             const currentDewPoint = currentCond.dewPoint?.degrees ?? (currentTemp - ((100 - currentHumidity) / 5));
-            const currentWind = currentCond.wind?.speed?.value ?? 6;
+            // The feed's own wind reading, or undefined. The 6 km/h below is only a stand-in for
+            // derived numbers (gust, 100 m wind); it is never reported as the current wind.
+            const currentWindReading: number | undefined = currentCond.wind?.speed?.value;
+            const currentWind = currentWindReading ?? 6;
             const currentWindGust = currentCond.wind?.gust?.value ?? (currentWind * 1.4);
             const current100mWind = parseFloat((currentWind * 1.38).toFixed(1));
             const currentConditionText = currentCond.weatherCondition?.description?.text || currentCond.weatherCondition?.type || 'Partly Cloudy';
@@ -1361,7 +1365,14 @@ async function startServer() {
               const p90 = parseFloat((hRainQpf * 1.5 + (hRainProb > 40 ? 1.5 : 0.1)).toFixed(2));
 
               // Same rule as the spray advice (shared engine), so the window can never contradict it.
-              const isSafe = isSafeSprayHour({ temp: hTemp, windSpeed: hWind, rainChance: hRainProb });
+              // Daytime only (Dhaka 6 AM to 7 PM), and an hour with no wind or rain reading is not safe.
+              const isSafe = isSafeSprayWindowHour({
+                time: intervalTime,
+                temp: hTemp,
+                windSpeed: item.wind?.speed?.value,
+                rainChance: item.precipitation?.probability?.percent,
+                isDaytime: typeof item.isDaytime === 'boolean' ? item.isDaytime : undefined,
+              });
 
               const displayDate = new Date(intervalTime);
               // Google Weather API returns UTC (Z) timestamps — label them in Bangladesh time
@@ -1635,7 +1646,7 @@ async function startServer() {
                 temperature_2m: currentTemp,
                 relative_humidity_2m: currentHumidity,
                 dew_point_2m: currentDewPoint,
-                wind_speed_10m: currentWind,
+                wind_speed_10m: currentWindReading ?? null,
                 wind_speed_100m: current100mWind,
                 direct_normal_irradiance: currentDNI,
                 surface_pressure: currentCond.airPressure?.meanSeaLevelMillibars,
@@ -1709,7 +1720,10 @@ async function startServer() {
         const currentTemp = current.temperature_2m ?? (hourly.temperature_2m ? hourly.temperature_2m[currentIndex] : 26);
         const currentHumidity = current.relative_humidity_2m ?? (hourly.relative_humidity_2m ? hourly.relative_humidity_2m[currentIndex] : 65);
         const currentDewPoint = hourly.dew_point_2m ? hourly.dew_point_2m[currentIndex] : (currentTemp - ((100 - currentHumidity) / 5));
-        const current10mWind = current.wind_speed_10m ?? (hourly.wind_speed_10m ? hourly.wind_speed_10m[currentIndex] : 8);
+        // The feed's own wind reading, or undefined. The 8 km/h below is only a stand-in for
+        // derived numbers (100 m wind, hourly gaps); it is never reported as the current wind.
+        const current10mWindReading: number | undefined = current.wind_speed_10m ?? (hourly.wind_speed_10m ? hourly.wind_speed_10m[currentIndex] : undefined);
+        const current10mWind = current10mWindReading ?? 8;
         const current100mWind = hourly.wind_speed_100m ? hourly.wind_speed_100m[currentIndex] : (current10mWind * 1.35);
         const currentDNI = hourly.direct_normal_irradiance ? hourly.direct_normal_irradiance[currentIndex] : 0;
         const currentShortwave = hourly.shortwave_radiation ? hourly.shortwave_radiation[currentIndex] : 0;
@@ -1754,7 +1768,13 @@ async function startServer() {
             const hPrecip = hourly.precipitation?.[i] ?? 0;
             const hWind = hourly.wind_speed_10m?.[i] ?? current10mWind;
             const hWind100 = hourly.wind_speed_100m?.[i] ?? (hWind * 1.35);
-            const isSafe = isSafeSprayHour({ temp: hTemp, windSpeed: hWind, rainChance: hProb });
+            // Daytime only, and an hour with no wind or rain reading is not safe.
+            const isSafe = isSafeSprayWindowHour({
+              time: hTime,
+              temp: hTemp,
+              windSpeed: hourly.wind_speed_10m?.[i],
+              rainChance: hourly.precipitation_probability?.[i],
+            });
             const d = new Date(hTime);
 
             hourlySpread.push({
@@ -1792,15 +1812,16 @@ async function startServer() {
 
             for (let j = 0; j < 3; j++) {
               const idx = i + j;
-              const rProb = rainProbs[idx] ?? 0;
-              const w10 = winds10m[idx] ?? 0;
-              const tVal = temps[idx] ?? 25;
+              // A missing reading stays missing: it can never make an hour safe.
+              const rProb = rainProbs[idx];
+              const w10 = winds10m[idx];
+              const tVal = temps[idx];
 
-              sumWind += w10;
-              sumTemp += tVal;
+              sumWind += w10 ?? 0;
+              sumTemp += tVal ?? 0;
               if (rProb > maxRainProbLocal) maxRainProbLocal = rProb;
 
-              if (!isSafeSprayHour({ temp: tVal, windSpeed: w10, rainChance: rProb })) {
+              if (typeof tVal !== 'number' || !isSafeSprayWindowHour({ time: times[idx], temp: tVal, windSpeed: w10, rainChance: rProb })) {
                 isSafe = false;
                 break;
               }
@@ -1922,7 +1943,7 @@ async function startServer() {
             temperature_2m: currentTemp,
             relative_humidity_2m: currentHumidity,
             dew_point_2m: currentDewPoint,
-            wind_speed_10m: current10mWind,
+            wind_speed_10m: current10mWindReading ?? null,
             wind_speed_100m: current100mWind,
             direct_normal_irradiance: currentDNI
           },

@@ -3,43 +3,7 @@ import { Mic } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Language } from '../../utils/translations';
 import { toBn } from '../../utils/banglaNum';
-
-/**
- * Parse a spoken amount into a number. Accepts plain digits / Bangla digits and
- * common spoken Bangla forms (word-digits 0-99 combined with hajar/likkho/koti
- * multipliers). Returns null when nothing amount-like was heard.
- */
-export const parseSpokenAmount = (raw: string): number | null => {
-  const t = String(raw || '').replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
-  const WORDS: Record<string, number> = {
-    'শূন্য': 0, 'এক': 1, 'দুই': 2, 'তিন': 3, 'চার': 4,
-    'পাঁচ': 5, 'ছয়': 6, 'সাত': 7, 'আট': 8, 'নয়': 9,
-    'দশ': 10, 'এগারো': 11, 'বারো': 12, 'তেরো': 13, 'চৌদ্দ': 14,
-    'পনেরো': 15, 'ষোলো': 16, 'সতেরো': 17, 'আঠারো': 18, 'ঊনিশ': 19,
-    'বিশ': 20, 'ত্রিশ': 30, 'চল্লিশ': 40, 'পঞ্চাশ': 50,
-    'ষাট': 60, 'সত্তর': 70, 'আশি': 80, 'নব্বই': 90,
-    'একশ': 100, 'একশো': 100, 'শ': 100, 'শত': 100,
-  };
-  const MULT: Record<string, number> = {
-    'কোটি': 10000000, 'লক্ষ': 100000, 'হাজার': 1000,
-  };
-  const tokens = t.split(/[\s,]+/).filter(Boolean);
-  let total = 0;
-  let current = 0;
-  let found = false;
-  for (const tok of tokens) {
-    const w = tok.replace(/[।.,]/g, '');
-    if (/^\d+(?:\.\d+)?$/.test(w)) { current += parseFloat(w); found = true; continue; }
-    // hundreds compounds like "panch sho" (500)
-    if (w.endsWith('শ') || w.endsWith('শো')) {
-      const base = w.replace(/(?:শো|শ)$/, '');
-      if (base && base in WORDS) { current += WORDS[base] * 100; found = true; continue; }
-    }
-    if (w in WORDS) { current += WORDS[w]; found = true; continue; }
-    if (w in MULT) { total += (current === 0 ? 1 : current) * MULT[w]; current = 0; found = true; continue; }
-  }
-  return found ? Math.round(total + current) : null;
-};
+import { parseSpokenAmount } from './parseSpokenAmount';
 
 interface Props {
   lang: Language;

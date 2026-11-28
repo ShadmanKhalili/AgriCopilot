@@ -43,6 +43,7 @@ import Disclosure from './ui/Disclosure';
 import { recordFarmerInteractionEvent } from '../utils/farmerProfiler';
 import { INVESTOR_DEMO_PRESETS, DemoPreset } from '../data/investorDemoPresets';
 import type { PrescriptionData } from './DigitalPrescriptionModal';
+import { stableRxId } from '../utils/prescriptionData';
 
 const DigitalPrescriptionModal = lazy(() => import('./DigitalPrescriptionModal'));
 
@@ -1662,7 +1663,7 @@ Return a JSON object with this exact structure:
 
   const handleOpenPrescriptionForPreset = (preset: DemoPreset) => {
     setCurrentRxData({
-      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+      rxId: stableRxId(`preset|${preset.id}`),
       crop: lang === 'bn' ? preset.cropBn : preset.cropEn,
       cropStage: lang === 'bn' ? preset.stageBn : preset.stageEn,
       location: preset.location,
@@ -1687,7 +1688,7 @@ Return a JSON object with this exact structure:
       return;
     }
     setCurrentRxData({
-      rxId: `RX-BD-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+      rxId: stableRxId(`live|${lastSavedSession?.crop || ''}|${lastSavedSession?.title || ''}|${lastSavedSession?.summary || ''}`),
       crop: lastSavedSession?.crop || (lang === 'bn' ? 'শনাক্তকৃত ফসল / উদ্ভিদ' : 'Observed Crop / Plant'),
       cropStage: lang === 'bn' ? 'মাঠ পর্যায় (লাইভ স্ক্যান)' : 'Field Stage (Live Multimodal Scan)',
       location: locationContext || 'Bangladesh',

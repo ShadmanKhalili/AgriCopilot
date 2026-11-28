@@ -40,7 +40,9 @@ export type ActionReason =
   /** Soil moisture < SOIL_DRY and rain not likely. irrigate: go. */
   | 'soil_dry'
   /** No soil reading, or soil neither wet nor dry. irrigate: wait. */
-  | 'check_soil';
+  | 'check_soil'
+  /** A reading the rule needs (rain chance or wind) is missing. spray/fertilise/irrigate: wait, check the sky. */
+  | 'no_data';
 
 export const ACTION_REASONS: readonly ActionReason[] = [
   'rain_likely',
@@ -53,6 +55,7 @@ export const ACTION_REASONS: readonly ActionReason[] = [
   'soil_wet',
   'soil_dry',
   'check_soil',
+  'no_data',
 ];
 
 /** The agreed thresholds. Do not change without agreeing the new behaviour. */
@@ -76,10 +79,10 @@ export const FARM_THRESHOLDS = {
 export interface ActionInput {
   /** °C. For a future day, that day's maximum. Undefined when unknown: no heat check. */
   temp?: number;
-  /** km/h. For a future day, that day's maximum. Undefined when unknown: no wind check. */
+  /** km/h. For a future day, that day's maximum. Undefined when unknown: spray waits ('no_data'). */
   windSpeed?: number;
-  /** Highest chance of rain for the day, %. */
-  rainChance: number;
+  /** Highest chance of rain for the day, %. Undefined when unknown: spray and fertilise wait ('no_data'). */
+  rainChance?: number;
   /** Highest chance of rain in the next hours (next 12 h for today), %. */
   rainChanceSoon?: number;
   /** %. Not used by the rules today; carried for completeness. */
@@ -108,10 +111,13 @@ export interface DayActions {
 /** Today's numbers as read from the weather feed. */
 export interface TodayConditions {
   temp: number;
-  humidity: number;
-  windSpeed: number;
-  rainChanceToday: number;
-  rainChanceNext12h: number;
+  /** Undefined when the feed has no reading. Never 0. */
+  humidity?: number;
+  /** Undefined when the feed has no reading. Never 0. */
+  windSpeed?: number;
+  /** Undefined when neither the hourly nor the daily data has a chance of rain. */
+  rainChanceToday?: number;
+  rainChanceNext12h?: number;
   soilMoisture?: number;
 }
 
@@ -124,19 +130,25 @@ const T = FARM_THRESHOLDS;
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
-const rainOf = (input: ActionInput): number =>
-  Math.max(isNum(input.rainChance) ? input.rainChance : 0, isNum(input.rainChanceSoon) ? input.rainChanceSoon : 0);
+/** The highest known chance of rain, or undefined when no chance is known at all. */
+const rainOf = (input: ActionInput): number | undefined => {
+  const known = [input.rainChance, input.rainChanceSoon].filter(isNum);
+  return known.length > 0 ? Math.max(...known) : undefined;
+};
 
 export function sprayAction(input: ActionInput): FarmAction {
   const rain = rainOf(input);
   const wind = isNum(input.windSpeed) ? input.windSpeed : undefined;
   const temp = isNum(input.temp) ? input.temp : undefined;
-  if (rain >= T.RAIN_LIKELY) return { kind: 'spray', status: 'stop', reason: 'rain_likely' };
+  // A known bad reading still stops the spray, even if another reading is missing.
+  if (rain !== undefined && rain >= T.RAIN_LIKELY) return { kind: 'spray', status: 'stop', reason: 'rain_likely' };
   if (wind !== undefined && wind > T.WIND_TOO_STRONG) return { kind: 'spray', status: 'stop', reason: 'wind_strong' };
-  if (rain >= T.RAIN_POSSIBLE) return { kind: 'spray', status: 'wait', reason: 'rain_possible' };
+  if (rain !== undefined && rain >= T.RAIN_POSSIBLE) return { kind: 'spray', status: 'wait', reason: 'rain_possible' };
   if (wind !== undefined && wind > T.WIND_BREEZY) return { kind: 'spray', status: 'wait', reason: 'wind_breezy' };
   if (temp !== undefined && temp > T.TOO_HOT_TO_SPRAY) return { kind: 'spray', status: 'wait', reason: 'too_hot' };
-  return { kind: 'spray', status: 'go', reason: wind === undefined ? 'rain_unlikely' : 'low_risk' };
+  // Missing rain or wind is never "safe": ask the farmer to look at the sky.
+  if (rain === undefined || wind === undefined) return { kind: 'spray', status: 'wait', reason: 'no_data' };
+  return { kind: 'spray', status: 'go', reason: 'low_risk' };
 }
 
 /** °C; below this it is too cold to spray (the rules above have no cold check). */
@@ -147,21 +159,25 @@ export const TOO_COLD_TO_SPRAY = 12;
  * hour, and it is not too cold. Used for the "safe spraying window" so it can
  * never contradict the spray advice.
  */
-export function isSafeSprayHour(input: { temp: number; windSpeed: number; rainChance: number }): boolean {
+export function isSafeSprayHour(input: { temp: number; windSpeed?: number | null; rainChance?: number | null }): boolean {
   if (isNum(input.temp) && input.temp < TOO_COLD_TO_SPRAY) return false;
-  return sprayAction(input).status === 'go';
+  return sprayAction({ temp: input.temp, windSpeed: input.windSpeed ?? undefined, rainChance: input.rainChance ?? undefined }).status === 'go';
 }
 
 export function irrigateAction(input: ActionInput): FarmAction {
   const soil = isNum(input.soilMoisture) ? input.soilMoisture : undefined;
-  if (rainOf(input) >= T.RAIN_LIKELY) return { kind: 'irrigate', status: 'stop', reason: 'rain_likely' };
+  const rain = rainOf(input);
+  if (rain !== undefined && rain >= T.RAIN_LIKELY) return { kind: 'irrigate', status: 'stop', reason: 'rain_likely' };
   if (soil !== undefined && soil >= T.SOIL_WET) return { kind: 'irrigate', status: 'stop', reason: 'soil_wet' };
+  // Dry soil but no rain forecast: do not say "go" on a guess.
+  if (soil !== undefined && soil < T.SOIL_DRY && rain === undefined) return { kind: 'irrigate', status: 'wait', reason: 'no_data' };
   if (soil !== undefined && soil < T.SOIL_DRY) return { kind: 'irrigate', status: 'go', reason: 'soil_dry' };
   return { kind: 'irrigate', status: 'wait', reason: 'check_soil' };
 }
 
 export function fertiliseAction(input: ActionInput): FarmAction {
   const rain = rainOf(input);
+  if (rain === undefined) return { kind: 'fertilise', status: 'wait', reason: 'no_data' };
   if (rain >= T.RAIN_LIKELY) return { kind: 'fertilise', status: 'stop', reason: 'rain_likely' };
   if (rain >= T.RAIN_POSSIBLE) return { kind: 'fertilise', status: 'wait', reason: 'rain_possible' };
   return { kind: 'fertilise', status: 'go', reason: 'rain_unlikely' };
@@ -173,7 +189,6 @@ export function farmActions(input: ActionInput): FarmAction[] {
 }
 
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
-const numOr = (v: unknown, fallback: number): number => (isNum(v) ? v : fallback);
 const numOrNull = (v: unknown): number | null => (isNum(v) ? v : null);
 
 /**
@@ -197,7 +212,7 @@ export function todayConditionsFromFeed(feed: unknown): TodayConditions | null {
   // "Today" means the rest of today. The daily figure covers the whole day,
   // so in the evening it would still warn about rain that fell in the morning.
   // When the hourly data covers the hours left today, use those instead.
-  const dailyChance = numOr(f?.daily?.precipitation_probability_max?.[0], 0);
+  const dailyChance = numOrNull(f?.daily?.precipitation_probability_max?.[0]) ?? undefined;
   const todayKey = String(current.time || '').slice(0, 10);
   const restOfToday = todayKey.length === 10
     ? probs.filter((p, i) => i >= start && typeof times[i] === 'string' && (times[i] as string).slice(0, 10) === todayKey).filter(isNum)
@@ -207,8 +222,9 @@ export function todayConditionsFromFeed(feed: unknown): TodayConditions | null {
 
   return {
     temp: current.temperature_2m,
-    humidity: numOr(current.relative_humidity_2m, 0),
-    windSpeed: numOr(current.wind_speed_10m, 0),
+    // Missing readings stay undefined; a made-up 0 would read as calm, dry air.
+    humidity: numOrNull(current.relative_humidity_2m) ?? undefined,
+    windSpeed: numOrNull(current.wind_speed_10m) ?? undefined,
     rainChanceToday,
     rainChanceNext12h: next12.length > 0 ? Math.max(...next12) : rainChanceToday,
     soilMoisture: isNum(soil) ? soil : undefined,
@@ -236,8 +252,8 @@ export const WEEK_DAYS = 7;
  * - Day 0 (today) uses today's full reading (current wind, next-12-hours rain,
  *   soil) when the feed has a current reading, so it always matches `today`.
  * - A later day uses that day's rain chance, max temperature and max wind
- *   (`wind_speed_10m_max`). With no wind for the day, spray is decided from rain
- *   and heat only. There is no soil reading for a later day, so irrigation
+ *   (`wind_speed_10m_max`). With no wind for the day, spray waits ('no_data')
+ *   unless rain or heat already stops it. There is no soil reading for a later day, so irrigation
  *   follows rain only.
  * - A day with no date or no rain chance is left out: the advice would be a guess.
  */

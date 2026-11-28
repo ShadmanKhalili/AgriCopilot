@@ -157,7 +157,7 @@ export interface SeasonTotals {
   costCount: number;
   soldMon: number;
   revenue: number;
-  /** Revenue minus recorded costs. Null until something is sold. */
+  /** Revenue minus recorded costs. Null until something is sold AND at least one cost is noted. */
   profit: number | null;
   /** Average sale price, BDT per mon. Null until something is sold. */
   avgPricePerMon: number | null;
@@ -175,7 +175,9 @@ export const seasonTotals = (
     costCount: expenses.length,
     soldMon,
     revenue,
-    profit: sales.length ? revenue - costTotal : null,
+    // No costs noted means the farmer has not told us the costs, not that
+    // they were zero: showing the whole income as "profit" would be wrong.
+    profit: sales.length && expenses.length ? revenue - costTotal : null,
     avgPricePerMon: soldMon > 0 ? Math.round(revenue / soldMon) : null,
   };
 };

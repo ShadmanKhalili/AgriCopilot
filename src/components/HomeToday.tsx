@@ -113,7 +113,9 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
               <CloudSun className="w-10 h-10 text-sky-600 shrink-0" aria-hidden="true" />
               <span className="text-4xl font-bold leading-none">{num(state.weather.temp)}°</span>
               <span className="text-base font-bold text-stone-700 dark:text-stone-300">
-                {bn ? `বৃষ্টির সম্ভাবনা ${num(state.weather.rainChanceToday)}%` : `Chance of rain ${num(state.weather.rainChanceToday)}%`}
+                {state.weather.rainChanceToday === undefined
+                  ? (bn ? 'বৃষ্টির সম্ভাবনা —' : 'Chance of rain —')
+                  : (bn ? `বৃষ্টির সম্ভাবনা ${num(state.weather.rainChanceToday)}%` : `Chance of rain ${num(state.weather.rainChanceToday)}%`)}
               </span>
             </div>
 
@@ -193,7 +195,7 @@ export default function HomeToday({ lang, onNavigate, onOpenAllServices, onSetAr
         </Card>
       )}
 
-      <HomeCalendarTasks lang={lang} onNavigate={onNavigate} />
+      <HomeCalendarTasks lang={lang} onNavigate={onNavigate} signals={signals} />
 
       <div className="grid grid-cols-2 gap-3">
         <BigActionButton
